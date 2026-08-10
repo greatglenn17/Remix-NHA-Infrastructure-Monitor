@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to get requesting user's document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getUserRole() {
+      return getUserData().role;
+    }
+    
+    function isSuperAdmin() {
+      return request.auth != null && (getUserRole() == 'SUPER_ADMIN' || getUserRole() == 'Super Admin');
+    }
+    
+    function isEngineerAdmin() {
+      return request.auth != null && (getUserRole() == 'ENGINEER_ADMIN' || getUserRole() == 'Engineer Admin' || isSuperAdmin());
+    }
+    
+    function isFieldEngineer() {
+      return request.auth != null && (getUserRole() == 'FIELD_ENGINEER' || getUserRole() == 'Field Engineer' || isEngineerAdmin());
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Projects collection
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isEngineerAdmin();
+      allow update: if isEngineerAdmin();
+      allow delete: if isSuperAdmin();
+
+      // Subcollections
+      match /reports/{reportId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isFieldEngineer();
+        allow delete: if isEngineerAdmin();
+      }
+
+      match /issues/{issueId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isFieldEngineer();
+        allow delete: if isEngineerAdmin();
+      }
+
+      match /payments/{paymentId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isFieldEngineer();
+        allow delete: if isEngineerAdmin();
+      }
+
+      match /documents/{docId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isFieldEngineer();
+        allow delete: if isEngineerAdmin();
+      }
+    }
+
+    // Audit logs
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+  }
+}

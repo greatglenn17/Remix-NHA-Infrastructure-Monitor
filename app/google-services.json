@@ -1,0 +1,33 @@
+{
+  "project_info": {
+    "project_number": "308171947377",
+    "project_id": "oceanic-lambda-4t8c4",
+    "storage_bucket": "oceanic-lambda-4t8c4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:308171947377:android:ea283c021325b0e6c60ad0",
+        "android_client_info": {
+          "package_name": "com.aistudio.nhaconstruction.monitoring.mmcfpg"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJzZfUa78GpeHSuTrEbpOUZtZnflg6_pk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "308171947377-e6lhhac38v13ioilgi14u2uiq63uard8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

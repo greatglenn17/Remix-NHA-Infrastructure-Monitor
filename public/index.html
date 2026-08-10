@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NHA Infrastructure Monitor - Bulacan District Office</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NHA Monitor">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/building--v1.png">
+    
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #0F172A; color: #F8FAFC; min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+        
+        /* HEADER BAR */
+        header { background: #0F172A; border-bottom: 1px solid rgba(51, 65, 85, 0.6); padding: 12px 16px; position: sticky; top: 0; z-index: 100; }
+        .header-container { display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto; width: 100%; }
+        .brand-section { display: flex; align-items: center; gap: 12px; }
+        .nha-logo { width: 44px; height: 44px; background: #0284C7; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 20px; box-shadow: 0 0 12px rgba(2, 132, 199, 0.4); }
+        .brand-title { font-size: 15px; font-weight: 800; color: #F8FAFC; line-height: 1.2; }
+        .brand-subtitle { font-size: 9.5px; font-weight: 700; color: #94A3B8; letter-spacing: 0.6px; margin-top: 2px; }
+        
+        .badges-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2.5px 8px; border-radius: 50px; font-size: 8.5px; font-weight: 700; letter-spacing: 0.4px; }
+        .badge-offline { background: rgba(22, 163, 74, 0.2); color: #4ADE80; border: 1px solid rgba(22, 163, 74, 0.8); }
+        .badge-drive { background: rgba(15, 118, 110, 0.25); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.8); cursor: pointer; }
+        
+        .user-section { display: flex; align-items: center; gap: 10px; }
+        .bell-btn { background: #1E293B; border: 1px solid #334155; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #38BDF8; cursor: pointer; position: relative; }
+        .bell-badge { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: #EF4444; border-radius: 50%; }
+        .user-chip { background: #1E293B; border: 1px solid #334155; padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #38BDF8; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        
+        /* PROJECT CARD HEADER */
+        .project-banner { background: #1E293B; border-bottom: 1px solid #334155; padding: 14px 16px; }
+        .banner-container { max-width: 1200px; margin: 0 auto; }
+        .status-pill { background: #DC2626; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .variance-pill { background: rgba(239, 68, 68, 0.2); color: #EF4444; border: 1px solid #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; float: right; }
+        .project-name { font-size: 18px; font-weight: 800; color: #F8FAFC; margin-top: 6px; }
+        .project-location { font-size: 12px; color: #94A3B8; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+        .project-metrics { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; font-weight: 700; }
+        
+        /* TAB NAVIGATION */
+        .tabs-nav { background: #0F172A; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; scrollbar-width: none; }
+        .tabs-nav::-webkit-scrollbar { display: none; }
+        .tab-item { padding: 12px 18px; font-size: 12px; font-weight: 700; color: #94A3B8; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab-item.active { color: #38BDF8; border-bottom-color: #38BDF8; background: rgba(56, 189, 248, 0.05); }
+        
+        /* MAIN CONTENT AREA */
+        main { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+        
+        /* SDP METRICS BAR */
+        .sdp-header-card { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 12px; }
+        .sdp-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .sdp-title { font-size: 13px; font-weight: 800; color: #F8FAFC; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sdp-subtitle { font-size: 11px; color: #38BDF8; font-weight: 600; }
+        .sdp-metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .metric-chip { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 8px 4px; text-align: center; }
+        .metric-label { font-size: 8.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase; }
+        .metric-value { font-size: 13px; font-weight: 800; margin-top: 2px; }
+        .val-lots { color: #F8FAFC; }
+        .val-billed { color: #38BDF8; }
+        .val-unbilled { color: #94A3B8; }
+        .val-completed { color: #4ADE80; }
+        .val-avg { color: #F59E0B; }
+        
+        /* SEARCH & FILTER BAR */
+        .search-filter-row { display: flex; gap: 8px; align-items: center; }
+        .custom-search-box { flex: 1; background: #1E293B; border: 1px solid #334155; border-radius: 8px; height: 42px; display: flex; align-items: center; padding: 0 12px; gap: 8px; }
+        .custom-search-box:focus-within { border-color: #38BDF8; }
+        .custom-search-box i { color: #38BDF8; font-size: 14px; }
+        .search-input { background: transparent; border: none; outline: none; color: #F8FAFC; font-size: 13px; font-weight: 700; width: 100%; }
+        .search-input::placeholder { color: #94A3B8; font-weight: 500; font-size: 12px; }
+        .filter-btn { background: #1E293B; border: 1px solid #334155; color: #F8FAFC; font-size: 11px; font-weight: 700; height: 42px; padding: 0 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        
+        /* CAD BLUEPRINT VIEWPORT & CANVAS */
+        .cad-viewport { background: #0F172A; border: 1px solid #334155; border-radius: 12px; height: 480px; position: relative; overflow: hidden; touch-action: none; user-select: none; }
+        .cad-canvas { width: 100%; height: 100%; background-color: #07111E; background-image: radial-gradient(rgba(30, 41, 59, 0.8) 1px, transparent 1px); background-size: 24px 24px; position: absolute; top: 0; left: 0; transform-origin: 0 0; cursor: grab; }
+        .cad-canvas:active { cursor: grabbing; }
+        
+        /* FLOATING ZOOM TOOLBAR */
+        .zoom-toolbar { position: absolute; top: 10px; right: 10px; background: rgba(30, 41, 59, 0.95); border: 1px solid #334155; border-radius: 10px; padding: 4px; display: flex; align-items: center; gap: 4px; z-index: 20; backdrop-filter: blur(8px); }
+        .preset-btn { background: #0F172A; border: 1px solid #334155; color: #F8FAFC; font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+        .preset-btn.active { background: #0284C7; color: white; border-color: #38BDF8; }
+        .zoom-step-btn { background: transparent; border: none; color: #38BDF8; width: 28px; height: 28px; font-weight: bold; cursor: pointer; font-size: 14px; border-radius: 4px; }
+        .zoom-step-btn:hover { background: rgba(56, 189, 248, 0.15); }
+        .zoom-readout { color: #38BDF8; font-size: 11px; font-weight: 800; padding: 0 4px; }
+        .reset-btn { background: #0F172A; border: 1px solid #334155; color: #F59E0B; font-size: 10px; font-weight: 800; padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        
+        /* CAD BLUEPRINT VECTOR LOTS */
+        .vector-lot { position: absolute; border: 2px solid #38BDF8; background: rgba(2, 132, 199, 0.25); border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: white; cursor: pointer; transition: all 0.15s; }
+        .vector-lot:hover { background: rgba(56, 189, 248, 0.45); border-color: #7DD3FC; transform: scale(1.02); }
+        .lot-status-badge { font-size: 8px; padding: 2px 4px; border-radius: 3px; margin-top: 2px; text-transform: uppercase; font-weight: 700; }
+        .bg-billed { background: #0284C7; color: white; }
+        .bg-unbilled { background: #475569; color: #CBD5E1; }
+        .bg-completed { background: #16A34A; color: white; }
+        
+        /* BOTTOM LOT INSPECTION CARD */
+        .inspection-card { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+        .lot-card-header { display: flex; justify-content: space-between; align-items: center; }
+        .lot-card-title { font-size: 15px; font-weight: 800; color: #F8FAFC; display: flex; align-items: center; gap: 8px; }
+        .lot-details-text { font-size: 11.5px; color: #94A3B8; line-height: 1.5; }
+        .card-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 4px; }
+        .action-btn { padding: 10px; border-radius: 8px; border: none; font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-update { background: #0284C7; color: white; }
+        .btn-inspect { background: #059669; color: white; }
+        .btn-history { background: #334155; color: #F8FAFC; }
+
+        /* MODAL DIALOG */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: #1E293B; border: 1px solid #334155; border-radius: 16px; width: 100%; max-width: 440px; padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 800; color: #F8FAFC; }
+        .modal-close { background: transparent; border: none; color: #94A3B8; font-size: 18px; cursor: pointer; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; }
+        .form-input, .form-select { background: #0F172A; border: 1px solid #334155; border-radius: 8px; padding: 10px; color: #F8FAFC; font-size: 13px; font-weight: 600; outline: none; }
+        .form-input:focus, .form-select:focus { border-color: #38BDF8; }
+        .save-btn { background: #0284C7; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; margin-top: 6px; }
+    </style>
+</head>
+<body>
+
+    <!-- TOP HEADER BAR -->
+    <header>
+        <div class="header-container">
+            <div class="brand-section">
+                <div class="nha-logo"><i class="fa-solid fa-building-flag"></i></div>
+                <div>
+                    <div class="brand-title">NHA Monitoring Application</div>
+                    <div class="brand-subtitle">BULACAN DISTRICT OFFICE</div>
+                    <div class="badges-row">
+                        <span class="badge badge-offline"><i class="fa-solid fa-cloud-arrow-down"></i> OFFLINE</span>
+                        <span class="badge badge-drive" onclick="triggerSync()"><i class="fa-solid fa-arrows-rotate"></i> GOOGLE DRIVE</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="user-section">
+                <button class="bell-btn" title="About App" onclick="openAboutModal()" style="color:#38BDF8;"><i class="fa-solid fa-circle-info"></i></button>
+                <button class="bell-btn" onclick="promptAdminPin()"><i class="fa-solid fa-bell"></i><span class="bell-badge"></span></button>
+                <div class="user-chip" onclick="promptAdminPin()"><i class="fa-solid fa-user-shield"></i> SA</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- PROJECT BANNER -->
+    <div class="project-banner">
+        <div class="banner-container">
+            <div>
+                <span class="status-pill">ON-GOING</span>
+                <span class="variance-pill">Variance: -12.4%</span>
+            </div>
+            <div class="project-name">Caloocan Resettlement Phase 3 Housing Development</div>
+            <div class="project-location"><i class="fa-solid fa-location-dot" style="color:#38BDF8"></i> Brgy. 178, Camarin, Caloocan City</div>
+            <div class="project-metrics">
+                <span>Target: 65.0% | Actual: 52.6%</span>
+                <span style="color:#38BDF8">Revised End: 2026-09-18</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <div class="tabs-nav">
+        <div class="tab-item" onclick="switchTab(this)">Overview</div>
+        <div class="tab-item active" onclick="switchTab(this)">Subdivision Plan</div>
+        <div class="tab-item" onclick="switchTab(this)">Weekly Reports</div>
+        <div class="tab-item" onclick="switchTab(this)">Monthly Reports</div>
+        <div class="tab-item" onclick="switchTab(this)">Weather Chart</div>
+        <div class="tab-item" onclick="switchTab(this)">Issues</div>
+    </div>
+
+    <!-- MAIN VIEWPORT CONTENT -->
+    <main id="tabContent">
+        <!-- SDP METRICS -->
+        <div class="sdp-header-card">
+            <div class="sdp-title-row">
+                <div>
+                    <div class="sdp-title">SUBDIVISION PLAN</div>
+                    <div class="sdp-subtitle">Approved Subdivision Layout Plan (Ph. 3) • v1</div>
+                </div>
+                <button style="background:#0284C7; color:white; border:none; padding:6px 12px; border-radius:6px; font-weight:700; font-size:11px; cursor:pointer;"><i class="fa-solid fa-file-arrow-up"></i> Upload Revised</button>
+            </div>
+            <div class="sdp-metrics-grid">
+                <div class="metric-chip"><div class="metric-label">TOTAL LOTS</div><div class="metric-value val-lots">12</div></div>
+                <div class="metric-chip"><div class="metric-label">BILLED</div><div class="metric-value val-billed">4</div></div>
+                <div class="metric-chip"><div class="metric-label">NOT BILLED</div><div class="metric-value val-unbilled">8</div></div>
+                <div class="metric-chip"><div class="metric-label">COMPLETED</div><div class="metric-value val-completed">3</div></div>
+                <div class="metric-chip"><div class="metric-label">AVG PROGRESS</div><div class="metric-value val-avg">59.5%</div></div>
+            </div>
+        </div>
+
+        <!-- SEARCH & FILTER BAR -->
+        <div class="search-filter-row">
+            <div class="custom-search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search Block / Lot / Unit..." oninput="filterLots(this.value)">
+                <i class="fa-solid fa-xmark" style="cursor:pointer; display:none;" id="clearSearch" onclick="clearSearchInput()"></i>
+            </div>
+            <button class="filter-btn"><i class="fa-solid fa-filter" style="color:#F59E0B"></i> FILTER</button>
+        </div>
+
+        <!-- CAD BLUEPRINT INTERACTIVE CANVAS -->
+        <div class="cad-viewport" id="viewport">
+            <div class="zoom-toolbar">
+                <button class="preset-btn" onclick="setZoom(0.25, this)">25%</button>
+                <button class="preset-btn" onclick="setZoom(0.50, this)">50%</button>
+                <button class="preset-btn active" onclick="setZoom(1.00, this)">100%</button>
+                <button class="preset-btn" onclick="setZoom(2.50, this)">250%</button>
+                <button class="zoom-step-btn" onclick="stepZoom(-0.25)">-</button>
+                <span class="zoom-readout" id="zoomReadout">100%</span>
+                <button class="zoom-step-btn" onclick="stepZoom(0.25)">+</button>
+                <button class="reset-btn" onclick="resetViewport()"><i class="fa-solid fa-bullseye"></i> RESET</button>
+            </div>
+
+            <div class="cad-canvas" id="canvas">
+                <!-- 12 VECTOR LOTS -->
+                <div class="vector-lot" style="left:40px; top:40px; width:120px; height:90px;" onclick="selectLot('Block 1 / Lot 1', '100%', 'Awarded', 'BILLED', 'HU-B1-L1')">
+                    <span>B1 / L1</span>
+                    <span class="lot-status-badge bg-completed">100% • BILLED</span>
+                </div>
+                <div class="vector-lot" style="left:180px; top:40px; width:120px; height:90px;" onclick="selectLot('Block 1 / Lot 2', '80%', 'Awarded', 'BILLED', 'HU-B1-L2')">
+                    <span>B1 / L2</span>
+                    <span class="lot-status-badge bg-billed">80% • BILLED</span>
+                </div>
+                <div class="vector-lot" style="left:320px; top:40px; width:120px; height:90px;" onclick="selectLot('Block 1 / Lot 3', '60%', 'Awarded', 'NOT BILLED', 'HU-B1-L3')">
+                    <span>B1 / L3</span>
+                    <span class="lot-status-badge bg-unbilled">60% • UNBILLED</span>
+                </div>
+                <div class="vector-lot" style="left:460px; top:40px; width:120px; height:90px;" onclick="selectLot('Block 1 / Lot 4', '40%', 'Awarded', 'NOT BILLED', 'HU-B1-L4')">
+                    <span>B1 / L4</span>
+                    <span class="lot-status-badge bg-unbilled">40% • UNBILLED</span>
+                </div>
+
+                <div class="vector-lot" style="left:40px; top:160px; width:120px; height:90px;" onclick="selectLot('Block 2 / Lot 1', '100%', 'Awarded', 'BILLED', 'HU-B2-L1')">
+                    <span>B2 / L1</span>
+                    <span class="lot-status-badge bg-completed">100% • BILLED</span>
+                </div>
+                <div class="vector-lot" style="left:180px; top:160px; width:120px; height:90px;" onclick="selectLot('Block 2 / Lot 2', '75%', 'Awarded', 'BILLED', 'HU-B2-L2')">
+                    <span>B2 / L2</span>
+                    <span class="lot-status-badge bg-billed">75% • BILLED</span>
+                </div>
+                <div class="vector-lot" style="left:320px; top:160px; width:120px; height:90px;" onclick="selectLot('Block 2 / Lot 3', '50%', 'Awarded', 'NOT BILLED', 'HU-B2-L3')">
+                    <span>B2 / L3</span>
+                    <span class="lot-status-badge bg-unbilled">50% • UNBILLED</span>
+                </div>
+                <div class="vector-lot" style="left:460px; top:160px; width:120px; height:90px;" onclick="selectLot('Block 2 / Lot 4', '30%', 'Awarded', 'NOT BILLED', 'HU-B2-L4')">
+                    <span>B2 / L4</span>
+                    <span class="lot-status-badge bg-unbilled">30% • UNBILLED</span>
+                </div>
+
+                <div class="vector-lot" style="left:40px; top:280px; width:120px; height:90px;" onclick="selectLot('Block 3 / Lot 1', '100%', 'Awarded', 'BILLED', 'HU-B3-L1')">
+                    <span>B3 / L1</span>
+                    <span class="lot-status-badge bg-completed">100% • BILLED</span>
+                </div>
+                <div class="vector-lot" style="left:180px; top:280px; width:120px; height:90px;" onclick="selectLot('Block 3 / Lot 2', '45%', 'Awarded', 'NOT BILLED', 'HU-B3-L2')">
+                    <span>B3 / L2</span>
+                    <span class="lot-status-badge bg-unbilled">45% • UNBILLED</span>
+                </div>
+                <div class="vector-lot" style="left:320px; top:280px; width:120px; height:90px;" onclick="selectLot('Block 3 / Lot 3', '20%', 'Awarded', 'NOT BILLED', 'HU-B3-L3')">
+                    <span>B3 / L3</span>
+                    <span class="lot-status-badge bg-unbilled">20% • UNBILLED</span>
+                </div>
+                <div class="vector-lot" style="left:460px; top:280px; width:120px; height:90px;" onclick="selectLot('Block 3 / Lot 4', '10%', 'Awarded', 'NOT BILLED', 'HU-B3-L4')">
+                    <span>B3 / L4</span>
+                    <span class="lot-status-badge bg-unbilled">10% • UNBILLED</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SELECTED LOT INSPECTION CARD -->
+        <div class="inspection-card" id="inspectionCard">
+            <div class="lot-card-header">
+                <div class="lot-card-title"><i class="fa-solid fa-house-circle-check" style="color:#38BDF8"></i> <span id="cardLotTitle">Block 1 / Lot 1</span></div>
+                <span class="badge badge-offline bg-completed" id="cardLotBadge">BILLED</span>
+            </div>
+            <div class="lot-details-text">
+                Progress: <strong style="color:#F8FAFC" id="cardProgress">100% (Awarded)</strong> • Area: <strong>120.0 sq.m</strong> • Unit: <strong id="cardUnit">HU-B1-L1</strong><br/>
+                Last Updated: <strong>2026-08-05 by Engr. Glenn C. Aprovechado</strong>
+            </div>
+            <div class="card-actions">
+                <button class="action-btn btn-update" onclick="openUpdateModal()"><i class="fa-solid fa-pen"></i> Update</button>
+                <button class="action-btn btn-inspect" onclick="alert('Record Inspection modal opened')"><i class="fa-solid fa-clipboard-check"></i> Inspect</button>
+                <button class="action-btn btn-history" onclick="alert('Showing lot history timeline')"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- UPDATE PROGRESS MODAL -->
+    <div class="modal-overlay" id="updateModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span>Update Construction Progress</span>
+                <button class="modal-close" onclick="closeUpdateModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Selected Target</label>
+                <input type="text" class="form-input" id="modalLotName" value="Block 1 / Lot 1" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Progress Percentage (%)</label>
+                <input type="number" class="form-input" id="modalProgressVal" value="100" min="0" max="100">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Billing Reference Status</label>
+                <select class="form-select" id="modalBillingVal">
+                    <option value="BILLED">BILLED</option>
+                    <option value="NOT BILLED">NOT BILLED</option>
+                </select>
+            </div>
+            <button class="save-btn" onclick="saveLotProgress()"><i class="fa-solid fa-floppy-disk"></i> Save & Sync to Google Drive</button>
+        </div>
+    </div>
+
+    <!-- ABOUT NHA MONITOR MODAL -->
+    <div class="modal-overlay" id="aboutModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-info" style="color:#38BDF8"></i> About NHA Monitor</span>
+                <button class="modal-close" onclick="closeAboutModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div style="background:#0F172A; border:1px solid #334155; border-radius:10px; padding:12px; margin-top:4px;">
+                <div style="font-size:10px; font-weight:800; color:#38BDF8; letter-spacing:0.5px;">APPLICATION CREATOR</div>
+                <div style="font-size:14px; font-weight:800; color:#F8FAFC; margin-top:2px;">ENGR. GLENN C. APROVECHADO</div>
+                <div style="font-size:11px; color:#94A3B8; margin-top:2px;">Principal Engineer C • Bulacan District Office</div>
+            </div>
+
+            <div style="background:#0F172A; border:1px solid #334155; border-radius:10px; padding:12px;">
+                <div style="font-size:10px; font-weight:800; color:#4ADE80; letter-spacing:0.5px;">BUILD & SYSTEM INFO</div>
+                <div style="font-size:13px; font-weight:800; color:#F8FAFC; margin-top:2px;">Version: v1.0.4 (Build 104)</div>
+                <div style="font-size:11px; color:#94A3B8; margin-top:2px;">National Housing Authority (NHA) • Region III</div>
+                <div style="font-size:11px; color:#94A3B8; margin-top:2px;">Engine: PWA Web Edition + Real-Time Drive Sync</div>
+            </div>
+
+            <button class="save-btn" onclick="closeAboutModal()" style="background:#334155; color:#F8FAFC;"><i class="fa-solid fa-check"></i> Close</button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC & CANVAS PAN/ZOOM -->
+    <script>
+        function openAboutModal() {
+            document.getElementById('aboutModal').classList.add('active');
+        }
+        function closeAboutModal() {
+            document.getElementById('aboutModal').classList.remove('active');
+        }
+
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW reg error:', err));
+        }
+
+        // Viewport Pan & Zoom State
+        let currentScale = 1.0;
+        let currentOffsetX = 0;
+        let currentOffsetY = 0;
+        let isDragging = false;
+        let startX = 0, startY = 0;
+
+        const canvas = document.getElementById('canvas');
+        const viewport = document.getElementById('viewport');
+        const zoomReadout = document.getElementById('zoomReadout');
+
+        function updateTransform() {
+            canvas.style.transform = `translate(${currentOffsetX}px, ${currentOffsetY}px) scale(${currentScale})`;
+            zoomReadout.textContent = `${Math.round(currentScale * 100)}%`;
+        }
+
+        function setZoom(scale, btn) {
+            currentScale = scale;
+            if (scale === 1.0) { currentOffsetX = 0; currentOffsetY = 0; }
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            updateTransform();
+        }
+
+        function stepZoom(delta) {
+            currentScale = Math.min(Math.max(0.2, currentScale + delta), 5.0);
+            updateTransform();
+        }
+
+        function resetViewport() {
+            setZoom(1.0, document.querySelectorAll('.preset-btn')[2]);
+        }
+
+        // Touch & Mouse Panning
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.zoom-toolbar')) return;
+            isDragging = true;
+            startX = e.clientX - currentOffsetX;
+            startY = e.clientY - currentOffsetY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            currentOffsetX = e.clientX - startX;
+            currentOffsetY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        // Touch gestures for iPad / iPhone
+        viewport.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - currentOffsetX;
+                startY = e.touches[0].clientY - currentOffsetY;
+            }
+        });
+
+        viewport.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches.length === 1) {
+                currentOffsetX = e.touches[0].clientX - startX;
+                currentOffsetY = e.touches[0].clientY - startY;
+                updateTransform();
+            }
+        });
+
+        viewport.addEventListener('touchend', () => isDragging = false);
+
+        // Lot Selection
+        let activeLotTitle = "Block 1 / Lot 1";
+        function selectLot(title, progress, status, billing, unit) {
+            activeLotTitle = title;
+            document.getElementById('cardLotTitle').textContent = title;
+            document.getElementById('cardProgress').textContent = `${progress} (${status})`;
+            document.getElementById('cardUnit').textContent = unit;
+            document.getElementById('cardLotBadge').textContent = billing;
+        }
+
+        // Search Filter
+        function filterLots(query) {
+            const clearBtn = document.getElementById('clearSearch');
+            clearBtn.style.display = query ? 'block' : 'none';
+            const lots = document.querySelectorAll('.vector-lot');
+            const q = query.toLowerCase().trim();
+            lots.forEach(lot => {
+                const text = lot.textContent.toLowerCase();
+                lot.style.display = text.includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function clearSearchInput() {
+            document.getElementById('searchInput').value = '';
+            filterLots('');
+        }
+
+        // Admin PIN Elevation
+        function promptAdminPin() {
+            const pin = prompt("Enter Super Admin Elevation PIN:");
+            if (pin === "021793") {
+                alert("SUPER ADMIN ELEVATED (Engr. Glenn C. Aprovechado - Principal Engineer C)");
+            } else if (pin) {
+                alert("Incorrect PIN. Access Denied.");
+            }
+        }
+
+        // Modals
+        function openUpdateModal() {
+            document.getElementById('modalLotName').value = activeLotTitle;
+            document.getElementById('updateModal').classList.add('active');
+        }
+
+        function closeUpdateModal() {
+            document.getElementById('updateModal').classList.remove('active');
+        }
+
+        function saveLotProgress() {
+            const val = document.getElementById('modalProgressVal').value;
+            const bill = document.getElementById('modalBillingVal').value;
+            alert(`Progress updated to ${val}% (${bill}) for ${activeLotTitle}. Synced to Google Drive cloud.`);
+            closeUpdateModal();
+        }
+
+        function triggerSync() {
+            alert("Google Drive sync initiated for account: great.glenn17@gmail.com");
+        }
+
+        function switchTab(el) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+        }
+    </script>
+</body>
+</html>

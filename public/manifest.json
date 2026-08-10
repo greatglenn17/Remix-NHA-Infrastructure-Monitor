@@ -1,0 +1,21 @@
+{
+  "short_name": "NHA Monitor",
+  "name": "NHA Infrastructure Monitor - Bulacan District Office",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/building--v1.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/building--v1.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "display": "standalone",
+  "orientation": "portrait"
+}
