@@ -76,7 +76,7 @@ fun AdminElevationDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Elevating to ${targetRole.label} requires Secret Admin PIN (021793). Authorized personnel receive full administrative & auditing powers.",
+                        text = "Elevating to ${targetRole.label} requires Secret Admin PIN. Authorized personnel receive full administrative & auditing powers.",
                         style = MaterialTheme.typography.bodySmall.copy(color = GoldAccent, fontSize = 12.sp),
                         modifier = Modifier.padding(10.dp)
                     )
@@ -89,7 +89,7 @@ fun AdminElevationDialog(
                         pinInput = it
                         if (pinError != null) pinError = null
                     },
-                    label = { Text("Secret Admin PIN (e.g. 021793)") },
+                    label = { Text("Enter 6-Digit Secret Admin PIN") },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = GoldAccent) },
                     trailingIcon = {
                         IconButton(onClick = { isPinVisible = !isPinVisible }) {
@@ -179,7 +179,7 @@ fun AdminElevationDialog(
                     if (pinInput.trim() == secretPin) {
                         onElevateSuccess(targetRole, positionTitle.trim(), officeRegion.trim())
                     } else {
-                        pinError = "Invalid Secret PIN! Only authorized personnel with PIN 021793 can elevate role."
+                        pinError = "Invalid Secret PIN! Contact your Principal Engineer or Super Admin for authorization."
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = Color.Black),

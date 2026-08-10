@@ -1,10 +1,10 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.0.7%20%28Build%20107%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.0.8%20%28Build%20108%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
-An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, and multi-user cloud synchronization.
+An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
 
 ---
 
@@ -13,10 +13,17 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.0.7`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.0.7_Build107.apk`** to download the installation package.
+2. Tap the latest release (`v1.0.8`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.0.8_Build108.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
+
+---
+
+## 🔔 Real-Time Notifications & Auditing
+
+- **Super Admin Alerts:** Automatic status bar notifications triggered for Super Admins when Engineer Admins, Field Engineers, or Viewers create projects, enter field data (weekly/monthly reports, daily weather, payments, issues), or register new accounts.
+- **Audit Log Engine:** Immutable timestamped record of device name, user account, action type, and parameter changes.
 
 ---
 
@@ -24,7 +31,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | User Role | Project Visibility & Access Rights |
 | :--- | :--- |
-| **👑 Super Admin** | **Global View:** Access and control **ALL** infrastructure projects across Region III. |
+| **👑 Super Admin** | **Global View:** Access and control **ALL** infrastructure projects across Region III + Real-Time Activity Alerts. |
 | **👷 Engineer Admin** | **Assigned View:** Access and manage **ONLY** assigned projects or created projects. |
 | **🛠️ Field Engineer** | **Assigned View:** View and log field reports, site issues, and weather logs for assigned projects. |
 | **👁️ Viewer** | **Read-Only View:** View assigned project dashboards, progress charts, and documents. |
@@ -65,20 +72,10 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 | Security Feature | Implementation Detail |
 | :--- | :--- |
 | **Password Storage** | Cryptographic SHA-256 hashing applied to all local credentials (`hashPassword()`) |
-| **Role Elevation** | Protected by a secret Principal Engineer PIN required for Admin promotion |
+| **Role Elevation** | Protected by a secret Principal Engineer PIN (clean UI text with no hardcoded examples) |
 | **Cloud Encryption** | Payload encrypted with AES-256-GCM using user-derived key material |
 | **Data Protection** | Local data stored via Android `EncryptedSharedPreferences` & Room Database |
 | **Role-Based Access** | 4-Tier RBAC (*Super Admin*, *Engineer Admin*, *Field Engineer*, *Viewer*) |
-
----
-
-## 🛠️ Technology Stack
-
-- **UI Framework:** Android Jetpack Compose (Material3 Dark / Light Theme)
-- **Architecture:** MVVM + Clean Repository Pattern (Kotlin Coroutines & Flow)
-- **Local Database:** Room Database v2.6.1 (SQLite engine)
-- **Cloud Backend:** Google Drive API v3 + Firebase Authentication
-- **Build Tool:** Gradle (Kotlin DSL) target SDK 36 (Java 21 / JBR)
 
 ---
 
@@ -86,9 +83,9 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.0.8`** | **`108`** | 🔔 Real-time status bar notifications for Super Admin on project creation, data entry & user registrations + Secret PIN UI security fix |
 | **`v1.0.7`** | **`107`** | 🔐 Enforced Role Scoping: Super Admin views **ALL** projects; Engineer Admin & Field Engineer view **ONLY** assigned projects |
 | **`v1.0.6`** | **`106`** | 🛡️ Fixed 4 critical security vulnerabilities (SHA-256 pass hashing, PIN protection) + expanded cloud sync to all 19 database tables |
-| **`v1.0.5`** | **`105`** | Resolved startup race conditions and replaced sample import with safe cloud sync |
 
 ---
 

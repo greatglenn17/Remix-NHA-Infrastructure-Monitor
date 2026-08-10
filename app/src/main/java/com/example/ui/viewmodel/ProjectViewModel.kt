@@ -1397,8 +1397,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
 
-            // Notify Super Admin and Engineer Admin if Field Engineer makes changes or adds a project!
-            if (currentAccount.role == UserRole.FIELD_ENGINEER && actionType != "User Login" && actionType != "User Logout") {
+            // Notify Super Admin on ALL changes by Engineer Admin, Field Engineer, or User Registrations/Elevations!
+            if (currentAccount.role != UserRole.SUPER_ADMIN && actionType != "User Login" && actionType != "User Logout") {
                 var pName = ""
                 if (projectId != null) {
                     try {
@@ -1407,18 +1407,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 val notificationTitle = when {
-                    actionType.contains("Creation", ignoreCase = true) -> "New Project Added by Field Engineer"
-                    actionType.contains("Report", ignoreCase = true) -> "New Report Submitted by Field Engineer"
-                    actionType.contains("Payment", ignoreCase = true) -> "Disbursement Added by Field Engineer"
-                    else -> "Field Engineer Project Update ($actionType)"
+                    actionType.contains("Registration", ignoreCase = true) -> "New Account Registration (${currentAccount.role.label})"
+                    actionType.contains("Elevation", ignoreCase = true) -> "Role Elevation Alert (${currentAccount.role.label})"
+                    actionType.contains("Creation", ignoreCase = true) || actionType.contains("Project", ignoreCase = true) -> "Project Activity by ${currentAccount.role.label}"
+                    actionType.contains("Report", ignoreCase = true) -> "Report Submitted by ${currentAccount.role.label}"
+                    actionType.contains("Payment", ignoreCase = true) -> "Disbursement Added by ${currentAccount.role.label}"
+                    actionType.contains("Weather", ignoreCase = true) -> "Weather Entry by ${currentAccount.role.label}"
+                    actionType.contains("Issue", ignoreCase = true) -> "Site Issue Logged by ${currentAccount.role.label}"
+                    else -> "System Alert ($actionType) by ${currentAccount.role.label}"
                 }
 
                 val appNotification = AppNotification(
                     title = notificationTitle,
-                    message = "${currentAccount.name}: $details",
-                    actorName = currentAccount.name,
+                    message = "$userName: $details",
+                    actorName = userName,
                     actorRole = currentAccount.role.name,
-                    targetRole = "ADMIN",
+                    targetRole = "SUPER_ADMIN",
                     projectId = projectId,
                     projectName = pName,
                     actionType = actionType,
@@ -1428,10 +1432,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 notificationDao.insertNotification(appNotification)
 
                 // Send Native Android Status Bar Notification Alert
-                com.example.utils.NotificationHelper.sendAdminNotification(
+                com.example.util.AppNotificationManager.sendAdminNotification(
                     context = getApplication(),
                     title = notificationTitle,
-                    message = "${currentAccount.name}: $details"
+                    message = "$userName: $details"
                 )
             }
         }
