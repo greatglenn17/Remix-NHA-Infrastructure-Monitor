@@ -118,6 +118,46 @@ interface ProjectDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAuditLog(log: AuditLog)
 
+    // Cloud Backup Queries
+    @Query("SELECT * FROM time_extensions")
+    fun getAllTimeExtensions(): Flow<List<TimeExtension>>
+
+    @Query("SELECT * FROM variation_orders")
+    fun getAllVariationOrders(): Flow<List<VariationOrder>>
+
+    @Query("SELECT * FROM work_suspensions")
+    fun getAllWorkSuspensions(): Flow<List<WorkSuspensionOrder>>
+
+    @Query("SELECT * FROM work_resumptions")
+    fun getAllWorkResumptions(): Flow<List<WorkResumptionLog>>
+
+    @Query("SELECT * FROM project_inspections")
+    fun getAllInspections(): Flow<List<ProjectInspection>>
+
+    @Query("SELECT * FROM project_images")
+    fun getAllImages(): Flow<List<ProjectImage>>
+
+    @Query("SELECT * FROM project_payments")
+    fun getAllPayments(): Flow<List<ProjectPayment>>
+
+    @Query("SELECT * FROM project_issues")
+    fun getAllIssues(): Flow<List<ProjectIssue>>
+
+    @Query("SELECT * FROM sdp_plans")
+    fun getAllSdpPlans(): Flow<List<SdpPlan>>
+
+    @Query("SELECT * FROM sdp_lots")
+    fun getAllSdpLots(): Flow<List<SdpLot>>
+
+    @Query("SELECT * FROM sdp_roads")
+    fun getAllSdpRoads(): Flow<List<SdpRoad>>
+
+    @Query("SELECT * FROM sdp_lot_progress")
+    fun getAllSdpLotProgress(): Flow<List<SdpLotProgress>>
+
+    @Query("SELECT * FROM sdp_lot_inspections")
+    fun getAllSdpLotInspections(): Flow<List<SdpLotInspection>>
+
     @Query("""
         SELECT 
             (SELECT COUNT(*) FROM projects WHERE status IN ('On-going', 'Behind Schedule')) AS activeProjectsCount,

@@ -23,7 +23,14 @@ interface ReportDao {
     @Query("DELETE FROM weekly_reports WHERE id = :id")
     suspend fun deleteWeeklyReport(id: Long)
 
+    // Cloud Backup Queries
+    @Query("SELECT * FROM weekly_reports")
+    fun getAllWeeklyReports(): Flow<List<WeeklyReport>>
+
     // Daily Hourly Weather
+    @Query("SELECT * FROM daily_hourly_weather")
+    fun getAllDailyWeather(): Flow<List<DailyHourlyWeather>>
+
     @Query("SELECT * FROM daily_hourly_weather WHERE projectId = :projectId ORDER BY date ASC")
     fun getDailyWeatherForProject(projectId: Long): Flow<List<DailyHourlyWeather>>
 
@@ -37,6 +44,9 @@ interface ReportDao {
     suspend fun insertDailyWeatherList(weatherList: List<DailyHourlyWeather>)
 
     // Monthly Reports
+    @Query("SELECT * FROM monthly_reports")
+    fun getAllMonthlyReports(): Flow<List<MonthlyReport>>
+
     @Query("SELECT * FROM monthly_reports WHERE projectId = :projectId ORDER BY id DESC")
     fun getMonthlyReportsForProject(projectId: Long): Flow<List<MonthlyReport>>
 

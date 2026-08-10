@@ -45,7 +45,7 @@ object AppUpdateManager {
                 val jsonStr = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(jsonStr)
                 val serverVersionCode = json.optInt("versionCode", currentVersionCode)
-                val serverVersionName = json.optString("versionName", "v1.0.4")
+                val serverVersionName = json.optString("versionName", "v${BuildConfig.VERSION_NAME}")
                 val releaseNotes = json.optString("releaseNotes", "New feature updates and stability improvements.")
                 val apkUrl = json.optString("apkDownloadUrl", "")
                 val mandatory = json.optBoolean("isMandatory", false)
@@ -163,7 +163,7 @@ object AppUpdateManager {
                     withContext(Dispatchers.Main) {
                         android.widget.Toast.makeText(
                             context,
-                            "App is currently at the latest build v1.0.4. Live server will stream future APK releases.",
+                            "App is currently at the latest build v${BuildConfig.VERSION_NAME}. Live server will stream future APK releases.",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                         onDownloadFailed("Update package unavailable.")
@@ -173,7 +173,7 @@ object AppUpdateManager {
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
                         context,
-                        "Your app is on the latest build v1.0.4 (Build 104).",
+                        "Your app is on the latest build v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}).",
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                     onDownloadFailed(e.message ?: "Download failed.")

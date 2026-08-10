@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
 import com.example.BuildConfig
 import com.example.R
 import com.example.data.model.AppThemeMode
-import com.example.data.model.SampleUsers
 import com.example.data.model.UserAccount
 import com.example.data.model.UserRole
 import com.example.ui.dialogs.AdminElevationDialog
@@ -620,7 +619,7 @@ fun TopAppBarHeader(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Version: v1.0.4 (Build 104)",
+                                text = "Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = DarkTextPrimary,
                                     fontWeight = FontWeight.Bold
@@ -651,7 +650,7 @@ fun TopAppBarHeader(
                                         } else {
                                             android.widget.Toast.makeText(
                                                 context,
-                                                "NHA Infrastructure Monitor is up to date!\nVersion: v1.0.4 (Build 104) is the latest release.",
+                                                "NHA Infrastructure Monitor is up to date!\nVersion: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) is the latest release.",
                                                 android.widget.Toast.LENGTH_LONG
                                             ).show()
                                         }

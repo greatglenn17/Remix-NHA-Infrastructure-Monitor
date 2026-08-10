@@ -51,6 +51,12 @@ class AuthManager(private val context: Context) {
     val isUserSignedIn: Boolean
         get() = auth?.currentUser != null || prefs.getBoolean("is_session_active", false)
 
+    private fun hashPassword(password: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest(password.trim().toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
     fun saveRegisteredUser(
         email: String,
         pass: String,
@@ -60,12 +66,12 @@ class AuthManager(private val context: Context) {
         office: String?
     ) {
         val cleanEmail = email.trim().lowercase()
-        val cleanPass = pass.trim()
+        val hashedPass = hashPassword(pass)
         val registeredEmails = prefs.getStringSet("registered_emails_set", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         registeredEmails.add(cleanEmail)
 
         prefs.edit()
-            .putString("reg_pass_$cleanEmail", cleanPass)
+            .putString("reg_pass_$cleanEmail", hashedPass)
             .putString("reg_name_$cleanEmail", displayName?.trim() ?: cleanEmail.substringBefore("@").capitalizeWords())
             .putString("reg_role_$cleanEmail", role.name)
             .putString("reg_pos_$cleanEmail", position?.trim() ?: "")
@@ -76,10 +82,10 @@ class AuthManager(private val context: Context) {
 
     fun isLocalRegisteredUser(email: String, pass: String): Boolean {
         val cleanEmail = email.trim().lowercase()
-        val cleanPass = pass.trim()
+        val inputHash = hashPassword(pass)
 
         val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
-        return savedPass != null && savedPass == cleanPass
+        return savedPass != null && (savedPass == inputHash || savedPass == pass.trim())
     }
 
     fun getRegisteredUserAccount(
@@ -118,10 +124,11 @@ class AuthManager(private val context: Context) {
         }
 
         val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
+        val inputHash = hashPassword(cleanPass)
 
         // 1. If account was registered locally via Create Account tab:
         if (savedPass != null) {
-            if (savedPass == cleanPass) {
+            if (savedPass == inputHash || savedPass == cleanPass) {
                 return Result.success(null)
             } else {
                 return Result.failure(IllegalArgumentException("Incorrect password for $cleanEmail. Please re-type your password."))
@@ -179,11 +186,7 @@ class AuthManager(private val context: Context) {
                 return Result.success(result.user)
             } catch (e: Exception) {
                 android.util.Log.w("AuthManager", "Firebase remote sign-up exception: ${e.message}")
-                if (e.message?.contains("already in use", ignoreCase = true) == true ||
-                    e.message?.contains("badly formatted", ignoreCase = true) == true ||
-                    e.message?.contains("weak", ignoreCase = true) == true) {
-                    return Result.failure(e)
-                }
+                return Result.failure(e)
             }
         }
         return Result.success(null)

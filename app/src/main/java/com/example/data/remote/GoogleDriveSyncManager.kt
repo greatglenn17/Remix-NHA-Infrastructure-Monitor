@@ -104,6 +104,23 @@ class GoogleDriveSyncManager(
 
             val projects = projectDao.getAllProjects().first()
             val docs = projectDao.getAllPendingDocuments().first()
+            val weeklyReports = reportDao.getAllWeeklyReports().first()
+            val monthlyReports = reportDao.getAllMonthlyReports().first()
+            val dailyWeather = reportDao.getAllDailyWeather().first()
+            val timeExts = projectDao.getAllTimeExtensions().first()
+            val varOrders = projectDao.getAllVariationOrders().first()
+            val workSusp = projectDao.getAllWorkSuspensions().first()
+            val workRes = projectDao.getAllWorkResumptions().first()
+            val inspections = projectDao.getAllInspections().first()
+            val images = projectDao.getAllImages().first()
+            val payments = projectDao.getAllPayments().first()
+            val issues = projectDao.getAllIssues().first()
+            val auditLogs = projectDao.getAllAuditLogs().first()
+            val sdpPlans = projectDao.getAllSdpPlans().first()
+            val sdpLots = projectDao.getAllSdpLots().first()
+            val sdpRoads = projectDao.getAllSdpRoads().first()
+            val sdpLotProgress = projectDao.getAllSdpLotProgress().first()
+            val sdpLotInspections = projectDao.getAllSdpLotInspections().first()
 
             val projectsArray = JSONArray()
             projects.forEach { p ->
@@ -141,14 +158,317 @@ class GoogleDriveSyncManager(
                 })
             }
 
+            val weeklyArray = JSONArray()
+            weeklyReports.forEach { w ->
+                weeklyArray.put(JSONObject().apply {
+                    put("id", w.id)
+                    put("projectId", w.projectId)
+                    put("reportingWeek", w.reportingWeek)
+                    put("daysElapsed", w.daysElapsed)
+                    put("remainingDays", w.remainingDays)
+                    put("targetAccomplishmentPct", w.targetAccomplishmentPct)
+                    put("actualAccomplishmentPct", w.actualAccomplishmentPct)
+                    put("manpowerJson", w.manpowerJson)
+                    put("equipmentJson", w.equipmentJson)
+                    put("activitiesJson", w.activitiesJson)
+                    put("issuesJson", w.issuesJson)
+                    put("accomplishmentItemsJson", w.accomplishmentItemsJson)
+                    put("documentsIssuedReceivedJson", w.documentsIssuedReceivedJson)
+                    put("attachedPhotoUrlsJson", w.attachedPhotoUrlsJson)
+                    put("submittedByStaff", w.submittedByStaff)
+                    put("createdAtTimestamp", w.createdAtTimestamp)
+                })
+            }
+
+            val monthlyArray = JSONArray()
+            monthlyReports.forEach { m ->
+                monthlyArray.put(JSONObject().apply {
+                    put("id", m.id)
+                    put("projectId", m.projectId)
+                    put("reportingMonth", m.reportingMonth)
+                    put("scopeWeightPct", m.scopeWeightPct)
+                    put("scopeTargetPct", m.scopeTargetPct)
+                    put("scopeActualPct", m.scopeActualPct)
+                    put("paymentsJson", m.paymentsJson)
+                    put("unworkableDaysCount", m.unworkableDaysCount)
+                    put("workableDaysCount", m.workableDaysCount)
+                    put("cpesIssuesJson", m.cpesIssuesJson)
+                    put("recommendations", m.recommendations)
+                    put("preparedByName", m.preparedByName)
+                    put("preparedByStatus", m.preparedByStatus)
+                    put("checkedByName", m.checkedByName)
+                    put("checkedByStatus", m.checkedByStatus)
+                    put("notedByName", m.notedByName)
+                    put("notedByStatus", m.notedByStatus)
+                    put("auditTrailJson", m.auditTrailJson)
+                    put("accomplishmentItemsJson", m.accomplishmentItemsJson)
+                })
+            }
+
+            val weatherArray = JSONArray()
+            dailyWeather.forEach { dw ->
+                weatherArray.put(JSONObject().apply {
+                    put("id", dw.id)
+                    put("projectId", dw.projectId)
+                    put("weeklyReportId", dw.weeklyReportId ?: -1L)
+                    put("date", dw.date)
+                    put("dayOfWeek", dw.dayOfWeek)
+                    put("hourlyConditionsCsv", dw.hourlyConditionsCsv)
+                })
+            }
+
+            val timeExtArray = JSONArray()
+            timeExts.forEach { te ->
+                timeExtArray.put(JSONObject().apply {
+                    put("id", te.id)
+                    put("projectId", te.projectId)
+                    put("extensionNo", te.extensionNo)
+                    put("noOfDays", te.noOfDays)
+                    put("revisedDurationDays", te.revisedDurationDays)
+                    put("periodConsidered", te.periodConsidered)
+                    put("reason", te.reason)
+                    put("revisedCompletionDate", te.revisedCompletionDate)
+                    put("remarks", te.remarks)
+                })
+            }
+
+            val varOrderArray = JSONArray()
+            varOrders.forEach { vo ->
+                varOrderArray.put(JSONObject().apply {
+                    put("id", vo.id)
+                    put("projectId", vo.projectId)
+                    put("voNo", vo.voNo)
+                    put("description", vo.description)
+                    put("costDifference", vo.costDifference)
+                    put("revisedContractCost", vo.revisedContractCost)
+                    put("approvalDate", vo.approvalDate)
+                    put("remarks", vo.remarks)
+                })
+            }
+
+            val workSuspArray = JSONArray()
+            workSusp.forEach { ws ->
+                workSuspArray.put(JSONObject().apply {
+                    put("id", ws.id)
+                    put("projectId", ws.projectId)
+                    put("name", ws.name)
+                    put("effectivityDate", ws.effectivityDate)
+                    put("durationDays", ws.durationDays)
+                    put("endDate", ws.endDate)
+                    put("reason", ws.reason)
+                    put("remarks", ws.remarks)
+                })
+            }
+
+            val workResArray = JSONArray()
+            workRes.forEach { wr ->
+                workResArray.put(JSONObject().apply {
+                    put("id", wr.id)
+                    put("projectId", wr.projectId)
+                    put("name", wr.name)
+                    put("dateResumed", wr.dateResumed)
+                    put("reason", wr.reason)
+                    put("remarks", wr.remarks)
+                })
+            }
+
+            val inspArray = JSONArray()
+            inspections.forEach { ins ->
+                inspArray.put(JSONObject().apply {
+                    put("id", ins.id)
+                    put("projectId", ins.projectId)
+                    put("inspectorName", ins.inspectorName)
+                    put("inspectionDate", ins.inspectionDate)
+                    put("findings", ins.findings)
+                    put("status", ins.status)
+                    put("remarks", ins.remarks)
+                })
+            }
+
+            val imgArray = JSONArray()
+            images.forEach { img ->
+                imgArray.put(JSONObject().apply {
+                    put("id", img.id)
+                    put("projectId", img.projectId)
+                    put("imageUrl", img.imageUrl)
+                    put("caption", img.caption)
+                    put("category", img.category)
+                    put("uploadedDate", img.uploadedDate)
+                })
+            }
+
+            val payArray = JSONArray()
+            payments.forEach { pay ->
+                payArray.put(JSONObject().apply {
+                    put("id", pay.id)
+                    put("projectId", pay.projectId)
+                    put("name", pay.name)
+                    put("dvNo", pay.dvNo)
+                    put("date", pay.date)
+                    put("periodCovered", pay.periodCovered)
+                    put("grossAmount", pay.grossAmount)
+                    put("percentage", pay.percentage)
+                    put("balanceAmount", pay.balanceAmount)
+                    put("balancePercentage", pay.balancePercentage)
+                    put("fileUrl", pay.fileUrl)
+                })
+            }
+
+            val issueArray = JSONArray()
+            issues.forEach { iss ->
+                issueArray.put(JSONObject().apply {
+                    put("id", iss.id)
+                    put("projectId", iss.projectId)
+                    put("date", iss.date)
+                    put("description", iss.description)
+                    put("actionTaken", iss.actionTaken)
+                    put("remarks", iss.remarks)
+                    put("loggedBy", iss.loggedBy)
+                    put("timestamp", iss.timestamp)
+                    put("status", iss.status)
+                    put("isCritical", iss.isCritical)
+                })
+            }
+
+            val auditArray = JSONArray()
+            auditLogs.forEach { al ->
+                auditArray.put(JSONObject().apply {
+                    put("id", al.id)
+                    put("projectId", al.projectId ?: -1L)
+                    put("timestamp", al.timestamp)
+                    put("user", al.user)
+                    put("device", al.device)
+                    put("actionType", al.actionType)
+                    put("oldValue", al.oldValue)
+                    put("newValue", al.newValue)
+                    put("details", al.details)
+                })
+            }
+
+            val sdpPlansArray = JSONArray()
+            sdpPlans.forEach { sp ->
+                sdpPlansArray.put(JSONObject().apply {
+                    put("id", sp.id)
+                    put("projectId", sp.projectId)
+                    put("planName", sp.planName)
+                    put("pdfFileUrl", sp.pdfFileUrl)
+                    put("version", sp.version)
+                    put("isActive", sp.isActive)
+                    put("uploadedDate", sp.uploadedDate)
+                    put("uploadedBy", sp.uploadedBy)
+                    put("description", sp.description)
+                })
+            }
+
+            val sdpLotsArray = JSONArray()
+            sdpLots.forEach { sl ->
+                sdpLotsArray.put(JSONObject().apply {
+                    put("id", sl.id)
+                    put("projectId", sl.projectId)
+                    put("sdpPlanId", sl.sdpPlanId)
+                    put("blockNumber", sl.blockNumber)
+                    put("lotNumber", sl.lotNumber)
+                    put("housingUnitNumber", sl.housingUnitNumber)
+                    put("lotAreaSqM", sl.lotAreaSqM)
+                    put("polygonNormalizedJson", sl.polygonNormalizedJson)
+                    put("isActive", sl.isActive)
+                    put("description", sl.description)
+                    put("createdBy", sl.createdBy)
+                    put("createdDate", sl.createdDate)
+                    put("lastModifiedBy", sl.lastModifiedBy)
+                    put("lastModifiedDate", sl.lastModifiedDate)
+                })
+            }
+
+            val sdpRoadsArray = JSONArray()
+            sdpRoads.forEach { sr ->
+                sdpRoadsArray.put(JSONObject().apply {
+                    put("id", sr.id)
+                    put("projectId", sr.projectId)
+                    put("sdpPlanId", sr.sdpPlanId)
+                    put("roadName", sr.roadName)
+                    put("roadType", sr.roadType)
+                    put("polylineNormalizedJson", sr.polylineNormalizedJson)
+                    put("isActive", sr.isActive)
+                    put("createdBy", sr.createdBy)
+                    put("createdDate", sr.createdDate)
+                    put("lastModifiedBy", sr.lastModifiedBy)
+                    put("lastModifiedDate", sr.lastModifiedDate)
+                })
+            }
+
+            val sdpLotProgressArray = JSONArray()
+            sdpLotProgress.forEach { slp ->
+                sdpLotProgressArray.put(JSONObject().apply {
+                    put("id", slp.id)
+                    put("projectId", slp.projectId)
+                    put("sdpPlanId", slp.sdpPlanId)
+                    put("sdpLotId", slp.sdpLotId)
+                    put("physicalProgress", slp.physicalProgress)
+                    put("constructionStatus", slp.constructionStatus)
+                    put("currentActivity", slp.currentActivity)
+                    put("startDate", slp.startDate)
+                    put("targetCompletionDate", slp.targetCompletionDate)
+                    put("contractor", slp.contractor)
+                    put("remarks", slp.remarks)
+                    put("billingStatus", slp.billingStatus)
+                    put("billingDate", slp.billingDate)
+                    put("billedBy", slp.billedBy)
+                    put("billingReference", slp.billingReference)
+                    put("billingRemarks", slp.billingRemarks)
+                    put("createdBy", slp.createdBy)
+                    put("createdDate", slp.createdDate)
+                    put("lastModifiedBy", slp.lastModifiedBy)
+                    put("lastModifiedDate", slp.lastModifiedDate)
+                })
+            }
+
+            val sdpLotInspectionsArray = JSONArray()
+            sdpLotInspections.forEach { sli ->
+                sdpLotInspectionsArray.put(JSONObject().apply {
+                    put("id", sli.id)
+                    put("projectId", sli.projectId)
+                    put("sdpPlanId", sli.sdpPlanId)
+                    put("sdpLotId", sli.sdpLotId)
+                    put("inspectionTimestamp", sli.inspectionTimestamp)
+                    put("inspectionDate", sli.inspectionDate)
+                    put("inspectedBy", sli.inspectedBy)
+                    put("physicalProgress", sli.physicalProgress)
+                    put("constructionStatus", sli.constructionStatus)
+                    put("currentActivity", sli.currentActivity)
+                    put("contractor", sli.contractor)
+                    put("remarks", sli.remarks)
+                    put("billingStatus", sli.billingStatus)
+                    put("billingReference", sli.billingReference)
+                    put("createdDate", sli.createdDate)
+                })
+            }
+
             val rawJsonPayload = JSONObject().apply {
-                put("version", 2)
+                put("version", 3)
                 put("appName", "NHA Infrastructure Monitor")
                 put("backupTimestamp", System.currentTimeMillis())
                 put("formattedDate", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
                 put("accountEmail", _driveAccountEmail.value)
                 put("projects", projectsArray)
                 put("pendingDocuments", docsArray)
+                put("weeklyReports", weeklyArray)
+                put("monthlyReports", monthlyArray)
+                put("dailyWeather", weatherArray)
+                put("timeExtensions", timeExtArray)
+                put("variationOrders", varOrderArray)
+                put("workSuspensions", workSuspArray)
+                put("workResumptions", workResArray)
+                put("inspections", inspArray)
+                put("images", imgArray)
+                put("payments", payArray)
+                put("issues", issueArray)
+                put("auditLogs", auditArray)
+                put("sdpPlans", sdpPlansArray)
+                put("sdpLots", sdpLotsArray)
+                put("sdpRoads", sdpRoadsArray)
+                put("sdpLotProgress", sdpLotProgressArray)
+                put("sdpLotInspections", sdpLotInspectionsArray)
             }.toString()
 
             _syncStatusMessage.value = "Encrypting backup payload & generating checksum..."
@@ -301,8 +621,26 @@ class GoogleDriveSyncManager(
             val dataObj = JSONObject(decryptedJson)
             val projectsArray = dataObj.optJSONArray("projects") ?: JSONArray()
             val docsArray = dataObj.optJSONArray("pendingDocuments") ?: JSONArray()
+            val weeklyArray = dataObj.optJSONArray("weeklyReports") ?: JSONArray()
+            val monthlyArray = dataObj.optJSONArray("monthlyReports") ?: JSONArray()
+            val weatherArray = dataObj.optJSONArray("dailyWeather") ?: JSONArray()
+            val timeExtArray = dataObj.optJSONArray("timeExtensions") ?: JSONArray()
+            val varOrderArray = dataObj.optJSONArray("variationOrders") ?: JSONArray()
+            val workSuspArray = dataObj.optJSONArray("workSuspensions") ?: JSONArray()
+            val workResArray = dataObj.optJSONArray("workResumptions") ?: JSONArray()
+            val inspArray = dataObj.optJSONArray("inspections") ?: JSONArray()
+            val imgArray = dataObj.optJSONArray("images") ?: JSONArray()
+            val payArray = dataObj.optJSONArray("payments") ?: JSONArray()
+            val issueArray = dataObj.optJSONArray("issues") ?: JSONArray()
+            val auditArray = dataObj.optJSONArray("auditLogs") ?: JSONArray()
+            val sdpPlansArray = dataObj.optJSONArray("sdpPlans") ?: JSONArray()
+            val sdpLotsArray = dataObj.optJSONArray("sdpLots") ?: JSONArray()
+            val sdpRoadsArray = dataObj.optJSONArray("sdpRoads") ?: JSONArray()
+            val sdpLotProgressArray = dataObj.optJSONArray("sdpLotProgress") ?: JSONArray()
+            val sdpLotInspectionsArray = dataObj.optJSONArray("sdpLotInspections") ?: JSONArray()
 
             val projectDao = db.projectDao()
+            val reportDao = db.reportDao()
 
             for (i in 0 until projectsArray.length()) {
                 val p = projectsArray.getJSONObject(i)
@@ -340,6 +678,308 @@ class GoogleDriveSyncManager(
                     fileUrl = d.optString("fileUrl", "")
                 )
                 projectDao.insertPendingDocument(doc)
+            }
+
+            for (i in 0 until weeklyArray.length()) {
+                val w = weeklyArray.getJSONObject(i)
+                val wr = WeeklyReport(
+                    id = w.getLong("id"),
+                    projectId = w.getLong("projectId"),
+                    reportingWeek = w.optString("reportingWeek", "Week 1"),
+                    daysElapsed = w.optInt("daysElapsed", 0),
+                    remainingDays = w.optInt("remainingDays", 0),
+                    targetAccomplishmentPct = w.optDouble("targetAccomplishmentPct", 0.0),
+                    actualAccomplishmentPct = w.optDouble("actualAccomplishmentPct", 0.0),
+                    manpowerJson = w.optString("manpowerJson", "[]"),
+                    equipmentJson = w.optString("equipmentJson", "[]"),
+                    activitiesJson = w.optString("activitiesJson", "[]"),
+                    issuesJson = w.optString("issuesJson", "[]"),
+                    accomplishmentItemsJson = w.optString("accomplishmentItemsJson", "[]"),
+                    documentsIssuedReceivedJson = w.optString("documentsIssuedReceivedJson", "[]"),
+                    attachedPhotoUrlsJson = w.optString("attachedPhotoUrlsJson", "[]"),
+                    submittedByStaff = w.optString("submittedByStaff", "Engr. Field"),
+                    createdAtTimestamp = w.optLong("createdAtTimestamp", System.currentTimeMillis())
+                )
+                reportDao.insertWeeklyReport(wr)
+            }
+
+            for (i in 0 until monthlyArray.length()) {
+                val m = monthlyArray.getJSONObject(i)
+                val mr = MonthlyReport(
+                    id = m.getLong("id"),
+                    projectId = m.getLong("projectId"),
+                    reportingMonth = m.optString("reportingMonth", m.optString("monthYear", "July 2026")),
+                    scopeWeightPct = m.optDouble("scopeWeightPct", 100.0),
+                    scopeTargetPct = m.optDouble("scopeTargetPct", m.optDouble("targetAccomplishment", 0.0)),
+                    scopeActualPct = m.optDouble("scopeActualPct", m.optDouble("actualAccomplishment", 0.0)),
+                    paymentsJson = m.optString("paymentsJson", "[]"),
+                    unworkableDaysCount = m.optInt("unworkableDaysCount", 0),
+                    workableDaysCount = m.optInt("workableDaysCount", 20),
+                    cpesIssuesJson = m.optString("cpesIssuesJson", "[]"),
+                    recommendations = m.optString("recommendations", ""),
+                    preparedByName = m.optString("preparedByName", m.optString("preparedBy", "Engr. Admin")),
+                    preparedByStatus = m.optString("preparedByStatus", "Reviewed"),
+                    checkedByName = m.optString("checkedByName", "Engr. Supervising"),
+                    checkedByStatus = m.optString("checkedByStatus", "Reviewed"),
+                    notedByName = m.optString("notedByName", "Director NHA"),
+                    notedByStatus = m.optString("notedByStatus", "Noted"),
+                    auditTrailJson = m.optString("auditTrailJson", ""),
+                    accomplishmentItemsJson = m.optString("accomplishmentItemsJson", "[]")
+                )
+                reportDao.insertMonthlyReport(mr)
+            }
+
+            for (i in 0 until weatherArray.length()) {
+                val dw = weatherArray.getJSONObject(i)
+                val weather = DailyHourlyWeather(
+                    id = dw.getLong("id"),
+                    projectId = dw.getLong("projectId"),
+                    weeklyReportId = if (dw.has("weeklyReportId") && dw.getLong("weeklyReportId") != -1L) dw.getLong("weeklyReportId") else null,
+                    date = dw.getString("date"),
+                    dayOfWeek = dw.optString("dayOfWeek", "Monday"),
+                    hourlyConditionsCsv = dw.optString("hourlyConditionsCsv", "FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR")
+                )
+                reportDao.insertDailyWeather(weather)
+            }
+
+            for (i in 0 until timeExtArray.length()) {
+                val te = timeExtArray.getJSONObject(i)
+                val timeExt = TimeExtension(
+                    id = te.getLong("id"),
+                    projectId = te.getLong("projectId"),
+                    extensionNo = te.getInt("extensionNo"),
+                    noOfDays = te.optInt("noOfDays", te.optInt("daysGranted", 0)),
+                    revisedDurationDays = te.optInt("revisedDurationDays", 0),
+                    periodConsidered = te.optString("periodConsidered", ""),
+                    reason = te.getString("reason"),
+                    revisedCompletionDate = te.optString("revisedCompletionDate", te.optString("revisedExpiryDate", "")),
+                    remarks = te.optString("remarks", "")
+                )
+                projectDao.insertTimeExtension(timeExt)
+            }
+
+            for (i in 0 until varOrderArray.length()) {
+                val vo = varOrderArray.getJSONObject(i)
+                val varOrder = VariationOrder(
+                    id = vo.getLong("id"),
+                    projectId = vo.getLong("projectId"),
+                    voNo = vo.getInt("voNo"),
+                    description = vo.getString("description"),
+                    costDifference = vo.optDouble("costDifference", vo.optDouble("amountChange", 0.0)),
+                    revisedContractCost = vo.optDouble("revisedContractCost", 0.0),
+                    approvalDate = vo.optString("approvalDate", vo.optString("approvedDate", "")),
+                    remarks = vo.optString("remarks", "")
+                )
+                projectDao.insertVariationOrder(varOrder)
+            }
+
+            for (i in 0 until workSuspArray.length()) {
+                val ws = workSuspArray.getJSONObject(i)
+                val workSusp = WorkSuspensionOrder(
+                    id = ws.getLong("id"),
+                    projectId = ws.getLong("projectId"),
+                    name = ws.optString("name", "Work Suspension Order"),
+                    effectivityDate = ws.getString("effectivityDate"),
+                    durationDays = ws.getInt("durationDays"),
+                    endDate = ws.optString("endDate", ""),
+                    reason = ws.getString("reason"),
+                    remarks = ws.optString("remarks", "")
+                )
+                projectDao.insertWorkSuspensionOrder(workSusp)
+            }
+
+            for (i in 0 until workResArray.length()) {
+                val wr = workResArray.getJSONObject(i)
+                val workRes = WorkResumptionLog(
+                    id = wr.getLong("id"),
+                    projectId = wr.getLong("projectId"),
+                    name = wr.optString("name", "Work Resumption Order"),
+                    dateResumed = wr.optString("dateResumed", wr.optString("resumptionDate", "")),
+                    reason = wr.optString("reason", "Work Resumed"),
+                    remarks = wr.optString("remarks", "")
+                )
+                projectDao.insertWorkResumptionLog(workRes)
+            }
+
+            for (i in 0 until inspArray.length()) {
+                val ins = inspArray.getJSONObject(i)
+                val inspection = ProjectInspection(
+                    id = ins.getLong("id"),
+                    projectId = ins.getLong("projectId"),
+                    inspectorName = ins.getString("inspectorName"),
+                    inspectionDate = ins.getString("inspectionDate"),
+                    findings = ins.getString("findings"),
+                    status = ins.optString("status", "Passed"),
+                    remarks = ins.optString("remarks", "")
+                )
+                projectDao.insertInspection(inspection)
+            }
+
+            for (i in 0 until imgArray.length()) {
+                val img = imgArray.getJSONObject(i)
+                val image = ProjectImage(
+                    id = img.getLong("id"),
+                    projectId = img.getLong("projectId"),
+                    imageUrl = img.optString("imageUrl", img.optString("imageUri", "")),
+                    caption = img.optString("caption", ""),
+                    category = img.optString("category", "Progress"),
+                    uploadedDate = img.optString("uploadedDate", img.optString("dateTaken", "2026-08-01"))
+                )
+                projectDao.insertImage(image)
+            }
+
+            for (i in 0 until payArray.length()) {
+                val pay = payArray.getJSONObject(i)
+                val payment = ProjectPayment(
+                    id = pay.getLong("id"),
+                    projectId = pay.getLong("projectId"),
+                    name = pay.optString("name", "Billing Payment"),
+                    dvNo = pay.optString("dvNo", pay.optString("disbursementVoucherNo", "")),
+                    date = pay.optString("date", pay.optString("paymentDate", "")),
+                    periodCovered = pay.optString("periodCovered", pay.optString("billingPeriod", "")),
+                    grossAmount = pay.optDouble("grossAmount", pay.optDouble("amountGross", 0.0)),
+                    percentage = pay.optDouble("percentage", 0.0),
+                    balanceAmount = pay.optDouble("balanceAmount", 0.0),
+                    balancePercentage = pay.optDouble("balancePercentage", 0.0),
+                    fileUrl = pay.optString("fileUrl", "")
+                )
+                projectDao.insertProjectPayment(payment)
+            }
+
+            for (i in 0 until issueArray.length()) {
+                val iss = issueArray.getJSONObject(i)
+                val issue = ProjectIssue(
+                    id = iss.getLong("id"),
+                    projectId = iss.getLong("projectId"),
+                    date = iss.optString("date", ""),
+                    description = iss.getString("description"),
+                    actionTaken = iss.optString("actionTaken", ""),
+                    remarks = iss.optString("remarks", ""),
+                    loggedBy = iss.optString("loggedBy", iss.optString("reportedBy", "Engr. Field")),
+                    timestamp = iss.optLong("timestamp", System.currentTimeMillis()),
+                    status = iss.optString("status", "Pending"),
+                    isCritical = iss.optBoolean("isCritical", false)
+                )
+                projectDao.insertProjectIssue(issue)
+            }
+
+            for (i in 0 until auditArray.length()) {
+                val al = auditArray.getJSONObject(i)
+                val auditLog = AuditLog(
+                    id = al.getLong("id"),
+                    projectId = if (al.has("projectId") && al.getLong("projectId") != -1L) al.getLong("projectId") else null,
+                    actionType = al.getString("actionType"),
+                    details = al.getString("details"),
+                    oldValue = al.optString("oldValue", ""),
+                    newValue = al.optString("newValue", ""),
+                    user = al.optString("user", "System"),
+                    timestamp = al.optLong("timestamp", System.currentTimeMillis())
+                )
+                projectDao.insertAuditLog(auditLog)
+            }
+
+            for (i in 0 until sdpPlansArray.length()) {
+                val sp = sdpPlansArray.getJSONObject(i)
+                val plan = SdpPlan(
+                    id = sp.getLong("id"),
+                    projectId = sp.getLong("projectId"),
+                    planName = sp.optString("planName", sp.optString("name", "SDP Plan")),
+                    pdfFileUrl = sp.optString("pdfFileUrl", ""),
+                    version = sp.optInt("version", 1),
+                    isActive = sp.optBoolean("isActive", true),
+                    uploadedDate = sp.optString("uploadedDate", ""),
+                    uploadedBy = sp.optString("uploadedBy", "Engr. Admin"),
+                    description = sp.optString("description", "")
+                )
+                projectDao.insertSdpPlan(plan)
+            }
+
+            for (i in 0 until sdpLotsArray.length()) {
+                val sl = sdpLotsArray.getJSONObject(i)
+                val lot = SdpLot(
+                    id = sl.getLong("id"),
+                    projectId = sl.optLong("projectId", 1L),
+                    sdpPlanId = sl.getLong("sdpPlanId"),
+                    blockNumber = sl.optString("blockNumber", sl.optInt("blockNumber", 1).toString()),
+                    lotNumber = sl.optString("lotNumber", sl.optInt("lotNumber", 1).toString()),
+                    housingUnitNumber = sl.optString("housingUnitNumber", ""),
+                    lotAreaSqM = sl.optDouble("lotAreaSqM", sl.optDouble("areaSqm", 0.0)),
+                    polygonNormalizedJson = sl.optString("polygonNormalizedJson", sl.optString("boundaryJson", "")),
+                    isActive = sl.optBoolean("isActive", true),
+                    description = sl.optString("description", ""),
+                    createdBy = sl.optString("createdBy", ""),
+                    createdDate = sl.optString("createdDate", ""),
+                    lastModifiedBy = sl.optString("lastModifiedBy", ""),
+                    lastModifiedDate = sl.optString("lastModifiedDate", "")
+                )
+                projectDao.insertSdpLot(lot)
+            }
+
+            for (i in 0 until sdpRoadsArray.length()) {
+                val sr = sdpRoadsArray.getJSONObject(i)
+                val road = SdpRoad(
+                    id = sr.getLong("id"),
+                    projectId = sr.optLong("projectId", 1L),
+                    sdpPlanId = sr.getLong("sdpPlanId"),
+                    roadName = sr.optString("roadName", sr.optString("name", "Road")),
+                    roadType = sr.optString("roadType", "Main Road"),
+                    polylineNormalizedJson = sr.optString("polylineNormalizedJson", ""),
+                    isActive = sr.optBoolean("isActive", true),
+                    createdBy = sr.optString("createdBy", ""),
+                    createdDate = sr.optString("createdDate", ""),
+                    lastModifiedBy = sr.optString("lastModifiedBy", ""),
+                    lastModifiedDate = sr.optString("lastModifiedDate", "")
+                )
+                projectDao.insertSdpRoad(road)
+            }
+
+            for (i in 0 until sdpLotProgressArray.length()) {
+                val slp = sdpLotProgressArray.getJSONObject(i)
+                val lotProgress = SdpLotProgress(
+                    id = slp.getLong("id"),
+                    projectId = slp.optLong("projectId", 1L),
+                    sdpPlanId = slp.getLong("sdpPlanId"),
+                    sdpLotId = slp.getLong("sdpLotId"),
+                    physicalProgress = slp.optInt("physicalProgress", slp.optDouble("progressPercent", 0.0).toInt()),
+                    constructionStatus = slp.optString("constructionStatus", slp.optString("status", "Not Started")),
+                    currentActivity = slp.optString("currentActivity", ""),
+                    startDate = slp.optString("startDate", ""),
+                    targetCompletionDate = slp.optString("targetCompletionDate", ""),
+                    contractor = slp.optString("contractor", ""),
+                    remarks = slp.optString("remarks", ""),
+                    billingStatus = slp.optString("billingStatus", "NOT BILLED"),
+                    billingDate = slp.optString("billingDate", ""),
+                    billedBy = slp.optString("billedBy", ""),
+                    billingReference = slp.optString("billingReference", ""),
+                    billingRemarks = slp.optString("billingRemarks", ""),
+                    createdBy = slp.optString("createdBy", ""),
+                    createdDate = slp.optString("createdDate", ""),
+                    lastModifiedBy = slp.optString("lastModifiedBy", ""),
+                    lastModifiedDate = slp.optString("lastModifiedDate", "")
+                )
+                projectDao.insertOrUpdateLotProgress(lotProgress)
+            }
+
+            for (i in 0 until sdpLotInspectionsArray.length()) {
+                val sli = sdpLotInspectionsArray.getJSONObject(i)
+                val lotInsp = SdpLotInspection(
+                    id = sli.getLong("id"),
+                    projectId = sli.optLong("projectId", 1L),
+                    sdpPlanId = sli.optLong("sdpPlanId", 1L),
+                    sdpLotId = sli.getLong("sdpLotId"),
+                    inspectionTimestamp = sli.optLong("inspectionTimestamp", System.currentTimeMillis()),
+                    inspectionDate = sli.optString("inspectionDate", ""),
+                    inspectedBy = sli.optString("inspectedBy", sli.optString("inspectorName", "Engr. Inspector")),
+                    physicalProgress = sli.optInt("physicalProgress", 0),
+                    constructionStatus = sli.optString("constructionStatus", "Ongoing"),
+                    currentActivity = sli.optString("currentActivity", ""),
+                    contractor = sli.optString("contractor", ""),
+                    remarks = sli.optString("remarks", sli.optString("findings", "")),
+                    billingStatus = sli.optString("billingStatus", "NOT BILLED"),
+                    billingReference = sli.optString("billingReference", ""),
+                    createdDate = sli.optString("createdDate", "")
+                )
+                projectDao.insertSdpLotInspection(lotInsp)
             }
 
             val formattedTime = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault()).format(Date())
