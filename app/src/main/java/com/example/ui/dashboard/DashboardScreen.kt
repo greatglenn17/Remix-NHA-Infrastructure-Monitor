@@ -435,12 +435,12 @@ fun DashboardScreen(
                             }
                         } else {
                             Text(
-                                text = if (currentUser.role == UserRole.FIELD_ENGINEER) "No assigned projects found for ${currentUser.name}" else "No projects match the selected filters",
+                                text = if (currentUser.role != UserRole.SUPER_ADMIN) "No assigned projects found for ${currentUser.name}" else "No projects match the selected filters",
                                 style = MaterialTheme.typography.titleMedium.copy(color = Color.Gray, textAlign = TextAlign.Center)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (currentUser.role == UserRole.FIELD_ENGINEER) "Contact your Supervising Engineer / Admin to assign a project to your account" else "Try clearing search or changing status/type filters",
+                                text = if (currentUser.role != UserRole.SUPER_ADMIN) "Contact your Principal Engineer / Super Admin to assign a project to your account" else "Try clearing search or changing status/type filters",
                                 style = MaterialTheme.typography.bodySmall.copy(color = Color.LightGray, textAlign = TextAlign.Center)
                             )
                         }

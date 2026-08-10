@@ -194,7 +194,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
-            if (user.role == UserRole.SUPER_ADMIN || user.role == UserRole.ENGINEER_ADMIN) {
+            if (user.role == UserRole.SUPER_ADMIN) {
                 projects
             } else {
                 projects.filter { project ->

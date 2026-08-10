@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.0.6%20%28Build%20106%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.0.7%20%28Build%20107%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, and multi-user cloud synchronization.
@@ -13,10 +13,21 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.0.6`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.0.6_Build106.apk`** to download the installation package.
+2. Tap the latest release (`v1.0.7`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.0.7_Build107.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
+
+---
+
+## 👥 Role-Based Project Access Control (RBAC)
+
+| User Role | Project Visibility & Access Rights |
+| :--- | :--- |
+| **👑 Super Admin** | **Global View:** Access and control **ALL** infrastructure projects across Region III. |
+| **👷 Engineer Admin** | **Assigned View:** Access and manage **ONLY** assigned projects or created projects. |
+| **🛠️ Field Engineer** | **Assigned View:** View and log field reports, site issues, and weather logs for assigned projects. |
+| **👁️ Viewer** | **Read-Only View:** View assigned project dashboards, progress charts, and documents. |
 
 ---
 
@@ -25,7 +36,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### 📊 1. Multi-Project Infrastructure Dashboard
 - Real-time project tracking across all regional housing sites.
 - Automated calculation of physical accomplishment percentage, target schedule, and **Slippage (% variance)**.
-- Filter by project status (*On-going*, *Behind Schedule*, *Completed*, *Suspended*).
+- Role-scoped project visibility enforcing strict access boundaries.
 
 ### 🔍 2. Field Inspection & Photo Documentation
 - On-site digital inspection logs with findings and status tags.
@@ -57,7 +68,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 | **Role Elevation** | Protected by a secret Principal Engineer PIN required for Admin promotion |
 | **Cloud Encryption** | Payload encrypted with AES-256-GCM using user-derived key material |
 | **Data Protection** | Local data stored via Android `EncryptedSharedPreferences` & Room Database |
-| **Role-Based Access** | 4-Tier RBAC (*Viewer*, *Field Engineer*, *Engineer Admin*, *Super Admin*) |
+| **Role-Based Access** | 4-Tier RBAC (*Super Admin*, *Engineer Admin*, *Field Engineer*, *Viewer*) |
 
 ---
 
@@ -75,9 +86,9 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
-| **`v1.0.6`** | **`106`** | 🛡️ Fixed 4 critical security vulnerabilities (SHA-256 pass hashing, PIN protection, registration rules) + expanded cloud sync to all 19 database tables |
+| **`v1.0.7`** | **`107`** | 🔐 Enforced Role Scoping: Super Admin views **ALL** projects; Engineer Admin & Field Engineer view **ONLY** assigned projects |
+| **`v1.0.6`** | **`106`** | 🛡️ Fixed 4 critical security vulnerabilities (SHA-256 pass hashing, PIN protection) + expanded cloud sync to all 19 database tables |
 | **`v1.0.5`** | **`105`** | Resolved startup race conditions and replaced sample import with safe cloud sync |
-| **`v1.0.4`** | **`104`** | Added Subdivision Plan (SDP) interactive mapping and daily weather charts |
 
 ---
 
