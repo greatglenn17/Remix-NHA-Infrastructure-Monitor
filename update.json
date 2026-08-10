@@ -1,0 +1,7 @@
+{
+  "versionCode": 107,
+  "versionName": "1.0.7",
+  "releaseNotes": "v1.0.7: Enforced Role-Based Access Control — Super Admin views all projects; Engineer Admin and Field Engineers view assigned projects.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.0.7_Build107.apk",
+  "isMandatory": false
+}

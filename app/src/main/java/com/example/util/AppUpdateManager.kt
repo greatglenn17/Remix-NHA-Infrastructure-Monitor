@@ -35,7 +35,7 @@ object AppUpdateManager {
         val currentVersionCode = BuildConfig.VERSION_CODE
         try {
             // Default mock/live update config check for demonstration & live sync
-            val targetUrl = customUpdateUrl ?: "https://raw.githubusercontent.com/glenn/nha-monitor/main/update.json"
+            val targetUrl = customUpdateUrl ?: "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
             val connection = URL(targetUrl).openConnection() as HttpURLConnection
             connection.connectTimeout = 3000
             connection.readTimeout = 3000
@@ -63,13 +63,13 @@ object AppUpdateManager {
             // Fallback simulated update info for local testing
         }
 
-        // Return latest simulated state
-        val mockLatestCode = currentVersionCode // set higher to test prompt
+        // Return latest state
+        val mockLatestCode = currentVersionCode
         AppUpdateInfo(
             latestVersionCode = mockLatestCode,
             latestVersionName = "v${BuildConfig.VERSION_NAME}",
             releaseNotes = "System is up to date with latest Bulacan District Office features.",
-            apkDownloadUrl = "https://github.com/nha-monitor/releases/download/latest/app-release.apk",
+            apkDownloadUrl = "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases",
             isMandatory = false,
             isUpdateAvailable = false
         )
@@ -94,7 +94,7 @@ object AppUpdateManager {
         onDownloadStarted()
 
         val validUrl = if (apkUrl.isBlank() || apkUrl.contains("example.com") || apkUrl.contains("nha-monitor/releases")) {
-            "https://raw.githubusercontent.com/glenn/nha-monitor/main/update.json" // Test target URL
+            "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
         } else {
             apkUrl
         }
