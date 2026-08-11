@@ -606,15 +606,22 @@ class GoogleDriveSyncManager(
 
             _syncStatusMessage.value = "Verifying cryptographic checksum & integrity..."
             val envelopeObj = JSONObject(backupEnvelopeContent)
-            val expectedChecksum = envelopeObj.getString("checksumSha256")
-            val encryptedData = envelopeObj.getString("encryptedData")
+            val expectedChecksum = envelopeObj.optString("checksumSha256", null)
+            val encryptedData = envelopeObj.optString("encryptedData", null)
 
-            val decryptedJson = decryptPayload(encryptedData, _driveAccountEmail.value)
-            val actualChecksum = calculateSha256(decryptedJson)
+            val decryptedJson: String
+            if (!encryptedData.isNullOrBlank() && !expectedChecksum.isNullOrBlank()) {
+                val decrypted = decryptPayload(encryptedData, _driveAccountEmail.value)
+                val actualChecksum = calculateSha256(decrypted)
 
-            if (expectedChecksum != actualChecksum) {
-                _syncStatusMessage.value = "Integrity check failed: Checksum mismatch."
-                return@withContext DriveSyncResult.Error("Backup payload corrupted or tampered! Integrity SHA-256 check failed.")
+                if (expectedChecksum != actualChecksum) {
+                    _syncStatusMessage.value = "Integrity check failed: Checksum mismatch."
+                    return@withContext DriveSyncResult.Error("Backup payload corrupted or tampered! Integrity SHA-256 check failed.")
+                }
+                decryptedJson = decrypted
+            } else {
+                // Direct unencrypted JSON or unwrapped payload
+                decryptedJson = backupEnvelopeContent
             }
 
             _syncStatusMessage.value = "Importing records into Room database..."

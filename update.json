@@ -1,7 +1,7 @@
 {
-  "versionCode": 115,
-  "versionName": "1.1.5",
-  "releaseNotes": "v1.1.5: 🛡️ Guaranteed Zero-Data-Loss In-Place Update & Permanent Account Preservation — guarantees all subordinate accounts and project data are 100% preserved during updates.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.5_Build115.apk",
+  "versionCode": 116,
+  "versionName": "1.1.6",
+  "releaseNotes": "v1.1.6: 🔧 Universal Cloud Sync Envelope Parsing Fix — resolved 'No value for checksumSha256' error to support both encrypted and direct JSON cloud payloads.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.6_Build116.apk",
   "isMandatory": false
 }
