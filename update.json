@@ -1,7 +1,7 @@
 {
-  "versionCode": 118,
-  "versionName": "1.1.8",
-  "releaseNotes": "v1.1.8: 👥 Strict Role Scoping & Duplicate Card Prevention — Super Admin syncs & views all subordinate projects, Engineer Admins only view their assigned projects, duplicate project cards deduplicated.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.8_Build118.apk",
+  "versionCode": 119,
+  "versionName": "1.1.9",
+  "releaseNotes": "v1.1.9: 🎯 Scope of Works Exact Field Alignment — aligned project Scope of Works rendering between Super Admin and subordinate screens to match Jam Princess's exact input.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.9_Build119.apk",
   "isMandatory": false
 }

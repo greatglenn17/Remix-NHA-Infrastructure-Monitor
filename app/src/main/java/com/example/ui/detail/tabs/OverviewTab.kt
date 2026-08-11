@@ -163,7 +163,7 @@ fun OverviewTab(
                             }
                             list
                         }
-                        parsedScopeItems.forEachIndexed { index, (name, amt, weight) ->
+                        parsedScopeItems.filter { it.first.isNotBlank() }.forEachIndexed { index, (name, amt, weight) ->
                             Surface(
                                 color = Color(0xFF1A2332),
                                 shape = RoundedCornerShape(6.dp),
