@@ -1,11 +1,72 @@
 {
-    "projects":  [
-
-                 ],
-    "registeredUsers":  [
-
-                        ],
-    "backupTimestamp":  1786435764864,
+    "version":  3,
     "appName":  "NHA Infrastructure Monitor",
-    "version":  3
+    "projects":  [
+                     {
+                         "contractDurationDays":  215,
+                         "completionDateRevised":  "2026-07-16",
+                         "assignedStaff":  "Jam Princess M. Francisco",
+                         "implementingOffice":  "Bulacan District Office",
+                         "dateStarted":  "2024-12-10",
+                         "completionDateOriginal":  "2025-07-12",
+                         "contractCostOriginal":  0,
+                         "targetAccomplishment":  0,
+                         "id":  101,
+                         "actualAccomplishment":  0,
+                         "scopeOfWork":  "Housing Project - 130 Units, Land Area: 10928 Sq. M.",
+                         "contractor":  "ARR Construction",
+                         "contractCostRevised":  0,
+                         "projectType":  "Housing Project",
+                         "location":  "Brgy. Anyatam, San Ildefonso, Bulacan",
+                         "status":  "ON-GOING",
+                         "name":  "St. Ildefonsus Village Resettlement Project Phase 2"
+                     }
+                 ],
+    "backupTimestamp":  1786439097271,
+    "registeredUsers":  [
+                            {
+                                "email":  "great.glenn17@gmail.com",
+                                "position":  "Principal Engineer C",
+                                "name":  "Engr. Glenn C. Aprovechado",
+                                "office":  "Bulacan District Office",
+                                "role":  "SUPER_ADMIN"
+                            },
+                            {
+                                "email":  "jamprincessm@gmail.com",
+                                "position":  "Senior Architect A",
+                                "name":  "Architect Jam Princess M. Francisco",
+                                "office":  "Bulacan District Office",
+                                "role":  "ENGINEER_ADMIN"
+                            }
+                        ],
+    "pendingDocuments":  [
+                             {
+                                 "status":  "PENDING SUPER ADMIN APPROVAL",
+                                 "documentName":  "Disbursement Voucher - Billing 1",
+                                 "remarks":  "Submitted by Jam Princess M. Francisco",
+                                 "id":  1001,
+                                 "projectId":  101
+                             },
+                             {
+                                 "status":  "APPROVED",
+                                 "documentName":  "Contract Agreement - ARR Construction",
+                                 "remarks":  "Signed contract document",
+                                 "id":  1002,
+                                 "projectId":  101
+                             },
+                             {
+                                 "status":  "VERIFIED",
+                                 "documentName":  "Subdivision Layout Plan - Phase 2",
+                                 "remarks":  "Approved by Bulacan District Office",
+                                 "id":  1003,
+                                 "projectId":  101
+                             },
+                             {
+                                 "status":  "APPROVED",
+                                 "documentName":  "Notice to Proceed (NTP)",
+                                 "remarks":  "Effective Dec 10, 2024",
+                                 "id":  1004,
+                                 "projectId":  101
+                             }
+                         ]
 }
