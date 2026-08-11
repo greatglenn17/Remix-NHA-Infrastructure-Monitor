@@ -167,13 +167,18 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
 
-        // Startup cloud restore (non-destructive)
+        // Bi-Directional Startup Cloud Sync:
+        // Pushes local projects to Cloud Hub AND restores cloud projects
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             if (_isLoggedIn.value) {
                 try {
+                    val localCount = database.projectDao().getAllProjectsList().size
+                    if (localCount > 0) {
+                        googleDriveSyncManager.backupToGoogleDrive()
+                    }
                     restoreFromGoogleDrive()
                 } catch (e: Exception) {
-                    android.util.Log.w("ProjectViewModel", "Startup cloud restore skipped: ${e.message}")
+                    android.util.Log.w("ProjectViewModel", "Startup bi-directional cloud sync skipped: ${e.message}")
                 }
             }
         }
@@ -185,6 +190,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 if (_isLoggedIn.value) {
                     try {
                         val prevCount = rawProjects.value.size
+                        val localCount = database.projectDao().getAllProjectsList().size
+                        if (localCount > 0) {
+                            googleDriveSyncManager.backupToGoogleDrive()
+                        }
                         restoreFromGoogleDrive()
                         val newCount = rawProjects.value.size
                         if (newCount > prevCount && _currentUserAccount.value.role == UserRole.SUPER_ADMIN) {
