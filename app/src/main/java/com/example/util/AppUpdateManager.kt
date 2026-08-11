@@ -93,8 +93,8 @@ object AppUpdateManager {
         ).show()
         onDownloadStarted()
 
-        val validUrl = if (apkUrl.isBlank() || apkUrl.contains("example.com") || apkUrl.contains("nha-monitor/releases")) {
-            "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
+        val validUrl = if (apkUrl.isBlank() || apkUrl.contains("example.com") || apkUrl.contains("update.json")) {
+            "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.0_Build110.apk"
         } else {
             apkUrl
         }
@@ -108,7 +108,8 @@ object AppUpdateManager {
                 setMimeType("application/vnd.android.package-archive")
             }
 
-            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? DownloadManager
+                ?: (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager)
             val downloadId = downloadManager.enqueue(request)
 
             val onComplete = object : BroadcastReceiver() {
@@ -116,10 +117,10 @@ object AppUpdateManager {
                     val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                     if (id == downloadId) {
                         try { context.unregisterReceiver(this) } catch (_: Exception) {}
-                        if (file.exists() && file.length() > 0) {
+                        if (file.exists() && file.length() > 500000) { // Valid APK size check (>500KB)
                             installApk(context, file)
                         } else {
-                            downloadDirectFallback(context, validUrl, file, onDownloadFailed)
+                            openBrowserDownloadFallback(context)
                         }
                     }
                 }
@@ -132,53 +133,21 @@ object AppUpdateManager {
                 context.registerReceiver(onComplete, filter)
             }
         } catch (e: Exception) {
-            downloadDirectFallback(context, validUrl, file, onDownloadFailed)
+            openBrowserDownloadFallback(context)
         }
     }
 
-    private fun downloadDirectFallback(
-        context: Context,
-        apkUrl: String,
-        targetFile: File,
-        onDownloadFailed: (String) -> Unit
-    ) {
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val url = URL(apkUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 8000
-                connection.readTimeout = 15000
-                connection.connect()
-
-                if (connection.responseCode in 200..299) {
-                    connection.inputStream.use { input ->
-                        targetFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    withContext(Dispatchers.Main) {
-                        installApk(context, targetFile)
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(
-                            context,
-                            "App is currently at the latest build v${BuildConfig.VERSION_NAME}. Live server will stream future APK releases.",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                        onDownloadFailed("Update package unavailable.")
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        context,
-                        "Your app is on the latest build v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}).",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                    onDownloadFailed(e.message ?: "Download failed.")
-                }
+    private fun openBrowserDownloadFallback(context: Context) {
+        try {
+            val browserIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases")
+            ).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
+            context.startActivity(browserIntent)
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Please visit GitHub releases to download the update.", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 

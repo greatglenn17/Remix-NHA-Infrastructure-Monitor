@@ -1,7 +1,7 @@
 {
-  "versionCode": 110,
-  "versionName": "1.1.0",
-  "releaseNotes": "v1.1.0: Guaranteed Super Admin Notifications on all new Engineer Admin / Field Engineer account registrations and role elevations.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.0_Build110.apk",
+  "versionCode": 111,
+  "versionName": "1.1.1",
+  "releaseNotes": "v1.1.1: Fixed in-app auto updater download target URL & added automatic browser fallback.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.1_Build111.apk",
   "isMandatory": false
 }

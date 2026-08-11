@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.1.0%20%28Build%20110%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.1.1%20%28Build%20111%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,69 +13,10 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.1.0`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.1.0_Build110.apk`** to download the installation package.
+2. Tap the latest release (`v1.1.1`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.1.1_Build111.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
-
----
-
-## 🔔 Real-Time Notifications & Auditing
-
-- **Super Admin Alerts:** Automatic status bar notifications triggered for Super Admins when Engineer Admins, Field Engineers, or Viewers create projects, enter field data (weekly/monthly reports, daily weather, payments, issues), or register new accounts.
-- **Audit Log Engine:** Immutable timestamped record of device name, user account, action type, and parameter changes.
-
----
-
-## 👥 Role-Based Project Access Control (RBAC)
-
-| User Role | Project Visibility & Access Rights |
-| :--- | :--- |
-| **👑 Super Admin** | **Global View:** Access and control **ALL** infrastructure projects across Region III + Real-Time Activity Alerts. |
-| **👷 Engineer Admin** | **Assigned View:** Access and manage **ONLY** assigned projects or created projects. |
-| **🛠️ Field Engineer** | **Assigned View:** View and log field reports, site issues, and weather logs for assigned projects. |
-| **👁️ Viewer** | **Read-Only View:** View assigned project dashboards, progress charts, and documents. |
-
----
-
-## 🌟 Key Features & Capabilities
-
-### 📊 1. Multi-Project Infrastructure Dashboard
-- Real-time project tracking across all regional housing sites.
-- Automated calculation of physical accomplishment percentage, target schedule, and **Slippage (% variance)**.
-- Role-scoped project visibility enforcing strict access boundaries.
-
-### 🔍 2. Field Inspection & Photo Documentation
-- On-site digital inspection logs with findings and status tags.
-- Photo gallery with timestamping and category tagging (*Progress*, *Defects*, *Site Inspection*).
-
-### ☀️ 3. Daily Hourly Weather Chart & Automated Slippage Analysis
-- Hourly weather tracking (08:00 to 17:00) with condition logging (*Fair*, *Cloudy*, *Rain Showers*, *Stormy*).
-- Auto-calculation of **workable vs. unworkable days** to justify contract time extensions.
-
-### 🗺️ 4. Subdivision Plan (SDP) Block & Lot Interactive Mapping
-- Interactive vector mapping of housing blocks, lot boundaries, and road networks.
-- Individual lot progress tracking, contractor assignments, and developer billing verification.
-
-### 💰 5. Sub-Logs, Variation Orders & Billing Payments
-- Full ledger tracking for Time Extensions, Variation Orders (VO), Work Suspensions, and Resumption Orders.
-- Billing voucher records with gross amount, net payment, and balance tracking.
-
-### ☁️ 6. AES-256 Encrypted Google Drive Cloud Synchronization
-- One-tap cloud backup and restore powered by Google Drive REST API.
-- All 19 database tables serialized with **AES-256-GCM encryption** and **SHA-256 cryptographic checksum integrity verification**.
-
----
-
-## 🛡️ Security Architecture
-
-| Security Feature | Implementation Detail |
-| :--- | :--- |
-| **Password Storage** | Cryptographic SHA-256 hashing applied to all local credentials (`hashPassword()`) |
-| **Role Elevation** | Protected by a secret Principal Engineer PIN (clean UI text with no hardcoded examples) |
-| **Cloud Encryption** | Payload encrypted with AES-256-GCM using user-derived key material |
-| **Data Protection** | Local data stored via Android `EncryptedSharedPreferences` & Room Database |
-| **Role-Based Access** | 4-Tier RBAC (*Super Admin*, *Engineer Admin*, *Field Engineer*, *Viewer*) |
 
 ---
 
@@ -83,9 +24,9 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.1.1`** | **`111`** | 🔧 In-App Auto-Updater Download Fix: Corrected APK download target URL & added automatic browser fallback |
 | **`v1.1.0`** | **`110`** | 🔔 User Registration Notification Fix: Guaranteed Super Admin alert dispatch on all new Engineer Admin / Field Engineer registrations |
 | **`v1.0.9`** | **`109`** | 🔧 User Registration Resilience: Subordinates can register and sign in seamlessly regardless of Firebase Console provider state |
-| **`v1.0.8`** | **`108`** | 🔔 Real-time status bar notifications for Super Admin on project creation, data entry & user registrations + Secret PIN UI security fix |
 
 ---
 
