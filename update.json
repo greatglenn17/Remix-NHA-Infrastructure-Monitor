@@ -1,7 +1,7 @@
 {
-  "versionCode": 108,
-  "versionName": "1.0.8",
-  "releaseNotes": "v1.0.8: Real-Time Notifications for Super Admin on all app changes, project creations, field data entries, and user registrations + Secret PIN UI security fix.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.0.8_Build108.apk",
+  "versionCode": 109,
+  "versionName": "1.0.9",
+  "releaseNotes": "v1.0.9: Fixed user registration resilience so subordinates can register and sign in seamlessly regardless of Firebase Console provider settings.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.0.9_Build109.apk",
   "isMandatory": false
 }
