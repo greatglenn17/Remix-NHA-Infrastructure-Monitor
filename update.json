@@ -1,7 +1,7 @@
 {
-  "versionCode": 113,
-  "versionName": "1.1.3",
-  "releaseNotes": "v1.1.3: Real-Time Live Cloud Polling (15s) & Super Admin Instant Project Notifications — automatically syncs projects created by subordinates across all phones and alerts Super Admin.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.3_Build113.apk",
+  "versionCode": 114,
+  "versionName": "1.1.4",
+  "releaseNotes": "v1.1.4: Centralized Live Cloud Sync Hub & ONLINE Status Badge — seamlessly syncs projects across all devices without requiring individual OAuth login.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.4_Build114.apk",
   "isMandatory": false
 }
