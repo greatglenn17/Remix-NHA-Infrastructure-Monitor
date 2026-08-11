@@ -167,19 +167,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
 
-        // Bi-Directional Startup Cloud Sync:
-        // Pushes local projects to Cloud Hub AND restores cloud projects
+        // Bi-Directional Startup Cloud Sync with Room DB Deduplication
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (_isLoggedIn.value) {
-                try {
-                    val localCount = database.projectDao().getAllProjectsList().size
+            try {
+                cleanupDuplicateProjectsInDatabase()
+                if (_isLoggedIn.value) {
+                    val localCount = projectDao.getAllProjectsList().size
                     if (localCount > 0) {
                         googleDriveSyncManager.backupToGoogleDrive()
                     }
                     restoreFromGoogleDrive()
-                } catch (e: Exception) {
-                    android.util.Log.w("ProjectViewModel", "Startup bi-directional cloud sync skipped: ${e.message}")
                 }
+            } catch (e: Exception) {
+                android.util.Log.w("ProjectViewModel", "Startup bi-directional cloud sync skipped: ${e.message}")
             }
         }
 
@@ -189,8 +189,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 kotlinx.coroutines.delay(15000)
                 if (_isLoggedIn.value) {
                     try {
+                        cleanupDuplicateProjectsInDatabase()
                         val prevCount = rawProjects.value.size
-                        val localCount = database.projectDao().getAllProjectsList().size
+                        val localCount = projectDao.getAllProjectsList().size
                         if (localCount > 0) {
                             googleDriveSyncManager.backupToGoogleDrive()
                         }
@@ -224,7 +225,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
-            val deduplicated = projects.distinctBy { it.name.trim().lowercase() }
+            val deduplicated = projects.distinctBy { proj ->
+                proj.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
+            }
             if (user.role == UserRole.SUPER_ADMIN) {
                 // Super Admin sees ALL projects created by all subordinates & engineer admins
                 deduplicated
@@ -1877,6 +1880,23 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                 onComplete()
             }
+        }
+    }
+
+    private suspend fun cleanupDuplicateProjectsInDatabase() {
+        try {
+            val list = projectDao.getAllProjectsList()
+            val seen = HashSet<String>()
+            for (p in list) {
+                val key = p.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
+                if (seen.contains(key)) {
+                    projectDao.deleteProjectById(p.id)
+                } else {
+                    seen.add(key)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

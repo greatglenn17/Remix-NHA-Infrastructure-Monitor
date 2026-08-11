@@ -1,7 +1,7 @@
 {
-  "versionCode": 119,
-  "versionName": "1.1.9",
-  "releaseNotes": "v1.1.9: 🎯 Scope of Works Exact Field Alignment — aligned project Scope of Works rendering between Super Admin and subordinate screens to match Jam Princess's exact input.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.9_Build119.apk",
-  "isMandatory": false
+  "versionCode": 120,
+  "versionName": "1.2.0",
+  "releaseNotes": "v1.2.0: 🧹 Automatic Room Database Duplicate Purge & Normalized Card Deduplication — automatically deletes all pre-existing duplicate project cards on subordinate and admin devices.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.2.0_Build120.apk",
+  "isMandatory": true
 }
