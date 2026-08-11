@@ -1398,7 +1398,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
 
             // Notify Super Admin on ALL changes by Engineer Admin, Field Engineer, or User Registrations/Elevations!
-            if (currentAccount.role != UserRole.SUPER_ADMIN && actionType != "User Login" && actionType != "User Logout") {
+            val isRegistrationOrElevation = actionType.contains("Registration", ignoreCase = true) || actionType.contains("Elevation", ignoreCase = true)
+            val isNonSuperAdminAction = currentAccount.role != UserRole.SUPER_ADMIN && actionType != "User Login" && actionType != "User Logout"
+
+            if (isRegistrationOrElevation || isNonSuperAdminAction) {
                 var pName = ""
                 if (projectId != null) {
                     try {
@@ -1407,8 +1410,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 val notificationTitle = when {
-                    actionType.contains("Registration", ignoreCase = true) -> "New Account Registration (${currentAccount.role.label})"
-                    actionType.contains("Elevation", ignoreCase = true) -> "Role Elevation Alert (${currentAccount.role.label})"
+                    actionType.contains("Registration", ignoreCase = true) -> "New User Registration Alert"
+                    actionType.contains("Elevation", ignoreCase = true) -> "Role Elevation Alert"
                     actionType.contains("Creation", ignoreCase = true) || actionType.contains("Project", ignoreCase = true) -> "Project Activity by ${currentAccount.role.label}"
                     actionType.contains("Report", ignoreCase = true) -> "Report Submitted by ${currentAccount.role.label}"
                     actionType.contains("Payment", ignoreCase = true) -> "Disbursement Added by ${currentAccount.role.label}"
