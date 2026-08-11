@@ -653,11 +653,18 @@ class GoogleDriveSyncManager(
             val projectDao = db.projectDao()
             val reportDao = db.reportDao()
 
+            val existingProjects = projectDao.getAllProjectsList()
+            val existingNameMap = existingProjects.associateBy { it.name.trim().lowercase() }
+
             for (i in 0 until projectsArray.length()) {
                 val p = projectsArray.getJSONObject(i)
+                val pName = p.getString("name").trim()
+                val pNameKey = pName.lowercase()
+                val matchedId = existingNameMap[pNameKey]?.id ?: p.getLong("id")
+
                 val project = Project(
-                    id = p.getLong("id"),
-                    name = p.getString("name"),
+                    id = matchedId,
+                    name = pName,
                     location = p.getString("location"),
                     implementingOffice = p.getString("implementingOffice"),
                     contractor = p.getString("contractor"),
@@ -675,6 +682,18 @@ class GoogleDriveSyncManager(
                     assignedStaff = p.optString("assignedStaff", "Engr. Unassigned")
                 )
                 projectDao.insertProject(project)
+            }
+
+            // Clean up any remaining duplicate project rows in Room DB by name
+            val updatedList = projectDao.getAllProjectsList()
+            val seenNames = HashSet<String>()
+            for (proj in updatedList) {
+                val key = proj.name.trim().lowercase()
+                if (seenNames.contains(key)) {
+                    projectDao.deleteProjectById(proj.id)
+                } else {
+                    seenNames.add(key)
+                }
             }
 
             for (i in 0 until docsArray.length()) {

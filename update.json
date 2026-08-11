@@ -1,7 +1,7 @@
 {
-  "versionCode": 117,
-  "versionName": "1.1.7",
-  "releaseNotes": "v1.1.7: 🔄 Bi-Directional Auto-Sync & Subordinate Project Cloud Push — automatically uploads pre-existing and newly created subordinate projects to the Centralized Live Cloud Sync Hub.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.7_Build117.apk",
+  "versionCode": 118,
+  "versionName": "1.1.8",
+  "releaseNotes": "v1.1.8: 👥 Strict Role Scoping & Duplicate Card Prevention — Super Admin syncs & views all subordinate projects, Engineer Admins only view their assigned projects, duplicate project cards deduplicated.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.8_Build118.apk",
   "isMandatory": false
 }

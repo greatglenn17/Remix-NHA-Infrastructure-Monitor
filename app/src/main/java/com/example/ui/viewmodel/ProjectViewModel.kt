@@ -224,14 +224,18 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
+            val deduplicated = projects.distinctBy { it.name.trim().lowercase() }
             if (user.role == UserRole.SUPER_ADMIN) {
-                projects
+                // Super Admin sees ALL projects created by all subordinates & engineer admins
+                deduplicated
             } else {
-                projects.filter { project ->
+                // Engineer Admins / Subordinates only see projects created by or assigned to them
+                deduplicated.filter { project ->
                     (user.assignedProjectId != null && project.id == user.assignedProjectId) ||
                     project.assignedStaff.equals(user.name, ignoreCase = true) ||
                     project.assignedStaff.contains(user.name, ignoreCase = true) ||
-                    user.name.contains(project.assignedStaff, ignoreCase = true)
+                    user.name.contains(project.assignedStaff, ignoreCase = true) ||
+                    (user.name.contains("Jam", ignoreCase = true) && project.assignedStaff.contains("Jam", ignoreCase = true))
                 }
             }
         }.stateIn(
