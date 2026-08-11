@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.1.2%20%28Build%20112%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.1.3%20%28Build%20113%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.1.2`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.1.2_Build112.apk`** to download the installation package.
+2. Tap the latest release (`v1.1.3`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.1.3_Build113.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.1.3`** | **`113`** | ⚡ Live 15s Cloud Sync & Subordinate Project Alerts: Real-time background sync loop automatically fetches newly created projects and alerts Super Admin |
 | **`v1.1.2`** | **`112`** | ☁️ Cross-Device User Registration Cloud Sync: Registered subordinate accounts are now automatically synchronized across all phones via Google Drive |
 | **`v1.1.1`** | **`111`** | 🔧 In-App Auto-Updater Download Fix: Corrected APK download target URL & added automatic browser fallback |
 | **`v1.1.0`** | **`110`** | 🔔 User Registration Notification Fix: Guaranteed Super Admin alert dispatch on all new Engineer Admin / Field Engineer registrations |

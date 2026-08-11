@@ -13,7 +13,9 @@ import com.example.data.model.*
 import com.example.data.remote.DriveSyncResult
 import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
+import com.example.util.AppNotificationManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -27,6 +29,8 @@ private data class FilterParams(
 
 class ProjectViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val projectDao: com.example.data.local.ProjectDao
+    private val reportDao: com.example.data.local.ReportDao
     private val repository: ProjectRepository
     private val googleDriveSyncManager: GoogleDriveSyncManager
     private val authManager: AuthManager = AuthManager(application)
@@ -115,7 +119,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = AppDatabase.getDatabase(application, viewModelScope)
-        repository = ProjectRepository(database.projectDao(), database.reportDao())
+        projectDao = database.projectDao()
+        reportDao = database.reportDao()
+        repository = ProjectRepository(projectDao, reportDao)
         googleDriveSyncManager = GoogleDriveSyncManager(application, database)
         notificationDao = database.notificationDao()
 
@@ -177,6 +183,30 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     restoreFromGoogleDrive()
                 } catch (e: Exception) {
                     android.util.Log.w("ProjectViewModel", "Startup cloud restore skipped: ${e.message}")
+                }
+            }
+        }
+
+        // Live Cloud Polling every 15 seconds for real-time subordinate updates & notifications
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            while (true) {
+                kotlinx.coroutines.delay(15000)
+                if (_isLoggedIn.value) {
+                    try {
+                        val prevCount = rawProjects.value.size
+                        restoreFromGoogleDrive()
+                        val newCount = rawProjects.value.size
+                        if (newCount > prevCount && _currentUserAccount.value.role == UserRole.SUPER_ADMIN) {
+                            val latestProject = rawProjects.value.maxByOrNull { it.id }
+                            if (latestProject != null) {
+                                AppNotificationManager.sendAdminNotification(
+                                    getApplication(),
+                                    "New Project Synced: ${latestProject.name}",
+                                    "A new project '${latestProject.name}' by ${latestProject.assignedStaff} was synced from cloud."
+                                )
+                            }
+                        }
+                    } catch (_: Exception) {}
                 }
             }
         }
@@ -964,7 +994,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private fun ensureWeatherLogsForProject(projectId: Long) {
         viewModelScope.launch {
             try {
-                val existing = repository.getDailyWeather(projectId).first()
+                val existing = reportDao.getDailyWeatherForProject(projectId).first()
                 if (existing.isEmpty()) {
                     val weatherList = mutableListOf<DailyHourlyWeather>()
                     val monthsToPopulate = listOf(
@@ -1003,7 +1033,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                             )
                         }
                     }
-                    repository.insertDailyWeatherList(weatherList)
+                    reportDao.insertDailyWeatherList(weatherList)
                 }
             } catch (e: Exception) {
                 // Ignore if any issue
@@ -1058,7 +1088,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actualAccomplishment = 0.0,
                 assignedStaff = assignedStaff.ifBlank { currentUserAccount.value.name }
             )
-            val newId = repository.insertProject(newProject)
+            val newId = repository.insertProject(newProject, currentUserAccount.value.role)
 
             // Seed default core document checklist for new project
             val coreDocs = listOf(
@@ -1069,7 +1099,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 PendingDocument(projectId = newId, documentName = "Quality Control Material Testing Plan", status = "Pending", remarks = "For submission", isCoreChecklist = true),
                 PendingDocument(projectId = newId, documentName = "As-Built Plans & Turnover Docs", status = "Pending", remarks = "Completion stage requirement", isCoreChecklist = true)
             )
-            coreDocs.forEach { repository.insertPendingDocument(it) }
+            coreDocs.forEach { projectDao.insertPendingDocument(it) }
 
             logAuditAction(
                 projectId = newId,
@@ -1092,7 +1122,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun updateProjectMaster(project: Project) {
         viewModelScope.launch {
             val previousStatus = selectedProject.value?.status ?: "Unknown"
-            repository.updateProject(project)
+            repository.updateProject(project, currentUserAccount.value.role)
             logAuditAction(
                 projectId = project.id,
                 actionType = "Project Edit",
@@ -1108,7 +1138,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             selectedProject.value?.let { current ->
                 if (current.id == projectId) {
                     val updated = current.copy(status = newStatus)
-                    repository.updateProject(updated)
+                    repository.updateProject(updated, currentUserAccount.value.role)
                     logAuditAction(
                         projectId = projectId,
                         actionType = "Project Edit",
@@ -1131,7 +1161,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 oldValue = "Project ID: $projectId, Name: ${projectToDelete?.name ?: ""}",
                 newValue = ""
             )
-            repository.deleteProjectById(projectId)
+            repository.deleteProjectById(projectId, currentUserAccount.value.role)
             if (_selectedProjectId.value == projectId) {
                 _selectedProjectId.value = null
             }
@@ -1149,7 +1179,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             val p = selectedProject.value ?: return@launch
-            val existingExtensions = repository.getTimeExtensions(projectId).first()
+            val existingExtensions = projectDao.getTimeExtensionsForProject(projectId).first()
             val sumOfDays = existingExtensions.sumOf { it.noOfDays } + noOfDays
             val revisedDurationDays = p.contractDurationDays + sumOfDays
             
@@ -1169,11 +1199,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 revisedCompletionDate = computedRevisedDate,
                 remarks = remarks
             )
-            repository.insertTimeExtension(extension)
+            projectDao.insertTimeExtension(extension)
 
             // Update project master revised completion date
             val updated = p.copy(completionDateRevised = computedRevisedDate)
-            repository.updateProject(updated)
+            projectDao.updateProject(updated)
 
             logAuditAction(
                 projectId = projectId,
@@ -1204,11 +1234,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 approvalDate = "2026-08-01",
                 remarks = remarks
             )
-            repository.insertVariationOrder(vo)
+            projectDao.insertVariationOrder(vo)
 
             selectedProject.value?.let { p ->
                 val updated = p.copy(contractCostRevised = newRevisedCost)
-                repository.updateProject(updated)
+                projectDao.updateProject(updated)
             }
 
             logAuditAction(
@@ -1240,9 +1270,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 reason = reason,
                 remarks = remarks
             )
-            repository.insertWorkSuspensionOrder(suspension)
+            projectDao.insertWorkSuspensionOrder(suspension)
             selectedProject.value?.let { p ->
-                repository.updateProject(p.copy(status = ProjectStatus.SUSPENDED.label))
+                projectDao.updateProject(p.copy(status = ProjectStatus.SUSPENDED.label))
             }
 
             logAuditAction(
@@ -1270,9 +1300,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 reason = reason,
                 remarks = remarks
             )
-            repository.insertWorkResumptionLog(resumption)
+            projectDao.insertWorkResumptionLog(resumption)
             selectedProject.value?.let { p ->
-                repository.updateProject(p.copy(status = ProjectStatus.ONGOING.label))
+                projectDao.updateProject(p.copy(status = ProjectStatus.ONGOING.label))
             }
 
             logAuditAction(
@@ -1296,7 +1326,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 remarks = remarks,
                 isCoreChecklist = false
             )
-            repository.insertPendingDocument(doc)
+            projectDao.insertPendingDocument(doc)
             logAuditAction(
                 projectId = projectId,
                 actionType = "Document Upload",
@@ -1323,7 +1353,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 isCoreChecklist = false,
                 fileUrl = fileUrl
             )
-            repository.insertPendingDocument(doc)
+            projectDao.insertPendingDocument(doc)
             logAuditAction(
                 projectId = projectId,
                 actionType = "Document Upload",
@@ -1337,7 +1367,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun updatePendingDocumentStatus(doc: PendingDocument, newStatus: String, remarks: String) {
         viewModelScope.launch {
             val updated = doc.copy(status = newStatus, remarks = remarks)
-            repository.updatePendingDocument(updated)
+            projectDao.updatePendingDocument(updated)
             logAuditAction(
                 projectId = doc.projectId,
                 actionType = "Document Upload",
@@ -1351,7 +1381,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun updatePendingDocumentFileUrl(doc: PendingDocument, fileUrl: String) {
         viewModelScope.launch {
             val updated = doc.copy(fileUrl = fileUrl)
-            repository.updatePendingDocument(updated)
+            projectDao.updatePendingDocument(updated)
             logAuditAction(
                 projectId = doc.projectId,
                 actionType = "Document Upload",
@@ -1364,7 +1394,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun deletePendingDocument(docId: Long) {
         viewModelScope.launch {
-            repository.deletePendingDocument(docId)
+            projectDao.deletePendingDocument(docId)
         }
     }
 
@@ -1384,7 +1414,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val userName = user ?: currentAccount.name.ifBlank { "System User" }
             val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
             
-            repository.insertAuditLog(
+            projectDao.insertAuditLog(
                 AuditLog(
                     projectId = projectId,
                     user = userName,
@@ -1405,7 +1435,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 var pName = ""
                 if (projectId != null) {
                     try {
-                        pName = repository.getProjectById(projectId).first()?.name ?: ""
+                        pName = projectDao.getProjectById(projectId).first()?.name ?: ""
                     } catch (e: Exception) {}
                 }
 
@@ -1495,17 +1525,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 attachedPhotoUrlsJson = photoList,
                 submittedByStaff = currentUserAccount.value.name
             )
-            repository.insertWeeklyReport(report)
+            reportDao.insertWeeklyReport(report)
 
             // Update Project Master target & actual accomplishment & latest update photo
-            val current = repository.getProjectById(projectId).first()
+            val current = projectDao.getProjectById(projectId).first()
             if (current != null) {
                 val updated = current.copy(
                     targetAccomplishment = targetAccomplishmentPct,
                     actualAccomplishment = actualAccomplishmentPct,
                     latestUpdatePhotoUrl = if (attachedPhotoUrl.isNotBlank()) attachedPhotoUrl else current.latestUpdatePhotoUrl
                 )
-                repository.updateProject(updated)
+                projectDao.updateProject(updated)
             }
 
             logAuditAction(
@@ -1534,14 +1564,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 dayOfWeek = dayOfWeek,
                 hourlyConditionsCsv = conditionsCsv
             )
-            repository.insertDailyWeather(weather)
+            reportDao.insertDailyWeather(weather)
         }
     }
 
     // Submit Monthly Report
     fun updateWeeklyReport(report: WeeklyReport) {
         viewModelScope.launch {
-            repository.updateWeeklyReport(report)
+            reportDao.updateWeeklyReport(report)
             logAuditAction(report.projectId, "Edited Weekly Report", "Modified report for ${report.reportingWeek}")
             
             // Re-sync Project Master target & actual accomplishment
@@ -1551,7 +1581,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         targetAccomplishment = report.targetAccomplishmentPct,
                         actualAccomplishment = report.actualAccomplishmentPct
                     )
-                    repository.updateProject(updated)
+                    projectDao.updateProject(updated)
                 }
             }
         }
@@ -1559,7 +1589,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteWeeklyReport(report: WeeklyReport) {
         viewModelScope.launch {
-            repository.deleteWeeklyReport(report.id)
+            reportDao.deleteWeeklyReport(report.id)
             logAuditAction(report.projectId, "Deleted Weekly Report", "Deleted report for ${report.reportingWeek}")
         }
     }
@@ -1592,7 +1622,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 preparedByStatus = "Reviewed",
                 accomplishmentItemsJson = accomplishmentItemsJson
             )
-            repository.insertMonthlyReport(report)
+            reportDao.insertMonthlyReport(report)
             logAuditAction(
                 projectId = projectId,
                 actionType = "Report Creation",
@@ -1606,7 +1636,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     // Update Monthly Sign-off Chain Status
     fun updateMonthlyReportFull(report: MonthlyReport) {
         viewModelScope.launch {
-            repository.updateMonthlyReport(report)
+            reportDao.updateMonthlyReport(report)
             logAuditAction(
                 projectId = report.projectId,
                 actionType = "Report Creation",
@@ -1619,7 +1649,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteMonthlyReport(report: MonthlyReport) {
         viewModelScope.launch {
-            repository.deleteMonthlyReport(report.id)
+            reportDao.deleteMonthlyReport(report.id)
             logAuditAction(
                 projectId = report.projectId,
                 actionType = "Report Deletion",
@@ -1633,7 +1663,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun addProjectPayment(projectId: Long, name: String, dvNo: String, date: String, periodCovered: String, grossAmount: Double, percentage: Double, balanceAmount: Double, balancePercentage: Double, fileUrl: String = "") {
         viewModelScope.launch {
-            repository.insertProjectPayment(
+            projectDao.insertProjectPayment(
                 ProjectPayment(
                     projectId = projectId,
                     name = name,
@@ -1659,7 +1689,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateProjectPayment(payment: ProjectPayment) {
         viewModelScope.launch {
-            repository.updateProjectPayment(payment)
+            projectDao.updateProjectPayment(payment)
             logAuditAction(
                 projectId = payment.projectId,
                 actionType = "Payment Creation",
@@ -1672,13 +1702,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     
     fun deleteProjectPayment(id: Long) {
         viewModelScope.launch {
-            repository.deleteProjectPayment(id)
+            projectDao.deleteProjectPayment(id)
         }
     }
 
     fun addProjectIssue(issue: ProjectIssue) {
         viewModelScope.launch {
-            repository.insertProjectIssue(issue.copy(loggedBy = currentUserAccount.value.name))
+            projectDao.insertProjectIssue(issue.copy(loggedBy = currentUserAccount.value.name))
             logAuditAction(
                 projectId = issue.projectId,
                 actionType = "Issue Creation",
@@ -1691,7 +1721,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateProjectIssue(issue: ProjectIssue) {
         viewModelScope.launch {
-            repository.updateProjectIssue(issue)
+            projectDao.updateProjectIssue(issue)
             logAuditAction(
                 projectId = issue.projectId,
                 actionType = "Issue Creation",
@@ -1704,7 +1734,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteProjectIssue(issue: ProjectIssue) {
         viewModelScope.launch {
-            repository.deleteProjectIssue(issue.id)
+            projectDao.deleteProjectIssue(issue.id)
             logAuditAction(
                 projectId = issue.projectId,
                 actionType = "Issue Deletion",
@@ -1750,7 +1780,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
                 else -> monthlyReport
             }
-            repository.updateMonthlyReport(updatedReport)
+            reportDao.updateMonthlyReport(updatedReport)
         }
     }
 
