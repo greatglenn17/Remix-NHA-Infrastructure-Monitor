@@ -80,6 +80,41 @@ class AuthManager(private val context: Context) {
             .apply()
     }
 
+    fun getAllRegisteredUsersJson(): org.json.JSONArray {
+        val registeredEmails = prefs.getStringSet("registered_emails_set", emptySet()) ?: emptySet()
+        val array = org.json.JSONArray()
+        registeredEmails.forEach { email ->
+            val obj = org.json.JSONObject().apply {
+                put("email", email)
+                put("pass", prefs.getString("reg_pass_$email", ""))
+                put("name", prefs.getString("reg_name_$email", ""))
+                put("role", prefs.getString("reg_role_$email", UserRole.FIELD_ENGINEER.name))
+                put("position", prefs.getString("reg_pos_$email", ""))
+                put("office", prefs.getString("reg_office_$email", ""))
+            }
+            array.put(obj)
+        }
+        return array
+    }
+
+    fun restoreRegisteredUsersFromJson(array: org.json.JSONArray) {
+        val registeredEmails = prefs.getStringSet("registered_emails_set", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        val editor = prefs.edit()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val email = obj.optString("email", "").trim().lowercase()
+            if (email.isNotBlank()) {
+                registeredEmails.add(email)
+                editor.putString("reg_pass_$email", obj.optString("pass", ""))
+                editor.putString("reg_name_$email", obj.optString("name", email.substringBefore("@")))
+                editor.putString("reg_role_$email", obj.optString("role", UserRole.FIELD_ENGINEER.name))
+                editor.putString("reg_pos_$email", obj.optString("position", ""))
+                editor.putString("reg_office_$email", obj.optString("office", "Bulacan District Office"))
+            }
+        }
+        editor.putStringSet("registered_emails_set", registeredEmails).apply()
+    }
+
     fun isLocalRegisteredUser(email: String, pass: String): Boolean {
         val cleanEmail = email.trim().lowercase()
         val inputHash = hashPassword(pass)

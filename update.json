@@ -1,7 +1,7 @@
 {
-  "versionCode": 111,
-  "versionName": "1.1.1",
-  "releaseNotes": "v1.1.1: Fixed in-app auto updater download target URL & added automatic browser fallback.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.1_Build111.apk",
+  "versionCode": 112,
+  "versionName": "1.1.2",
+  "releaseNotes": "v1.1.2: Cross-Device User Registration Cloud Sync — registered user accounts are now automatically backed up and restored across all devices via Google Drive.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.2_Build112.apk",
   "isMandatory": false
 }

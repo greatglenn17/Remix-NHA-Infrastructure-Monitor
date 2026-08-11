@@ -41,6 +41,8 @@ class GoogleDriveSyncManager(
     private val db: AppDatabase
 ) {
 
+    private val authManager = com.example.data.auth.AuthManager(context)
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -469,6 +471,7 @@ class GoogleDriveSyncManager(
                 put("sdpRoads", sdpRoadsArray)
                 put("sdpLotProgress", sdpLotProgressArray)
                 put("sdpLotInspections", sdpLotInspectionsArray)
+                put("registeredUsers", authManager.getAllRegisteredUsersJson())
             }.toString()
 
             _syncStatusMessage.value = "Encrypting backup payload & generating checksum..."
@@ -638,6 +641,10 @@ class GoogleDriveSyncManager(
             val sdpRoadsArray = dataObj.optJSONArray("sdpRoads") ?: JSONArray()
             val sdpLotProgressArray = dataObj.optJSONArray("sdpLotProgress") ?: JSONArray()
             val sdpLotInspectionsArray = dataObj.optJSONArray("sdpLotInspections") ?: JSONArray()
+            val regUsersArray = dataObj.optJSONArray("registeredUsers")
+            if (regUsersArray != null && regUsersArray.length() > 0) {
+                authManager.restoreRegisteredUsersFromJson(regUsersArray)
+            }
 
             val projectDao = db.projectDao()
             val reportDao = db.reportDao()
