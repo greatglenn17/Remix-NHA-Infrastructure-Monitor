@@ -167,17 +167,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
 
-        // Sequential startup: clear legacy placeholders FIRST, then restore from cloud
+        // Startup cloud restore (non-destructive)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (!isCleared) {
-                try {
-                    database.projectDao().deleteAllProjects()
-                    prefs.edit().putBoolean("placeholders_cleared_v105", true).apply()
-                } catch (e: Exception) {
-                    android.util.Log.e("ProjectViewModel", "Error clearing legacy placeholders", e)
-                }
-            }
-            // Now safely restore from cloud AFTER any deletion is complete
             if (_isLoggedIn.value) {
                 try {
                     restoreFromGoogleDrive()

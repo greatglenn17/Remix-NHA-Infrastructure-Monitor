@@ -1,7 +1,7 @@
 {
-  "versionCode": 114,
-  "versionName": "1.1.4",
-  "releaseNotes": "v1.1.4: Centralized Live Cloud Sync Hub & ONLINE Status Badge — seamlessly syncs projects across all devices without requiring individual OAuth login.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.4_Build114.apk",
+  "versionCode": 115,
+  "versionName": "1.1.5",
+  "releaseNotes": "v1.1.5: 🛡️ Guaranteed Zero-Data-Loss In-Place Update & Permanent Account Preservation — guarantees all subordinate accounts and project data are 100% preserved during updates.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.5_Build115.apk",
   "isMandatory": false
 }
