@@ -125,6 +125,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         googleDriveSyncManager = GoogleDriveSyncManager(application, database)
         notificationDao = database.notificationDao()
 
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            reportDao.deleteWeatherLogsWithoutWeeklyReport()
+        }
+
         notifications = notificationDao.getAllNotifications().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -180,12 +184,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
+            val uniqueProjects = projects.distinctBy { project ->
+                "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
+            }
             if (user.role == UserRole.SUPER_ADMIN) {
                 // Super Admin sees ALL projects created by all subordinates & engineer admins
-                projects
+                uniqueProjects
             } else {
                 // Engineer Admins / Subordinates only see projects created by or assigned to them
-                projects.filter { project ->
+                uniqueProjects.filter { project ->
                     (user.assignedProjectId != null && project.id == user.assignedProjectId) ||
                     project.assignedStaff.equals(user.name, ignoreCase = true) ||
                     project.assignedStaff.contains(user.name, ignoreCase = true) ||
@@ -945,59 +952,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun selectProject(projectId: Long?) {
         _selectedProjectId.value = projectId
-        if (projectId != null) {
-            ensureWeatherLogsForProject(projectId)
-        }
-    }
-
-    private fun ensureWeatherLogsForProject(projectId: Long) {
-        viewModelScope.launch {
-            try {
-                val existing = reportDao.getDailyWeatherForProject(projectId).first()
-                if (existing.isEmpty()) {
-                    val weatherList = mutableListOf<DailyHourlyWeather>()
-                    val monthsToPopulate = listOf(
-                        Pair("2026-05", 31),
-                        Pair("2026-06", 30),
-                        Pair("2026-07", 31)
-                    )
-                    val daysOfWeek = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
-
-                    for ((yearMonth, maxDays) in monthsToPopulate) {
-                        for (day in 1..maxDays) {
-                            val dateStr = "%s-%02d".format(yearMonth, day)
-                            val dayOfWeekStr = daysOfWeek[day % 7]
-                            val hourlyCsv = when {
-                                yearMonth == "2026-05" && day in 18..24 -> {
-                                    "STORMY,STORMY,STORMY,RAINY,RAINY,STORMY,STORMY,STORMY,RAINY,RAINY,RAINY,RAINY,RAINY,RAINY,STORMY,STORMY,RAINY,RAINY,RAINY,RAINY,RAINY,RAINY,RAINY,RAINY"
-                                }
-                                day % 5 == 0 -> {
-                                    "FAIR,FAIR,FAIR,FAIR,FAIR,CLOUDY,CLOUDY,FAIR,FAIR,FAIR,FAIR,FAIR,RAIN_SHOWERS,RAIN_SHOWERS,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR"
-                                }
-                                day % 7 == 0 -> {
-                                    "CLOUDY,CLOUDY,RAINY,RAINY,RAINY,CLOUDY,CLOUDY,RAIN_SHOWERS,RAIN_SHOWERS,CLOUDY,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR"
-                                }
-                                else -> {
-                                    "FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,CLOUDY,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR,FAIR"
-                                }
-                            }
-                            weatherList.add(
-                                DailyHourlyWeather(
-                                    projectId = projectId,
-                                    weeklyReportId = null,
-                                    date = dateStr,
-                                    dayOfWeek = dayOfWeekStr,
-                                    hourlyConditionsCsv = hourlyCsv
-                                )
-                            )
-                        }
-                    }
-                    reportDao.insertDailyWeatherList(weatherList)
-                }
-            } catch (e: Exception) {
-                // Ignore if any issue
-            }
-        }
     }
 
     // Repository Actions
@@ -1024,6 +978,25 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     details = "Attempted project creation in Quick Demo Mode (Blocked)",
                     oldValue = "",
                     newValue = "Blocked Project Creation: $name"
+                )
+                return@launch
+            }
+            val duplicateProject = projectDao.getAllProjectsList().firstOrNull { existing ->
+                existing.name.normalizeProjectKey() == name.normalizeProjectKey() &&
+                    existing.location.normalizeProjectKey() == location.normalizeProjectKey()
+            }
+            if (duplicateProject != null) {
+                android.widget.Toast.makeText(
+                    getApplication(),
+                    "A project with this name and location already exists.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                logAuditAction(
+                    projectId = duplicateProject.id,
+                    actionType = "Duplicate Project Blocked",
+                    details = "Blocked duplicate project creation: $name ($location)",
+                    oldValue = "Existing project ID: ${duplicateProject.id}",
+                    newValue = ""
                 )
                 return@launch
             }
@@ -1836,3 +1809,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
 }
+
+private fun String.normalizeProjectKey(): String =
+    trim().lowercase().replace('\u00A0', ' ').replace(Regex("\\s+"), " ")

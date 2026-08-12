@@ -1,8 +1,8 @@
 {
-  "versionCode": 121,
-  "versionName": "1.2.1",
-  "releaseNotes": "v1.2.1: Security and data-safety corrective release. Removes embedded Cloud Hub credentials and false sync-success responses, stops destructive duplicate purges and destructive Room fallback migrations, and verifies update package checksums.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.2.1_Build121.apk",
-  "apkSha256": "722bdb04bc5d114580266a08af47f3a9a7882dcdd63edf89940a094ca6a84433",
+  "versionCode": 122,
+  "versionName": "1.2.2",
+  "releaseNotes": "v1.2.2: Removes generated placeholder weather logs; Monthly Weather now shows only data submitted with a weekly report. Also suppresses duplicate project cards using normalized project name and location matching.",
+  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.2.2_Build122.apk",
+  "apkSha256": "192a0fd2ab7e37f678b5c60b4eb450e8852e8c9856397fcf80b3a945ebb2fa6b",
   "isMandatory": true
 }

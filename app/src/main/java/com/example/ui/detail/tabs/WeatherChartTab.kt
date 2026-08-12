@@ -47,7 +47,12 @@ fun WeatherChartTab(
     dailyWeatherLogs: List<DailyHourlyWeather>,
     weeklyReports: List<WeeklyReport> = emptyList()
 ) {
-    if (dailyWeatherLogs.isEmpty() && weeklyReports.isEmpty()) {
+    val weeklyReportIds = remember(weeklyReports) { weeklyReports.map { it.id }.toSet() }
+    val submittedWeatherLogs = remember(dailyWeatherLogs, weeklyReportIds) {
+        dailyWeatherLogs.filter { it.weeklyReportId != null && it.weeklyReportId in weeklyReportIds }
+    }
+
+    if (submittedWeatherLogs.isEmpty() && weeklyReports.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -84,12 +89,13 @@ fun WeatherChartTab(
     var weeklyReportDropdownExpanded by remember { mutableStateOf(false) }
 
     // Monthly selection state
-    val availableMonths = remember(dailyWeatherLogs) {
-        val months = dailyWeatherLogs.map { it.date.substring(0, 7) }.distinct().sortedDescending()
-        if (months.isEmpty()) listOf("2026-06", "2026-05") else months
+    val availableMonths = remember(submittedWeatherLogs) {
+        submittedWeatherLogs.mapNotNull { it.date.takeIf { date -> date.length >= 7 }?.substring(0, 7) }
+            .distinct()
+            .sortedDescending()
     }
     var selectedMonth by remember(availableMonths) {
-        mutableStateOf(availableMonths.firstOrNull() ?: "2026-06")
+        mutableStateOf(availableMonths.firstOrNull().orEmpty())
     }
     var monthDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -341,9 +347,9 @@ fun WeatherChartTab(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             for (dayInfo in rowDays) {
-                                val log = remember(dailyWeatherLogs, currentReport.id, dayInfo.dbDateStr) {
-                                    dailyWeatherLogs.find {
-                                        (it.weeklyReportId == currentReport.id && it.date == dayInfo.dbDateStr) || it.date == dayInfo.dbDateStr
+                                val log = remember(submittedWeatherLogs, currentReport.id, dayInfo.dbDateStr) {
+                                    submittedWeatherLogs.find {
+                                        it.weeklyReportId == currentReport.id && it.date == dayInfo.dbDateStr
                                     }
                                 }
                                 val conditions = parseHourlyConditions(log)
@@ -399,7 +405,13 @@ fun WeatherChartTab(
             }
         } else {
             // Monthly View
-            ExposedDropdownMenuBox(
+            if (submittedWeatherLogs.isEmpty()) {
+                Text(
+                    text = "No weather logs submitted with weekly reports yet.",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = DarkTextSecondary),
+                    modifier = Modifier.padding(vertical = 24.dp)
+                )
+            } else ExposedDropdownMenuBox(
                 expanded = monthDropdownExpanded,
                 onExpandedChange = { monthDropdownExpanded = it },
                 modifier = Modifier.fillMaxWidth()
@@ -437,8 +449,9 @@ fun WeatherChartTab(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (submittedWeatherLogs.isNotEmpty()) Spacer(modifier = Modifier.height(16.dp))
 
+            if (submittedWeatherLogs.isNotEmpty()) {
             val daysInMonth = remember(selectedMonth) {
                 val parts = selectedMonth.split("-")
                 if (parts.size == 2) {
@@ -452,10 +465,9 @@ fun WeatherChartTab(
                 } else 31
             }
 
-            val filteredLogs = remember(dailyWeatherLogs, selectedMonth) {
-                dailyWeatherLogs.filter { it.date.startsWith(selectedMonth) }
+            val filteredLogs = remember(submittedWeatherLogs, selectedMonth) {
+                submittedWeatherLogs.filter { it.date.startsWith(selectedMonth) }
             }
-
             val itemsPerRow = 4
             val rows = (daysInMonth + itemsPerRow - 1) / itemsPerRow
 
@@ -494,6 +506,7 @@ fun WeatherChartTab(
                     }
                 }
             }
+        }
         }
 
         Spacer(modifier = Modifier.height(20.dp))

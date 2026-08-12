@@ -43,6 +43,12 @@ interface ReportDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDailyWeatherList(weatherList: List<DailyHourlyWeather>)
 
+    // Weather may only be displayed when it belongs to an existing weekly
+    // report. This removes legacy placeholder/orphan weather rows created by
+    // pre-v1.2.2 builds without touching valid submitted reports.
+    @Query("DELETE FROM daily_hourly_weather WHERE weeklyReportId IS NULL OR weeklyReportId NOT IN (SELECT id FROM weekly_reports)")
+    suspend fun deleteWeatherLogsWithoutWeeklyReport()
+
     // Monthly Reports
     @Query("SELECT * FROM monthly_reports")
     fun getAllMonthlyReports(): Flow<List<MonthlyReport>>
