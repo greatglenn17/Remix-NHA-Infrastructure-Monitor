@@ -250,7 +250,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "nha_construction_db_10"
                 )
                 .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
-                .fallbackToDestructiveMigration()
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance
@@ -302,4 +301,3 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
-

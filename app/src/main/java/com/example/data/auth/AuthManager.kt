@@ -211,7 +211,8 @@ class AuthManager(private val context: Context) {
         val cleanEmail = email.trim().lowercase()
         val cleanPass = pass.trim()
 
-        // 1. Save user registration credentials & profile locally first
+        // Store the local profile only. Firebase Auth remains the source of truth
+        // for credentials; local storage is not synchronized to other devices.
         saveRegisteredUser(cleanEmail, cleanPass, displayName, role, position, office)
 
         // 2. Sync registration to Firebase remote Auth if enabled
@@ -222,9 +223,8 @@ class AuthManager(private val context: Context) {
                 firebaseAuth.signOut()
                 return Result.success(result.user)
             } catch (e: Exception) {
-                android.util.Log.w("AuthManager", "Firebase remote sign-up exception: ${e.message}. Account registered locally.")
-                // Resilient fallback: local account registration completed cleanly via saveRegisteredUser above
-                return Result.success(null)
+                android.util.Log.w("AuthManager", "Firebase remote sign-up exception: ${e.message}")
+                return Result.failure(IllegalStateException("Account could not be created with Firebase. Check your connection and try again.", e))
             }
         }
         return Result.success(null)

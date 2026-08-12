@@ -167,51 +167,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
 
-        // Bi-Directional Startup Cloud Sync with Room DB Deduplication
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                cleanupDuplicateProjectsInDatabase()
-                if (_isLoggedIn.value) {
-                    val localCount = projectDao.getAllProjectsList().size
-                    if (localCount > 0) {
-                        googleDriveSyncManager.backupToGoogleDrive()
-                    }
-                    restoreFromGoogleDrive()
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("ProjectViewModel", "Startup bi-directional cloud sync skipped: ${e.message}")
-            }
-        }
-
-        // Live Cloud Polling every 15 seconds for real-time subordinate updates & notifications
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            while (true) {
-                kotlinx.coroutines.delay(15000)
-                if (_isLoggedIn.value) {
-                    try {
-                        cleanupDuplicateProjectsInDatabase()
-                        val prevCount = rawProjects.value.size
-                        val localCount = projectDao.getAllProjectsList().size
-                        if (localCount > 0) {
-                            googleDriveSyncManager.backupToGoogleDrive()
-                        }
-                        restoreFromGoogleDrive()
-                        val newCount = rawProjects.value.size
-                        if (newCount > prevCount && _currentUserAccount.value.role == UserRole.SUPER_ADMIN) {
-                            val latestProject = rawProjects.value.maxByOrNull { it.id }
-                            if (latestProject != null) {
-                                AppNotificationManager.sendAdminNotification(
-                                    getApplication(),
-                                    "New Project Synced: ${latestProject.name}",
-                                    "A new project '${latestProject.name}' by ${latestProject.assignedStaff} was synced from cloud."
-                                )
-                            }
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-
         // Mock a sync operation
         viewModelScope.launch {
             kotlinx.coroutines.delay(3500)
@@ -225,15 +180,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
-            val deduplicated = projects.distinctBy { proj ->
-                proj.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
-            }
             if (user.role == UserRole.SUPER_ADMIN) {
                 // Super Admin sees ALL projects created by all subordinates & engineer admins
-                deduplicated
+                projects
             } else {
                 // Engineer Admins / Subordinates only see projects created by or assigned to them
-                deduplicated.filter { project ->
+                projects.filter { project ->
                     (user.assignedProjectId != null && project.id == user.assignedProjectId) ||
                     project.assignedStaff.equals(user.name, ignoreCase = true) ||
                     project.assignedStaff.contains(user.name, ignoreCase = true) ||
@@ -1883,20 +1835,4 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private suspend fun cleanupDuplicateProjectsInDatabase() {
-        try {
-            val list = projectDao.getAllProjectsList()
-            val seen = HashSet<String>()
-            for (p in list) {
-                val key = p.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
-                if (seen.contains(key)) {
-                    projectDao.deleteProjectById(p.id)
-                } else {
-                    seen.add(key)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
 }

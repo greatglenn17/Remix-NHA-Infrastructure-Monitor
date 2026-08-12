@@ -139,6 +139,7 @@ fun UpdateAvailableDialog(
                     AppUpdateManager.downloadAndInstallApk(
                         context = context,
                         apkUrl = updateInfo.apkDownloadUrl,
+                        expectedSha256 = updateInfo.apkSha256,
                         onDownloadStarted = {
                             isDownloading = true
                         },

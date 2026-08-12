@@ -471,7 +471,6 @@ class GoogleDriveSyncManager(
                 put("sdpRoads", sdpRoadsArray)
                 put("sdpLotProgress", sdpLotProgressArray)
                 put("sdpLotInspections", sdpLotInspectionsArray)
-                put("registeredUsers", authManager.getAllRegisteredUsersJson())
             }.toString()
 
             _syncStatusMessage.value = "Encrypting backup payload & generating checksum..."
@@ -536,8 +535,10 @@ class GoogleDriveSyncManager(
                 }
                 uploadResponse.close()
             } else {
-                _syncStatusMessage.value = "Synchronizing encrypted payload to Cloud Sync Hub..."
-                uploadToGitHubCloudHub(envelopeJson)
+                _syncStatusMessage.value = "Google Drive authorization is required."
+                return@withContext DriveSyncResult.Error(
+                    "Google Drive authorization is required. Cloud Hub sync has been removed for security."
+                )
             }
 
             val formattedTime = SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault()).format(Date())
@@ -599,9 +600,10 @@ class GoogleDriveSyncManager(
                     ?: return@withContext DriveSyncResult.Error("Downloaded backup payload was empty.")
                 response.close()
             } else {
-                _syncStatusMessage.value = "Downloading payload from Cloud Sync Hub..."
-                backupEnvelopeContent = fetchFromGitHubCloudHub()
-                    ?: return@withContext DriveSyncResult.Error("No cloud backup file found in Cloud Sync Hub.")
+                _syncStatusMessage.value = "Google Drive authorization is required."
+                return@withContext DriveSyncResult.Error(
+                    "Google Drive authorization is required. Cloud Hub sync has been removed for security."
+                )
             }
 
             _syncStatusMessage.value = "Verifying cryptographic checksum & integrity..."
@@ -645,11 +647,6 @@ class GoogleDriveSyncManager(
             val sdpRoadsArray = dataObj.optJSONArray("sdpRoads") ?: JSONArray()
             val sdpLotProgressArray = dataObj.optJSONArray("sdpLotProgress") ?: JSONArray()
             val sdpLotInspectionsArray = dataObj.optJSONArray("sdpLotInspections") ?: JSONArray()
-            val regUsersArray = dataObj.optJSONArray("registeredUsers")
-            if (regUsersArray != null && regUsersArray.length() > 0) {
-                authManager.restoreRegisteredUsersFromJson(regUsersArray)
-            }
-
             val projectDao = db.projectDao()
             val reportDao = db.reportDao()
 
@@ -684,18 +681,6 @@ class GoogleDriveSyncManager(
                     assignedStaff = p.optString("assignedStaff", "Engr. Unassigned")
                 )
                 projectDao.insertProject(project)
-            }
-
-            // Clean up any remaining duplicate project rows in Room DB by normalized name
-            val updatedList = projectDao.getAllProjectsList()
-            val seenNames = HashSet<String>()
-            for (proj in updatedList) {
-                val key = proj.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
-                if (seenNames.contains(key)) {
-                    projectDao.deleteProjectById(proj.id)
-                } else {
-                    seenNames.add(key)
-                }
             }
 
             for (i in 0 until docsArray.length()) {
@@ -1102,95 +1087,4 @@ class GoogleDriveSyncManager(
         return String(decryptedBytes, Charsets.UTF_8)
     }
 
-    private fun getHubToken(): String {
-        val p1 = "Z2hwX1ByUDdJTUNEdG40"
-        val p2 = "dE9RYlNKR0FXSDNqQUVjTGdMdTJEb1NJSA=="
-        return String(Base64.getDecoder().decode(p1 + p2), Charsets.UTF_8)
-    }
-
-    private fun uploadToGitHubCloudHub(envelopeJson: String): Boolean {
-        try {
-            val githubToken = getHubToken()
-            val getUrl = "https://api.github.com/repos/greatglenn17/Remix-NHA-Infrastructure-Monitor/contents/cloud_sync.json"
-
-            var sha: String? = null
-            val getRequest = Request.Builder()
-                .url(getUrl)
-                .addHeader("Authorization", "token $githubToken")
-                .addHeader("Accept", "application/vnd.github.v3+json")
-                .get()
-                .build()
-
-            try {
-                client.newCall(getRequest).execute().use { res ->
-                    if (res.isSuccessful) {
-                        val str = res.body?.string() ?: ""
-                        val json = JSONObject(str)
-                        sha = json.optString("sha", null)
-                    }
-                }
-            } catch (_: Exception) {}
-
-            val base64Content = Base64.getEncoder().encodeToString(envelopeJson.toByteArray(Charsets.UTF_8))
-            val payloadObj = JSONObject().apply {
-                put("message", "Sync live project data from mobile app")
-                put("content", base64Content)
-                if (!sha.isNullOrBlank()) {
-                    put("sha", sha)
-                }
-            }
-
-            val requestBody = payloadObj.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val putRequest = Request.Builder()
-                .url(getUrl)
-                .addHeader("Authorization", "token $githubToken")
-                .addHeader("Accept", "application/vnd.github.v3+json")
-                .put(requestBody)
-                .build()
-
-            client.newCall(putRequest).execute().use { res ->
-                return res.isSuccessful
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return false
-        }
-    }
-
-    private fun fetchFromGitHubCloudHub(): String? {
-        try {
-            val githubToken = getHubToken()
-            val getUrl = "https://api.github.com/repos/greatglenn17/Remix-NHA-Infrastructure-Monitor/contents/cloud_sync.json"
-            val request = Request.Builder()
-                .url(getUrl)
-                .addHeader("Authorization", "token $githubToken")
-                .addHeader("Accept", "application/vnd.github.v3+json")
-                .get()
-                .build()
-
-            client.newCall(request).execute().use { res ->
-                if (res.isSuccessful) {
-                    val str = res.body?.string() ?: ""
-                    val json = JSONObject(str)
-                    val base64Content = json.optString("content", "").replace("\n", "").replace("\r", "")
-                    if (base64Content.isNotBlank()) {
-                        val decodedBytes = Base64.getDecoder().decode(base64Content)
-                        return String(decodedBytes, Charsets.UTF_8)
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-
-        // Raw fallback
-        try {
-            val rawUrl = "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/cloud_sync.json?t=${System.currentTimeMillis()}"
-            val request = Request.Builder().url(rawUrl).get().build()
-            client.newCall(request).execute().use { res ->
-                if (res.isSuccessful) {
-                    return res.body?.string()
-                }
-            }
-        } catch (_: Exception) {}
-        return null
-    }
 }

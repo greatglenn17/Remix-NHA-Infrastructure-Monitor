@@ -15,14 +15,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 data class AppUpdateInfo(
     val latestVersionCode: Int,
     val latestVersionName: String,
     val releaseNotes: String,
     val apkDownloadUrl: String,
+    val apkSha256: String = "",
     val isMandatory: Boolean = false,
     val isUpdateAvailable: Boolean = false
 )
@@ -48,6 +51,7 @@ object AppUpdateManager {
                 val serverVersionName = json.optString("versionName", "v${BuildConfig.VERSION_NAME}")
                 val releaseNotes = json.optString("releaseNotes", "New feature updates and stability improvements.")
                 val apkUrl = json.optString("apkDownloadUrl", "")
+                val apkSha256 = json.optString("apkSha256", "").trim().lowercase()
                 val mandatory = json.optBoolean("isMandatory", false)
 
                 return@withContext AppUpdateInfo(
@@ -55,6 +59,7 @@ object AppUpdateManager {
                     latestVersionName = serverVersionName,
                     releaseNotes = releaseNotes,
                     apkDownloadUrl = apkUrl,
+                    apkSha256 = apkSha256,
                     isMandatory = mandatory,
                     isUpdateAvailable = serverVersionCode > currentVersionCode
                 )
@@ -70,6 +75,7 @@ object AppUpdateManager {
             latestVersionName = "v${BuildConfig.VERSION_NAME}",
             releaseNotes = "System is up to date with latest Bulacan District Office features.",
             apkDownloadUrl = "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases",
+            apkSha256 = "",
             isMandatory = false,
             isUpdateAvailable = false
         )
@@ -78,6 +84,7 @@ object AppUpdateManager {
     fun downloadAndInstallApk(
         context: Context,
         apkUrl: String,
+        expectedSha256: String = "",
         onDownloadStarted: () -> Unit = {},
         onDownloadFailed: (String) -> Unit = {}
     ) {
@@ -108,8 +115,11 @@ object AppUpdateManager {
                 setMimeType("application/vnd.android.package-archive")
             }
 
-            val downloadManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? DownloadManager
-                ?: (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager)
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+                ?: run {
+                    onDownloadFailed("Android Download Manager is unavailable.")
+                    return
+                }
             val downloadId = downloadManager.enqueue(request)
 
             val onComplete = object : BroadcastReceiver() {
@@ -117,10 +127,14 @@ object AppUpdateManager {
                     val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                     if (id == downloadId) {
                         try { context.unregisterReceiver(this) } catch (_: Exception) {}
-                        if (file.exists() && file.length() > 500000) { // Valid APK size check (>500KB)
-                            installApk(context, file)
-                        } else {
+                        if (!file.exists() || file.length() <= 500000) {
+                            onDownloadFailed("The downloaded update is incomplete.")
                             openBrowserDownloadFallback(context)
+                        } else if (expectedSha256.isNotBlank() && !file.sha256().equals(expectedSha256, ignoreCase = true)) {
+                            onDownloadFailed("Update integrity verification failed.")
+                            file.delete()
+                        } else {
+                            installApk(context, file)
                         }
                     }
                 }
@@ -133,6 +147,7 @@ object AppUpdateManager {
                 context.registerReceiver(onComplete, filter)
             }
         } catch (e: Exception) {
+            onDownloadFailed(e.localizedMessage ?: "Unable to start update download.")
             openBrowserDownloadFallback(context)
         }
     }
@@ -169,5 +184,18 @@ object AppUpdateManager {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
         context.startActivity(intent)
+    }
+
+    private fun File.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(this).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

@@ -1,77 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to get requesting user's document
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    
-    function getUserRole() {
-      return getUserData().role;
-    }
-    
-    function isSuperAdmin() {
-      return request.auth != null && (getUserRole() == 'SUPER_ADMIN' || getUserRole() == 'Super Admin');
-    }
-    
-    function isEngineerAdmin() {
-      return request.auth != null && (getUserRole() == 'ENGINEER_ADMIN' || getUserRole() == 'Engineer Admin' || isSuperAdmin());
-    }
-    
-    function isFieldEngineer() {
-      return request.auth != null && (getUserRole() == 'FIELD_ENGINEER' || getUserRole() == 'Field Engineer' || isEngineerAdmin());
-    }
-
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
 
-    // Projects collection
+    // Administrative roles are Firebase custom claims. They must only be set
+    // by a trusted Admin SDK environment, never by a mobile client.
+    function isSuperAdmin() {
+      return signedIn() && request.auth.token.role == 'SUPER_ADMIN';
+    }
+
+    function isAssigned(projectId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/projects/$(projectId)).data.assignedUid == request.auth.uid;
+    }
+
     match /projects/{projectId} {
-      allow read: if isAuthenticated();
-      allow create: if isEngineerAdmin();
-      allow update: if isEngineerAdmin();
-      allow delete: if isSuperAdmin();
+      allow read: if isSuperAdmin() || (signedIn() && resource.data.assignedUid == request.auth.uid);
+      allow create, update, delete: if isSuperAdmin();
 
-      // Subcollections
-      match /reports/{reportId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isFieldEngineer();
-        allow delete: if isEngineerAdmin();
-      }
-
-      match /issues/{issueId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isFieldEngineer();
-        allow delete: if isEngineerAdmin();
-      }
-
-      match /payments/{paymentId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isFieldEngineer();
-        allow delete: if isEngineerAdmin();
-      }
-
-      match /documents/{docId} {
-        allow read: if isAuthenticated();
-        allow create, update: if isFieldEngineer();
-        allow delete: if isEngineerAdmin();
+      match /{subcollection}/{documentId} {
+        allow read: if isSuperAdmin() || isAssigned(projectId);
+        allow create, update, delete: if isSuperAdmin();
       }
     }
 
-    // Audit logs
-    match /audit_logs/{logId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isSuperAdmin();
-    }
-
-    // Users
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
-      allow delete: if isSuperAdmin();
+      allow read: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
