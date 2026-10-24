@@ -1,8 +1,8 @@
 {
-  "versionCode": 140,
-  "versionName": "1.4.0",
-  "releaseNotes": "v1.4.0: Photos and scanned files now sync to every phone. Attached photos are shrunk to save data (the camera also keeps the full-quality original in your Gallery), and attachments no longer stop opening after a restart. Take Photo with Camera now attaches your real photo, and the sample pictures were removed.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.4.0/NHA_Monitor_v1.4.0_Build140.apk",
-  "apkSha256": "9685e7616a5dcf0d67fb5e04c5b7f1dc6ff22d9a025719d2c82f0e2ea0cad288",
+  "versionCode": 141,
+  "versionName": "1.4.1",
+  "releaseNotes": "v1.4.1: A new project is now assigned to the engineer who creates it, so it shows on their phone straight away instead of going to a placeholder name.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.4.1/NHA_Monitor_v1.4.1_Build141.apk",
+  "apkSha256": "b0e2eaf85585b48d031028fd052dc0de1113fa76e6cd867b328335f07218288d",
   "isMandatory": true
 }

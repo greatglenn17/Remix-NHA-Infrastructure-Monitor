@@ -45,7 +45,7 @@ data class Project(
     val targetAccomplishment: Double = 0.0,
     val actualAccomplishment: Double = 0.0,
     val latestUpdatePhotoUrl: String = "",
-    val assignedStaff: String = "Juan Dela Cruz",
+    val assignedStaff: String = "",
     val lastUpdatedDate: String = "2026-08-01"
 ) {
     val variance: Double

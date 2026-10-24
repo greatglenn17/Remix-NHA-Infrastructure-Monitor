@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                         if (showCreateProjectDialog) {
                             CreateProjectDialog(
                                 onDismiss = { showCreateProjectDialog = false },
+                                creatorName = viewModel.currentUserAccount.collectAsState().value.name,
                                 onCreate = { name, location, office, contractor, scope, type, landArea, numberOfUnits, cost, duration, dateStarted, completionDate, assignedStaff ->
                                     viewModel.createProject(
                                         name = name,

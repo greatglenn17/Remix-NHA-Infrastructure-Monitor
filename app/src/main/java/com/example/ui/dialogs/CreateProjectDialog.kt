@@ -38,6 +38,8 @@ import org.json.JSONObject
 @Composable
 fun CreateProjectDialog(
     onDismiss: () -> Unit,
+    /** The signed-in user; a new project is assigned to them unless changed, so it shows on their phone. */
+    creatorName: String,
     onCreate: (
         name: String,
         location: String,
@@ -56,7 +58,7 @@ fun CreateProjectDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
-    var assignedStaff by remember { mutableStateOf("Juan Dela Cruz") }
+    var assignedStaff by remember { mutableStateOf(creatorName) }
     var implementingOffice by remember { mutableStateOf("Bulacan District Office") }
     var contractor by remember { mutableStateOf("") }
     val scopeItems = remember { mutableStateListOf<com.example.data.model.ScopeItem>() }
