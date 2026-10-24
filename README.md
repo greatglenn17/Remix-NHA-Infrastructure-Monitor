@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.2.8%20%28Build%20128%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.2.9%20%28Build%20129%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.2.8`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.2.8_Build128.apk`** to download the installation package.
+2. Tap the latest release (`v1.2.9`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.2.9_Build129.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.2.9`** | **`129`** | 🧹 Empty Project Defaults & VO Approval Date: New projects start with empty Land Area and No. of Units instead of sample 4.5 / 120 values (blank ones show "-"), and variation orders get an optional Date Approved field that shows in the Variation Orders Log |
 | **`v1.2.8`** | **`128`** | 📝 Variation Order Shortcut: Add variation orders straight from the Variation Orders Log on the Overview tab (opens the Pending Docs form set to Variation Order), and new ones appear in the log right away while Pending. Only Approved variation orders change the revised contract cost |
 | **`v1.2.7`** | **`127`** | 🗓️ Date Fixes & Backup Cleanup: The Monthly tab opens on the current month when a project has no reports, and the Google Drive backup button is hidden until Drive backup really works (projects still sync to every phone through Firestore) |
 | **`v1.2.6`** | **`126`** | 🔄 Sync & Weekly Report Fixes: Deleting a project from the dashboard now removes it on every phone, edits upload to the cloud right away instead of on the next app start, weekly reports compute real elapsed and remaining days, the weekly form starts empty instead of with sample data, and editing a weekly report keeps its manpower, equipment, issues and activities |

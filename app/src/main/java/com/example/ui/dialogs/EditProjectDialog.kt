@@ -82,17 +82,16 @@ fun EditProjectDialog(
     var projectType by remember { mutableStateOf(project.projectType) }
     // Parse land area into value and unit
     var landAreaValue by remember {
-        val parts = (project.landArea.ifBlank { "4.5 Hectares" }).split(" ", limit = 2)
-        mutableStateOf(parts.firstOrNull() ?: "4.5")
+        val parts = project.landArea.trim().split(" ", limit = 2)
+        mutableStateOf(parts.firstOrNull().orEmpty())
     }
     var landAreaUnit by remember {
-        val parts = (project.landArea.ifBlank { "4.5 Hectares" }).split(" ", limit = 2)
+        val parts = project.landArea.trim().split(" ", limit = 2)
         mutableStateOf(if (parts.size > 1 && parts[1].contains("Square", ignoreCase = true)) "Square Meters" else "Hectares")
     }
     var showLandAreaUnitDropdown by remember { mutableStateOf(false) }
     var numberOfUnits by remember {
-        val raw = project.numberOfUnits.ifBlank { "120" }
-        mutableStateOf(raw.replace(Regex("[^0-9]"), "").ifBlank { "120" })
+        mutableStateOf(project.numberOfUnits.replace(Regex("[^0-9]"), ""))
     }
     var showProjectTypeDropdown by remember { mutableStateOf(false) }
     var isCustomProjectType by remember { mutableStateOf(project.projectType !in listOf("Housing Project", "Community Facility")) }
@@ -501,7 +500,7 @@ fun EditProjectDialog(
                 onClick = {
                     val cost = scopeItems.sumOf { it.amount }
                     val duration = durationText.toIntOrNull() ?: 365
-                    val landArea = "$landAreaValue $landAreaUnit"
+                    val landArea = if (landAreaValue.isBlank()) "" else "${landAreaValue.trim()} $landAreaUnit"
                     if (name.isNotBlank() && contractor.isNotBlank()) {
                         val scopeOfWorkJson = JSONArray(scopeItems.map { JSONObject().put("name", it.name).put("amount", it.amount).put("weightPct", it.weightPct) }).toString()
                         onEdit(

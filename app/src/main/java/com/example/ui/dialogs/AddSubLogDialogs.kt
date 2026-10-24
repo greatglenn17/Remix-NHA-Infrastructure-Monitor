@@ -161,6 +161,11 @@ fun AddCustomDocumentDialog(
     var voNo by remember { mutableStateOf("") }
     var voAmount by remember { mutableStateOf("") }
     var voReason by remember { mutableStateOf("") }
+    var voDateApproved by remember { mutableStateOf("") }
+    // Optional while the order is still pending; when filled it must be a real date.
+    val voDateValid = remember(voDateApproved) {
+        voDateApproved.isBlank() || try { LocalDate.parse(voDateApproved.trim()); true } catch (_: DateTimeParseException) { false }
+    }
 
     // Work Suspension
     var wsNo by remember { mutableStateOf("") }
@@ -228,6 +233,15 @@ fun AddCustomDocumentDialog(
                         OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = voAmount, onValueChange = { voAmount = it }, label = { Text("Amount (PHP)") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = voReason, onValueChange = { voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(
+                            value = voDateApproved,
+                            onValueChange = { voDateApproved = it },
+                            label = { Text("Date Approved (YYYY-MM-DD)") },
+                            isError = !voDateValid,
+                            supportingText = { Text(if (voDateValid) "Leave blank if not yet approved" else "Use the format YYYY-MM-DD") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                     "Work Suspension Order" -> {
                         OutlinedTextField(value = wsNo, onValueChange = { wsNo = it }, label = { Text("Suspension No.") }, modifier = Modifier.fillMaxWidth())
@@ -271,7 +285,7 @@ fun AddCustomDocumentDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
+            Button(enabled = selectedType != "Variation Order" || voDateValid, onClick = {
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
                     "Time Extension" -> "Time Extension No. $teNo - $teDays Days"
@@ -283,7 +297,7 @@ fun AddCustomDocumentDialog(
                 val finalRemarks = when (selectedType) {
                     "Custom Document" -> remarks
                     "Time Extension" -> "Reason: $teReason"
-                    "Variation Order" -> "Reason: $voReason"
+                    "Variation Order" -> "Reason: $voReason" + if (voDateApproved.isNotBlank()) " | Date Approved: ${voDateApproved.trim()}" else ""
                     "Work Suspension Order" -> {
                         var computedEndDate = ""
                         try {

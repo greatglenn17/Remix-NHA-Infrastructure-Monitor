@@ -1,8 +1,8 @@
 {
-  "versionCode": 128,
-  "versionName": "1.2.8",
-  "releaseNotes": "v1.2.8: Add variation orders straight from the Variation Orders Log on the Overview tab, and see new ones there right away while they are still Pending. Only Approved variation orders change the revised contract cost.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.8/NHA_Monitor_v1.2.8_Build128.apk",
-  "apkSha256": "cb1abea09a6698c0225a7562bd0370fae19ba299d0ba9099275c27561e950c75",
+  "versionCode": 129,
+  "versionName": "1.2.9",
+  "releaseNotes": "v1.2.9: New projects no longer come with sample Land Area (4.5) and No. of Units (120) values, and variation orders now have a Date Approved field that shows in the Variation Orders Log.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.9/NHA_Monitor_v1.2.9_Build129.apk",
+  "apkSha256": "8308e2da2dcee151f762a48c9b3ee14c1ad7118ec91a81e2ac744cb9d04c72e2",
   "isMandatory": true
 }

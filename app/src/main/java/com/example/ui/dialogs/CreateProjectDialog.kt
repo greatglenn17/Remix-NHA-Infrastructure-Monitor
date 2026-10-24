@@ -64,10 +64,10 @@ fun CreateProjectDialog(
     var currentScopeAmount by remember { mutableStateOf("") }
     var currentScopeWeight by remember { mutableStateOf("") }
     var projectType by remember { mutableStateOf("Housing Project") }
-    var landAreaValue by remember { mutableStateOf("4.5") }
+    var landAreaValue by remember { mutableStateOf("") }
     var landAreaUnit by remember { mutableStateOf("Hectares") }
     var showLandAreaUnitDropdown by remember { mutableStateOf(false) }
-    var numberOfUnits by remember { mutableStateOf("120") }
+    var numberOfUnits by remember { mutableStateOf("") }
     var isCustomProjectType by remember { mutableStateOf(false) }
     var showProjectTypeDropdown by remember { mutableStateOf(false) }
     // Contract cost is auto-computed from scope items
@@ -489,7 +489,7 @@ fun CreateProjectDialog(
                 onClick = {
                     val cost = scopeItems.sumOf { it.amount }
                     val duration = durationText.toIntOrNull() ?: 365
-                    val landArea = "$landAreaValue $landAreaUnit"
+                    val landArea = if (landAreaValue.isBlank()) "" else "${landAreaValue.trim()} $landAreaUnit"
                     if (name.isNotBlank() && contractor.isNotBlank()) {
                         onCreate(
                             name,

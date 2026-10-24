@@ -196,10 +196,10 @@ fun OverviewTab(
                     if (project.projectType.contains("Housing", ignoreCase = true)) {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
-                                DetailItem("Land Area", project.landArea.ifBlank { "4.5 Hectares" })
+                                DetailItem("Land Area", project.landArea.ifBlank { "-" })
                             }
                             Column(modifier = Modifier.weight(1f)) {
-                                DetailItem("No. of Units", project.numberOfUnits.ifBlank { "120 Housing Units" })
+                                DetailItem("No. of Units", project.numberOfUnits.ifBlank { "-" })
                             }
                         }
                     }
@@ -593,7 +593,9 @@ fun OverviewTab(
                     Text("No variation orders recorded.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
                 } else {
                     voLogs.forEach { vo ->
-                        val cleanRemarks = vo.remarks.replace("^Remarks:\\s*".toRegex(RegexOption.IGNORE_CASE), "").trim()
+                        val dateApproved = Regex("\\|\\s*Date Approved:\\s*([^|]+)").find(vo.remarks)?.groupValues?.get(1)?.trim()
+                        val cleanRemarks = vo.remarks.replace("^Remarks:\\s*".toRegex(RegexOption.IGNORE_CASE), "")
+                            .replace(Regex("\\|\\s*Date Approved:[^|]*"), "").trim()
                         val displayText = if (cleanRemarks.startsWith("Reason:", ignoreCase = true)) {
                             cleanRemarks
                         } else if (cleanRemarks.isNotBlank()) {
@@ -613,6 +615,7 @@ fun OverviewTab(
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
                                 )
                                 Text("Status: ${vo.status}", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                                Text("Date Approved: ${dateApproved ?: "-"}", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
                                 if (displayText.isNotBlank()) {
                                     Text(displayText, style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
                                 }
