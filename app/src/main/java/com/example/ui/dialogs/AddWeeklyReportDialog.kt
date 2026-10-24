@@ -70,7 +70,7 @@ fun AddWeeklyReportDialog(
         accomplishmentItemsJson: String
     ) -> Unit
 ) {
-    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: "August 3 - August 9, 2026") }
+    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(java.time.LocalDate.now())) }
     
     val daysOfWeekWithDates = remember(reportingWeek) {
         val cal = java.util.Calendar.getInstance()
