@@ -1,8 +1,8 @@
 {
-  "versionCode": 122,
-  "versionName": "1.2.2",
-  "releaseNotes": "v1.2.2: Removes generated placeholder weather logs; Monthly Weather now shows only data submitted with a weekly report. Also suppresses duplicate project cards using normalized project name and location matching.",
-  "apkDownloadUrl": "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.2.2_Build122.apk",
-  "apkSha256": "192a0fd2ab7e37f678b5c60b4eb450e8852e8c9856397fcf80b3a945ebb2fa6b",
+  "versionCode": 125,
+  "versionName": "1.2.5",
+  "releaseNotes": "v1.2.5: Projects now sync to every phone through the cloud, duplicate project cards are merged automatically, and new projects send notifications. Please sign in again once after updating to turn on cloud sync.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.5/NHA_Monitor_v1.2.5_Build125.apk",
+  "apkSha256": "a30ecf301ebfdad28a1efe4eb642d6685869536ce092068309dbec2fd067feba",
   "isMandatory": true
 }
