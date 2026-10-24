@@ -30,6 +30,23 @@ object AssignmentPolicy {
         !isSuperAdmin && !inServerSnapshot && !hasPendingUpload && !createdByMe &&
             !AssignedUids.contains(localAssignedUids, myUid)
 
+    /**
+     * A cloud document's `assignedUids` as stored locally (a JSON array, possibly "[]"),
+     * or null when the document has no list yet; null never removes or hides anything.
+     */
+    fun storedList(hasField: Boolean, raw: Any?): String? {
+        if (!hasField || raw !is List<*>) return null
+        return AssignedUids.toJson(raw.filterIsInstance<String>())
+    }
+
+    /**
+     * The `assignedUids` a record upload carries, copied from its local project, or null
+     * while the project's list is unknown on this phone (""); the record then waits.
+     * An explicit "[]" is sent.
+     */
+    fun recordUploadList(localAssignedUids: String): List<String>? =
+        if (localAssignedUids.isBlank()) null else AssignedUids.parse(localAssignedUids)
+
     /** A missing role claim counts as a writer, as in the cloud rules. */
     fun canWrite(role: String?): Boolean = role != VIEWER
 

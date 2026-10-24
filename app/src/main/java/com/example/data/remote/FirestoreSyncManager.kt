@@ -109,29 +109,33 @@ class FirestoreSyncManager(
             return
         }
 
-        stopRealtimeSync()
+        // Cancel and launch under one lock (re-entrant), so a concurrent start or stop always sees this job.
+        synchronized(listenerLock) {
+            stopRealtimeSync()
+            listenerJob = scope.launch(Dispatchers.IO) { listenFor(currentUser) }
+        }
+    }
 
-        // Assigned under the lock, so a stop that follows always finds and cancels it.
-        synchronized(listenerLock) { listenerJob = scope.launch(Dispatchers.IO) {
-            var wait = 2_000L
-            var superAdmin: Boolean? = null
-            while (superAdmin == null) {
-                try {
-                    superAdmin = AssignmentPolicy.isSuperAdmin(roleOf(currentUser))
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // Guessing the role could filter a Super Admin's listeners, so wait for the token.
-                    Log.w(tag, "Could not read the account role; retrying in ${wait / 1000}s: ${e.message}")
-                    delay(wait)
-                    wait = (wait * 2).coerceAtMost(60_000L)
-                }
+    /** Reads the role, retrying until the token is available, then attaches the listeners unless stopped meanwhile. */
+    private suspend fun CoroutineScope.listenFor(currentUser: FirebaseUser) {
+        var wait = 2_000L
+        var superAdmin: Boolean? = null
+        while (superAdmin == null) {
+            try {
+                superAdmin = AssignmentPolicy.isSuperAdmin(roleOf(currentUser))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Guessing the role could filter a Super Admin's listeners, so wait for the token.
+                Log.w(tag, "Could not read the account role; retrying in ${wait / 1000}s: ${e.message}")
+                delay(wait)
+                wait = (wait * 2).coerceAtMost(60_000L)
             }
-            synchronized(listenerLock) {
-                if (!isActive) return@launch
-                attachListeners(currentUser.uid, superAdmin == true)
-            }
-        } }
+        }
+        synchronized(listenerLock) {
+            if (!isActive) return
+            attachListeners(currentUser.uid, superAdmin == true)
+        }
     }
 
     /** The account's role custom claim from the cached ID token (refreshed when it has expired). */
@@ -345,11 +349,8 @@ class FirestoreSyncManager(
     }
 
     /** The document's assignedUids as stored locally (a JSON array), or null when it has none yet. */
-    private fun remoteAssignedUids(doc: DocumentSnapshot): String? {
-        if (!doc.contains("assignedUids")) return null
-        val list = (doc.get("assignedUids") as? List<*>).orEmpty().filterIsInstance<String>()
-        return AssignedUids.toJson(list)
-    }
+    private fun remoteAssignedUids(doc: DocumentSnapshot): String? =
+        AssignmentPolicy.storedList(doc.contains("assignedUids"), doc.get("assignedUids"))
 
     /**
      * Keeps the local list equal to the cloud's even when the revision did not change
@@ -375,7 +376,8 @@ class FirestoreSyncManager(
 
     private suspend fun probe(projectUuid: String): Probe = try {
         val doc = firestore.collection("projects").document(projectUuid).get(Source.SERVER).await()
-        if (!doc.exists()) Probe.Missing else Probe.Found(remoteAssignedUids(doc) ?: "[]")
+        // A document without a list yet says nothing about this user: keep the project.
+        if (!doc.exists()) Probe.Missing else remoteAssignedUids(doc)?.let { Probe.Found(it) } ?: Probe.Unknown
     } catch (e: FirebaseFirestoreException) {
         if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) Probe.Denied else Probe.Unknown
     } catch (e: CancellationException) {
@@ -389,7 +391,9 @@ class FirestoreSyncManager(
      * not contain. Anything this phone still has to send keeps it here and queued (a
      * project created on this phone is still uploaded). Otherwise the cloud is asked
      * once: a listener can't deliver the change that unassigned the user, so the local
-     * list would still name them. An unassigned project is removed from this phone only.
+     * list would still name them. An unassigned project leaves this phone only: it is
+     * deleted, or hidden when it has data the cloud can't give back
+     * ([RecordSync.unassignLocally]).
      */
     private suspend fun handleMissingProject(project: Project, myUid: String) {
         val pending = recordSync.hasPendingUpload(project.id, project.projectUuid)
@@ -398,25 +402,32 @@ class FirestoreSyncManager(
             enqueueProjectEvent(project.projectUuid, "CREATE", project.revision)
             return
         }
-        val list = when (val probe = probe(project.projectUuid)) {
+        val list = if (project.assignedUids.isNotBlank() && !AssignedUids.contains(project.assignedUids, myUid)) {
+            // Already the server's answer (a project hidden earlier): no need to ask again.
+            project.assignedUids
+        } else when (val probe = probe(project.projectUuid)) {
             Probe.Missing -> {
                 // Old rules: the cloud has never seen it, so upload it as before.
                 enqueueProjectEvent(project.projectUuid, "CREATE", project.revision)
                 return
             }
-            is Probe.Found -> probe.assignedUidsJson.also {
-                if (it != project.assignedUids) recordSync.setAssignedUidsLocally(project.projectUuid, it)
-            }
+            is Probe.Found -> probe.assignedUidsJson
             Probe.Denied -> "[]"
             Probe.Unknown -> return
         }
-        if (AssignmentPolicy.shouldRemoveLocally(false, myUid, list, inServerSnapshot = false, hasPendingUpload = false, createdByMe = false)) {
-            val files = recordSync.attachmentNamesOf(project.id)
-            recordSync.removeProjectLocally(project.id)
-            // Deleted here, without queuing anything: the garbage collector would also delete
-            // the cloud copies of files nothing refers to, and they still belong to the project.
-            files.forEach { Attachments.fileForName(context, it)?.delete() }
-            Log.d(tag, "Removed unassigned project ${project.projectUuid} from this phone")
+        if (!AssignmentPolicy.shouldRemoveLocally(false, myUid, list, inServerSnapshot = false, hasPendingUpload = false, createdByMe = false)) {
+            // Still assigned; the project will arrive with a later snapshot.
+            if (list != project.assignedUids) recordSync.setAssignedUidsLocally(project.projectUuid, list)
+            return
+        }
+        // Files go without queuing anything: the garbage collector would also delete the
+        // cloud copies of unreferenced files, and they still belong to the project.
+        val outcome = recordSync.unassignLocally(project.id, project.projectUuid, list) { names ->
+            names.forEach { Attachments.fileForName(context, it)?.delete() }
+        }
+        // A hidden project comes through here on every snapshot; log only the change.
+        if (outcome == RecordSync.Unassigned.REMOVED || (outcome == RecordSync.Unassigned.HIDDEN && list != project.assignedUids)) {
+            Log.d(tag, "Unassigned project ${project.projectUuid}: $outcome on this phone")
         }
     }
 
@@ -544,8 +555,8 @@ class FirestoreSyncManager(
                         val doc = recordSync.buildDocument(table, event.entityUuid, currentUser.uid)
                         val record = firestore.collection("records").document(event.entityUuid)
                         if (doc != null) {
-                            if (!superAdmin && (doc["assignedUids"] as? List<*>).isNullOrEmpty()) {
-                                // The rules need the project's list, which hasn't reached this phone yet.
+                            if ("assignedUids" !in doc) {
+                                // The project's list hasn't reached this phone yet (any role): wait for it.
                                 waitingRecords.add(event.entityUuid)
                                 continue
                             }

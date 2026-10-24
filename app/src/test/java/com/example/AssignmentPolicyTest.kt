@@ -35,6 +35,22 @@ class AssignmentPolicyTest {
     }
 
     @Test
+    fun documentWithoutList_isUnknown_soTheProjectIsKept() {
+        // handleMissingProject treats a null list as Probe.Unknown and returns without removing.
+        assertNull(AssignmentPolicy.storedList(hasField = false, raw = null))
+        assertNull(AssignmentPolicy.storedList(hasField = true, raw = "not a list"))
+        assertEquals("[]", AssignmentPolicy.storedList(hasField = true, raw = emptyList<String>()))
+        assertEquals("[\"a\"]", AssignmentPolicy.storedList(hasField = true, raw = listOf("a")))
+    }
+
+    @Test
+    fun recordUpload_waitsForUnknownList_butSendsExplicitEmptyList() {
+        assertNull(AssignmentPolicy.recordUploadList(""))
+        assertEquals(emptyList<String>(), AssignmentPolicy.recordUploadList("[]"))
+        assertEquals(listOf("a"), AssignmentPolicy.recordUploadList("[\"a\"]"))
+    }
+
+    @Test
     fun onlyViewersCannotWrite() {
         assertFalse(AssignmentPolicy.canWrite("VIEWER"))
         assertTrue(AssignmentPolicy.canWrite("FIELD_ENGINEER"))

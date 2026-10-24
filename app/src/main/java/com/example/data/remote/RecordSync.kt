@@ -6,7 +6,6 @@ import android.database.sqlite.SQLiteDatabase
 import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.RecordSyncSchema
-import com.example.data.model.AssignedUids
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -53,17 +52,19 @@ class RecordSync(private val db: AppDatabase) {
             }
             data.put("_weather", weather)
         }
-        return hashMapOf(
+        return hashMapOf<String, Any>(
             "uuid" to uuid,
             "type" to table,
             "projectUuid" to projectUuid,
-            "assignedUids" to AssignedUids.parse(assignedUids),
             "revision" to row.getLong("revision"),
             "updatedAt" to row.getLong("updatedAt"),
             "updatedByUid" to uid,
             "isDeleted" to false,
             "data" to data.toString()
-        )
+        ).apply {
+            // Left out while the project's list is unknown here; the upload then waits for it.
+            AssignmentPolicy.recordUploadList(assignedUids)?.let { put("assignedUids", it) }
+        }
     }
 
     /**
@@ -196,6 +197,71 @@ class RecordSync(private val db: AppDatabase) {
      */
     fun removeProjectLocally(projectId: Long) = writeRemote {
         it.delete("projects", "id = ?", arrayOf(projectId))
+    }
+
+    enum class Unassigned { KEPT, HIDDEN, REMOVED }
+
+    /**
+     * Takes a project the user is no longer assigned to off this phone, without touching
+     * the cloud. The checks run in the same transaction as the write, so a change made
+     * meanwhile can't be lost:
+     * - something still to upload: nothing happens ([Unassigned.KEPT]);
+     * - rows that only exist on this phone (inspections, time extensions, SDP data, audit
+     *   logs...): the row stays and only gets the server's [serverAssignedUids], which hides
+     *   it; a later re-assignment brings it back ([Unassigned.HIDDEN]);
+     * - otherwise the project and its synced records are deleted ([Unassigned.REMOVED]).
+     *   [deleteFiles] gets the project's attachment file names before the delete commits,
+     *   so the garbage collector never sees them unreferenced (it would delete the cloud copies).
+     */
+    fun unassignLocally(
+        projectId: Long,
+        projectUuid: String,
+        serverAssignedUids: String,
+        deleteFiles: (Set<String>) -> Unit
+    ): Unassigned {
+        var result = Unassigned.KEPT
+        writeRemote { w ->
+            if (hasPendingUpload(projectId, projectUuid)) return@writeRemote
+            if (hasLocalOnlyRows(projectId)) {
+                w.execSQL("UPDATE projects SET assignedUids = ? WHERE id = ?", arrayOf(serverAssignedUids, projectId))
+                result = Unassigned.HIDDEN
+                return@writeRemote
+            }
+            deleteFiles(attachmentNamesOf(projectId))
+            w.delete("projects", "id = ?", arrayOf(projectId))
+            result = Unassigned.REMOVED
+        }
+        return result
+    }
+
+    /**
+     * Tables deleted with a project (a foreign key to `projects`) that the cloud doesn't
+     * hold, read from the database's own foreign keys: table -> its column naming the project.
+     * The synced record tables are left out, and so are weather rows, which travel inside
+     * their weekly report.
+     */
+    fun localOnlyChildTables(): Map<String, String> = localOnlyTables ?: buildMap {
+        val tables = sql.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0)) }
+        }
+        val synced = RecordSyncSchema.TABLES.toSet() + "daily_hourly_weather"
+        for (table in tables) {
+            if (table in synced) continue
+            sql.query("PRAGMA foreign_key_list(`$table`)").use { c ->
+                while (c.moveToNext()) {
+                    if (c.getString(c.getColumnIndexOrThrow("table")) == "projects") {
+                        put(table, c.getString(c.getColumnIndexOrThrow("from")))
+                    }
+                }
+            }
+        }
+    }.also { localOnlyTables = it }
+
+    @Volatile private var localOnlyTables: Map<String, String>? = null
+
+    /** Whether the project has rows the cloud can't give back (see [localOnlyChildTables]). */
+    fun hasLocalOnlyRows(projectId: Long): Boolean = localOnlyChildTables().any { (table, column) ->
+        sql.query("SELECT EXISTS(SELECT 1 FROM `$table` WHERE `$column` = ?)", arrayOf(projectId)).use { it.moveToFirst() && it.getInt(0) == 1 }
     }
 
     /** Whether this phone still has to send something for the project, one of its records or one of its files. */
