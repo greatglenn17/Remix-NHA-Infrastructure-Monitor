@@ -3,12 +3,18 @@ package com.example.data.remote
 import android.content.Context
 import android.util.Log
 import com.example.data.local.AppDatabase
+import com.example.data.local.ProjectDuplicateMerger
 import com.example.data.model.Project
 import com.example.data.model.SyncOutboxEvent
+import com.example.util.AppNotificationManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +43,9 @@ class FirestoreSyncManager(
     private val _syncStatus = MutableStateFlow<FirestoreSyncStatus>(FirestoreSyncStatus.Idle)
     private var projectListener: ListenerRegistration? = null
     private var authStateListener: FirebaseAuth.AuthStateListener? = null
+    private val reconcileMutex = Mutex()
+    /** Set after the first server snapshot, so a fresh install doesn't alert for every existing project. */
+    @Volatile private var hasServerSnapshot = false
 
     init {
         // Self-healing auth observer: automatically starts sync the instant Firebase Auth initializes
@@ -73,93 +82,165 @@ class FirestoreSyncManager(
         stopRealtimeSync()
 
         Log.d(tag, "Starting Firestore realtime listener for projects (User: ${currentUser.uid})...")
+        hasServerSnapshot = false
         projectListener = firestore.collection("projects")
-            .addSnapshotListener { snapshots, e ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshots, e ->
                 if (e != null) {
                     Log.w(tag, "Firestore listen failed.", e)
                     _syncStatus.value = FirestoreSyncStatus.Error(e.localizedMessage ?: "Sync listener error")
                     return@addSnapshotListener
                 }
+                if (snapshots == null || snapshots.metadata.hasPendingWrites()) return@addSnapshotListener
 
-                if (snapshots != null && !snapshots.isEmpty) {
-                    scope.launch(Dispatchers.IO) {
-                        for (doc in snapshots.documents) {
-                            try {
-                                val projectUuid = doc.id
-                                val name = doc.getString("name") ?: continue
-                                val revision = doc.getLong("revision") ?: 1L
-                                val updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis()
-                                val isDeleted = doc.getBoolean("isDeleted") ?: false
-
-                                val localProject = db.projectDao().getProjectByUuid(projectUuid)
-                                if (isDeleted) {
-                                    // Tombstone detected: remove from local Room cache so it disappears across all devices
-                                    if (localProject != null) {
-                                        db.projectDao().deleteProjectById(localProject.id)
-                                        Log.d(tag, "Reconciled remote tombstone deletion for project: $name ($projectUuid)")
-                                    }
-                                    continue
-                                }
-
-                                if (localProject == null) {
-                                    // Remote project doesn't exist locally — insert into Room
-                                    val newProj = Project(
-                                        projectUuid = projectUuid,
-                                        name = name,
-                                        location = doc.getString("location").orEmpty(),
-                                        implementingOffice = doc.getString("implementingOffice") ?: "Bulacan District Office",
-                                        contractor = doc.getString("contractor").orEmpty(),
-                                        scopeOfWork = doc.getString("scopeOfWork").orEmpty(),
-                                        projectType = doc.getString("projectType") ?: "Housing Project",
-                                        landArea = doc.getString("landArea") ?: "4.5 Hectares",
-                                        numberOfUnits = doc.getString("numberOfUnits") ?: "120 Housing Units",
-                                        contractCostOriginal = doc.getDouble("contractCostOriginal") ?: 0.0,
-                                        contractCostRevised = doc.getDouble("contractCostRevised") ?: 0.0,
-                                        contractDurationDays = doc.getLong("contractDurationDays")?.toInt() ?: 0,
-                                        dateStarted = doc.getString("dateStarted") ?: "2026-08-01",
-                                        completionDateOriginal = doc.getString("completionDateOriginal") ?: "2026-12-31",
-                                        completionDateRevised = doc.getString("completionDateRevised") ?: "2026-12-31",
-                                        status = doc.getString("status") ?: "On-going",
-                                        targetAccomplishment = doc.getDouble("targetAccomplishment") ?: 0.0,
-                                        actualAccomplishment = doc.getDouble("actualAccomplishment") ?: 0.0,
-                                        assignedStaff = doc.getString("assignedStaff") ?: "Engr. Staff",
-                                        revision = revision,
-                                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
-                                        updatedAt = updatedAt,
-                                        createdByUid = doc.getString("createdByUid").orEmpty(),
-                                        updatedByUid = doc.getString("updatedByUid").orEmpty(),
-                                        isDeleted = false
-                                    )
-                                    db.projectDao().insertProject(newProj)
-                                    Log.d(tag, "Ingested new remote project: $name ($projectUuid)")
-                                } else if (revision > localProject.revision) {
-                                    // Remote version is newer — update local Room entity
-                                    val updatedProj = localProject.copy(
-                                        name = name,
-                                        location = doc.getString("location") ?: localProject.location,
-                                        implementingOffice = doc.getString("implementingOffice") ?: localProject.implementingOffice,
-                                        contractor = doc.getString("contractor") ?: localProject.contractor,
-                                        scopeOfWork = doc.getString("scopeOfWork") ?: localProject.scopeOfWork,
-                                        contractCostRevised = doc.getDouble("contractCostRevised") ?: localProject.contractCostRevised,
-                                        status = doc.getString("status") ?: localProject.status,
-                                        targetAccomplishment = doc.getDouble("targetAccomplishment") ?: localProject.targetAccomplishment,
-                                        actualAccomplishment = doc.getDouble("actualAccomplishment") ?: localProject.actualAccomplishment,
-                                        assignedStaff = doc.getString("assignedStaff") ?: localProject.assignedStaff,
-                                        revision = revision,
-                                        updatedAt = updatedAt,
-                                        updatedByUid = doc.getString("updatedByUid") ?: localProject.updatedByUid,
-                                        isDeleted = false
-                                    )
-                                    db.projectDao().updateProject(updatedProj)
-                                    Log.d(tag, "Updated local project from remote revision $revision: $name")
-                                }
-                            } catch (ex: Exception) {
-                                Log.e(tag, "Error processing remote Firestore document", ex)
-                            }
+                val docs = snapshots.documents
+                val fromServer = !snapshots.metadata.isFromCache
+                scope.launch(Dispatchers.IO) {
+                    reconcileMutex.withLock {
+                        try {
+                            reconcile(docs, fromServer, currentUser.uid)
+                        } catch (ex: Exception) {
+                            Log.e(tag, "Error reconciling Firestore projects", ex)
                         }
                     }
                 }
             }
+    }
+
+    /**
+     * Line local projects up with the cloud: adopt the cloud uuid for projects that
+     * already exist under another uuid, insert new ones, apply newer revisions, and
+     * upload local projects the cloud has never seen.
+     */
+    private suspend fun reconcile(docs: List<DocumentSnapshot>, fromServer: Boolean, myUid: String) {
+        ProjectDuplicateMerger.merge(db)
+
+        val projectDao = db.projectDao()
+        val locals = projectDao.getAllProjectsList()
+        val liveDocs = docs.filter { it.getBoolean("isDeleted") != true && it.getString("name") != null }
+        val remoteRefs = docs.map { doc ->
+            ProjectReconciler.RemoteRef(
+                uuid = doc.id,
+                key = ProjectReconciler.key(doc.getString("name").orEmpty(), doc.getString("location").orEmpty()),
+                createdAt = doc.getLong("createdAt") ?: Long.MAX_VALUE,
+                isDeleted = doc.getBoolean("isDeleted") == true || doc.getString("name") == null
+            )
+        }
+        val plan = ProjectReconciler.plan(
+            locals.map { ProjectReconciler.LocalRef(it.id, it.projectUuid, ProjectReconciler.key(it.name, it.location)) },
+            remoteRefs
+        )
+
+        for (id in plan.deleteLocal) {
+            projectDao.deleteProjectById(id)
+            Log.d(tag, "Reconciled remote tombstone deletion for local project $id")
+        }
+        for ((id, uuid) in plan.adoptUuid) {
+            projectDao.updateProjectUuid(id, uuid)
+            Log.d(tag, "Local project $id now uses cloud uuid $uuid (duplicate prevented)")
+        }
+
+        for (doc in liveDocs) {
+            try {
+                val projectUuid = doc.id
+                val name = doc.getString("name") ?: continue
+                val revision = doc.getLong("revision") ?: 1L
+                val updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis()
+
+                val localProject = projectDao.getProjectByUuid(projectUuid)
+                if (localProject == null) {
+                    if (projectUuid !in plan.insertRemote) continue // non-canonical duplicate doc
+                    // Remote project doesn't exist locally — insert into Room
+                    val newProj = Project(
+                        projectUuid = projectUuid,
+                        name = name,
+                        location = doc.getString("location").orEmpty(),
+                        implementingOffice = doc.getString("implementingOffice") ?: "Bulacan District Office",
+                        contractor = doc.getString("contractor").orEmpty(),
+                        scopeOfWork = doc.getString("scopeOfWork").orEmpty(),
+                        projectType = doc.getString("projectType") ?: "Housing Project",
+                        landArea = doc.getString("landArea") ?: "4.5 Hectares",
+                        numberOfUnits = doc.getString("numberOfUnits") ?: "120 Housing Units",
+                        contractCostOriginal = doc.getDouble("contractCostOriginal") ?: 0.0,
+                        contractCostRevised = doc.getDouble("contractCostRevised") ?: 0.0,
+                        contractDurationDays = doc.getLong("contractDurationDays")?.toInt() ?: 0,
+                        dateStarted = doc.getString("dateStarted") ?: "2026-08-01",
+                        completionDateOriginal = doc.getString("completionDateOriginal") ?: "2026-12-31",
+                        completionDateRevised = doc.getString("completionDateRevised") ?: "2026-12-31",
+                        status = doc.getString("status") ?: "On-going",
+                        targetAccomplishment = doc.getDouble("targetAccomplishment") ?: 0.0,
+                        actualAccomplishment = doc.getDouble("actualAccomplishment") ?: 0.0,
+                        assignedStaff = doc.getString("assignedStaff") ?: "Engr. Staff",
+                        revision = revision,
+                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                        updatedAt = updatedAt,
+                        createdByUid = doc.getString("createdByUid").orEmpty(),
+                        updatedByUid = doc.getString("updatedByUid").orEmpty(),
+                        isDeleted = false
+                    )
+                    projectDao.insertProject(newProj)
+                    Log.d(tag, "Ingested new remote project: $name ($projectUuid)")
+                    if (hasServerSnapshot && newProj.createdByUid != myUid) {
+                        AppNotificationManager.sendProjectNotification(
+                            context = context,
+                            projectUuid = projectUuid,
+                            title = "📋 New Project Created",
+                            message = "$name has been added by ${newProj.assignedStaff}."
+                        )
+                    }
+                } else if (localProject.revision > revision) {
+                    enqueueProjectEvent(localProject.projectUuid, "UPDATE", localProject.revision)
+                } else if (revision > localProject.revision) {
+                    // Remote version is newer — update local Room entity
+                    val updatedProj = localProject.copy(
+                        name = name,
+                        location = doc.getString("location") ?: localProject.location,
+                        implementingOffice = doc.getString("implementingOffice") ?: localProject.implementingOffice,
+                        contractor = doc.getString("contractor") ?: localProject.contractor,
+                        scopeOfWork = doc.getString("scopeOfWork") ?: localProject.scopeOfWork,
+                        contractCostRevised = doc.getDouble("contractCostRevised") ?: localProject.contractCostRevised,
+                        status = doc.getString("status") ?: localProject.status,
+                        targetAccomplishment = doc.getDouble("targetAccomplishment") ?: localProject.targetAccomplishment,
+                        actualAccomplishment = doc.getDouble("actualAccomplishment") ?: localProject.actualAccomplishment,
+                        assignedStaff = doc.getString("assignedStaff") ?: localProject.assignedStaff,
+                        revision = revision,
+                        updatedAt = updatedAt,
+                        updatedByUid = doc.getString("updatedByUid") ?: localProject.updatedByUid,
+                        isDeleted = false
+                    )
+                    projectDao.updateProject(updatedProj)
+                    Log.d(tag, "Updated local project from remote revision $revision: $name")
+                }
+            } catch (ex: Exception) {
+                Log.e(tag, "Error processing remote Firestore document", ex)
+            }
+        }
+
+        // Only trust "missing from the cloud" when the snapshot came from the server;
+        // a cache snapshot may simply not have loaded every document yet.
+        if (fromServer) {
+            for (uuid in plan.uploadLocal) {
+                val project = projectDao.getProjectByUuid(uuid) ?: continue
+                enqueueProjectEvent(uuid, "CREATE", project.revision)
+            }
+            if (plan.uploadLocal.isNotEmpty()) {
+                Log.d(tag, "Queued ${plan.uploadLocal.size} local projects that were never uploaded")
+            }
+            hasServerSnapshot = true
+        }
+        flushOutbox()
+    }
+
+    private suspend fun enqueueProjectEvent(projectUuid: String, operation: String, revision: Long) {
+        if (db.syncOutboxDao().hasPendingFor(projectUuid)) return
+        db.syncOutboxDao().enqueue(
+            SyncOutboxEvent(
+                entityType = "project",
+                entityUuid = projectUuid,
+                operation = operation,
+                revision = revision,
+                payloadJson = "{\"projectUuid\":\"$projectUuid\"}"
+            )
+        )
     }
 
     /**
@@ -242,6 +323,10 @@ class FirestoreSyncManager(
 
                         db.syncOutboxDao().markSynced(event.eventId)
                         syncedCount++
+                    } else {
+                        // The row was merged into another project or its uuid was replaced by the
+                        // cloud one; the surviving row has its own event, so nothing is left to send.
+                        db.syncOutboxDao().markSynced(event.eventId)
                     }
                 }
             } catch (e: Exception) {

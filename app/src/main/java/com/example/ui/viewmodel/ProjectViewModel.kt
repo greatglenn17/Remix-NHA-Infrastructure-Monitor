@@ -147,7 +147,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
         // Restore persisted user session on startup
         val savedSession = authManager.getSavedUserSession()
-        if (savedSession != null) {
+        if (savedSession != null && authManager.isOfflineOnlySession) {
+            // Logged in via the on-device fallback only: ask for the password once so the
+            // account is linked to Firebase and this phone's projects can sync.
+            authManager.clearUserSession()
+            _isLoggedIn.value = false
+            _authSuccessMessage.value = "Please sign in again to turn on cloud sync for this phone."
+        } else if (savedSession != null) {
             _currentUserAccount.value = savedSession
             _isLoggedIn.value = true
         } else if (authManager.isUserSignedIn) {
@@ -170,6 +176,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         // Start realtime sync if user is already logged in (AuthStateListener in FirestoreSyncManager
         // will also trigger this automatically when Firebase Auth token is ready)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                com.example.data.local.ProjectDuplicateMerger.merge(database)
+            } catch (e: Exception) {
+                android.util.Log.w("ProjectViewModel", "Duplicate project merge skipped: ${e.message}")
+            }
             if (_isLoggedIn.value) {
                 try {
                     firestoreSyncManager.startRealtimeSync()

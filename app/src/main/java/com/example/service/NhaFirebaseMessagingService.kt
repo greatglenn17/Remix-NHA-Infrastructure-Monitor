@@ -30,11 +30,21 @@ class NhaFirebaseMessagingService : FirebaseMessagingService() {
         Log.d(tag, "Processing push notification: title=$title, eventId=$eventId")
 
         // Trigger native Android Status Bar Notification
-        AppNotificationManager.sendAdminNotification(
-            context = applicationContext,
-            title = title,
-            message = message
-        )
+        val projectId = data["projectId"]
+        if (data["type"] == "PROJECT_CREATED" && !projectId.isNullOrBlank()) {
+            AppNotificationManager.sendProjectNotification(
+                context = applicationContext,
+                projectUuid = projectId,
+                title = title,
+                message = message
+            )
+        } else {
+            AppNotificationManager.sendAdminNotification(
+                context = applicationContext,
+                title = title,
+                message = message
+            )
+        }
     }
 
     private fun registerTokenToFirestore(token: String) {

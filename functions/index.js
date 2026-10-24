@@ -4,6 +4,9 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
+// Roles a user may pick for themselves at registration. SUPER_ADMIN is never
+// taken from the client-written profile: only SUPER_ADMIN_EMAIL receives it.
+const SELF_ASSIGNABLE_ROLES = ["ENGINEER_ADMIN", "FIELD_ENGINEER", "VIEWER"];
 
 /**
  * Triggered whenever a user profile is created or updated in Firestore users/{uid}.
@@ -21,7 +24,8 @@ exports.syncUserCustomClaims = functions.firestore
     }
 
     const email = (data.email || "").trim().toLowerCase();
-    let requestedRole = (data.role || "FIELD_ENGINEER").toUpperCase();
+    const profileRole = (data.role || "FIELD_ENGINEER").toUpperCase();
+    let requestedRole = SELF_ASSIGNABLE_ROLES.includes(profileRole) ? profileRole : "FIELD_ENGINEER";
 
     if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
       requestedRole = "SUPER_ADMIN";
@@ -59,12 +63,10 @@ exports.notifyOnProjectWrite = functions.firestore
     const projectName = after.name || "Unnamed Project";
     const createdByUid = after.createdByUid || "";
 
-    if (isDeleted) return null;
+    if (isDeleted || !isNew) return null;
 
-    const title = isNew ? "📋 New Project Created" : "🔄 Project Updated";
-    const body = isNew
-      ? `${projectName} has been added.`
-      : `${projectName} has been updated.`;
+    const title = "📋 New Project Created";
+    const body = `${projectName} has been added by ${after.assignedStaff || "a team member"}.`;
 
     try {
       const usersSnapshot = await admin.firestore().collection("users").get();
@@ -89,17 +91,15 @@ exports.notifyOnProjectWrite = functions.firestore
 
       const response = await admin.messaging().sendEachForMulticast({
         tokens,
-        notification: { title, body },
         data: {
-          type: isNew ? "PROJECT_CREATED" : "PROJECT_UPDATED",
+          type: "PROJECT_CREATED",
+          title,
+          message: body,
           projectId,
           projectName,
           eventId: `proj_${projectId}_${Date.now()}`,
         },
-        android: {
-          priority: "high",
-          notification: { channelId: "project_updates" },
-        },
+        android: { priority: "high" },
       });
 
       console.log(`FCM for project ${projectId}: Success=${response.successCount} Failed=${response.failureCount}`);
@@ -152,15 +152,14 @@ async function notifySuperAdminsOnRegistration(userData) {
 
     await admin.messaging().sendEachForMulticast({
       tokens,
-      notification: {
-        title: "👤 New User Registration",
-        body: `${userData.displayName || userData.email} registered as ${userData.role || "FIELD_ENGINEER"}.`,
-      },
       data: {
         type: "REGISTRATION_ALERT",
+        title: "👤 New User Registration",
+        message: `${userData.displayName || userData.email} registered as ${userData.role || "FIELD_ENGINEER"}.`,
         userEmail: userData.email || "",
         displayName: userData.displayName || "",
       },
+      android: { priority: "high" },
     });
   } catch (error) {
     console.error("FCM registration notification error:", error);

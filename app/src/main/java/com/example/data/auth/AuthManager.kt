@@ -6,8 +6,9 @@ import androidx.security.crypto.MasterKey
 import com.example.data.model.UserAccount
 import com.example.data.model.UserRole
 import com.google.firebase.FirebaseApp
-import com.google.firebase.FirebaseOptions
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.tasks.await
 
@@ -41,6 +42,10 @@ class AuthManager(private val context: Context) {
 
     val currentFirebaseUser: FirebaseUser?
         get() = auth?.currentUser
+
+    /** True when the session was restored from the local fallback and has no Firebase user, so nothing syncs. */
+    val isOfflineOnlySession: Boolean
+        get() = auth != null && auth?.currentUser == null && prefs.getBoolean("is_session_active", false)
 
     val isUserSignedIn: Boolean
         get() = auth?.currentUser != null || prefs.getBoolean("is_session_active", false)
@@ -152,23 +157,34 @@ class AuthManager(private val context: Context) {
             return Result.failure(IllegalArgumentException("Password must be at least 6 characters long."))
         }
 
-        // 1. Try remote Firebase authentication first (primary source of truth for cloud sync):
+        val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
+        val inputHash = hashPassword(cleanPass)
+        val localPasswordMatches = savedPass != null && (savedPass == inputHash || savedPass == cleanPass)
+
+        // 1. Firebase Auth is the source of truth. Without a Firebase user nothing syncs,
+        //    so the local fallback below is only for when Firebase is unreachable.
         val firebaseAuth = auth
         if (firebaseAuth != null) {
             try {
                 val result = firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPass).await()
                 return Result.success(result.user)
+            } catch (e: FirebaseNetworkException) {
+                android.util.Log.w("AuthManager", "Firebase unreachable, using offline sign-in: ${e.message}")
             } catch (e: Exception) {
                 android.util.Log.w("AuthManager", "Firebase remote sign-in exception: ${e.message}")
+                if (!localPasswordMatches) {
+                    return Result.failure(IllegalArgumentException("Incorrect email or password for $cleanEmail."))
+                }
+                // The account exists only on this phone (registered before the move to the
+                // current Firebase project). The user proved the password locally, so create
+                // the matching Firebase account and they sync from now on.
+                return migrateLocalAccountToFirebase(firebaseAuth, cleanEmail, cleanPass)
             }
         }
 
-        // 2. If account was registered locally or offline fallback:
-        val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
-        val inputHash = hashPassword(cleanPass)
-
+        // 2. Offline fallback: Firebase is unavailable, verify against the local registration.
         if (savedPass != null) {
-            if (savedPass == inputHash || savedPass == cleanPass) {
+            if (localPasswordMatches) {
                 return Result.success(auth?.currentUser)
             } else {
                 return Result.failure(IllegalArgumentException("Incorrect password for $cleanEmail. Please re-type your password."))
@@ -177,6 +193,26 @@ class AuthManager(private val context: Context) {
 
         // 3. Account not found
         return Result.failure(IllegalArgumentException("No account found for $cleanEmail. Please click 'Create Account' tab to register first."))
+    }
+
+    private suspend fun migrateLocalAccountToFirebase(
+        firebaseAuth: FirebaseAuth,
+        email: String,
+        pass: String
+    ): Result<FirebaseUser?> {
+        return try {
+            val created = firebaseAuth.createUserWithEmailAndPassword(email, pass).await()
+            android.util.Log.i("AuthManager", "Migrated local account $email to Firebase Auth")
+            Result.success(created.user)
+        } catch (_: FirebaseAuthUserCollisionException) {
+            // A cloud account already exists with a different password.
+            Result.failure(IllegalArgumentException("Incorrect password for $email. Your cloud account uses a different password; tap 'Forgot Password' to reset it."))
+        } catch (e: FirebaseNetworkException) {
+            Result.failure(IllegalStateException("No internet connection. Please connect and sign in again.", e))
+        } catch (e: Exception) {
+            android.util.Log.w("AuthManager", "Firebase account migration failed: ${e.message}", e)
+            Result.failure(IllegalStateException(e.localizedMessage ?: "Unable to create your cloud account.", e))
+        }
     }
 
     suspend fun signUp(

@@ -33,7 +33,20 @@ object AppNotificationManager {
         context: Context,
         title: String,
         message: String
-    ) {
+    ) = post(context, notificationIdCounter++, title, message)
+
+    /**
+     * One notification per project: the FCM push and the in-app Firestore listener can both
+     * report the same new project, and a shared id makes the second one replace the first.
+     */
+    fun sendProjectNotification(
+        context: Context,
+        projectUuid: String,
+        title: String,
+        message: String
+    ) = post(context, "project:$projectUuid".hashCode(), title, message)
+
+    private fun post(context: Context, notificationId: Int, title: String, message: String) {
         try {
             createNotificationChannel(context)
 
@@ -59,7 +72,7 @@ object AppNotificationManager {
                 .build()
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.notify(notificationIdCounter++, notification)
+            notificationManager.notify(notificationId, notification)
         } catch (e: Exception) {
             android.util.Log.e("AppNotificationManager", "Error sending notification: ${e.message}", e)
         }

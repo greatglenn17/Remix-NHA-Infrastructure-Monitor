@@ -28,7 +28,10 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
-      allow create, update: if signedIn() && request.auth.uid == userId;
+      // A profile may only claim SUPER_ADMIN for the designated super admin account.
+      allow create, update: if signedIn() && request.auth.uid == userId
+        && (request.resource.data.get('role', '') != 'SUPER_ADMIN'
+            || request.auth.token.email == 'great.glenn17@gmail.com');
       allow delete: if isSuperAdmin();
 
       match /{subcollection}/{docId} {

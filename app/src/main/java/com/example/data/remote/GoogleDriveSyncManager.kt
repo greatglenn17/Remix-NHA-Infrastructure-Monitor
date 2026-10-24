@@ -128,6 +128,11 @@ class GoogleDriveSyncManager(
             projects.forEach { p ->
                 projectsArray.put(JSONObject().apply {
                     put("id", p.id)
+                    put("projectUuid", p.projectUuid)
+                    put("revision", p.revision)
+                    put("createdAt", p.createdAt)
+                    put("updatedAt", p.updatedAt)
+                    put("createdByUid", p.createdByUid)
                     put("name", p.name)
                     put("location", p.location)
                     put("implementingOffice", p.implementingOffice)
@@ -651,18 +656,27 @@ class GoogleDriveSyncManager(
             val reportDao = db.reportDao()
 
             val existingProjects = projectDao.getAllProjectsList()
-            val existingNameMap = existingProjects.associateBy { 
-                it.name.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim() 
-            }
+            val existingByUuid = existingProjects.associateBy { it.projectUuid }
+            val existingByKey = existingProjects.associateBy { ProjectReconciler.key(it.name, it.location) }
+            // Row ids are local to the phone that made the backup; map them to this phone's rows.
+            val projectIdMap = mutableMapOf<Long, Long>()
+            fun localProjectId(backupId: Long): Long = projectIdMap[backupId] ?: backupId
 
             for (i in 0 until projectsArray.length()) {
                 val p = projectsArray.getJSONObject(i)
                 val pName = p.getString("name").trim()
-                val pNameKey = pName.lowercase().replace("\u00A0", " ").replace(Regex("\\s+"), " ").trim()
-                val matchedId = existingNameMap[pNameKey]?.id ?: p.getLong("id")
+                val backupUuid = p.optString("projectUuid", "")
+                val existing = existingByUuid[backupUuid]
+                    ?: existingByKey[ProjectReconciler.key(pName, p.getString("location"))]
 
                 val project = Project(
-                    id = matchedId,
+                    id = existing?.id ?: 0,
+                    projectUuid = existing?.projectUuid ?: backupUuid.ifBlank { java.util.UUID.randomUUID().toString() },
+                    createdAt = existing?.createdAt ?: p.optLong("createdAt", System.currentTimeMillis()),
+                    updatedAt = p.optLong("updatedAt", System.currentTimeMillis()),
+                    createdByUid = existing?.createdByUid ?: p.optString("createdByUid", ""),
+                    updatedByUid = existing?.updatedByUid.orEmpty(),
+                    revision = maxOf(existing?.revision ?: 1L, p.optLong("revision", 1L)),
                     name = pName,
                     location = p.getString("location"),
                     implementingOffice = p.getString("implementingOffice"),
@@ -680,14 +694,21 @@ class GoogleDriveSyncManager(
                     actualAccomplishment = p.optDouble("actualAccomplishment", 0.0),
                     assignedStaff = p.optString("assignedStaff", "Engr. Unassigned")
                 )
-                projectDao.insertProject(project)
+                // Update in place: insertProject's REPLACE deletes the row first, and the
+                // ON DELETE CASCADE would wipe its inspections, payments and reports.
+                projectIdMap[p.getLong("id")] = if (existing != null) {
+                    projectDao.updateProject(project)
+                    existing.id
+                } else {
+                    projectDao.insertProject(project)
+                }
             }
 
             for (i in 0 until docsArray.length()) {
                 val d = docsArray.getJSONObject(i)
                 val doc = PendingDocument(
                     id = d.getLong("id"),
-                    projectId = d.getLong("projectId"),
+                    projectId = localProjectId(d.getLong("projectId")),
                     documentName = d.getString("documentName"),
                     status = d.getString("status"),
                     remarks = d.optString("remarks", ""),
@@ -701,7 +722,7 @@ class GoogleDriveSyncManager(
                 val w = weeklyArray.getJSONObject(i)
                 val wr = WeeklyReport(
                     id = w.getLong("id"),
-                    projectId = w.getLong("projectId"),
+                    projectId = localProjectId(w.getLong("projectId")),
                     reportingWeek = w.optString("reportingWeek", "Week 1"),
                     daysElapsed = w.optInt("daysElapsed", 0),
                     remainingDays = w.optInt("remainingDays", 0),
@@ -724,7 +745,7 @@ class GoogleDriveSyncManager(
                 val m = monthlyArray.getJSONObject(i)
                 val mr = MonthlyReport(
                     id = m.getLong("id"),
-                    projectId = m.getLong("projectId"),
+                    projectId = localProjectId(m.getLong("projectId")),
                     reportingMonth = m.optString("reportingMonth", m.optString("monthYear", "July 2026")),
                     scopeWeightPct = m.optDouble("scopeWeightPct", 100.0),
                     scopeTargetPct = m.optDouble("scopeTargetPct", m.optDouble("targetAccomplishment", 0.0)),
@@ -750,7 +771,7 @@ class GoogleDriveSyncManager(
                 val dw = weatherArray.getJSONObject(i)
                 val weather = DailyHourlyWeather(
                     id = dw.getLong("id"),
-                    projectId = dw.getLong("projectId"),
+                    projectId = localProjectId(dw.getLong("projectId")),
                     weeklyReportId = if (dw.has("weeklyReportId") && dw.getLong("weeklyReportId") != -1L) dw.getLong("weeklyReportId") else null,
                     date = dw.getString("date"),
                     dayOfWeek = dw.optString("dayOfWeek", "Monday"),
@@ -763,7 +784,7 @@ class GoogleDriveSyncManager(
                 val te = timeExtArray.getJSONObject(i)
                 val timeExt = TimeExtension(
                     id = te.getLong("id"),
-                    projectId = te.getLong("projectId"),
+                    projectId = localProjectId(te.getLong("projectId")),
                     extensionNo = te.getInt("extensionNo"),
                     noOfDays = te.optInt("noOfDays", te.optInt("daysGranted", 0)),
                     revisedDurationDays = te.optInt("revisedDurationDays", 0),
@@ -779,7 +800,7 @@ class GoogleDriveSyncManager(
                 val vo = varOrderArray.getJSONObject(i)
                 val varOrder = VariationOrder(
                     id = vo.getLong("id"),
-                    projectId = vo.getLong("projectId"),
+                    projectId = localProjectId(vo.getLong("projectId")),
                     voNo = vo.getInt("voNo"),
                     description = vo.getString("description"),
                     costDifference = vo.optDouble("costDifference", vo.optDouble("amountChange", 0.0)),
@@ -794,7 +815,7 @@ class GoogleDriveSyncManager(
                 val ws = workSuspArray.getJSONObject(i)
                 val workSusp = WorkSuspensionOrder(
                     id = ws.getLong("id"),
-                    projectId = ws.getLong("projectId"),
+                    projectId = localProjectId(ws.getLong("projectId")),
                     name = ws.optString("name", "Work Suspension Order"),
                     effectivityDate = ws.getString("effectivityDate"),
                     durationDays = ws.getInt("durationDays"),
@@ -809,7 +830,7 @@ class GoogleDriveSyncManager(
                 val wr = workResArray.getJSONObject(i)
                 val workRes = WorkResumptionLog(
                     id = wr.getLong("id"),
-                    projectId = wr.getLong("projectId"),
+                    projectId = localProjectId(wr.getLong("projectId")),
                     name = wr.optString("name", "Work Resumption Order"),
                     dateResumed = wr.optString("dateResumed", wr.optString("resumptionDate", "")),
                     reason = wr.optString("reason", "Work Resumed"),
@@ -822,7 +843,7 @@ class GoogleDriveSyncManager(
                 val ins = inspArray.getJSONObject(i)
                 val inspection = ProjectInspection(
                     id = ins.getLong("id"),
-                    projectId = ins.getLong("projectId"),
+                    projectId = localProjectId(ins.getLong("projectId")),
                     inspectorName = ins.getString("inspectorName"),
                     inspectionDate = ins.getString("inspectionDate"),
                     findings = ins.getString("findings"),
@@ -836,7 +857,7 @@ class GoogleDriveSyncManager(
                 val img = imgArray.getJSONObject(i)
                 val image = ProjectImage(
                     id = img.getLong("id"),
-                    projectId = img.getLong("projectId"),
+                    projectId = localProjectId(img.getLong("projectId")),
                     imageUrl = img.optString("imageUrl", img.optString("imageUri", "")),
                     caption = img.optString("caption", ""),
                     category = img.optString("category", "Progress"),
@@ -849,7 +870,7 @@ class GoogleDriveSyncManager(
                 val pay = payArray.getJSONObject(i)
                 val payment = ProjectPayment(
                     id = pay.getLong("id"),
-                    projectId = pay.getLong("projectId"),
+                    projectId = localProjectId(pay.getLong("projectId")),
                     name = pay.optString("name", "Billing Payment"),
                     dvNo = pay.optString("dvNo", pay.optString("disbursementVoucherNo", "")),
                     date = pay.optString("date", pay.optString("paymentDate", "")),
@@ -867,7 +888,7 @@ class GoogleDriveSyncManager(
                 val iss = issueArray.getJSONObject(i)
                 val issue = ProjectIssue(
                     id = iss.getLong("id"),
-                    projectId = iss.getLong("projectId"),
+                    projectId = localProjectId(iss.getLong("projectId")),
                     date = iss.optString("date", ""),
                     description = iss.getString("description"),
                     actionTaken = iss.optString("actionTaken", ""),
@@ -884,7 +905,7 @@ class GoogleDriveSyncManager(
                 val al = auditArray.getJSONObject(i)
                 val auditLog = AuditLog(
                     id = al.getLong("id"),
-                    projectId = if (al.has("projectId") && al.getLong("projectId") != -1L) al.getLong("projectId") else null,
+                    projectId = if (al.has("projectId") && al.getLong("projectId") != -1L) localProjectId(al.getLong("projectId")) else null,
                     actionType = al.getString("actionType"),
                     details = al.getString("details"),
                     oldValue = al.optString("oldValue", ""),
@@ -899,7 +920,7 @@ class GoogleDriveSyncManager(
                 val sp = sdpPlansArray.getJSONObject(i)
                 val plan = SdpPlan(
                     id = sp.getLong("id"),
-                    projectId = sp.getLong("projectId"),
+                    projectId = localProjectId(sp.getLong("projectId")),
                     planName = sp.optString("planName", sp.optString("name", "SDP Plan")),
                     pdfFileUrl = sp.optString("pdfFileUrl", ""),
                     version = sp.optInt("version", 1),
@@ -915,7 +936,7 @@ class GoogleDriveSyncManager(
                 val sl = sdpLotsArray.getJSONObject(i)
                 val lot = SdpLot(
                     id = sl.getLong("id"),
-                    projectId = sl.optLong("projectId", 1L),
+                    projectId = localProjectId(sl.optLong("projectId", 1L)),
                     sdpPlanId = sl.getLong("sdpPlanId"),
                     blockNumber = sl.optString("blockNumber", sl.optInt("blockNumber", 1).toString()),
                     lotNumber = sl.optString("lotNumber", sl.optInt("lotNumber", 1).toString()),
@@ -936,7 +957,7 @@ class GoogleDriveSyncManager(
                 val sr = sdpRoadsArray.getJSONObject(i)
                 val road = SdpRoad(
                     id = sr.getLong("id"),
-                    projectId = sr.optLong("projectId", 1L),
+                    projectId = localProjectId(sr.optLong("projectId", 1L)),
                     sdpPlanId = sr.getLong("sdpPlanId"),
                     roadName = sr.optString("roadName", sr.optString("name", "Road")),
                     roadType = sr.optString("roadType", "Main Road"),
@@ -954,7 +975,7 @@ class GoogleDriveSyncManager(
                 val slp = sdpLotProgressArray.getJSONObject(i)
                 val lotProgress = SdpLotProgress(
                     id = slp.getLong("id"),
-                    projectId = slp.optLong("projectId", 1L),
+                    projectId = localProjectId(slp.optLong("projectId", 1L)),
                     sdpPlanId = slp.getLong("sdpPlanId"),
                     sdpLotId = slp.getLong("sdpLotId"),
                     physicalProgress = slp.optInt("physicalProgress", slp.optDouble("progressPercent", 0.0).toInt()),
@@ -981,7 +1002,7 @@ class GoogleDriveSyncManager(
                 val sli = sdpLotInspectionsArray.getJSONObject(i)
                 val lotInsp = SdpLotInspection(
                     id = sli.getLong("id"),
-                    projectId = sli.optLong("projectId", 1L),
+                    projectId = localProjectId(sli.optLong("projectId", 1L)),
                     sdpPlanId = sli.optLong("sdpPlanId", 1L),
                     sdpLotId = sli.getLong("sdpLotId"),
                     inspectionTimestamp = sli.optLong("inspectionTimestamp", System.currentTimeMillis()),
