@@ -75,4 +75,31 @@ class AssignmentPolicyTest {
         assertFalse(AssignmentPolicy.isVisible(false, "u", ""))
         assertFalse(AssignmentPolicy.isVisible(false, null, "[\"u\"]"))
     }
+
+    private fun project(uids: String, staff: String) =
+        com.example.data.model.Project(name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "", contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 1, dateStarted = "2026-01-01", completionDateOriginal = "2026-01-02", completionDateRevised = "2026-01-02", assignedUids = uids, assignedStaff = staff)
+
+    @Test
+    fun mergeAssignment_withoutUsers_keepsCurrentRowAssignment() {
+        val edited = project("[\"old\"]", "Old Name")
+        val current = project("[\"a\",\"b\"]", "A, B")
+        val merged = AssignmentPolicy.mergeAssignment(edited, current, null)
+        assertEquals("[\"a\",\"b\"]", merged.assignedUids)
+        assertEquals("A, B", merged.assignedStaff)
+    }
+
+    @Test
+    fun mergeAssignment_unknownListStaysUnknown() {
+        val merged = AssignmentPolicy.mergeAssignment(project("", "X"), project("", "X"), null)
+        assertEquals("", merged.assignedUids)
+        assertEquals("X", merged.assignedStaff)
+    }
+
+    @Test
+    fun mergeAssignment_withUsers_replacesListAndNames() {
+        val users = listOf(com.example.data.model.RegisteredUser("u1", "One"), com.example.data.model.RegisteredUser("u2", "Two"))
+        val merged = AssignmentPolicy.mergeAssignment(project("[\"old\"]", "Old"), project("[\"old\"]", "Old"), users)
+        assertEquals("[\"u1\",\"u2\"]", merged.assignedUids)
+        assertEquals("One, Two", merged.assignedStaff)
+    }
 }

@@ -65,4 +65,20 @@ object AssignmentPolicy {
             exists -> null
             else -> listOf(myUid)
         }
+
+    /**
+     * The project to save from the edit dialog. With [users] (the Super Admin changed
+     * the assignment) the list and names come from them; otherwise the assignment is
+     * taken from the [current] row, never from the dialog's older copy, so an edit
+     * can't overwrite a newer assignment or clear a list this phone hasn't seen.
+     */
+    fun mergeAssignment(edited: com.example.data.model.Project, current: com.example.data.model.Project?, users: List<com.example.data.model.RegisteredUser>?): com.example.data.model.Project =
+        when {
+            users != null -> edited.copy(
+                assignedUids = AssignedUids.toJson(users.map { it.uid }),
+                assignedStaff = users.joinToString(", ") { it.name }
+            )
+            current != null -> edited.copy(assignedUids = current.assignedUids, assignedStaff = current.assignedStaff)
+            else -> edited
+        }
 }

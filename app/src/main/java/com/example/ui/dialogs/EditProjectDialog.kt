@@ -63,6 +63,8 @@ fun EditProjectDialog(
     var name by remember { mutableStateOf(project.name) }
     var location by remember { mutableStateOf(project.location) }
     val assignedStaff = project.assignedStaff
+    // A blank list means this phone has never received the assignment: editing it would send "[]" and clear it for everyone.
+    val canEditAssignment = canAssign && registeredUsersLoaded && project.assignedUids.isNotBlank()
     var selectedUids by remember { mutableStateOf(com.example.data.model.AssignedUids.parse(project.assignedUids)) }
     var implementingOffice by remember { mutableStateOf(project.implementingOffice) }
     var contractor by remember { mutableStateOf(project.contractor) }
@@ -454,7 +456,7 @@ fun EditProjectDialog(
                 )
                 AssignStaffField(
                     editable = canAssign,
-                    usersLoaded = registeredUsersLoaded,
+                    usersLoaded = canEditAssignment,
                     users = registeredUsers,
                     selectedUids = selectedUids,
                     assignedStaff = assignedStaff,
@@ -522,7 +524,7 @@ fun EditProjectDialog(
                             dateStarted,
                             completionDateOriginal,
                             assignedStaff,
-                            if (canAssign && registeredUsersLoaded) {
+                            if (canEditAssignment) {
                                 selectedUids.map { uid -> registeredUsers.firstOrNull { it.uid == uid } ?: com.example.data.model.RegisteredUser(uid, uid) }
                             } else null
                         )

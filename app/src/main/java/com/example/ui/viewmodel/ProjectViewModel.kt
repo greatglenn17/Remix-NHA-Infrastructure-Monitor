@@ -220,13 +220,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
 
         userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
-            val uniqueProjects = projects.distinctBy { project ->
-                "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
-            }
             // Super Admin sees everything; everyone else only the projects naming their account.
             val isSuperAdmin = user.role == UserRole.SUPER_ADMIN
             val myUid = authManager.currentFirebaseUser?.uid
-            uniqueProjects.filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids) }
+            projects
+                .filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids) }
+                .distinctBy { project ->
+                    "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
+                }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -1140,18 +1141,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun Project.withAssignment(users: List<RegisteredUser>): Project =
-        copy(
-            assignedUids = AssignedUids.toJson(users.map { it.uid }),
-            assignedStaff = users.joinToString(", ") { it.name }
-        )
-
-    /** Assigns [users] to the project (Super Admin) and syncs it like any other edit. */
-    fun updateProjectAssignment(project: Project, users: List<RegisteredUser>) {
-        if (currentUserAccount.value.role != UserRole.SUPER_ADMIN) return
-        viewModelScope.launch { saveProjectChange(project.withAssignment(users)) }
-    }
-
     /**
      * Saves the edit dialog. When [assignedUsers] is given (Super Admin editing the
      * assignment) the same save also carries the new assignment, as one outbox event.
@@ -1159,8 +1148,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null) {
         viewModelScope.launch {
             val previousStatus = selectedProject.value?.status ?: "Unknown"
-            val base = if (assignedUsers != null && currentUserAccount.value.role == UserRole.SUPER_ADMIN)
-                project.withAssignment(assignedUsers) else project
+            val admin = currentUserAccount.value.role == UserRole.SUPER_ADMIN
+            val current = projectDao.getProjectByIdOnce(project.id)
+            val base = AssignmentPolicy.mergeAssignment(project, current, if (admin) assignedUsers else null)
             val updatedProject = base.copy(
                 revision = project.revision + 1,
                 updatedAt = System.currentTimeMillis(),
