@@ -2,4 +2,7 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-files-path name="my_downloads" path="Download" />
     <external-path name="external_files" path="." />
+    <!-- Attachments opened in a viewer app, and camera photos before they are shrunk. -->
+    <files-path name="attachments" path="attachments/" />
+    <cache-path name="camera" path="camera/" />
 </paths>

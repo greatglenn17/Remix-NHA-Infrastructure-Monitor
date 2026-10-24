@@ -830,17 +830,9 @@ fun AddRelatedDocumentDialog(
         unfocusedLabelColor = DarkTextSecondary
     )
 
-    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            fileUrl = uri.toString()
-        }
+    val filePickerLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        fileUrl = ref
     }
-
-    val presetScans = listOf(
-        "Contract Scan" to "https://images.unsplash.com/photo-1568992687947-868a62a9f521?auto=format&fit=crop&w=800&q=80",
-        "Blueprint Scan" to "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=800&q=80",
-        "Permit Scan" to "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=800&q=80"
-    )
 
     val finalDocName = if (selectedPreset == "Other / Specific Custom Document...") {
         customDocName
@@ -1017,22 +1009,6 @@ fun AddRelatedDocumentDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Upload Scanned File / Photo", style = MaterialTheme.typography.labelSmall)
                         }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Quick reference document scan:", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            presetScans.forEach { (label, url) ->
-                                FilterChip(
-                                    selected = fileUrl == url,
-                                    onClick = { fileUrl = url },
-                                    label = { Text(label, fontSize = 9.sp) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
                     }
                 }
             }
@@ -1070,17 +1046,10 @@ fun ViewScannedCopyDialog(
     onDismiss: () -> Unit,
     onUpdateFileUrl: (PendingDocument, String) -> Unit
 ) {
-    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            onUpdateFileUrl(doc, uri.toString())
-        }
+    val filePickerLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        onUpdateFileUrl(doc, ref)
     }
-
-    val presetScans = listOf(
-        "Contract Scan" to "https://images.unsplash.com/photo-1568992687947-868a62a9f521?auto=format&fit=crop&w=800&q=80",
-        "Blueprint Scan" to "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=800&q=80",
-        "Permit Scan" to "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=800&q=80"
-    )
+    val openAttachment = com.example.ui.components.rememberAttachmentOpener()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -1125,15 +1094,24 @@ fun ViewScannedCopyDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(240.dp)
-                            .background(DarkBackground, RoundedCornerShape(8.dp)),
+                            .background(DarkBackground, RoundedCornerShape(8.dp))
+                            .clickable { openAttachment(doc.fileUrl) },
                         contentAlignment = Alignment.Center
                     ) {
-                        AsyncImage(
-                            model = doc.fileUrl,
-                            contentDescription = "Scanned Copy",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Fit
-                        )
+                        if (com.example.data.files.Attachments.isPdf(doc.fileUrl)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(40.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("PDF attached. Tap to open.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                            }
+                        } else {
+                            AsyncImage(
+                                model = doc.fileUrl,
+                                contentDescription = "Scanned Copy (tap to open)",
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     }
                 } else {
                     Box(
@@ -1154,25 +1132,6 @@ fun ViewScannedCopyDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text("Attach or replace scan:", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    presetScans.forEach { (label, url) ->
-                        OutlinedButton(
-                            onClick = { onUpdateFileUrl(doc, url) },
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                            modifier = Modifier.weight(1f).height(32.dp),
-                            border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f))
-                        ) {
-                            Text(label, fontSize = 9.sp, color = Color(0xFF38BDF8))
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

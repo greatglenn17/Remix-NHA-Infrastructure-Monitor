@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.3.1%20%28Build%20131%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.4.0%20%28Build%20140%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.3.1`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.3.1_Build131.apk`** to download the installation package.
+2. Tap the latest release (`v1.4.0`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.4.0_Build140.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.4.0`** | **`140`** | 📷 Photo & Scan Sync: Weekly report photos and document/payment scans upload to Firebase Storage and appear on every phone. Photos are shrunk to 2048 px (scans 2500 px, PDFs unchanged); the camera keeps the full original in the Gallery. Take Photo with Camera now attaches the real photo, attachments keep working after a restart, and the sample pictures were removed |
 | **`v1.3.1`** | **`131`** | 🔁 Sync Conflict Fix: When two phones edit the same report, document, issue, payment or project offline, every phone now ends up with the last saved edit instead of keeping different text |
 | **`v1.3.0`** | **`130`** | ☁️ Report & Record Sync: Weekly reports (with weather), monthly reports, documents, issues and payments now sync to every phone through Firestore, including edits and deletions. Records already on a phone upload automatically after updating. Photos and scanned files are not synced yet |
 | **`v1.2.9`** | **`129`** | 🧹 Empty Project Defaults & VO Approval Date: New projects start with empty Land Area and No. of Units instead of sample 4.5 / 120 values (blank ones show "-"), and variation orders get an optional Date Approved field that shows in the Variation Orders Log |

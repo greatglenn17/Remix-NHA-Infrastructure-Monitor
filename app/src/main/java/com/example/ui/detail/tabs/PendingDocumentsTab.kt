@@ -143,12 +143,10 @@ private fun PendingDocCard(
 ) {
     var showStatusDialog by remember { mutableStateOf(false) }
     var editingRemarks by remember { mutableStateOf(doc.remarks) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            onUpdateFileUrl(doc, uri.toString())
-        }
+    val launcher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        onUpdateFileUrl(doc, ref)
     }
-    val context = LocalContext.current
+    val openAttachment = com.example.ui.components.rememberAttachmentOpener()
 
     val (badgeBg, badgeText) = when (doc.status) {
         "Approved" -> Pair(StatusGreenBg, StatusGreenText)
@@ -176,19 +174,11 @@ private fun PendingDocCard(
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                         }
-                        val context = LocalContext.current
                         Text(
                             text = doc.documentName,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = if (doc.fileUrl.isNotBlank()) NavyPrimary else DarkTextPrimary),
                             modifier = Modifier.clickable(enabled = doc.fileUrl.isNotBlank()) {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(doc.fileUrl)).apply {
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    // Ignore
-                                }
+                                openAttachment(doc.fileUrl)
                             }
                         )
                     }
@@ -239,14 +229,7 @@ private fun PendingDocCard(
                         } else {
                             Button(
                                 onClick = { 
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(doc.fileUrl)).apply {
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        // Ignore
-                                    }
+                                    openAttachment(doc.fileUrl)
                                 },
                                 modifier = Modifier.height(32.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),

@@ -2,6 +2,7 @@ package com.example.data.remote
 
 import android.content.Context
 import android.util.Log
+import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.ProjectDuplicateMerger
 import com.example.data.local.RecordSyncSchema
@@ -206,6 +207,7 @@ class FirestoreSyncManager(
                         targetAccomplishment = doc.getDouble("targetAccomplishment") ?: 0.0,
                         actualAccomplishment = doc.getDouble("actualAccomplishment") ?: 0.0,
                         assignedStaff = doc.getString("assignedStaff") ?: "Engr. Staff",
+                        latestUpdatePhotoUrl = doc.getString("latestUpdatePhotoUrl").orEmpty(),
                         revision = revision,
                         createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
                         updatedAt = updatedAt,
@@ -242,6 +244,7 @@ class FirestoreSyncManager(
                         targetAccomplishment = doc.getDouble("targetAccomplishment") ?: localProject.targetAccomplishment,
                         actualAccomplishment = doc.getDouble("actualAccomplishment") ?: localProject.actualAccomplishment,
                         assignedStaff = doc.getString("assignedStaff") ?: localProject.assignedStaff,
+                        latestUpdatePhotoUrl = doc.getString("latestUpdatePhotoUrl") ?: localProject.latestUpdatePhotoUrl,
                         revision = revision,
                         updatedAt = updatedAt,
                         updatedByUid = doc.getString("updatedByUid") ?: localProject.updatedByUid,
@@ -338,6 +341,7 @@ class FirestoreSyncManager(
                             "targetAccomplishment" to project.targetAccomplishment,
                             "actualAccomplishment" to project.actualAccomplishment,
                             "assignedStaff" to project.assignedStaff,
+                            "latestUpdatePhotoUrl" to project.latestUpdatePhotoUrl,
                             "revision" to project.revision,
                             "createdAt" to project.createdAt,
                             "updatedAt" to project.updatedAt,
@@ -401,6 +405,10 @@ class FirestoreSyncManager(
                         syncedCount++
                     }
                     db.syncOutboxDao().markSynced(event.eventId)
+                } else if (event.entityType == Attachments.ENTITY_TYPE) {
+                    Attachments.upload(context, event)
+                    db.syncOutboxDao().markSynced(event.eventId)
+                    syncedCount++
                 }
             } catch (e: Exception) {
                 Log.w(tag, "Failed to sync outbox event ${event.eventId}", e)

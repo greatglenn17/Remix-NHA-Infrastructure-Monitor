@@ -35,6 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.files.Attachments
+import kotlinx.coroutines.launch
 import com.example.data.model.DailyActivity
 import com.example.data.model.EquipmentItem
 import com.example.data.model.ManpowerItem
@@ -172,21 +174,42 @@ fun AddWeeklyReportDialog(
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var showDateRangePicker by remember { mutableStateOf(false) }
 
-    // Activity Result Launchers for Gallery and Camera
+    // Picked and captured photos are copied into the app (shrunk) and attached by reference.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val photoScope = rememberCoroutineScope()
+    fun attachFailed(e: Exception) {
+        android.widget.Toast.makeText(context, "Photo not attached: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+    }
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
-        if (uris.isNotEmpty()) {
-            photoUrls.addAll(uris.map { it.toString() })
+        photoScope.launch {
+            for (uri in uris) {
+                try {
+                    photoUrls.add(Attachments.import(context, uri, Attachments.Kind.PHOTO))
+                } catch (e: Exception) {
+                    attachFailed(e)
+                }
+            }
         }
     }
 
+    var pendingCameraFile by remember { mutableStateOf<java.io.File?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
-            // Sample photo url for preview when captured
-            photoUrls.add("https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=600&q=80")
+        contract = ActivityResultContracts.TakePicture()
+    ) { saved ->
+        val file = pendingCameraFile ?: return@rememberLauncherForActivityResult
+        pendingCameraFile = null
+        if (!saved) {
+            file.delete()
+            return@rememberLauncherForActivityResult
+        }
+        photoScope.launch {
+            try {
+                photoUrls.add(Attachments.importCameraPhoto(context, file))
+            } catch (e: Exception) {
+                attachFailed(e)
+            }
         }
     }
 
@@ -1032,9 +1055,11 @@ fun AddWeeklyReportDialog(
                             .clickable {
                                 showPhotoSourceDialog = false
                                 try {
-                                    cameraLauncher.launch(null)
+                                    val (file, uri) = Attachments.newCameraFile(context)
+                                    pendingCameraFile = file
+                                    cameraLauncher.launch(uri)
                                 } catch (e: Exception) {
-                                    photoUrls.add("https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=600&q=80")
+                                    attachFailed(e)
                                 }
                             }
                     ) {
@@ -1062,7 +1087,7 @@ fun AddWeeklyReportDialog(
                                 try {
                                     galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                 } catch (e: Exception) {
-                                    photoUrls.add("https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80")
+                                    attachFailed(e)
                                 }
                             }
                     ) {
@@ -1075,30 +1100,6 @@ fun AddWeeklyReportDialog(
                             Column {
                                 Text("Choose from Phone Gallery", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
                                 Text("Select an existing picture from your device gallery", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontSize = 11.sp))
-                            }
-                        }
-                    }
-
-                    Surface(
-                        color = DarkSurfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                showPhotoSourceDialog = false
-                                photoUrls.add("https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=600&q=80")
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Foundation, contentDescription = null, tint = StatusGreenText)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text("NHA Site Inspection Photo", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                                Text("Use standard NHA site inspection picture", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontSize = 11.sp))
                             }
                         }
                     }

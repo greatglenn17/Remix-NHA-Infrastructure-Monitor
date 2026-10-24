@@ -50,9 +50,9 @@ fun PaymentsTab(
     var paymentToAttachScan by remember { mutableStateOf<ProjectPayment?>(null) }
 
     // Launcher for uploading scanned copy directly to an existing payment
-    val singleScanLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null && paymentToAttachScan != null && onUpdatePayment != null) {
-            val updated = paymentToAttachScan!!.copy(fileUrl = uri.toString())
+    val singleScanLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        if (paymentToAttachScan != null && onUpdatePayment != null) {
+            val updated = paymentToAttachScan!!.copy(fileUrl = ref)
             onUpdatePayment(updated)
             // If viewing the dialog, update the viewed object as well
             if (viewingDvPayment?.id == updated.id) {
@@ -391,10 +391,8 @@ fun AddPaymentDialog(
     var amountStr by remember { mutableStateOf("") }
     var fileUrl by remember { mutableStateOf("") }
 
-    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) {
-            fileUrl = uri.toString()
-        }
+    val filePickerLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        fileUrl = ref
     }
     
     val darkTextFieldColors = OutlinedTextFieldDefaults.colors(
@@ -407,11 +405,6 @@ fun AddPaymentDialog(
         focusedBorderColor = Color(0xFF38BDF8),
         unfocusedBorderColor = DarkBorder,
         cursorColor = Color(0xFF38BDF8)
-    )
-
-    val sampleDvScans = listOf(
-        "Sample DV #1" to "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=800&q=80",
-        "Sample DV #2" to "https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=800&q=80"
     )
 
     AlertDialog(
@@ -514,25 +507,6 @@ fun AddPaymentDialog(
                             Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Upload Scanned DV (Image / File)", style = MaterialTheme.typography.labelSmall)
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("Or select reference scanned voucher copy:", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            sampleDvScans.forEach { (label, url) ->
-                                FilterChip(
-                                    selected = (fileUrl == url),
-                                    onClick = { fileUrl = url },
-                                    label = { Text(label, fontSize = 10.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF38BDF8).copy(alpha = 0.2f),
-                                        selectedLabelColor = Color(0xFF38BDF8)
-                                    )
-                                )
-                            }
                         }
                     }
                 }

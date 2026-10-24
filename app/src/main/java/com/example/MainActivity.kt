@@ -165,7 +165,7 @@ class MainActivity : ComponentActivity() {
                                             targetAccomplishmentPct = target,
                                             actualAccomplishmentPct = actual,
                                             activitiesJson = activities,
-                                            attachedPhotoUrlsJson = if (photoUrl.isNotBlank()) """["$photoUrl"]""" else "[]",
+                                            attachedPhotoUrlsJson = com.example.data.files.Attachments.toJson(com.example.data.files.Attachments.parseList(photoUrl)),
                                             manpowerJson = manpowerJson,
                                             equipmentJson = equipmentJson,
                                             issuesJson = issuesJson,

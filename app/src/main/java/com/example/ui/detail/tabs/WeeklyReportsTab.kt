@@ -532,16 +532,16 @@ private fun WeeklyReportCard(
                         }
                     }
 
-                    if (report.attachedPhotoUrlsJson.isNotBlank() && report.attachedPhotoUrlsJson != "[]") {
+                    val photos = com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson)
+                    if (photos.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Attached Site Photo:",
+                            text = if (photos.size > 1) "Attached Site Photos (${photos.size}, all in the Photos tab):" else "Attached Site Photo:",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
                         )
-                        val cleanedUrl = report.attachedPhotoUrlsJson.replace("[", "").replace("]", "").replace("\"", "")
-                        if (cleanedUrl.isNotBlank()) {
+                        run {
                             AsyncImage(
-                                model = cleanedUrl,
+                                model = photos.first(),
                                 contentDescription = "Site Photo",
                                 modifier = Modifier
                                     .fillMaxWidth()

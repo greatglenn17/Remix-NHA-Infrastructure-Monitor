@@ -37,19 +37,13 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
 
     val photos = remember(weeklyReports) {
         weeklyReports.flatMap { report ->
-            val clean = report.attachedPhotoUrlsJson
-                .replace("[", "")
-                .replace("]", "")
-                .replace("\"", "")
-            if (clean.isNotBlank()) {
-                clean.split(",").map { url ->
-                    PhotoItem(
-                        url = url.trim(),
-                        weekDate = report.reportingWeek,
-                        submittedBy = report.submittedByStaff
-                    )
-                }
-            } else emptyList()
+            com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson).map { url ->
+                PhotoItem(
+                    url = url,
+                    weekDate = report.reportingWeek,
+                    submittedBy = report.submittedByStaff
+                )
+            }
         }
     }
 

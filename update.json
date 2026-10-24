@@ -1,8 +1,8 @@
 {
-  "versionCode": 131,
-  "versionName": "1.3.1",
-  "releaseNotes": "v1.3.1: Fixes phones showing different text after two phones edited the same report, document, issue, payment or project offline. Every phone now takes the last saved edit.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.3.1/NHA_Monitor_v1.3.1_Build131.apk",
-  "apkSha256": "35fa5ab1857963ff5088456d0c0127a43b0950a817cf1b6e282ea89e88425bf0",
+  "versionCode": 140,
+  "versionName": "1.4.0",
+  "releaseNotes": "v1.4.0: Photos and scanned files now sync to every phone. Attached photos are shrunk to save data (the camera also keeps the full-quality original in your Gallery), and attachments no longer stop opening after a restart. Take Photo with Camera now attaches your real photo, and the sample pictures were removed.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.4.0/NHA_Monitor_v1.4.0_Build140.apk",
+  "apkSha256": "9685e7616a5dcf0d67fb5e04c5b7f1dc6ff22d9a025719d2c82f0e2ea0cad288",
   "isMandatory": true
 }

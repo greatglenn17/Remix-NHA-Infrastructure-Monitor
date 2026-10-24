@@ -123,6 +123,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         repository = ProjectRepository(projectDao, reportDao)
         googleDriveSyncManager = GoogleDriveSyncManager(application, database)
         firestoreSyncManager = FirestoreSyncManager(application, database, viewModelScope)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                com.example.data.files.Attachments.migrateLegacy(application, database)
+                com.example.data.files.Attachments.collectGarbage(application, database)
+            } catch (e: Exception) {
+                android.util.Log.w("ProjectViewModel", "Attachment upkeep failed", e)
+            }
+        }
         notificationDao = database.notificationDao()
 
         notifications = notificationDao.getAllNotifications().stateIn(
@@ -1510,7 +1518,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             try {
-                val photoList = if (attachedPhotoUrl.isNotBlank()) """["$attachedPhotoUrl"]""" else "[]"
+                // The form passes its photo list as a JSON array.
+                val photos = com.example.data.files.Attachments.parseList(attachedPhotoUrl)
+                val photoList = com.example.data.files.Attachments.toJson(photos)
                 val report = WeeklyReport(
                     projectId = projectId,
                     reportingWeek = reportingWeek,
@@ -1535,7 +1545,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     val updated = current.copy(
                         targetAccomplishment = targetAccomplishmentPct,
                         actualAccomplishment = actualAccomplishmentPct,
-                        latestUpdatePhotoUrl = if (attachedPhotoUrl.isNotBlank()) attachedPhotoUrl else current.latestUpdatePhotoUrl
+                        latestUpdatePhotoUrl = photos.firstOrNull() ?: current.latestUpdatePhotoUrl
                     )
                     saveProjectChange(updated)
                 }
