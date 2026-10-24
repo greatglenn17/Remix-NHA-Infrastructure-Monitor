@@ -42,9 +42,11 @@ fun DashboardScreen(
     onCreateProjectClick: () -> Unit
 ) {
     val currentUser by viewModel.currentUserAccount.collectAsState()
+    val registeredUsers by viewModel.registeredUsers.collectAsState()
+    val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val projects by viewModel.filteredProjects.collectAsState()
-    val rawProjects by viewModel.rawProjects.collectAsState()
+    val scopedProjects by viewModel.userScopedProjects.collectAsState()
     val debugError by viewModel.debugError.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
@@ -317,7 +319,7 @@ fun DashboardScreen(
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                             HorizontalDivider(color = DarkBorder)
-                            val uniqueTypes = rawProjects.map { it.projectType }.distinct().sorted()
+                            val uniqueTypes = scopedProjects.map { it.projectType }.distinct().sorted()
                             val typeOptions = listOf("All") + uniqueTypes
                             typeOptions.forEach { typeOption ->
                                 DropdownMenuItem(
@@ -387,14 +389,14 @@ fun DashboardScreen(
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        if (rawProjects.isEmpty()) {
+                        if (scopedProjects.isEmpty()) {
                             Text(
-                                text = "Database is Empty",
+                                text = if (currentUser.role == UserRole.SUPER_ADMIN) "Database is Empty" else "No projects assigned to you yet",
                                 style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "No projects exist yet. Create a new project or sync from cloud.",
+                                text = if (currentUser.role == UserRole.SUPER_ADMIN) "No projects exist yet. Create a new project or sync from cloud." else "Ask the Super Admin to assign you a project, or create a new one.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, textAlign = TextAlign.Center)
                             )
                             Spacer(modifier = Modifier.height(20.dp))
@@ -493,10 +495,16 @@ fun DashboardScreen(
     }
 
     if (projectToEdit != null) {
+        LaunchedEffect(Unit) {
+            if (currentUser.role == com.example.data.model.UserRole.SUPER_ADMIN && !registeredUsersLoaded) viewModel.refreshRegisteredUsers()
+        }
         com.example.ui.dialogs.EditProjectDialog(
             project = projectToEdit!!,
+            canAssign = currentUser.role == com.example.data.model.UserRole.SUPER_ADMIN,
+            registeredUsers = registeredUsers,
+            registeredUsersLoaded = registeredUsersLoaded,
             onDismiss = { projectToEdit = null },
-            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff ->
+            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers ->
                 val updated = projectToEdit!!.copy(
                     name = name,
                     location = location,
@@ -512,7 +520,7 @@ fun DashboardScreen(
                     completionDateOriginal = completionDateOriginal,
                     assignedStaff = assignedStaff
                 )
-                viewModel.updateProjectMaster(updated)
+                viewModel.updateProjectMaster(updated, assignedUsers)
                 projectToEdit = null
             }
         )

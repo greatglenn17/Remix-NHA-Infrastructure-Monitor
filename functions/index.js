@@ -7,7 +7,9 @@ admin.initializeApp();
 const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
-// taken from the client-written profile: only SUPER_ADMIN_EMAIL receives it.
+// taken from the client-written profile: only the account whose Firebase Auth
+// email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
+// writable by the user, so it is never trusted for that decision.
 const SELF_ASSIGNABLE_ROLES = ["ENGINEER_ADMIN", "FIELD_ENGINEER", "VIEWER"];
 
 /**
@@ -25,7 +27,15 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
       return null;
     }
 
-    const email = (data.email || "").trim().toLowerCase();
+    // Read the real email from Firebase Auth, not from the client-written profile.
+    let email;
+    try {
+      const authUser = await admin.auth().getUser(uid);
+      email = (authUser.email || "").trim().toLowerCase();
+    } catch (err) {
+      console.error(`Could not read Auth user ${uid}; claims not set:`, err);
+      return null;
+    }
     const profileRole = (data.role || "FIELD_ENGINEER").toUpperCase();
     let requestedRole = SELF_ASSIGNABLE_ROLES.includes(profileRole) ? profileRole : "FIELD_ENGINEER";
 
@@ -50,7 +60,8 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
 
 /**
  * Triggered whenever a project is created or updated in Firestore projects/{projectId}.
- * Sends FCM push notification to ALL other authenticated devices for real-time sync awareness.
+ * Sends an FCM push notification to the devices of users assigned to a newly created
+ * project (and all Super Admins), excluding the user who created it.
  */
 exports.notifyOnProjectWrite = functions.region(REGION).firestore
   .document("projects/{projectId}")
@@ -64,6 +75,8 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
     const isDeleted = after.isDeleted === true;
     const projectName = after.name || "Unnamed Project";
     const createdByUid = after.createdByUid || "";
+    const updatedByUid = after.updatedByUid || "";
+    const assignedUids = Array.isArray(after.assignedUids) ? after.assignedUids : [];
 
     if (isDeleted || !isNew) return null;
 
@@ -76,6 +89,11 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
 
       for (const userDoc of usersSnapshot.docs) {
         if (userDoc.id === createdByUid) continue;
+        if (updatedByUid && userDoc.id === updatedByUid) continue;
+        // Only users assigned to the project, plus Super Admins, are notified.
+        const isRecipient =
+          assignedUids.includes(userDoc.id) || userDoc.get("role") === "SUPER_ADMIN";
+        if (!isRecipient) continue;
 
         const tokenDocs = await admin.firestore()
           .collection("users").doc(userDoc.id).collection("fcmTokens").get();
@@ -127,6 +145,65 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
 
     } catch (error) {
       console.error(`FCM error for project ${projectId}:`, error);
+    }
+
+    return null;
+  });
+
+/**
+ * Normalises an assignedUids value to a sorted JSON string for comparison.
+ * A missing or non-array value counts as an empty list.
+ */
+function assignedUidsKey(uids) {
+  return JSON.stringify(Array.isArray(uids) ? [...uids].sort() : []);
+}
+
+/**
+ * Triggered whenever a project is written. When its assignedUids change, copies the
+ * project's current list onto every record of that project so Firestore rules can check
+ * access per record. The list is re-read from the project document right before writing,
+ * so a retried or out-of-order event never writes a stale list. Only assignedUids is
+ * written: revision and updatedAt stay untouched so the app does not treat this as a
+ * content edit. Errors are rethrown so the event is retried (failurePolicy); the update
+ * is idempotent.
+ */
+exports.syncProjectAssignmentToRecords = functions.region(REGION)
+  .runWith({ failurePolicy: true })
+  .firestore
+  .document("projects/{projectId}")
+  .onWrite(async (change, context) => {
+    const projectId = context.params.projectId;
+    if (!change.after.exists) return null;
+
+    const after = change.after.data();
+    // Never write [] onto records just because the field is missing.
+    if (!Array.isArray(after.assignedUids)) return null;
+
+    const before = change.before.exists ? change.before.data() : null;
+    if (assignedUidsKey(before && before.assignedUids) === assignedUidsKey(after.assignedUids)) {
+      return null;
+    }
+
+    try {
+      const db = admin.firestore();
+      const current = await db.collection("projects").doc(projectId).get();
+      if (!current.exists) return null;
+      const assignedUids = current.data().assignedUids;
+      if (!Array.isArray(assignedUids)) return null;
+
+      const snap = await db.collection("records").where("projectUuid", "==", projectId).get();
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
+        const batch = db.batch();
+        snap.docs.slice(i, i + BATCH_SIZE).forEach((doc) => {
+          batch.update(doc.ref, { assignedUids });
+        });
+        await batch.commit();
+      }
+      console.log(`Updated assignedUids on ${snap.size} records of project ${projectId}`);
+    } catch (error) {
+      console.error(`Failed to sync assignments to records of project ${projectId}:`, error);
+      throw error;
     }
 
     return null;

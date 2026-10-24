@@ -3,6 +3,7 @@ package com.example.data.remote
 import android.content.ContentValues
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.RecordSyncSchema
 import org.json.JSONArray
@@ -12,7 +13,7 @@ import org.json.JSONObject
  * Moves synced records (see [RecordSyncSchema]) between Room and the Firestore
  * `records` collection. A cloud record is one document per row:
  *
- *   records/{uuid} = { uuid, type, projectUuid, revision, updatedAt, updatedByUid, isDeleted, data }
+ *   records/{uuid} = { uuid, type, projectUuid, assignedUids, revision, updatedAt, updatedByUid, isDeleted, data }
  *
  * `data` is the row as a JSON string without its local ids, so the format follows
  * the table's columns without per-type code. A weekly report also carries its
@@ -34,7 +35,7 @@ class RecordSync(private val db: AppDatabase) {
         val row = sql.query("SELECT * FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c ->
             if (c.moveToFirst()) c.toJson() else null
         } ?: return null
-        val projectUuid = projectUuidFor(row.optLong("projectId")) ?: return null
+        val (projectUuid, assignedUids) = projectFor(row.optLong("projectId")) ?: return null
         val data = JSONObject()
         row.keys().forEach { key -> if (key !in localOnly) data.put(key, row.get(key)) }
         if (table == "weekly_reports") {
@@ -51,7 +52,7 @@ class RecordSync(private val db: AppDatabase) {
             }
             data.put("_weather", weather)
         }
-        return hashMapOf(
+        return hashMapOf<String, Any>(
             "uuid" to uuid,
             "type" to table,
             "projectUuid" to projectUuid,
@@ -60,7 +61,10 @@ class RecordSync(private val db: AppDatabase) {
             "updatedByUid" to uid,
             "isDeleted" to false,
             "data" to data.toString()
-        )
+        ).apply {
+            // Left out while the project's list is unknown here; the upload then waits for it.
+            AssignmentPolicy.recordUploadList(assignedUids)?.let { put("assignedUids", it) }
+        }
     }
 
     /**
@@ -169,10 +173,154 @@ class RecordSync(private val db: AppDatabase) {
         }
     }
 
-    private fun projectUuidFor(projectId: Long): String? =
-        sql.query("SELECT projectUuid FROM projects WHERE id = ? LIMIT 1", arrayOf(projectId)).use { c ->
-            if (c.moveToFirst()) c.getString(0) else null
+    /** The project's uuid and assignedUids JSON, or null when it isn't on this phone. */
+    private fun projectFor(projectId: Long): Pair<String, String>? =
+        sql.query("SELECT projectUuid, assignedUids FROM projects WHERE id = ? LIMIT 1", arrayOf(projectId)).use { c ->
+            if (c.moveToFirst()) c.getString(0) to c.getString(1).orEmpty() else null
         }
+
+    /** The assignedUids JSON of the local project with [projectUuid], or null when it isn't on this phone. */
+    fun assignedUidsOf(projectUuid: String): String? =
+        sql.query("SELECT assignedUids FROM projects WHERE projectUuid = ? LIMIT 1", arrayOf(projectUuid)).use { c ->
+            if (c.moveToFirst()) c.getString(0).orEmpty() else null
+        }
+
+    /**
+     * Stores the cloud's list of assigned accounts on the local project, without queuing an
+     * upload. An identical list is not written again, so open screens aren't refreshed for nothing.
+     */
+    fun setAssignedUidsLocally(projectUuid: String, assignedUidsJson: String) = writeRemote {
+        it.execSQL(
+            "UPDATE projects SET assignedUids = ? WHERE projectUuid = ? AND assignedUids IS NOT ?",
+            arrayOf(assignedUidsJson, projectUuid, assignedUidsJson)
+        )
+    }
+
+    /**
+     * Removes a project this account is no longer assigned to from this phone only. Its
+     * records go with it through the foreign keys' ON DELETE CASCADE; the triggers are off,
+     * so nothing is tombstoned in the cloud.
+     */
+    fun removeProjectLocally(projectId: Long) = writeRemote {
+        it.delete("projects", "id = ?", arrayOf(projectId))
+    }
+
+    enum class Unassigned { KEPT, HIDDEN, REMOVED }
+
+    /**
+     * Takes a project the user is no longer assigned to off this phone, without touching
+     * the cloud. The checks run in the same transaction as the write, so a change made
+     * meanwhile can't be lost:
+     * - something still to upload: nothing happens ([Unassigned.KEPT]);
+     * - rows that only exist on this phone (inspections, time extensions, SDP data, audit
+     *   logs...), or a legacy attachment (`nhafile:<id>`, whose cloud copy only the Super
+     *   Admin can read, so the local file could never be downloaded again): the row stays
+     *   and only gets the server's [serverAssignedUids], which hides it; a later
+     *   re-assignment brings it back ([Unassigned.HIDDEN]). An identical list isn't rewritten;
+     * - otherwise the project and its synced records are deleted ([Unassigned.REMOVED]).
+     *   [deleteFiles] gets the project's attachment file names before the delete commits,
+     *   so the garbage collector never sees them unreferenced (it would delete the cloud copies).
+     */
+    fun unassignLocally(
+        projectId: Long,
+        projectUuid: String,
+        serverAssignedUids: String,
+        deleteFiles: (Set<String>) -> Unit
+    ): Unassigned {
+        var result = Unassigned.KEPT
+        writeRemote { w ->
+            if (hasPendingUpload(projectId, projectUuid)) return@writeRemote
+            val refs = attachmentRefsOf(projectId)
+            if (hasLocalOnlyRows(projectId) || refs.any { Attachments.projectOf(it) == null }) {
+                w.execSQL(
+                    "UPDATE projects SET assignedUids = ? WHERE id = ? AND assignedUids IS NOT ?",
+                    arrayOf(serverAssignedUids, projectId, serverAssignedUids)
+                )
+                result = Unassigned.HIDDEN
+                return@writeRemote
+            }
+            deleteFiles(refs.map(::fileNameOf).toSet())
+            w.delete("projects", "id = ?", arrayOf(projectId))
+            result = Unassigned.REMOVED
+        }
+        return result
+    }
+
+    /**
+     * Tables deleted with a project (a foreign key to `projects`) that the cloud doesn't
+     * hold, read from the database's own foreign keys: table -> its column naming the project.
+     * The synced record tables are left out, and so are weather rows, which travel inside
+     * their weekly report.
+     */
+    fun localOnlyChildTables(): Map<String, String> = localOnlyTables ?: buildMap {
+        val tables = sql.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0)) }
+        }
+        val synced = RecordSyncSchema.TABLES.toSet() + "daily_hourly_weather"
+        for (table in tables) {
+            if (table in synced) continue
+            sql.query("PRAGMA foreign_key_list(`$table`)").use { c ->
+                while (c.moveToNext()) {
+                    if (c.getString(c.getColumnIndexOrThrow("table")) == "projects") {
+                        put(table, c.getString(c.getColumnIndexOrThrow("from")))
+                    }
+                }
+            }
+        }
+    }.also { localOnlyTables = it }
+
+    @Volatile private var localOnlyTables: Map<String, String>? = null
+
+    /** Whether the project has rows the cloud can't give back (see [localOnlyChildTables]). */
+    fun hasLocalOnlyRows(projectId: Long): Boolean = localOnlyChildTables().any { (table, column) ->
+        sql.query("SELECT EXISTS(SELECT 1 FROM `$table` WHERE `$column` = ?)", arrayOf(projectId)).use { it.moveToFirst() && it.getInt(0) == 1 }
+    }
+
+    /** Whether this phone still has to send something for the project, one of its records or one of its files. */
+    fun hasPendingUpload(projectId: Long, projectUuid: String): Boolean {
+        val open = "state IN ('PENDING', 'FAILED')"
+        fun exists(query: String, args: Array<Any?>) = sql.query(query, args).use { it.moveToFirst() && it.getInt(0) == 1 }
+
+        if (exists("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityUuid = ? AND $open)", arrayOf(projectUuid))) return true
+        for (table in RecordSyncSchema.TABLES) {
+            val query = "SELECT EXISTS(SELECT 1 FROM sync_outbox o JOIN `$table` t ON t.uuid = o.entityUuid " +
+                "WHERE t.projectId = ? AND o.entityType = ? AND o.$open)"
+            if (exists(query, arrayOf(projectId, RecordSyncSchema.ENTITY_PREFIX + table))) return true
+        }
+        // A record delete outlives its row; its payload names the project.
+        val deletes = "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityType LIKE ? AND $open AND payloadJson LIKE ?)"
+        if (exists(deletes, arrayOf(RecordSyncSchema.ENTITY_PREFIX + "%", "%\"projectUuid\":\"$projectUuid\"%"))) return true
+
+        val names = attachmentNamesOf(projectId)
+        sql.query("SELECT entityUuid FROM sync_outbox WHERE entityType = ? AND $open", arrayOf(Attachments.ENTITY_TYPE)).use { c ->
+            while (c.moveToNext()) {
+                val entity = c.getString(0).orEmpty()
+                if (entity.startsWith("$projectUuid/") || entity.substringAfterLast('/') in names) return true
+            }
+        }
+        return false
+    }
+
+    /** Local file names of the attachments the project and its records refer to. */
+    fun attachmentNamesOf(projectId: Long): Set<String> = attachmentRefsOf(projectId).map(::fileNameOf).toSet()
+
+    private fun fileNameOf(ref: String) = ref.removePrefix("${Attachments.SCHEME}:").substringAfterLast('/')
+
+    /** The attachment references (`nhafile:...`) the project and its records hold. */
+    fun attachmentRefsOf(projectId: Long): Set<String> {
+        val refs = mutableSetOf<String>()
+        fun collect(query: String) = sql.query(query, arrayOf(projectId)).use { c ->
+            while (c.moveToNext()) {
+                for (i in 0 until c.columnCount) {
+                    if (c.getType(i) != Cursor.FIELD_TYPE_STRING) continue
+                    refs.addAll(Attachments.refsIn(c.getString(i)))
+                }
+            }
+        }
+        collect("SELECT * FROM projects WHERE id = ?")
+        for (table in RecordSyncSchema.TABLES) collect("SELECT * FROM `$table` WHERE projectId = ?")
+        return refs
+    }
 
     /** Only columns this version of the app has, so a newer phone's extra fields are ignored. */
     private fun columnsOf(table: String): Set<String> = columnCache.getOrPut(table) {

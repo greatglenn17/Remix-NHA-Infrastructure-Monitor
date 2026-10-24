@@ -38,41 +38,68 @@ import java.util.concurrent.ConcurrentHashMap
  * the picked original. The record stores a reference `nhafile:<id>.jpg|.pdf` instead of
  * the picked uri, which syncs with the record like any other text. The file itself is
  * queued in sync_outbox as a `file` event, uploaded to Cloud Storage at
- * `attachments/<id>.<ext>`, and downloaded by other phones the first time it is shown.
+ * `attachments/<projectUuid>/<id>.<ext>`, and downloaded by other phones the first time it is shown.
+ * The reference carries the project: `nhafile:<projectUuid>/<id>.<ext>`. References made by
+ * 1.4.x have no project (`nhafile:<id>.<ext>`) and keep the Storage path `attachments/<id>.<ext>`.
+ * Locally the file is always `attachments/<id>.<ext>`.
  */
 object Attachments {
     const val SCHEME = "nhafile"
     const val ENTITY_TYPE = "file"
+    /** Files must be smaller than this: the same limit as storage.rules (`size < 20 * 1024 * 1024`). */
     const val MAX_BYTES = 20L * 1024 * 1024
 
     private const val TAG = "Attachments"
+    private const val MOVED_FROM = "movedFrom"
     private const val DIR = "attachments"
     private const val JPEG_QUALITY = 85
     /** Files must be at least this old before an unreferenced one is cleaned up, so a form still open keeps its picks. */
     private const val ORPHAN_AGE_MS = 24L * 60 * 60 * 1000
 
     private val validName = Regex("[0-9a-f-]{36}\\.(jpg|pdf)")
-    private val refPattern = Regex("$SCHEME:[0-9a-f-]{36}\\.(?:jpg|pdf)")
+    private const val UUID_PATTERN = "[0-9a-f-]{36}"
+    private val refPattern = Regex("$SCHEME:(?:$UUID_PATTERN/)?$UUID_PATTERN\\.(?:jpg|pdf)")
+    private val projectUuidPattern = Regex(UUID_PATTERN)
     private val downloadLocks = ConcurrentHashMap<String, Mutex>()
 
     /** Longest side in pixels: photos look the same on screen and in print; scans keep small text readable. */
     enum class Kind(val maxEdge: Int) { PHOTO(2048), SCAN(2500) }
 
     class UnsupportedFileException : Exception("Only photos and PDF files can be attached.")
-    class FileTooLargeException : Exception("The file is larger than 20 MB.")
+    class FileTooLargeException : Exception("The file must be smaller than 20 MB.")
 
     fun isRef(value: String) = value.startsWith("$SCHEME:")
 
     /** The file name inside a reference, or null when it isn't one of ours (never a path from elsewhere). */
-    private fun nameOf(ref: String): String? = ref.removePrefix("$SCHEME:").takeIf { isRef(ref) && validName.matches(it) }
+    private fun nameOf(ref: String): String? = split(ref)?.second
+
+    /** The project uuid (null for a legacy reference) and file name of a valid reference, or null. */
+    private fun split(ref: String): Pair<String?, String>? {
+        if (!isRef(ref)) return null
+        val parts = ref.removePrefix("$SCHEME:").split('/')
+        return when (parts.size) {
+            1 -> if (validName.matches(parts[0])) null to parts[0] else null
+            2 -> if (projectUuidPattern.matches(parts[0]) && validName.matches(parts[1])) parts[0] to parts[1] else null
+            else -> null
+        }
+    }
+
+    /** The project a reference belongs to; null for a legacy reference or one that isn't ours. */
+    fun projectOf(ref: String): String? = split(ref)?.first
+
+    /** Where the file lives in Cloud Storage, or null when [ref] isn't one of ours. */
+    fun storagePathOf(ref: String): String? = split(ref)?.let { (project, name) -> storagePath(project, name) }
+
+    private fun storagePath(project: String?, name: String) = if (project == null) "$DIR/$name" else "$DIR/$project/$name"
+
+    /** The outbox `entityUuid` of a file: `<projectUuid>/<fileName>`, or just the file name when legacy. */
+    private fun entityOf(project: String?, name: String) = if (project == null) name else "$project/$name"
 
     fun isPdf(ref: String) = ref.endsWith(".pdf")
 
     private fun dir(context: Context) = File(context.filesDir, DIR).apply { mkdirs() }
 
     fun fileForName(context: Context, name: String): File? = if (validName.matches(name)) File(dir(context), name) else null
-
-    fun storagePath(name: String) = "$DIR/$name"
 
     fun contentTypeOf(name: String) = if (name.endsWith(".pdf")) "application/pdf" else "image/jpeg"
 
@@ -102,7 +129,17 @@ object Attachments {
     fun toJson(list: List<String>): String = JSONArray(list).toString()
 
     /** Copies a picked file into the app, shrinking images, and queues it for upload. Returns its reference. */
-    suspend fun import(context: Context, uri: Uri, kind: Kind): String = withContext(Dispatchers.IO) {
+    suspend fun import(context: Context, uri: Uri, kind: Kind, projectUuid: String): String =
+        copyIn(context, uri, kind, requireProject(projectUuid))
+
+    private fun requireProject(projectUuid: String): String {
+        if (projectUuid.isBlank()) throw IllegalStateException("No project selected")
+        if (!projectUuidPattern.matches(projectUuid)) throw IllegalStateException("Invalid project")
+        return projectUuid
+    }
+
+    /** A null [projectUuid] makes a legacy reference; only the one-time migration of old uris does that. */
+    private suspend fun copyIn(context: Context, uri: Uri, kind: Kind, projectUuid: String?): String = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val bytes = resolver.openInputStream(uri)?.use { input ->
             val buffer = java.io.ByteArrayOutputStream()
@@ -117,15 +154,15 @@ object Attachments {
             }
             buffer.toByteArray()
         } ?: throw UnsupportedFileException()
-        store(context, bytes, kind)
+        store(context, bytes, kind, projectUuid)
     }
 
-    private suspend fun store(context: Context, bytes: ByteArray, kind: Kind): String {
+    private suspend fun store(context: Context, bytes: ByteArray, kind: Kind, projectUuid: String?): String {
         val isPdf = bytes.size > 4 && String(bytes, 0, 4, Charsets.US_ASCII) == "%PDF"
         val id = UUID.randomUUID().toString()
         val name: String
         if (isPdf) {
-            if (bytes.size > MAX_BYTES) throw FileTooLargeException()
+            if (bytes.size >= MAX_BYTES) throw FileTooLargeException()
             name = "$id.pdf"
             File(dir(context), name).writeBytes(bytes)
         } else {
@@ -135,9 +172,9 @@ object Attachments {
             bitmap.recycle()
         }
         AppDatabase.getDatabase(context, CoroutineScope(Dispatchers.IO)).syncOutboxDao().enqueue(
-            SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = name, operation = "UPSERT", revision = 1, payloadJson = "{}")
+            SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = entityOf(projectUuid, name), operation = "UPSERT", revision = 1, payloadJson = "{}")
         )
-        return "$SCHEME:$name"
+        return if (projectUuid == null) "$SCHEME:$name" else "$SCHEME:$projectUuid/$name"
     }
 
     /** Decodes an image no larger than [maxEdge] on its longest side, turned the way the camera held it. */
@@ -180,7 +217,8 @@ object Attachments {
      * attaches the shrunk copy. Older Android versions need a storage permission for the
      * Gallery copy, so there only the attachment is kept.
      */
-    suspend fun importCameraPhoto(context: Context, file: File): String = withContext(Dispatchers.IO) {
+    suspend fun importCameraPhoto(context: Context, file: File, projectUuid: String): String = withContext(Dispatchers.IO) {
+        requireProject(projectUuid)
         try {
             val bytes = file.readBytes()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -195,7 +233,7 @@ object Attachments {
                     }
                 }.onFailure { Log.w(TAG, "Could not save the original photo to the Gallery", it) }
             }
-            store(context, bytes, Kind.PHOTO)
+            store(context, bytes, Kind.PHOTO, projectUuid)
         } finally {
             file.delete()
         }
@@ -203,7 +241,7 @@ object Attachments {
 
     /** The local copy of an attachment, downloading it first when another phone added it. Null while it isn't available. */
     suspend fun ensureLocal(context: Context, ref: String): File? = withContext(Dispatchers.IO) {
-        val name = nameOf(ref) ?: return@withContext null
+        val (project, name) = split(ref) ?: return@withContext null
         val file = File(dir(context), name)
         if (file.exists()) return@withContext file
         if (FirebaseAuth.getInstance().currentUser == null) return@withContext null
@@ -211,7 +249,7 @@ object Attachments {
             if (file.exists()) return@withLock file
             val part = File(dir(context), "$name.part")
             try {
-                FirebaseStorage.getInstance().reference.child(storagePath(name)).getFile(part).await()
+                FirebaseStorage.getInstance().reference.child(storagePath(project, name)).getFile(part).await()
                 if (part.renameTo(file)) file else null
             } catch (e: Exception) {
                 // Usually not uploaded yet by the phone that added it; the next view tries again.
@@ -239,28 +277,100 @@ object Attachments {
 
     /** Uploads or deletes the cloud copy for one `file` outbox event. */
     suspend fun upload(context: Context, event: SyncOutboxEvent) {
-        val name = event.entityUuid.takeIf { validName.matches(it) } ?: return
-        val cloud = FirebaseStorage.getInstance().reference.child(storagePath(name))
+        val (project, name) = split("$SCHEME:${event.entityUuid}") ?: return
+        val cloud = FirebaseStorage.getInstance().reference.child(storagePath(project, name))
         if (event.operation == "DELETE") {
             try {
                 cloud.delete().await()
             } catch (e: StorageException) {
-                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND) throw e
+                // Gone already, or not this account's to delete (another project, or the legacy
+                // path only the Super Admin may touch): a retry could never succeed.
+                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
             }
         } else {
             val file = File(dir(context), name)
-            if (!file.exists()) return
+            if (!file.exists() && !fetchMovedCopy(event, name, file)) return
             cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
         }
     }
 
+    /**
+     * For a file moved to another project ([moveProjectRefs]) that this phone has no copy of,
+     * downloads the copy at the old project's path into [file]. False when there is none to get
+     * (never uploaded, or not readable by this account), so the event is dropped, not retried.
+     */
+    private suspend fun fetchMovedCopy(event: SyncOutboxEvent, name: String, file: File): Boolean {
+        val oldProject = runCatching { org.json.JSONObject(event.payloadJson).optString(MOVED_FROM) }.getOrNull()
+        if (oldProject.isNullOrEmpty() || !projectUuidPattern.matches(oldProject)) return false
+        val part = File(file.parentFile, "$name.part")
+        return try {
+            FirebaseStorage.getInstance().reference.child(storagePath(oldProject, name)).getFile(part).await()
+            part.renameTo(file)
+        } catch (e: StorageException) {
+            part.delete()
+            if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
+            false
+        }
+    }
+
     /** Columns that hold attachment references. */
-    private val referencingColumns = listOf(
+    val referencingColumns = listOf(
         "weekly_reports" to "attachedPhotoUrlsJson",
         "pending_documents" to "fileUrl",
         "project_payments" to "fileUrl",
         "projects" to "latestUpdatePhotoUrl"
     )
+
+    /**
+     * Points every attachment reference of project [oldUuid] at [newUuid], after the local
+     * project took over the cloud's uuid or was merged into another row. Runs inside the
+     * caller's transaction, with the sync triggers on: every changed record is queued, so
+     * the cloud copies (and through them other phones) get the new references. The project's
+     * own photo column has no trigger and is only rewritten here.
+     *
+     * The files follow: uploads not done yet are re-keyed to the new project, and every other
+     * moved file is queued once more, so a copy exists at the new Storage path. That includes
+     * files another phone uploaded; [upload] fetches the old copy first when this phone has none
+     * (the old copy is left where it is).
+     */
+    fun moveProjectRefs(sql: androidx.sqlite.db.SupportSQLiteDatabase, oldUuid: String, newUuid: String) {
+        if (oldUuid == newUuid || !projectUuidPattern.matches(oldUuid) || !projectUuidPattern.matches(newUuid)) return
+        val from = "$SCHEME:$oldUuid/"
+        val to = "$SCHEME:$newUuid/"
+        val movedNames = linkedSetOf<String>()
+        for ((table, column) in referencingColumns) {
+            sql.query("SELECT `$column` FROM `$table` WHERE instr(`$column`, ?) > 0", arrayOf<Any>(from)).use { c ->
+                while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { ref ->
+                    split(ref)?.let { (project, name) -> if (project == oldUuid) movedNames.add(name) }
+                }
+            }
+            sql.execSQL(
+                "UPDATE `$table` SET `$column` = REPLACE(`$column`, ?, ?) WHERE instr(`$column`, ?) > 0",
+                arrayOf(from, to, from)
+            )
+        }
+
+        val oldPrefix = "$oldUuid/"
+        val newPrefix = "$newUuid/"
+        val rest = oldPrefix.length + 1
+        val isOld = "entityType = '$ENTITY_TYPE' AND operation = 'UPSERT' AND substr(entityUuid, 1, ${oldPrefix.length}) = ?"
+        // Every moved file needs a copy at the new path, including ones another phone uploaded:
+        // the payload names the old project so [upload] can fetch that copy when this phone has none.
+        val payload = org.json.JSONObject().put(MOVED_FROM, oldUuid).toString()
+        for (name in movedNames) {
+            sql.execSQL(
+                "INSERT INTO sync_outbox (eventId, entityType, entityUuid, operation, revision, payloadJson, createdAt, attemptCount, state, lastError) " +
+                    "SELECT lower(hex(randomblob(16))), '$ENTITY_TYPE', ?, 'UPSERT', 1, ?, ?, 0, '${SyncOutboxEvent.STATE_PENDING}', '' " +
+                    "WHERE NOT EXISTS (SELECT 1 FROM sync_outbox WHERE entityType = '$ENTITY_TYPE' AND operation = 'UPSERT' " +
+                    "AND state != '${SyncOutboxEvent.STATE_SYNCED}' AND entityUuid IN (?, ?))",
+                arrayOf<Any>(newPrefix + name, payload, System.currentTimeMillis(), newPrefix + name, oldPrefix + name)
+            )
+        }
+        sql.execSQL(
+            "UPDATE sync_outbox SET entityUuid = ? || substr(entityUuid, $rest) WHERE $isOld AND state != '${SyncOutboxEvent.STATE_SYNCED}'",
+            arrayOf<Any>(newPrefix, oldPrefix)
+        )
+    }
 
     /**
      * Deletes local files, and their cloud copies, that no record refers to any more,
@@ -271,7 +381,7 @@ object Attachments {
         val referenced = mutableSetOf<String>()
         for ((table, column) in referencingColumns) {
             sql.query("SELECT `$column` FROM `$table` WHERE `$column` LIKE '%$SCHEME:%'").use { c ->
-                while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { referenced.add(it.removePrefix("$SCHEME:")) }
+                while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { ref -> nameOf(ref)?.let { referenced.add(it) } }
             }
         }
         val cutoff = System.currentTimeMillis() - ORPHAN_AGE_MS
@@ -280,8 +390,11 @@ object Attachments {
             if (file.name.endsWith(".part")) { file.delete(); return@forEach }
             if (!validName.matches(file.name) || file.name in referenced) return@forEach
             file.delete()
+            // Only a file this phone uploaded has a cloud copy whose path it knows; a downloaded
+            // one is left to the phone that added it (a guessed path would fail on every retry).
+            val entity = db.syncOutboxDao().fileEntityFor(file.name) ?: return@forEach
             db.syncOutboxDao().enqueue(
-                SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = file.name, operation = "DELETE", revision = 1, payloadJson = "{}")
+                SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = entity, operation = "DELETE", revision = 1, payloadJson = "{}")
             )
         }
     }
@@ -300,7 +413,7 @@ object Attachments {
             isRef(value) -> value
             value.contains("images.unsplash.com") -> null
             value.startsWith("content:") || value.startsWith("file:") ->
-                runCatching { import(context, Uri.parse(value), kind) }.getOrDefault(value)
+                runCatching { copyIn(context, Uri.parse(value), kind, null) }.getOrDefault(value)
             else -> value
         }
 
