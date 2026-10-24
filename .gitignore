@@ -27,3 +27,7 @@ functions/node_modules/
 
 # Firebase Auth exports (contain user emails / password hashes)
 users.json
+
+# Rules test dependencies
+rules-tests/node_modules/
+rules-tests/*-debug.log
