@@ -46,6 +46,7 @@ data class Project(
     val actualAccomplishment: Double = 0.0,
     val latestUpdatePhotoUrl: String = "",
     val assignedStaff: String = "",
+    val assignedUids: String = "", // JSON array of Firebase uids allowed to open this project
     val lastUpdatedDate: String = "2026-08-01"
 ) {
     val variance: Double
