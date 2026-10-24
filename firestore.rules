@@ -39,6 +39,18 @@ service cloud.firestore {
       }
     }
 
+    // Weekly/monthly reports, documents, issues and payments, one document per record.
+    // Same access as project profiles: any signed-in user. Records are never deleted,
+    // only marked isDeleted, so other phones learn about the deletion.
+    match /records/{recordId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.uuid == recordId
+        && request.resource.data.projectUuid is string
+        && request.resource.data.revision is int;
+      allow delete: if false;
+    }
+
     match /audit_logs/{logId} {
       allow read: if isSuperAdmin();
       allow create: if signedIn();

@@ -4,10 +4,12 @@ import android.content.Context
 import android.util.Log
 import com.example.data.local.AppDatabase
 import com.example.data.local.ProjectDuplicateMerger
+import com.example.data.local.RecordSyncSchema
 import com.example.data.model.Project
 import com.example.data.model.SyncOutboxEvent
 import com.example.util.AppNotificationManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -43,6 +45,8 @@ class FirestoreSyncManager(
 
     private val _syncStatus = MutableStateFlow<FirestoreSyncStatus>(FirestoreSyncStatus.Idle)
     private var projectListener: ListenerRegistration? = null
+    private var recordListener: ListenerRegistration? = null
+    private val recordSync = RecordSync(db)
     private var authStateListener: FirebaseAuth.AuthStateListener? = null
     private val reconcileMutex = Mutex()
     private val flushMutex = Mutex()
@@ -110,6 +114,28 @@ class FirestoreSyncManager(
                             reconcile(docs, fromServer, currentUser.uid)
                         } catch (ex: Exception) {
                             Log.e(tag, "Error reconciling Firestore projects", ex)
+                        }
+                    }
+                }
+            }
+
+        // Reports, documents, issues and payments: only changed documents are applied.
+        recordListener = firestore.collection("records")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    Log.w(tag, "Firestore records listen failed.", e)
+                    return@addSnapshotListener
+                }
+                val docs = snapshots?.documentChanges.orEmpty()
+                    .filter { it.type != DocumentChange.Type.REMOVED && !it.document.metadata.hasPendingWrites() }
+                    .map { it.document.data + ("uuid" to it.document.id) }
+                if (docs.isEmpty()) return@addSnapshotListener
+                scope.launch(Dispatchers.IO) {
+                    reconcileMutex.withLock {
+                        try {
+                            recordSync.applyRemote(docs)
+                        } catch (ex: Exception) {
+                            Log.e(tag, "Error applying Firestore records", ex)
                         }
                     }
                 }
@@ -237,6 +263,8 @@ class FirestoreSyncManager(
             }
             hasServerSnapshot = true
         }
+        // Records that arrived before their project can be applied now.
+        recordSync.retryDeferred()
         flushOutbox()
     }
 
@@ -259,6 +287,8 @@ class FirestoreSyncManager(
     fun stopRealtimeSync() {
         projectListener?.remove()
         projectListener = null
+        recordListener?.remove()
+        recordListener = null
     }
 
     /**
@@ -277,6 +307,7 @@ class FirestoreSyncManager(
 
         _syncStatus.value = FirestoreSyncStatus.Syncing
         var syncedCount = 0
+        val uploadedRecords = mutableSetOf<String>()
 
         for (event in pending) {
             try {
@@ -338,6 +369,34 @@ class FirestoreSyncManager(
                         // cloud one; the surviving row has its own event, so nothing is left to send.
                         db.syncOutboxDao().markSynced(event.eventId)
                     }
+                } else if (event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX)) {
+                    // Every event uploads the row as it is now, so one upload per record covers the rest.
+                    if (event.entityUuid !in uploadedRecords) {
+                        val table = event.entityType.removePrefix(RecordSyncSchema.ENTITY_PREFIX)
+                        val doc = recordSync.buildDocument(table, event.entityUuid, currentUser.uid)
+                        val record = firestore.collection("records").document(event.entityUuid)
+                        if (doc != null) {
+                            record.set(doc).await()
+                            uploadedRecords.add(event.entityUuid)
+                        } else if (event.operation == "DELETE") {
+                            val projectUuid = org.json.JSONObject(event.payloadJson).optString("projectUuid")
+                            record.set(
+                                hashMapOf<String, Any>(
+                                    "uuid" to event.entityUuid,
+                                    "type" to table,
+                                    "projectUuid" to projectUuid,
+                                    "revision" to event.revision,
+                                    "isDeleted" to true,
+                                    "updatedAt" to System.currentTimeMillis(),
+                                    "updatedByUid" to currentUser.uid
+                                ),
+                                SetOptions.merge()
+                            ).await()
+                            uploadedRecords.add(event.entityUuid)
+                        }
+                        syncedCount++
+                    }
+                    db.syncOutboxDao().markSynced(event.eventId)
                 }
             } catch (e: Exception) {
                 Log.w(tag, "Failed to sync outbox event ${event.eventId}", e)

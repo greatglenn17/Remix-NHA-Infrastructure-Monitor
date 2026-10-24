@@ -1,8 +1,8 @@
 {
-  "versionCode": 129,
-  "versionName": "1.2.9",
-  "releaseNotes": "v1.2.9: New projects no longer come with sample Land Area (4.5) and No. of Units (120) values, and variation orders now have a Date Approved field that shows in the Variation Orders Log.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.9/NHA_Monitor_v1.2.9_Build129.apk",
-  "apkSha256": "8308e2da2dcee151f762a48c9b3ee14c1ad7118ec91a81e2ac744cb9d04c72e2",
+  "versionCode": 130,
+  "versionName": "1.3.0",
+  "releaseNotes": "v1.3.0: Weekly and monthly reports (with weather), documents, issues and payments now sync to every phone through the cloud, including edits and deletions. Records already on this phone upload automatically after updating. Photos and scanned files are not synced yet.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.3.0/NHA_Monitor_v1.3.0_Build130.apk",
+  "apkSha256": "3a687fac82c638b351644b7db6a4c90cfa6a303d57b3e41a8d6b732d760aa6d1",
   "isMandatory": true
 }

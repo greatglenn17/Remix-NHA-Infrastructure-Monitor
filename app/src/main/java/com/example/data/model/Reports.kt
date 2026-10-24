@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "weekly_reports",
@@ -15,7 +16,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class WeeklyReport(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -33,7 +34,11 @@ data class WeeklyReport(
     val documentsIssuedReceivedJson: String, // JSON array of DocumentActionItem
     val attachedPhotoUrlsJson: String, // JSON array of image URLs
     val submittedByStaff: String,
-    val createdAtTimestamp: Long = System.currentTimeMillis()
+    val createdAtTimestamp: Long = System.currentTimeMillis(),
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 data class ManpowerItem(
@@ -130,7 +135,7 @@ data class DailyHourlyWeather(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class MonthlyReport(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -151,7 +156,11 @@ data class MonthlyReport(
     val notedByName: String = "Director Maria Perez",
     val notedByStatus: String = "Noted",
     val auditTrailJson: String = "", // Timestamps & approval notes
-    val accomplishmentItemsJson: String = "[]" // List of AccomplishmentItem
+    val accomplishmentItemsJson: String = "[]", // List of AccomplishmentItem
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 data class PaymentEntry(

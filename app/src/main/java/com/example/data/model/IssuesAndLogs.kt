@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "project_issues",
@@ -15,7 +16,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class ProjectIssue(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -27,7 +28,11 @@ data class ProjectIssue(
     val loggedBy: String,
     val timestamp: Long = System.currentTimeMillis(),
     val status: String = "Pending",
-    val isCritical: Boolean = false
+    val isCritical: Boolean = false,
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
@@ -64,7 +69,7 @@ data class AuditLog(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class ProjectPayment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -77,5 +82,9 @@ data class ProjectPayment(
     val percentage: Double,
     val balanceAmount: Double,
     val balancePercentage: Double,
-    val fileUrl: String = ""
+    val fileUrl: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )

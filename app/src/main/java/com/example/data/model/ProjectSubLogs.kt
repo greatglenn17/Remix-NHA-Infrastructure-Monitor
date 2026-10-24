@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "time_extensions",
@@ -106,7 +107,7 @@ data class WorkResumptionLog(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class PendingDocument(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -115,5 +116,9 @@ data class PendingDocument(
     val status: String = "Pending", // "Pending", "Submitted", "Approved"
     val remarks: String = "",
     val isCoreChecklist: Boolean = true,
-    val fileUrl: String = ""
+    val fileUrl: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
