@@ -31,13 +31,7 @@ class AuthManager(private val context: Context) {
     private val auth: FirebaseAuth? by lazy {
         try {
             if (FirebaseApp.getApps(context).isEmpty()) {
-                val options = FirebaseOptions.Builder()
-                    .setApiKey("AIzaSyDJzZfUa78GpeHSuTrEbpOUZtZnflg6_pk")
-                    .setApplicationId("1:308171947377:android:ea283c021325b0e6c60ad0")
-                    .setGcmSenderId("308171947377")
-                    .setProjectId("oceanic-lambda-4t8c4")
-                    .build()
-                FirebaseApp.initializeApp(context, options)
+                FirebaseApp.initializeApp(context)
             }
             FirebaseAuth.getInstance()
         } catch (_: Exception) {
@@ -158,45 +152,30 @@ class AuthManager(private val context: Context) {
             return Result.failure(IllegalArgumentException("Password must be at least 6 characters long."))
         }
 
+        // 1. Try remote Firebase authentication first (primary source of truth for cloud sync):
+        val firebaseAuth = auth
+        if (firebaseAuth != null) {
+            try {
+                val result = firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPass).await()
+                return Result.success(result.user)
+            } catch (e: Exception) {
+                android.util.Log.w("AuthManager", "Firebase remote sign-in exception: ${e.message}")
+            }
+        }
+
+        // 2. If account was registered locally or offline fallback:
         val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
         val inputHash = hashPassword(cleanPass)
 
-        // 1. If account was registered locally via Create Account tab:
         if (savedPass != null) {
             if (savedPass == inputHash || savedPass == cleanPass) {
-                return Result.success(null)
+                return Result.success(auth?.currentUser)
             } else {
                 return Result.failure(IllegalArgumentException("Incorrect password for $cleanEmail. Please re-type your password."))
             }
         }
 
-        // 2. Try remote Firebase authentication if available:
-        val firebaseAuth = auth
-        if (firebaseAuth != null) {
-            try {
-                val result = firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPass).await()
-                // Security: Do NOT auto-register Firebase users locally — require explicit Create Account registration
-                return Result.success(result.user)
-            } catch (e: Exception) {
-                android.util.Log.w("AuthManager", "Firebase remote sign-in exception: ${e.message}")
-                val err = e.message ?: ""
-                val friendlyMessage = when {
-                    err.contains("user-not-found", ignoreCase = true) || 
-                    err.contains("no user record", ignoreCase = true) ||
-                    err.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) ||
-                    err.contains("user_not_found", ignoreCase = true) ->
-                        "No account found for $cleanEmail. Click 'Create Account' tab to register."
-                    err.contains("password", ignoreCase = true) || err.contains("wrong-password", ignoreCase = true) ->
-                        "Incorrect password for $cleanEmail. Please verify your password."
-                    err.contains("badly formatted", ignoreCase = true) || err.contains("INVALID_EMAIL", ignoreCase = true) ->
-                        "Invalid email address format. Please check your email."
-                    else -> "No account found for $cleanEmail. Please click 'Create Account' tab to register first."
-                }
-                return Result.failure(IllegalArgumentException(friendlyMessage))
-            }
-        }
-
-        // 3. Account not registered locally and no remote match:
+        // 3. Account not found
         return Result.failure(IllegalArgumentException("No account found for $cleanEmail. Please click 'Create Account' tab to register first."))
     }
 
@@ -220,11 +199,16 @@ class AuthManager(private val context: Context) {
         if (firebaseAuth != null) {
             try {
                 val result = firebaseAuth.createUserWithEmailAndPassword(cleanEmail, cleanPass).await()
-                firebaseAuth.signOut()
                 return Result.success(result.user)
             } catch (e: Exception) {
-                android.util.Log.w("AuthManager", "Firebase remote sign-up exception: ${e.message}")
-                return Result.failure(IllegalStateException("Account could not be created with Firebase. Check your connection and try again.", e))
+                android.util.Log.w("AuthManager", "Firebase remote sign-up exception: ${e.message}", e)
+                try {
+                    val signInResult = firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPass).await()
+                    return Result.success(signInResult.user)
+                } catch (_: Exception) {
+                    val msg = e.localizedMessage ?: e.message ?: "Account creation failed"
+                    return Result.failure(IllegalStateException(msg, e))
+                }
             }
         }
         return Result.success(null)

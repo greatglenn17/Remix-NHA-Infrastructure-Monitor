@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -141,11 +142,7 @@ object AppUpdateManager {
             }
 
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(onComplete, filter, Context.RECEIVER_EXPORTED)
-            } else {
-                context.registerReceiver(onComplete, filter)
-            }
+            ContextCompat.registerReceiver(context, onComplete, filter, ContextCompat.RECEIVER_EXPORTED)
         } catch (e: Exception) {
             onDownloadFailed(e.localizedMessage ?: "Unable to start update download.")
             openBrowserDownloadFallback(context)

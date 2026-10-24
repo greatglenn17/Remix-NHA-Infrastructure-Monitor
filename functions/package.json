@@ -1,0 +1,14 @@
+{
+  "name": "nha-monitor-functions",
+  "version": "1.0.0",
+  "description": "NHA Monitor Cloud Functions for Custom Claims and FCM",
+  "main": "index.js",
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^4.9.0"
+  },
+  "private": true
+}

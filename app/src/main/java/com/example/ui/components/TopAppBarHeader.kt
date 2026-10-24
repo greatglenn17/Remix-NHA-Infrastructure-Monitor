@@ -221,18 +221,18 @@ fun TopAppBarHeader(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             HeaderBadge(
-                                text = if (isSyncing) "SYNCING" else "ONLINE",
-                                icon = if (isSyncing) Icons.Default.Sync else Icons.Default.CloudDone,
-                                iconTint = if (isSyncing) Color(0xFFFBBF24) else Color(0xFF4ADE80),
-                                textColor = if (isSyncing) Color(0xFFFBBF24) else Color(0xFF4ADE80),
-                                backgroundColor = if (isSyncing) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF16A34A).copy(alpha = 0.2f),
-                                borderColor = if (isSyncing) Color(0xFFF59E0B).copy(alpha = 0.8f) else Color(0xFF16A34A).copy(alpha = 0.8f),
-                                isSpinning = isSyncing
+                                text = "LOCAL DATA",
+                                icon = Icons.Default.Storage,
+                                iconTint = Color(0xFFFBBF24),
+                                textColor = Color(0xFFFBBF24),
+                                backgroundColor = Color(0xFFF59E0B).copy(alpha = 0.2f),
+                                borderColor = Color(0xFFF59E0B).copy(alpha = 0.8f),
+                                isSpinning = false
                             )
 
                             if (onOpenDriveSync != null) {
                                 HeaderBadge(
-                                    text = "CLOUD SYNC",
+                                    text = "MANUAL BACKUP",
                                     icon = Icons.Default.CloudSync,
                                     iconTint = Color(0xFF38BDF8),
                                     textColor = Color(0xFF38BDF8),

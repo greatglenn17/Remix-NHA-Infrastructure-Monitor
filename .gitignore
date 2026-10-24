@@ -21,3 +21,9 @@ cloud_sync.json
 *.apk
 *.zip
 *.file
+
+# Cloud Functions dependencies
+functions/node_modules/
+
+# Firebase Auth exports (contain user emails / password hashes)
+users.json

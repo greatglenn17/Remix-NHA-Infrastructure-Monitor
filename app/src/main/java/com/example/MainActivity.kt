@@ -145,10 +145,22 @@ class MainActivity : ComponentActivity() {
                                             issuesJson = issuesJson,
                                             accomplishmentItemsJson = accItemsJson
                                         )
-                                        viewModel.updateWeeklyReport(updated)
+                                        viewModel.updateWeeklyReportWithWeather(
+                                            updated,
+                                            dailyWeatherDates.map { (dayOfWeek, dateStr) ->
+                                                val rawValue = dailyWeatherMap[dayOfWeek] ?: "FAIR"
+                                                val conditions = if (rawValue.contains(",")) rawValue else List(24) { rawValue }.joinToString(",")
+                                                com.example.data.model.DailyHourlyWeather(
+                                                    projectId = pId,
+                                                    date = dateStr,
+                                                    dayOfWeek = dayOfWeek,
+                                                    hourlyConditionsCsv = conditions
+                                                )
+                                            }
+                                        )
                                         viewModel.weeklyReportToEdit.value = null
                                     } else {
-                                        viewModel.submitWeeklyReport(
+                                        viewModel.submitWeeklyReportWithWeather(
                                             projectId = pId,
                                             reportingWeek = week,
                                             daysElapsed = 330,
@@ -161,20 +173,17 @@ class MainActivity : ComponentActivity() {
                                             issuesJson = issuesJson,
                                             accomplishmentItemsJson = accItemsJson,
                                             documentsIssuedReceivedJson = "[]",
-                                            attachedPhotoUrl = photoUrl
-                                        )
-                                    }
-                                    val reportId = System.currentTimeMillis()
-
-                                    dailyWeatherDates.forEach { (dayOfWeek, dateStr) ->
-                                        val rawVal = dailyWeatherMap[dayOfWeek] ?: "FAIR"
-                                        val csv = if (rawVal.contains(",")) rawVal else List(24) { rawVal }.joinToString(",")
-                                        viewModel.saveDailyHourlyWeather(
-                                            projectId = pId,
-                                            weeklyReportId = reportId,
-                                            date = dateStr,
-                                            dayOfWeek = dayOfWeek,
-                                            conditionsCsv = csv
+                                            attachedPhotoUrl = photoUrl,
+                                            weatherDrafts = dailyWeatherDates.map { (dayOfWeek, dateStr) ->
+                                                val rawValue = dailyWeatherMap[dayOfWeek] ?: "FAIR"
+                                                val conditions = if (rawValue.contains(",")) rawValue else List(24) { rawValue }.joinToString(",")
+                                                com.example.data.model.DailyHourlyWeather(
+                                                    projectId = pId,
+                                                    date = dateStr,
+                                                    dayOfWeek = dayOfWeek,
+                                                    hourlyConditionsCsv = conditions
+                                                )
+                                            }
                                         )
                                     }
                                     showAddWeeklyReportDialog = false

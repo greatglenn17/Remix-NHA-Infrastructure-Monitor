@@ -9,8 +9,10 @@ import java.time.format.DateTimeParseException
 import com.example.data.auth.AuthManager
 import com.example.data.local.AppDatabase
 import com.example.data.local.PrepopulateData
+import com.example.data.local.WeeklyReportWeatherWriter
 import com.example.data.model.*
 import com.example.data.remote.DriveSyncResult
+import com.example.data.remote.FirestoreSyncManager
 import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
 import com.example.util.AppNotificationManager
@@ -31,8 +33,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     private val projectDao: com.example.data.local.ProjectDao
     private val reportDao: com.example.data.local.ReportDao
+    private val syncOutboxDao: com.example.data.local.SyncOutboxDao
+    private lateinit var database: AppDatabase
+    private lateinit var weeklyReportWeatherWriter: WeeklyReportWeatherWriter
     private val repository: ProjectRepository
     private val googleDriveSyncManager: GoogleDriveSyncManager
+    private val firestoreSyncManager: FirestoreSyncManager
     private val authManager: AuthManager = AuthManager(application)
 
     // Auth States
@@ -68,21 +74,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     val currentUserAccount: StateFlow<UserAccount> = _currentUserAccount.asStateFlow()
 
     fun elevateUserRole(targetRole: UserRole, positionTitle: String? = null, officeRegion: String? = null) {
-        val current = _currentUserAccount.value
-        val newTitle = if (!positionTitle.isNullOrBlank()) positionTitle else current.title
-        val newOffice = if (!officeRegion.isNullOrBlank()) officeRegion else current.office
-        val updated = current.copy(role = targetRole, title = newTitle, office = newOffice)
-        _currentUserAccount.value = updated
-        authManager.saveUserSession(updated, "officer@nha.gov.ph")
-        logAuditAction(
-            actionType = "Role Elevation",
-            details = "Elevated role for ${current.name} to ${targetRole.label} (PIN 021793 Authorized)",
-            oldValue = "${current.role.name} (${current.title})",
-            newValue = "${targetRole.name} (${updated.title})"
-        )
+        // Role changes are server-only. A mobile client must never elevate a
+        // cached account using a PIN, preferences, or UI state.
+        _authError.value = "Role changes require an authorized backend administrator."
     }
 
-    private val _isSyncing = MutableStateFlow(true)
+    private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     // Filters & Sorting
@@ -118,16 +115,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     val unreadNotificationCount: StateFlow<Int>
 
     init {
-        val database = AppDatabase.getDatabase(application, viewModelScope)
+        database = AppDatabase.getDatabase(application, viewModelScope)
         projectDao = database.projectDao()
         reportDao = database.reportDao()
+        syncOutboxDao = database.syncOutboxDao()
+        weeklyReportWeatherWriter = WeeklyReportWeatherWriter(database, reportDao)
         repository = ProjectRepository(projectDao, reportDao)
         googleDriveSyncManager = GoogleDriveSyncManager(application, database)
+        firestoreSyncManager = FirestoreSyncManager(application, database, viewModelScope)
         notificationDao = database.notificationDao()
-
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            reportDao.deleteWeatherLogsWithoutWeeklyReport()
-        }
 
         notifications = notificationDao.getAllNotifications().stateIn(
             scope = viewModelScope,
@@ -171,10 +167,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
 
-        // Mock a sync operation
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(3500)
-            _isSyncing.value = false
+        // Start realtime sync if user is already logged in (AuthStateListener in FirestoreSyncManager
+        // will also trigger this automatically when Firebase Auth token is ready)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (_isLoggedIn.value) {
+                try {
+                    firestoreSyncManager.startRealtimeSync()
+                    firestoreSyncManager.flushOutbox()
+                } catch (e: Exception) {
+                    android.util.Log.w("ProjectViewModel", "Startup sync skipped: ${e.message}")
+                }
+            }
         }
 
         rawProjects = repository.allProjects.stateIn(
@@ -279,6 +282,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 _authLoading.value = false
                 if (result.isSuccess) {
                     _authSuccessMessage.value = "Registration Successful! Account created for $cleanEmail. Please type your password to sign in."
+                    val createdUser = result.getOrNull()
+                    if (createdUser != null) {
+                        firestoreSyncManager.syncUserProfile(
+                            uid = createdUser.uid,
+                            email = cleanEmail,
+                            displayName = displayName ?: cleanEmail.substringBefore("@"),
+                            role = role.name,
+                            position = position.orEmpty(),
+                            office = office.orEmpty()
+                        )
+                    }
                     logAuditAction(
                         projectId = null,
                         actionType = "User Registration",
@@ -311,6 +325,23 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     _currentUserAccount.value = userAcc
                     _isLoggedIn.value = true
                     _authLoading.value = false
+                    authManager.saveUserSession(userAcc, cleanEmail)
+
+                    // Trigger realtime Firestore sync, flush outbox, and sync profile/FCM token
+                    firestoreSyncManager.startRealtimeSync()
+                    firestoreSyncManager.flushOutbox()
+                    val currentFirebaseUser = authManager.currentFirebaseUser
+                    if (currentFirebaseUser != null) {
+                        firestoreSyncManager.syncUserProfile(
+                            uid = currentFirebaseUser.uid,
+                            email = cleanEmail,
+                            displayName = userAcc.name,
+                            role = userAcc.role.name,
+                            position = position.orEmpty(),
+                            office = office.orEmpty()
+                        )
+                    }
+
                     logAuditAction(
                         projectId = null,
                         actionType = "User Login",
@@ -327,7 +358,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                             "No account found with this email. Click 'Create Account' to register."
                         errMessage?.contains("invalid", ignoreCase = true) == true ->
                             "Invalid email or password. Please verify your credentials."
-                        else -> errMessage ?: "Authentication failed. Please check credentials or try Quick Demo."
+                        else -> errMessage ?: "Authentication failed. Please check credentials."
                     }
                     _authError.value = formattedErr
                     _authLoading.value = false
@@ -404,6 +435,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun signOutUser() {
         val previousUser = currentUserAccount.value.name
+        firestoreSyncManager.stopRealtimeSync()
         authManager.signOut()
         _currentUserAccount.value = DefaultUserAccount
         _isLoggedIn.value = false
@@ -1001,6 +1033,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 return@launch
             }
             val newProject = Project(
+                createdByUid = authManager.currentFirebaseUser?.uid.orEmpty(),
+                updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty(),
                 name = name,
                 location = location,
                 implementingOffice = implementingOffice,
@@ -1021,6 +1055,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 assignedStaff = assignedStaff.ifBlank { currentUserAccount.value.name }
             )
             val newId = repository.insertProject(newProject, currentUserAccount.value.role)
+            val persistedProject = newProject.copy(id = newId)
+            syncOutboxDao.enqueue(
+                SyncOutboxEvent(
+                    entityType = "project",
+                    entityUuid = persistedProject.projectUuid,
+                    operation = "CREATE",
+                    revision = persistedProject.revision,
+                    payloadJson = "{\"projectUuid\":\"${persistedProject.projectUuid}\"}"
+                )
+            )
+            firestoreSyncManager.flushOutbox()
 
             // Seed default core document checklist for new project
             val coreDocs = listOf(
@@ -1040,27 +1085,33 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 oldValue = "",
                 newValue = "Title: $name, Location: $location, Cost: ₱$contractCostOriginal, Duration: $contractDurationDays days"
             )
-            // Always trigger immediate cloud sync on project creation
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    backupToGoogleDrive()
-                } catch (e: Exception) {
-                    android.util.Log.w("ProjectViewModel", "Auto-backup on creation failed: ${e.message}")
-                }
-            }
         }
     }
 
     fun updateProjectMaster(project: Project) {
         viewModelScope.launch {
             val previousStatus = selectedProject.value?.status ?: "Unknown"
-            repository.updateProject(project, currentUserAccount.value.role)
+            val updatedProject = project.copy(
+                revision = project.revision + 1,
+                updatedAt = System.currentTimeMillis(),
+                updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty()
+            )
+            repository.updateProject(updatedProject, currentUserAccount.value.role)
+            syncOutboxDao.enqueue(
+                SyncOutboxEvent(
+                    entityType = "project",
+                    entityUuid = updatedProject.projectUuid,
+                    operation = "UPDATE",
+                    revision = updatedProject.revision,
+                    payloadJson = "{\"projectUuid\":\"${updatedProject.projectUuid}\",\"name\":\"${updatedProject.name.replace("\"", "\\\"")}\"}"
+                )
+            )
             logAuditAction(
-                projectId = project.id,
+                projectId = updatedProject.id,
                 actionType = "Project Edit",
-                details = "Updated project master: ${project.name}",
+                details = "Updated project master: ${updatedProject.name}",
                 oldValue = "Status: $previousStatus",
-                newValue = "Status: ${project.status}, Revised Cost: ₱${project.contractCostRevised}"
+                newValue = "Status: ${updatedProject.status}, Revised Cost: ₱${updatedProject.contractCostRevised}"
             )
         }
     }
@@ -1069,8 +1120,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             selectedProject.value?.let { current ->
                 if (current.id == projectId) {
-                    val updated = current.copy(status = newStatus)
+                    val updated = current.copy(
+                        status = newStatus,
+                        revision = current.revision + 1,
+                        updatedAt = System.currentTimeMillis(),
+                        updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty()
+                    )
                     repository.updateProject(updated, currentUserAccount.value.role)
+                    syncOutboxDao.enqueue(
+                        SyncOutboxEvent(
+                            entityType = "project",
+                            entityUuid = updated.projectUuid,
+                            operation = "UPDATE",
+                            revision = updated.revision,
+                            payloadJson = "{\"projectUuid\":\"${updated.projectUuid}\",\"status\":\"$newStatus\"}"
+                        )
+                    )
                     logAuditAction(
                         projectId = projectId,
                         actionType = "Project Edit",
@@ -1093,6 +1158,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 oldValue = "Project ID: $projectId, Name: ${projectToDelete?.name ?: ""}",
                 newValue = ""
             )
+            if (projectToDelete != null) {
+                syncOutboxDao.enqueue(
+                    SyncOutboxEvent(
+                        entityType = "project",
+                        entityUuid = projectToDelete.projectUuid,
+                        operation = "DELETE",
+                        revision = projectToDelete.revision + 1,
+                        payloadJson = "{\"projectUuid\":\"${projectToDelete.projectUuid}\",\"isDeleted\":true}"
+                    )
+                )
+            }
             repository.deleteProjectById(projectId, currentUserAccount.value.role)
             if (_selectedProjectId.value == projectId) {
                 _selectedProjectId.value = null
@@ -1106,7 +1182,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         noOfDays: Int,
         periodConsidered: String,
         reason: String,
-        revisedCompletionDate: String, // Ignored, we compute it
+        revisedCompletionDate: String,
         remarks: String
     ) {
         viewModelScope.launch {
@@ -1114,7 +1190,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val existingExtensions = projectDao.getTimeExtensionsForProject(projectId).first()
             val sumOfDays = existingExtensions.sumOf { it.noOfDays } + noOfDays
             val revisedDurationDays = p.contractDurationDays + sumOfDays
-            
+
             var computedRevisedDate = p.completionDateOriginal
             try {
                 val start = LocalDate.parse(p.dateStarted)
@@ -1133,7 +1209,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             projectDao.insertTimeExtension(extension)
 
-            // Update project master revised completion date
             val updated = p.copy(completionDateRevised = computedRevisedDate)
             projectDao.updateProject(updated)
 
@@ -1343,9 +1418,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             if (oldValue.isNotBlank() && oldValue == newValue) return@launch
 
             val currentAccount = currentUserAccount.value
-            val userName = user ?: currentAccount.name.ifBlank { "System User" }
+            val userName = user ?: currentAccount.name
             val deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
-            
+
             projectDao.insertAuditLog(
                 AuditLog(
                     projectId = projectId,
@@ -1424,7 +1499,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun submitWeeklyReport(
+    fun submitWeeklyReportWithWeather(
         projectId: Long,
         reportingWeek: String,
         daysElapsed: Int,
@@ -1437,66 +1512,51 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         issuesJson: String,
         accomplishmentItemsJson: String,
         documentsIssuedReceivedJson: String,
-        attachedPhotoUrl: String
+        attachedPhotoUrl: String,
+        weatherDrafts: List<DailyHourlyWeather>
     ) {
         viewModelScope.launch {
-            val photoList = if (attachedPhotoUrl.isNotBlank()) """["$attachedPhotoUrl"]""" else "[]"
-            val report = WeeklyReport(
-                projectId = projectId,
-                reportingWeek = reportingWeek,
-                daysElapsed = daysElapsed,
-                remainingDays = remainingDays,
-                targetAccomplishmentPct = targetAccomplishmentPct,
-                actualAccomplishmentPct = actualAccomplishmentPct,
-                manpowerJson = manpowerJson,
-                equipmentJson = equipmentJson,
-                activitiesJson = activitiesJson,
-                issuesJson = issuesJson,
-                accomplishmentItemsJson = accomplishmentItemsJson,
-                documentsIssuedReceivedJson = documentsIssuedReceivedJson,
-                attachedPhotoUrlsJson = photoList,
-                submittedByStaff = currentUserAccount.value.name
-            )
-            reportDao.insertWeeklyReport(report)
-
-            // Update Project Master target & actual accomplishment & latest update photo
-            val current = projectDao.getProjectById(projectId).first()
-            if (current != null) {
-                val updated = current.copy(
-                    targetAccomplishment = targetAccomplishmentPct,
-                    actualAccomplishment = actualAccomplishmentPct,
-                    latestUpdatePhotoUrl = if (attachedPhotoUrl.isNotBlank()) attachedPhotoUrl else current.latestUpdatePhotoUrl
+            try {
+                val photoList = if (attachedPhotoUrl.isNotBlank()) """["$attachedPhotoUrl"]""" else "[]"
+                val report = WeeklyReport(
+                    projectId = projectId,
+                    reportingWeek = reportingWeek,
+                    daysElapsed = daysElapsed,
+                    remainingDays = remainingDays,
+                    targetAccomplishmentPct = targetAccomplishmentPct,
+                    actualAccomplishmentPct = actualAccomplishmentPct,
+                    manpowerJson = manpowerJson,
+                    equipmentJson = equipmentJson,
+                    activitiesJson = activitiesJson,
+                    issuesJson = issuesJson,
+                    accomplishmentItemsJson = accomplishmentItemsJson,
+                    documentsIssuedReceivedJson = documentsIssuedReceivedJson,
+                    attachedPhotoUrlsJson = photoList,
+                    submittedByStaff = currentUserAccount.value.name
                 )
-                projectDao.updateProject(updated)
+                weeklyReportWeatherWriter.create(report, weatherDrafts)
+
+                // Update Project Master target & actual accomplishment & latest update photo.
+                val current = projectDao.getProjectById(projectId).first()
+                if (current != null) {
+                    val updated = current.copy(
+                        targetAccomplishment = targetAccomplishmentPct,
+                        actualAccomplishment = actualAccomplishmentPct,
+                        latestUpdatePhotoUrl = if (attachedPhotoUrl.isNotBlank()) attachedPhotoUrl else current.latestUpdatePhotoUrl
+                    )
+                    projectDao.updateProject(updated)
+                }
+
+                logAuditAction(
+                    projectId = projectId,
+                    actionType = "Report Creation",
+                    details = "Submitted Weekly Report for $reportingWeek",
+                    oldValue = "",
+                    newValue = "Week: $reportingWeek, Target: $targetAccomplishmentPct%, Actual: $actualAccomplishmentPct%"
+                )
+            } catch (error: Exception) {
+                _authError.value = "Weekly report was not saved: ${error.message ?: "database transaction failed"}"
             }
-
-            logAuditAction(
-                projectId = projectId,
-                actionType = "Report Creation",
-                details = "Submitted Weekly Report for $reportingWeek",
-                oldValue = "",
-                newValue = "Week: $reportingWeek, Target: $targetAccomplishmentPct%, Actual: $actualAccomplishmentPct%"
-            )
-        }
-    }
-
-    // Save or update 24h Daily Weather Log
-    fun saveDailyHourlyWeather(
-        projectId: Long,
-        weeklyReportId: Long,
-        date: String,
-        dayOfWeek: String,
-        conditionsCsv: String
-    ) {
-        viewModelScope.launch {
-            val weather = DailyHourlyWeather(
-                projectId = projectId,
-                weeklyReportId = weeklyReportId,
-                date = date,
-                dayOfWeek = dayOfWeek,
-                hourlyConditionsCsv = conditionsCsv
-            )
-            reportDao.insertDailyWeather(weather)
         }
     }
 
@@ -1515,6 +1575,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     )
                     projectDao.updateProject(updated)
                 }
+            }
+        }
+    }
+
+    fun updateWeeklyReportWithWeather(report: WeeklyReport, weatherDrafts: List<DailyHourlyWeather>) {
+        viewModelScope.launch {
+            try {
+                weeklyReportWeatherWriter.update(report, weatherDrafts)
+                logAuditAction(report.projectId, "Edited Weekly Report", "Modified report and weather for ${report.reportingWeek}")
+            } catch (error: Exception) {
+                _authError.value = "Weekly report was not updated: ${error.message ?: "database transaction failed"}"
             }
         }
     }
@@ -1790,6 +1861,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun importSampleData(onComplete: () -> Unit = {}) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                firestoreSyncManager.startRealtimeSync()
+                firestoreSyncManager.flushOutbox()
                 restoreFromGoogleDrive()
                 logAuditAction(
                     projectId = null,

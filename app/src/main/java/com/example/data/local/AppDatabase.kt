@@ -36,15 +36,17 @@ import androidx.security.crypto.MasterKey
         SdpLot::class,
         SdpRoad::class,
         SdpLotProgress::class,
-        SdpLotInspection::class
+        SdpLotInspection::class,
+        SyncOutboxEvent::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun reportDao(): ReportDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun syncOutboxDao(): SyncOutboxDao
 
     companion object {
         @Volatile
@@ -240,6 +242,39 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE projects ADD COLUMN projectUuid TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE projects ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE projects ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE projects ADD COLUMN createdByUid TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE projects ADD COLUMN updatedByUid TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE projects ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE projects ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+
+                val timestamp = System.currentTimeMillis()
+                db.query("SELECT id FROM projects WHERE projectUuid = ''").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val localId = cursor.getLong(0)
+                        val uuid = java.util.UUID.randomUUID().toString()
+                        db.execSQL(
+                            "UPDATE projects SET projectUuid = ?, createdAt = ?, updatedAt = ? WHERE id = ?",
+                            arrayOf(uuid, timestamp, timestamp, localId)
+                        )
+                    }
+                }
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_projects_projectUuid ON projects(projectUuid)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS sync_outbox (" +
+                        "eventId TEXT NOT NULL PRIMARY KEY, entityType TEXT NOT NULL, entityUuid TEXT NOT NULL, " +
+                        "operation TEXT NOT NULL, revision INTEGER NOT NULL, payloadJson TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL, attemptCount INTEGER NOT NULL, state TEXT NOT NULL, lastError TEXT NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_entityUuid ON sync_outbox(entityUuid)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_state ON sync_outbox(state)")
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 performPreMigrationBackup(context.applicationContext, "nha_construction_db_10")
@@ -249,7 +284,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance

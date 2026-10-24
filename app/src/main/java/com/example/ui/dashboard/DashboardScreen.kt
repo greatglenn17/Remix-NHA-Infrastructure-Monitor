@@ -411,7 +411,7 @@ fun DashboardScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (currentUser.role == UserRole.ENGINEER_ADMIN) {
+                                if (currentUser.role == UserRole.SUPER_ADMIN || currentUser.role == UserRole.ENGINEER_ADMIN) {
                                     Button(
                                         onClick = onCreateProjectClick,
                                         shape = RoundedCornerShape(10.dp),

@@ -2,6 +2,7 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 enum class ProjectType(val label: String) {
     HOUSING_PROJECT("Housing Project"),
@@ -18,6 +19,14 @@ enum class ProjectStatus(val label: String) {
 @Entity(tableName = "projects")
 data class Project(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Immutable cross-device identity.  Room's numeric [id] remains local only. */
+    val projectUuid: String = UUID.randomUUID().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val createdByUid: String = "",
+    val updatedByUid: String = "",
+    val revision: Long = 1,
+    val isDeleted: Boolean = false,
     val name: String,
     val location: String,
     val implementingOffice: String,

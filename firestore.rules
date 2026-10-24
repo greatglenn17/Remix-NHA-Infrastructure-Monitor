@@ -17,23 +17,29 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} {
-      allow read: if isSuperAdmin() || (signedIn() && resource.data.assignedUid == request.auth.uid);
-      allow create, update, delete: if isSuperAdmin();
+      allow read, create, update, delete: if signedIn();
 
       match /{subcollection}/{documentId} {
         allow read: if isSuperAdmin() || isAssigned(projectId);
-        allow create, update, delete: if isSuperAdmin();
+        allow create, update: if isSuperAdmin() || isAssigned(projectId);
+        allow delete: if isSuperAdmin();
       }
     }
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
-      allow create, update, delete: if isSuperAdmin();
+      allow create, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if isSuperAdmin();
+
+      match /{subcollection}/{docId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
     }
 
     match /audit_logs/{logId} {
       allow read: if isSuperAdmin();
-      allow create, update, delete: if false;
+      allow create: if signedIn();
+      allow update, delete: if false;
     }
 
     match /{document=**} {
