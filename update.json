@@ -1,8 +1,8 @@
 {
-  "versionCode": 150,
-  "versionName": "1.5.0",
-  "releaseNotes": "v1.5.0: Projects are linked to user accounts. Engineers and viewers see and sync only the projects assigned to them; the Super Admin sees every project and assigns people from a checklist on the project edit screen. A new project is assigned to the engineer who creates it. Photos and scans are stored per project.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.5.0/NHA_Monitor_v1.5.0_Build150.apk",
-  "apkSha256": "f9d6df23b62bbe8464b597e5a96a7511ed5d684bf8cd4e22ffc1b7ae3da46ff7",
+  "versionCode": 151,
+  "versionName": "1.5.1",
+  "releaseNotes": "v1.5.1: A new weekly report starts on the current week (Monday to Sunday) instead of a fixed August date, and its daily weather follows that week.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.5.1/NHA_Monitor_v1.5.1_Build151.apk",
+  "apkSha256": "5954785631551e42237069bfc26c7ccc6303b6ed212a5975506e5db47d101bea",
   "isMandatory": true
 }
