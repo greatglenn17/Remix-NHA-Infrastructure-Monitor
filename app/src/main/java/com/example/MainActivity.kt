@@ -75,10 +75,10 @@ class MainActivity : ComponentActivity() {
                         var showAddWeeklyReportDialog by remember { mutableStateOf(false) }
                         var showAddMonthlyReportDialog by remember { mutableStateOf(false) }
                         var showAddTimeExtensionDialog by remember { mutableStateOf(false) }
-                        var showAddVariationOrderDialog by remember { mutableStateOf(false) }
                         var showAddWorkSuspensionDialog by remember { mutableStateOf(false) }
                         var showAddWorkResumptionDialog by remember { mutableStateOf(false) }
                         var showAddDocumentDialog by remember { mutableStateOf(false) }
+                        var addDocumentInitialType by remember { mutableStateOf("Custom Document") }
                         var showAddIssueDialog by remember { mutableStateOf(false) }
 
                         // Navigation: Null selected project -> Dashboard Screen; Selected -> Detail Screen
@@ -101,10 +101,10 @@ class MainActivity : ComponentActivity() {
                                 onAddWeeklyReportClick = { showAddWeeklyReportDialog = true },
                                 onAddMonthlyReportClick = { showAddMonthlyReportDialog = true },
                                 onAddTimeExtensionClick = { showAddTimeExtensionDialog = true },
-                                onAddVariationOrderClick = { showAddVariationOrderDialog = true },
+                                onAddVariationOrderClick = { addDocumentInitialType = "Variation Order"; showAddDocumentDialog = true },
                                 onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
                                 onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
-                                onAddDocumentClick = { showAddDocumentDialog = true },
+                                onAddDocumentClick = { addDocumentInitialType = "Custom Document"; showAddDocumentDialog = true },
                                 onAddIssueClick = { showAddIssueDialog = true }
                             )
                         }
@@ -282,18 +282,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (showAddVariationOrderDialog) {
-                        selectedProjectId?.let { pId ->
-                            AddVariationOrderDialog(
-                                onDismiss = { showAddVariationOrderDialog = false },
-                                onSubmit = { voNo, desc, costDiff, approvalDate, remarks ->
-                                    viewModel.addVariationOrder(pId, voNo, desc, costDiff, approvalDate, remarks)
-                                    showAddVariationOrderDialog = false
-                                }
-                            )
-                        }
-                    }
-
                     if (showAddWorkSuspensionDialog) {
                         selectedProjectId?.let { pId ->
                             AddWorkSuspensionDialog(
@@ -320,6 +308,7 @@ class MainActivity : ComponentActivity() {
                     if (showAddDocumentDialog) {
                         selectedProjectId?.let { pId ->
                             AddCustomDocumentDialog(
+                                initialType = addDocumentInitialType,
                                 onDismiss = { showAddDocumentDialog = false },
                                 onSubmit = { docName, remarks ->
                                     viewModel.addPendingDocument(pId, docName, remarks)

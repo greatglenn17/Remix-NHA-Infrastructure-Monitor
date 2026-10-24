@@ -55,55 +55,6 @@ fun AddTimeExtensionDialog(
 }
 
 @Composable
-fun AddVariationOrderDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (voNo: Int, desc: String, costDiff: Double, approvalDate: String, remarks: String) -> Unit
-) {
-    var voNo by remember { mutableStateOf("1") }
-    var desc by remember { mutableStateOf("Additional works") }
-    var costDiff by remember { mutableStateOf("100000.0") }
-    var approvalDate by remember { mutableStateOf(LocalDate.now().toString()) }
-    val approvalDateValid = remember(approvalDate) {
-        try { LocalDate.parse(approvalDate.trim(), DateTimeFormatter.ISO_LOCAL_DATE); true } catch (_: DateTimeParseException) { false }
-    }
-    var remarks by remember { mutableStateOf("Approved") }
-
-    AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text("ADD VARIATION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = NavyPrimary)) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") })
-                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Description") })
-                OutlinedTextField(value = costDiff, onValueChange = { costDiff = it }, label = { Text("Cost Difference") })
-                OutlinedTextField(
-                    value = approvalDate,
-                    onValueChange = { approvalDate = it },
-                    label = { Text("Approval Date (YYYY-MM-DD)") },
-                    isError = !approvalDateValid,
-                    supportingText = if (approvalDateValid) null else { { Text("Use the format YYYY-MM-DD") } }
-                )
-                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") })
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = approvalDateValid,
-                onClick = { onSubmit(voNo.toIntOrNull()?:1, desc, costDiff.toDoubleOrNull()?:0.0, approvalDate.trim(), remarks) }
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-}
-
-@Composable
 fun AddWorkSuspensionDialog(
     onDismiss: () -> Unit,
     onSubmit: (name: String, effectivityDate: String, durationDays: Int, endDate: String, reason: String, remarks: String) -> Unit
@@ -189,11 +140,12 @@ fun AddWorkResumptionDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCustomDocumentDialog(
+    initialType: String = "Custom Document",
     onDismiss: () -> Unit,
     onSubmit: (docName: String, remarks: String) -> Unit
 ) {
     val docTypes = listOf("Custom Document", "Time Extension", "Variation Order", "Work Suspension Order", "Work Resumption Order")
-    var selectedType by remember { mutableStateOf(docTypes[0]) }
+    var selectedType by remember { mutableStateOf(initialType.takeIf { it in docTypes } ?: docTypes[0]) }
     var expanded by remember { mutableStateOf(false) }
 
     // Custom

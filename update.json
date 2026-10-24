@@ -1,8 +1,8 @@
 {
-  "versionCode": 127,
-  "versionName": "1.2.7",
-  "releaseNotes": "v1.2.7: The Monthly tab opens on the current month when a project has no reports, variation orders take a real approval date, and the Google Drive backup button is hidden until Drive backup really works. Projects are still synced to every phone through the cloud.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.7/NHA_Monitor_v1.2.7_Build127.apk",
-  "apkSha256": "6121a222968ad7e9d9be651d0c27e2c7f73dc0820c82a75b3ea053b8cecd1f8f",
+  "versionCode": 128,
+  "versionName": "1.2.8",
+  "releaseNotes": "v1.2.8: Add variation orders straight from the Variation Orders Log on the Overview tab, and see new ones there right away while they are still Pending. Only Approved variation orders change the revised contract cost.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.8/NHA_Monitor_v1.2.8_Build128.apk",
+  "apkSha256": "cb1abea09a6698c0225a7562bd0370fae19ba299d0ba9099275c27561e950c75",
   "isMandatory": true
 }

@@ -41,7 +41,6 @@ fun ProjectDetailScreen(
     val isSyncing by viewModel.isSyncing.collectAsState()
     val project by viewModel.selectedProject.collectAsState()
     val timeExtensions by viewModel.timeExtensions.collectAsState()
-    val variationOrders by viewModel.variationOrders.collectAsState()
     val workSuspensionOrders by viewModel.workSuspensionOrders.collectAsState()
     val workResumptionLogs by viewModel.workResumptionLogs.collectAsState()
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
@@ -279,6 +278,7 @@ fun ProjectDetailScreen(
                         pendingDocuments = pendingDocuments,
                         currentUserRole = currentUser.role,
                         onEditProjectClick = { projectToEdit = currentProject },
+                        onAddVariationOrderClick = onAddVariationOrderClick,
                         onAddRelatedDocument = { name, status, remarks, fileUrl ->
                             viewModel.addRelatedDocument(currentProject.id, name, status, remarks, fileUrl)
                         },

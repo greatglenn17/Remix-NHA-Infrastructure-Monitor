@@ -478,11 +478,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val variationOrders: StateFlow<List<VariationOrder>> = _selectedProjectId.flatMapLatest { id ->
-        if (id == null) flowOf(emptyList()) else repository.getVariationOrders(id)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    @OptIn(ExperimentalCoroutinesApi::class)
     val workSuspensionOrders: StateFlow<List<WorkSuspensionOrder>> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getWorkSuspensionOrders(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1252,43 +1247,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 details = "Added Time Extension No. $extensionNo (+ $noOfDays days)",
                 oldValue = "Completion: ${p.completionDateOriginal}",
                 newValue = "Revised Completion: $computedRevisedDate"
-            )
-        }
-    }
-
-    fun addVariationOrder(
-        projectId: Long,
-        voNo: Int,
-        description: String,
-        costDifference: Double,
-        approvalDate: String,
-        remarks: String
-    ) {
-        viewModelScope.launch {
-            val currentCost = selectedProject.value?.contractCostRevised ?: 0.0
-            val newRevisedCost = currentCost + costDifference
-            val vo = VariationOrder(
-                projectId = projectId,
-                voNo = voNo,
-                description = description,
-                costDifference = costDifference,
-                revisedContractCost = newRevisedCost,
-                approvalDate = approvalDate,
-                remarks = remarks
-            )
-            projectDao.insertVariationOrder(vo)
-
-            selectedProject.value?.let { p ->
-                val updated = p.copy(contractCostRevised = newRevisedCost)
-                saveProjectChange(updated)
-            }
-
-            logAuditAction(
-                projectId = projectId,
-                actionType = "Project Edit",
-                details = "Added Variation Order VO-$voNo ($description)",
-                oldValue = "Cost: ₱$currentCost",
-                newValue = "Revised Cost: ₱$newRevisedCost"
             )
         }
     }

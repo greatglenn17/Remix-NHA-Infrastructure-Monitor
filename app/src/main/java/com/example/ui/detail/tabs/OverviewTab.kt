@@ -39,6 +39,7 @@ fun OverviewTab(
     pendingDocuments: List<PendingDocument>,
     currentUserRole: UserRole,
     onEditProjectClick: () -> Unit = {},
+    onAddVariationOrderClick: () -> Unit = {},
     onAddRelatedDocument: (documentName: String, status: String, remarks: String, fileUrl: String) -> Unit = { _, _, _, _ -> },
     onUpdateDocumentFileUrl: (doc: PendingDocument, fileUrl: String) -> Unit = { _, _ -> },
     onDeleteDocument: (Long) -> Unit = {}
@@ -579,12 +580,13 @@ fun OverviewTab(
 
         // Variation Orders Log
         item {
-            val voLogs = pendingDocuments.filter { it.documentName.contains("Variation Order", ignoreCase = true) && (it.status.equals("Approved", ignoreCase = true) || it.status.equals("Submitted", ignoreCase = true)) }
+            // Pending ones are listed too so a newly added order shows up; only Approved ones change the revised cost.
+            val voLogs = pendingDocuments.filter { it.documentName.contains("Variation Order", ignoreCase = true) }
             LogCardHeader(
                 title = "Variation Orders Log (${voLogs.size})",
                 icon = Icons.Default.ReceiptLong,
-                showAddButton = false,
-                onAddClick = {},
+                showAddButton = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT),
+                onAddClick = onAddVariationOrderClick,
                 testTag = "add_variation_button"
             ) {
                 if (voLogs.isEmpty()) {
