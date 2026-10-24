@@ -50,6 +50,7 @@ object Attachments {
     const val MAX_BYTES = 20L * 1024 * 1024
 
     private const val TAG = "Attachments"
+    private const val MOVED_FROM = "movedFrom"
     private const val DIR = "attachments"
     private const val JPEG_QUALITY = 85
     /** Files must be at least this old before an unreferenced one is cleaned up, so a form still open keeps its picks. */
@@ -288,8 +289,27 @@ object Attachments {
             }
         } else {
             val file = File(dir(context), name)
-            if (!file.exists()) return
+            if (!file.exists() && !fetchMovedCopy(event, name, file)) return
             cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
+        }
+    }
+
+    /**
+     * For a file moved to another project ([moveProjectRefs]) that this phone has no copy of,
+     * downloads the copy at the old project's path into [file]. False when there is none to get
+     * (never uploaded, or not readable by this account), so the event is dropped, not retried.
+     */
+    private suspend fun fetchMovedCopy(event: SyncOutboxEvent, name: String, file: File): Boolean {
+        val oldProject = runCatching { org.json.JSONObject(event.payloadJson).optString(MOVED_FROM) }.getOrNull()
+        if (oldProject.isNullOrEmpty() || !projectUuidPattern.matches(oldProject)) return false
+        val part = File(file.parentFile, "$name.part")
+        return try {
+            FirebaseStorage.getInstance().reference.child(storagePath(oldProject, name)).getFile(part).await()
+            part.renameTo(file)
+        } catch (e: StorageException) {
+            part.delete()
+            if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
+            false
         }
     }
 
@@ -308,15 +328,22 @@ object Attachments {
      * the cloud copies (and through them other phones) get the new references. The project's
      * own photo column has no trigger and is only rewritten here.
      *
-     * The files follow: uploads not done yet are re-keyed to the new project, and files this
-     * phone already uploaded are queued once more, so a copy exists at the new Storage path
+     * The files follow: uploads not done yet are re-keyed to the new project, and every other
+     * moved file is queued once more, so a copy exists at the new Storage path. That includes
+     * files another phone uploaded; [upload] fetches the old copy first when this phone has none
      * (the old copy is left where it is).
      */
     fun moveProjectRefs(sql: androidx.sqlite.db.SupportSQLiteDatabase, oldUuid: String, newUuid: String) {
         if (oldUuid == newUuid || !projectUuidPattern.matches(oldUuid) || !projectUuidPattern.matches(newUuid)) return
         val from = "$SCHEME:$oldUuid/"
         val to = "$SCHEME:$newUuid/"
+        val movedNames = linkedSetOf<String>()
         for ((table, column) in referencingColumns) {
+            sql.query("SELECT `$column` FROM `$table` WHERE instr(`$column`, ?) > 0", arrayOf<Any>(from)).use { c ->
+                while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { ref ->
+                    split(ref)?.let { (project, name) -> if (project == oldUuid) movedNames.add(name) }
+                }
+            }
             sql.execSQL(
                 "UPDATE `$table` SET `$column` = REPLACE(`$column`, ?, ?) WHERE instr(`$column`, ?) > 0",
                 arrayOf(from, to, from)
@@ -327,15 +354,18 @@ object Attachments {
         val newPrefix = "$newUuid/"
         val rest = oldPrefix.length + 1
         val isOld = "entityType = '$ENTITY_TYPE' AND operation = 'UPSERT' AND substr(entityUuid, 1, ${oldPrefix.length}) = ?"
-        sql.execSQL(
-            "INSERT INTO sync_outbox (eventId, entityType, entityUuid, operation, revision, payloadJson, createdAt, attemptCount, state, lastError) " +
-                "SELECT lower(hex(randomblob(16))), '$ENTITY_TYPE', moved, 'UPSERT', 1, '{}', ?, 0, '${SyncOutboxEvent.STATE_PENDING}', '' FROM (" +
-                "SELECT DISTINCT ? || substr(entityUuid, $rest) AS moved FROM sync_outbox " +
-                "WHERE $isOld AND state = '${SyncOutboxEvent.STATE_SYNCED}') " +
-                "WHERE NOT EXISTS (SELECT 1 FROM sync_outbox o WHERE o.entityType = '$ENTITY_TYPE' AND o.operation = 'UPSERT' " +
-                "AND o.state != '${SyncOutboxEvent.STATE_SYNCED}' AND (o.entityUuid = moved OR o.entityUuid = ? || substr(moved, ${newPrefix.length + 1})))",
-            arrayOf<Any>(System.currentTimeMillis(), newPrefix, oldPrefix, oldPrefix)
-        )
+        // Every moved file needs a copy at the new path, including ones another phone uploaded:
+        // the payload names the old project so [upload] can fetch that copy when this phone has none.
+        val payload = org.json.JSONObject().put(MOVED_FROM, oldUuid).toString()
+        for (name in movedNames) {
+            sql.execSQL(
+                "INSERT INTO sync_outbox (eventId, entityType, entityUuid, operation, revision, payloadJson, createdAt, attemptCount, state, lastError) " +
+                    "SELECT lower(hex(randomblob(16))), '$ENTITY_TYPE', ?, 'UPSERT', 1, ?, ?, 0, '${SyncOutboxEvent.STATE_PENDING}', '' " +
+                    "WHERE NOT EXISTS (SELECT 1 FROM sync_outbox WHERE entityType = '$ENTITY_TYPE' AND operation = 'UPSERT' " +
+                    "AND state != '${SyncOutboxEvent.STATE_SYNCED}' AND entityUuid IN (?, ?))",
+                arrayOf<Any>(newPrefix + name, payload, System.currentTimeMillis(), newPrefix + name, oldPrefix + name)
+            )
+        }
         sql.execSQL(
             "UPDATE sync_outbox SET entityUuid = ? || substr(entityUuid, $rest) WHERE $isOld AND state != '${SyncOutboxEvent.STATE_SYNCED}'",
             arrayOf<Any>(newPrefix, oldPrefix)

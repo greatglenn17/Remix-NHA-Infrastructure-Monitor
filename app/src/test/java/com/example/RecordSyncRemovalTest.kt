@@ -193,8 +193,10 @@ class RecordSyncRemovalTest {
         val pending = "${fileId()}.pdf"
         val uploaded = "${fileId()}.jpg"
         val legacy = "nhafile:${fileId()}.jpg"
+        val fromOtherPhone = "${fileId()}.jpg"
         val doc = PendingDocument(projectId = id, documentName = "Scan", fileUrl = "nhafile:$old/$pending")
         db.projectDao().insertPendingDocument(doc)
+        db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "Downloaded", fileUrl = "nhafile:$old/$fromOtherPhone"))
         sql.execSQL("UPDATE projects SET latestUpdatePhotoUrl = ? WHERE id = ?", arrayOf<Any>("nhafile:$old/$uploaded", id))
         db.syncOutboxDao().enqueue(SyncOutboxEvent(entityType = Attachments.ENTITY_TYPE, entityUuid = "$old/$uploaded", operation = "UPSERT", revision = 1, payloadJson = "{}"))
         db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "Old", fileUrl = legacy))
@@ -214,7 +216,10 @@ class RecordSyncRemovalTest {
         assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:pending_documents' AND entityUuid = ? AND state = 'PENDING'", doc.uuid))
         assertEquals("open upload re-keyed", 1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", "$new/$pending"))
         assertEquals("already uploaded file queued under the new project", 1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", "$new/$uploaded"))
-        assertEquals("no open upload left on the old path", 0, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'file' AND entityUuid LIKE ? AND state != 'SYNCED'", "$old/%"))
+        assertEquals("another phone's file is queued too, naming the old project", 1,
+            count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING' AND payloadJson LIKE ?", "$new/$fromOtherPhone", "%$old%"))
+        assertEquals("the open upload is not queued twice", 1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'file' AND entityUuid = ?", "$new/$pending"))
+        assertEquals("no open upload left on the old path", 0,count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'file' AND entityUuid LIKE ? AND state != 'SYNCED'", "$old/%"))
     }
 
     @Test
