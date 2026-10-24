@@ -3,6 +3,8 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+// Same region as the Firestore database, so triggers do not cross regions.
+const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
 // taken from the client-written profile: only SUPER_ADMIN_EMAIL receives it.
@@ -12,7 +14,7 @@ const SELF_ASSIGNABLE_ROLES = ["ENGINEER_ADMIN", "FIELD_ENGINEER", "VIEWER"];
  * Triggered whenever a user profile is created or updated in Firestore users/{uid}.
  * Automatically mints authoritative custom claims in Firebase Auth.
  */
-exports.syncUserCustomClaims = functions.firestore
+exports.syncUserCustomClaims = functions.region(REGION).firestore
   .document("users/{uid}")
   .onWrite(async (change, context) => {
     const uid = context.params.uid;
@@ -50,7 +52,7 @@ exports.syncUserCustomClaims = functions.firestore
  * Triggered whenever a project is created or updated in Firestore projects/{projectId}.
  * Sends FCM push notification to ALL other authenticated devices for real-time sync awareness.
  */
-exports.notifyOnProjectWrite = functions.firestore
+exports.notifyOnProjectWrite = functions.region(REGION).firestore
   .document("projects/{projectId}")
   .onWrite(async (change, context) => {
     const projectId = context.params.projectId;
