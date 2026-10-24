@@ -6,20 +6,30 @@ import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.ProjectDuplicateMerger
 import com.example.data.local.RecordSyncSchema
+import com.example.data.model.AssignedUids
 import com.example.data.model.Project
 import com.example.data.model.SyncOutboxEvent
 import com.example.util.AppNotificationManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +57,9 @@ class FirestoreSyncManager(
     private val _syncStatus = MutableStateFlow<FirestoreSyncStatus>(FirestoreSyncStatus.Idle)
     private var projectListener: ListenerRegistration? = null
     private var recordListener: ListenerRegistration? = null
+    /** Reads the role, then attaches the listeners; replaced on every start. */
+    private var listenerJob: Job? = null
+    private val listenerLock = Any()
     private val recordSync = RecordSync(db)
     private var authStateListener: FirebaseAuth.AuthStateListener? = null
     private val reconcileMutex = Mutex()
@@ -86,6 +99,8 @@ class FirestoreSyncManager(
 
     /**
      * Start real-time Firestore synchronization listeners for cross-device updates.
+     * The Super Admin listens to every project and record; everyone else only to those
+     * assigned to their account, so the role is read before the listeners are attached.
      */
     fun startRealtimeSync() {
         val currentUser = auth.currentUser
@@ -96,9 +111,41 @@ class FirestoreSyncManager(
 
         stopRealtimeSync()
 
-        Log.d(tag, "Starting Firestore realtime listener for projects (User: ${currentUser.uid})...")
+        // Assigned under the lock, so a stop that follows always finds and cancels it.
+        synchronized(listenerLock) { listenerJob = scope.launch(Dispatchers.IO) {
+            var wait = 2_000L
+            var superAdmin: Boolean? = null
+            while (superAdmin == null) {
+                try {
+                    superAdmin = AssignmentPolicy.isSuperAdmin(roleOf(currentUser))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Guessing the role could filter a Super Admin's listeners, so wait for the token.
+                    Log.w(tag, "Could not read the account role; retrying in ${wait / 1000}s: ${e.message}")
+                    delay(wait)
+                    wait = (wait * 2).coerceAtMost(60_000L)
+                }
+            }
+            synchronized(listenerLock) {
+                if (!isActive) return@launch
+                attachListeners(currentUser.uid, superAdmin == true)
+            }
+        } }
+    }
+
+    /** The account's role custom claim from the cached ID token (refreshed when it has expired). */
+    private suspend fun roleOf(user: FirebaseUser): String? =
+        user.getIdToken(false).await().claims["role"] as? String
+
+    private fun attachListeners(uid: String, superAdmin: Boolean) {
+        fun scoped(collection: String): Query = firestore.collection(collection).let {
+            if (superAdmin) it else it.whereArrayContains("assignedUids", uid)
+        }
+
+        Log.d(tag, "Starting Firestore realtime listener for projects (User: $uid, all projects: $superAdmin)...")
         hasServerSnapshot = false
-        projectListener = firestore.collection("projects")
+        projectListener = scoped("projects")
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshots, e ->
                 if (e != null) {
                     Log.w(tag, "Firestore listen failed.", e)
@@ -112,7 +159,7 @@ class FirestoreSyncManager(
                 scope.launch(Dispatchers.IO) {
                     reconcileMutex.withLock {
                         try {
-                            reconcile(docs, fromServer, currentUser.uid)
+                            reconcile(docs, fromServer, uid, superAdmin)
                         } catch (ex: Exception) {
                             Log.e(tag, "Error reconciling Firestore projects", ex)
                         }
@@ -121,7 +168,7 @@ class FirestoreSyncManager(
             }
 
         // Reports, documents, issues and payments: only changed documents are applied.
-        recordListener = firestore.collection("records")
+        recordListener = scoped("records")
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
                     Log.w(tag, "Firestore records listen failed.", e)
@@ -146,9 +193,11 @@ class FirestoreSyncManager(
     /**
      * Line local projects up with the cloud: adopt the cloud uuid for projects that
      * already exist under another uuid, insert new ones, apply newer revisions, and
-     * upload local projects the cloud has never seen.
+     * upload local projects the cloud has never seen. For everyone but the Super Admin
+     * the snapshot holds only their assigned projects, so a local project missing from it
+     * may instead have been unassigned; see [handleMissingProject].
      */
-    private suspend fun reconcile(docs: List<DocumentSnapshot>, fromServer: Boolean, myUid: String) {
+    private suspend fun reconcile(docs: List<DocumentSnapshot>, fromServer: Boolean, myUid: String, isSuperAdmin: Boolean) {
         ProjectDuplicateMerger.merge(db)
 
         val projectDao = db.projectDao()
@@ -213,6 +262,7 @@ class FirestoreSyncManager(
                         updatedAt = updatedAt,
                         createdByUid = doc.getString("createdByUid").orEmpty(),
                         updatedByUid = doc.getString("updatedByUid").orEmpty(),
+                        assignedUids = remoteAssignedUids(doc) ?: "",
                         isDeleted = false
                     )
                     projectDao.insertProject(newProj)
@@ -248,11 +298,13 @@ class FirestoreSyncManager(
                         revision = revision,
                         updatedAt = updatedAt,
                         updatedByUid = doc.getString("updatedByUid") ?: localProject.updatedByUid,
+                        assignedUids = remoteAssignedUids(doc) ?: localProject.assignedUids,
                         isDeleted = false
                     )
                     projectDao.updateProject(updatedProj)
                     Log.d(tag, "Updated local project from remote revision $revision: $name")
                 }
+                if (localProject != null) adoptAssignedUids(localProject, doc, isSuperAdmin)
             } catch (ex: Exception) {
                 Log.e(tag, "Error processing remote Firestore document", ex)
             }
@@ -263,10 +315,14 @@ class FirestoreSyncManager(
         if (fromServer) {
             for (uuid in plan.uploadLocal) {
                 val project = projectDao.getProjectByUuid(uuid) ?: continue
-                enqueueProjectEvent(uuid, "CREATE", project.revision)
+                if (isSuperAdmin) {
+                    enqueueProjectEvent(uuid, "CREATE", project.revision)
+                } else {
+                    handleMissingProject(project, myUid)
+                }
             }
             if (plan.uploadLocal.isNotEmpty()) {
-                Log.d(tag, "Queued ${plan.uploadLocal.size} local projects that were never uploaded")
+                Log.d(tag, "Checked ${plan.uploadLocal.size} local projects missing from the cloud snapshot")
             }
             hasServerSnapshot = true
         }
@@ -288,10 +344,88 @@ class FirestoreSyncManager(
         )
     }
 
+    /** The document's assignedUids as stored locally (a JSON array), or null when it has none yet. */
+    private fun remoteAssignedUids(doc: DocumentSnapshot): String? {
+        if (!doc.contains("assignedUids")) return null
+        val list = (doc.get("assignedUids") as? List<*>).orEmpty().filterIsInstance<String>()
+        return AssignedUids.toJson(list)
+    }
+
+    /**
+     * Keeps the local list equal to the cloud's even when the revision did not change
+     * (the migration script and the Super Admin's edits set it), so records are uploaded
+     * with the list the rules expect. Only the Super Admin edits it, so only their unsent
+     * change is kept.
+     */
+    private suspend fun adoptAssignedUids(local: Project, doc: DocumentSnapshot, isSuperAdmin: Boolean) {
+        val remote = remoteAssignedUids(doc) ?: return
+        if (AssignedUids.parse(remote) == AssignedUids.parse(local.assignedUids) && local.assignedUids.isNotBlank()) return
+        if (isSuperAdmin && db.syncOutboxDao().hasPendingFor(local.projectUuid)) return
+        recordSync.setAssignedUidsLocally(local.projectUuid, remote)
+    }
+
+    /** What a direct server read says about a project missing from the listener's snapshot. */
+    private sealed class Probe {
+        object Missing : Probe()
+        data class Found(val assignedUidsJson: String) : Probe()
+        /** Not readable: unassigned under the new rules (or missing; the rules hide which). */
+        object Denied : Probe()
+        object Unknown : Probe()
+    }
+
+    private suspend fun probe(projectUuid: String): Probe = try {
+        val doc = firestore.collection("projects").document(projectUuid).get(Source.SERVER).await()
+        if (!doc.exists()) Probe.Missing else Probe.Found(remoteAssignedUids(doc) ?: "[]")
+    } catch (e: FirebaseFirestoreException) {
+        if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) Probe.Denied else Probe.Unknown
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Probe.Unknown
+    }
+
+    /**
+     * A non-admin's local project that a server snapshot of their assigned projects does
+     * not contain. Anything this phone still has to send keeps it here and queued (a
+     * project created on this phone is still uploaded). Otherwise the cloud is asked
+     * once: a listener can't deliver the change that unassigned the user, so the local
+     * list would still name them. An unassigned project is removed from this phone only.
+     */
+    private suspend fun handleMissingProject(project: Project, myUid: String) {
+        val pending = recordSync.hasPendingUpload(project.id, project.projectUuid)
+        val createdByMe = db.syncOutboxDao().isUnconfirmedCreate(project.projectUuid)
+        if (pending || createdByMe) {
+            enqueueProjectEvent(project.projectUuid, "CREATE", project.revision)
+            return
+        }
+        val list = when (val probe = probe(project.projectUuid)) {
+            Probe.Missing -> {
+                // Old rules: the cloud has never seen it, so upload it as before.
+                enqueueProjectEvent(project.projectUuid, "CREATE", project.revision)
+                return
+            }
+            is Probe.Found -> probe.assignedUidsJson.also {
+                if (it != project.assignedUids) recordSync.setAssignedUidsLocally(project.projectUuid, it)
+            }
+            Probe.Denied -> "[]"
+            Probe.Unknown -> return
+        }
+        if (AssignmentPolicy.shouldRemoveLocally(false, myUid, list, inServerSnapshot = false, hasPendingUpload = false, createdByMe = false)) {
+            val files = recordSync.attachmentNamesOf(project.id)
+            recordSync.removeProjectLocally(project.id)
+            // Deleted here, without queuing anything: the garbage collector would also delete
+            // the cloud copies of files nothing refers to, and they still belong to the project.
+            files.forEach { Attachments.fileForName(context, it)?.delete() }
+            Log.d(tag, "Removed unassigned project ${project.projectUuid} from this phone")
+        }
+    }
+
     /**
      * Stop real-time Firestore listeners.
      */
-    fun stopRealtimeSync() {
+    fun stopRealtimeSync() = synchronized(listenerLock) {
+        listenerJob?.cancel()
+        listenerJob = null
         projectListener?.remove()
         projectListener = null
         recordListener?.remove()
@@ -307,17 +441,37 @@ class FirestoreSyncManager(
             return@withContext Result.failure(IllegalStateException("User is not authenticated with Firebase."))
         }
 
-        val pending = db.syncOutboxDao().pendingEventsList()
+        // Projects first: a record (or file) is only accepted once its project exists in the cloud.
+        val pending = db.syncOutboxDao().pendingEventsList().sortedBy { if (it.entityType == "project") 0 else 1 }
         if (pending.isEmpty()) {
             return@withContext Result.success(0)
         }
 
+        val role = try {
+            roleOf(currentUser)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Without the role the upload can't be shaped for the rules; everything stays queued.
+            Log.w(tag, "Could not read the account role; outbox left for the next sync", e)
+            return@withContext Result.failure(e)
+        }
+        val superAdmin = AssignmentPolicy.isSuperAdmin(role)
+        val canWrite = AssignmentPolicy.canWrite(role)
+
         _syncStatus.value = FirestoreSyncStatus.Syncing
         var syncedCount = 0
         val uploadedRecords = mutableSetOf<String>()
+        /** Records whose project has no assigned accounts on this phone yet; they wait for the next flush. */
+        val waitingRecords = mutableSetOf<String>()
 
         for (event in pending) {
             try {
+                if (!canWrite && (event.entityType == "project" || event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX))) {
+                    // A Viewer can't write projects or records; the change stays on this phone only.
+                    db.syncOutboxDao().markSynced(event.eventId)
+                    continue
+                }
                 if (event.entityType == "project") {
                     val project = db.projectDao().getProjectByUuid(event.entityUuid)
                     if (project != null) {
@@ -350,10 +504,7 @@ class FirestoreSyncManager(
                             "isDeleted" to (event.operation == "DELETE" || project.isDeleted)
                         )
 
-                        firestore.collection("projects")
-                            .document(project.projectUuid)
-                            .set(data, SetOptions.merge())
-                            .await()
+                        uploadProject(project, data, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)
                         syncedCount++
@@ -365,10 +516,18 @@ class FirestoreSyncManager(
                             "updatedAt" to System.currentTimeMillis(),
                             "updatedByUid" to currentUser.uid
                         )
-                        firestore.collection("projects")
-                            .document(event.entityUuid)
-                            .set(deleteData, SetOptions.merge())
-                            .await()
+                        val ref = firestore.collection("projects").document(event.entityUuid)
+                        if (superAdmin) {
+                            ref.set(deleteData, SetOptions.merge()).await()
+                        } else {
+                            // update() never creates a document, so no tombstone without assignedUids.
+                            try {
+                                ref.update(deleteData).await()
+                            } catch (e: FirebaseFirestoreException) {
+                                // Never reached the cloud: nothing there to mark deleted.
+                                if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw e
+                            }
+                        }
 
                         db.syncOutboxDao().markSynced(event.eventId)
                         syncedCount++
@@ -379,27 +538,35 @@ class FirestoreSyncManager(
                     }
                 } else if (event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX)) {
                     // Every event uploads the row as it is now, so one upload per record covers the rest.
+                    if (event.entityUuid in waitingRecords) continue
                     if (event.entityUuid !in uploadedRecords) {
                         val table = event.entityType.removePrefix(RecordSyncSchema.ENTITY_PREFIX)
                         val doc = recordSync.buildDocument(table, event.entityUuid, currentUser.uid)
                         val record = firestore.collection("records").document(event.entityUuid)
                         if (doc != null) {
+                            if (!superAdmin && (doc["assignedUids"] as? List<*>).isNullOrEmpty()) {
+                                // The rules need the project's list, which hasn't reached this phone yet.
+                                waitingRecords.add(event.entityUuid)
+                                continue
+                            }
                             record.set(doc).await()
                             uploadedRecords.add(event.entityUuid)
                         } else if (event.operation == "DELETE") {
                             val projectUuid = org.json.JSONObject(event.payloadJson).optString("projectUuid")
-                            record.set(
-                                hashMapOf<String, Any>(
-                                    "uuid" to event.entityUuid,
-                                    "type" to table,
-                                    "projectUuid" to projectUuid,
-                                    "revision" to event.revision,
-                                    "isDeleted" to true,
-                                    "updatedAt" to System.currentTimeMillis(),
-                                    "updatedByUid" to currentUser.uid
-                                ),
-                                SetOptions.merge()
-                            ).await()
+                            val tombstone = hashMapOf<String, Any>(
+                                "uuid" to event.entityUuid,
+                                "type" to table,
+                                "projectUuid" to projectUuid,
+                                "revision" to event.revision,
+                                "isDeleted" to true,
+                                "updatedAt" to System.currentTimeMillis(),
+                                "updatedByUid" to currentUser.uid
+                            )
+                            // Merged, so without a local list the stored record keeps its own.
+                            recordSync.assignedUidsOf(projectUuid)?.takeIf { it.isNotBlank() }?.let {
+                                tombstone["assignedUids"] = AssignedUids.parse(it)
+                            }
+                            record.set(tombstone, SetOptions.merge()).await()
                             uploadedRecords.add(event.entityUuid)
                         }
                         syncedCount++
@@ -419,6 +586,31 @@ class FirestoreSyncManager(
         _syncStatus.value = FirestoreSyncStatus.Synced()
         Result.success(syncedCount)
     }
+    }
+
+    /**
+     * Writes a project document. The Super Admin sends the whole document including
+     * `assignedUids`. Anyone else updates it without touching the list, and creates it,
+     * naming only themselves, when it doesn't exist yet. The new rules may report a missing
+     * document as PERMISSION_DENIED (the update rule reads the stored list), so that also
+     * falls back to the create, which they only allow for a missing document anyway.
+     */
+    private suspend fun uploadProject(project: Project, data: Map<String, Any>, superAdmin: Boolean, uid: String) {
+        val ref: DocumentReference = firestore.collection("projects").document(project.projectUuid)
+        if (superAdmin) {
+            val list = AssignmentPolicy.projectUploadFields(true, exists = true, myUid = uid, localAssignedUids = project.assignedUids)
+            ref.set(if (list == null) data else data + ("assignedUids" to list), SetOptions.merge()).await()
+            return
+        }
+        try {
+            ref.update(data).await()
+        } catch (e: FirebaseFirestoreException) {
+            if (e.code != FirebaseFirestoreException.Code.NOT_FOUND && e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
+            val list = AssignmentPolicy.projectUploadFields(false, exists = false, myUid = uid, localAssignedUids = project.assignedUids)!!
+            ref.set(data + ("assignedUids" to list)).await()
+            // The records uploaded next must carry the same list as the project.
+            recordSync.setAssignedUidsLocally(project.projectUuid, AssignedUids.toJson(list))
+        }
     }
 
     /**

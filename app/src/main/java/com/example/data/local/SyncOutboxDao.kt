@@ -31,6 +31,13 @@ interface SyncOutboxDao {
     @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityUuid = :entityUuid AND state IN ('PENDING', 'FAILED'))")
     suspend fun hasPendingFor(entityUuid: String): Boolean
 
+    /** True for a project this phone queued as new whose upload the cloud has not confirmed yet. */
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityType = 'project' AND entityUuid = :projectUuid AND operation = 'CREATE') " +
+            "AND NOT EXISTS(SELECT 1 FROM sync_outbox WHERE entityType = 'project' AND entityUuid = :projectUuid AND state = 'SYNCED')"
+    )
+    suspend fun isUnconfirmedCreate(projectUuid: String): Boolean
+
     /** The `entityUuid` this phone queued when it added the named attachment file (carries the project), or null. */
     @Query("SELECT entityUuid FROM sync_outbox WHERE entityType = 'file' AND operation = 'UPSERT' AND (entityUuid = :name OR entityUuid LIKE '%/' || :name) LIMIT 1")
     suspend fun fileEntityFor(name: String): String?
