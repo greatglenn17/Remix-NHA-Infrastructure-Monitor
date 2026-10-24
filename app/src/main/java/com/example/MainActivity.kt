@@ -286,8 +286,8 @@ class MainActivity : ComponentActivity() {
                         selectedProjectId?.let { pId ->
                             AddVariationOrderDialog(
                                 onDismiss = { showAddVariationOrderDialog = false },
-                                onSubmit = { voNo, desc, costDiff, remarks ->
-                                    viewModel.addVariationOrder(pId, voNo, desc, costDiff, remarks)
+                                onSubmit = { voNo, desc, costDiff, approvalDate, remarks ->
+                                    viewModel.addVariationOrder(pId, voNo, desc, costDiff, approvalDate, remarks)
                                     showAddVariationOrderDialog = false
                                 }
                             )

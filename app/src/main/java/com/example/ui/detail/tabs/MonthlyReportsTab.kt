@@ -31,11 +31,16 @@ fun MonthlyReportsTab(
     onDeleteMonthlyReportClick: (MonthlyReport) -> Unit,
     onSignOffClick: (MonthlyReport, String, String, String) -> Unit
 ) {
+    // With no reports yet, start on the current month rather than a fixed one.
+    val currentMonth = remember {
+        val today = java.time.LocalDate.now()
+        today.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) + " " + today.year
+    }
     val availableMonths = remember(monthlyReports, weeklyReports) {
         val monthsFromMonthly = monthlyReports.map { it.reportingMonth }
         val monthsFromWeekly = weeklyReports.mapNotNull { rep ->
             val clean = rep.reportingWeek.replace(Regex("Week \\d+: "), "")
-            val yearMatch = Regex("\\b(20\\d{2})\\b").find(clean)?.value ?: "2026"
+            val yearMatch = Regex("\\b(20\\d{2})\\b").find(clean)?.value ?: currentMonth.substringAfter(" ")
             val monthNames = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
             val shortMonthNames = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
             var foundMonth: String? = null
@@ -47,11 +52,11 @@ fun MonthlyReportsTab(
             }
             foundMonth
         }
-        (monthsFromMonthly + monthsFromWeekly).distinct().filter { it.isNotBlank() }.ifEmpty { listOf("June 2026") }
+        (monthsFromMonthly + monthsFromWeekly).distinct().filter { it.isNotBlank() }.ifEmpty { listOf(currentMonth) }
     }
 
     var selectedMonth by remember(availableMonths) {
-        mutableStateOf(availableMonths.firstOrNull() ?: "June 2026")
+        mutableStateOf(availableMonths.firstOrNull() ?: currentMonth)
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
 

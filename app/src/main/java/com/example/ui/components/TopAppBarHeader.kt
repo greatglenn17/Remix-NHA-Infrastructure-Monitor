@@ -230,6 +230,7 @@ fun TopAppBarHeader(
                                 isSpinning = false
                             )
 
+                            // No screen passes this until Google Drive sign-in is implemented, so the badge stays hidden.
                             if (onOpenDriveSync != null) {
                                 HeaderBadge(
                                     text = "MANUAL BACKUP",

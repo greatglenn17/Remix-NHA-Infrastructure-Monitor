@@ -57,11 +57,15 @@ fun AddTimeExtensionDialog(
 @Composable
 fun AddVariationOrderDialog(
     onDismiss: () -> Unit,
-    onSubmit: (voNo: Int, desc: String, costDiff: Double, remarks: String) -> Unit
+    onSubmit: (voNo: Int, desc: String, costDiff: Double, approvalDate: String, remarks: String) -> Unit
 ) {
     var voNo by remember { mutableStateOf("1") }
     var desc by remember { mutableStateOf("Additional works") }
     var costDiff by remember { mutableStateOf("100000.0") }
+    var approvalDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    val approvalDateValid = remember(approvalDate) {
+        try { LocalDate.parse(approvalDate.trim(), DateTimeFormatter.ISO_LOCAL_DATE); true } catch (_: DateTimeParseException) { false }
+    }
     var remarks by remember { mutableStateOf("Approved") }
 
     AlertDialog(
@@ -77,11 +81,21 @@ fun AddVariationOrderDialog(
                 OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") })
                 OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Description") })
                 OutlinedTextField(value = costDiff, onValueChange = { costDiff = it }, label = { Text("Cost Difference") })
+                OutlinedTextField(
+                    value = approvalDate,
+                    onValueChange = { approvalDate = it },
+                    label = { Text("Approval Date (YYYY-MM-DD)") },
+                    isError = !approvalDateValid,
+                    supportingText = if (approvalDateValid) null else { { Text("Use the format YYYY-MM-DD") } }
+                )
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") })
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(voNo.toIntOrNull()?:1, desc, costDiff.toDoubleOrNull()?:0.0, remarks) }) {
+            Button(
+                enabled = approvalDateValid,
+                onClick = { onSubmit(voNo.toIntOrNull()?:1, desc, costDiff.toDoubleOrNull()?:0.0, approvalDate.trim(), remarks) }
+            ) {
                 Text("Save")
             }
         },

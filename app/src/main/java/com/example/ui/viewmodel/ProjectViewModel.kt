@@ -1261,6 +1261,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         voNo: Int,
         description: String,
         costDifference: Double,
+        approvalDate: String,
         remarks: String
     ) {
         viewModelScope.launch {
@@ -1272,7 +1273,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 description = description,
                 costDifference = costDifference,
                 revisedContractCost = newRevisedCost,
-                approvalDate = "2026-08-01",
+                approvalDate = approvalDate,
                 remarks = remarks
             )
             projectDao.insertVariationOrder(vo)

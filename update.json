@@ -1,8 +1,8 @@
 {
-  "versionCode": 126,
-  "versionName": "1.2.6",
-  "releaseNotes": "v1.2.6: Deleting a project now removes it on every phone, edits sync to the cloud right away, weekly reports show the real elapsed and remaining days, the weekly form no longer starts with sample data, and editing a weekly report keeps its manpower, equipment, issues and activities.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.6/NHA_Monitor_v1.2.6_Build126.apk",
-  "apkSha256": "5e554504089ac6362259f19517ba5272ced09977f0a79e9cc28621fff49ebc3b",
+  "versionCode": 127,
+  "versionName": "1.2.7",
+  "releaseNotes": "v1.2.7: The Monthly tab opens on the current month when a project has no reports, variation orders take a real approval date, and the Google Drive backup button is hidden until Drive backup really works. Projects are still synced to every phone through the cloud.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.7/NHA_Monitor_v1.2.7_Build127.apk",
+  "apkSha256": "6121a222968ad7e9d9be651d0c27e2c7f73dc0820c82a75b3ea053b8cecd1f8f",
   "isMandatory": true
 }

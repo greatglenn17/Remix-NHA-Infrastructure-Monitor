@@ -29,7 +29,6 @@ import com.example.data.model.ProjectStatus
 import com.example.data.model.UserRole
 import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
-import com.example.ui.dialogs.GoogleDriveSyncDialog
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ProjectViewModel
 import java.text.NumberFormat
@@ -54,16 +53,9 @@ fun DashboardScreen(
     val allPendingDocs by viewModel.allPendingDocuments.collectAsState()
     val summaryStats by viewModel.dashboardSummaryStats.collectAsState()
 
-    val isDriveSyncing by viewModel.isDriveSyncing.collectAsState()
-    val lastDriveSyncTime by viewModel.lastDriveSyncTime.collectAsState()
-    val isAutoSyncEnabled by viewModel.isAutoSyncEnabled.collectAsState()
-    val driveAccountEmail by viewModel.driveAccountEmail.collectAsState()
-    val driveSyncStatusMessage by viewModel.driveSyncStatusMessage.collectAsState()
-
     var showSortMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
     var showTypeMenu by remember { mutableStateOf(false) }
-    var showGoogleDriveDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var projectToDelete by remember { mutableStateOf<Long?>(null) }
     var projectToEdit by remember { mutableStateOf<Project?>(null) }
@@ -81,7 +73,6 @@ fun DashboardScreen(
                 currentUser = currentUser,
                 onSwitchUser = { viewModel.switchUserAccount(it) },
                 isSyncing = isSyncing,
-                onOpenDriveSync = { showGoogleDriveDialog = true },
                 onEditProfileClick = { showEditProfileDialog = true },
                 onSignOut = { viewModel.signOutUser() },
                 unreadNotificationCount = unreadCount,
@@ -535,20 +526,6 @@ fun DashboardScreen(
                 viewModel.updateUserProfile(name, position, office)
                 showEditProfileDialog = false
             }
-        )
-    }
-
-    if (showGoogleDriveDialog) {
-        GoogleDriveSyncDialog(
-            accountEmail = driveAccountEmail,
-            lastSyncTime = lastDriveSyncTime,
-            isSyncing = isDriveSyncing,
-            isAutoSyncEnabled = isAutoSyncEnabled,
-            statusMessage = driveSyncStatusMessage,
-            onDismiss = { showGoogleDriveDialog = false },
-            onBackupNow = { viewModel.backupToGoogleDrive() },
-            onRestoreNow = { viewModel.restoreFromGoogleDrive() },
-            onToggleAutoSync = { viewModel.toggleDriveAutoSync(it) }
         )
     }
 
