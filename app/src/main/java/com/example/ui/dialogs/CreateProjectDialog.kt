@@ -75,7 +75,7 @@ fun CreateProjectDialog(
     // Contract cost is auto-computed from scope items
     
     var durationText by remember { mutableStateOf("") }
-    var dateStarted by remember { mutableStateOf("2026-08-01") }
+    var dateStarted by remember { mutableStateOf(LocalDate.now().toString()) }
     
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {

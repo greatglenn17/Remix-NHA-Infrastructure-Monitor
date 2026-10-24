@@ -125,6 +125,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         firestoreSyncManager = FirestoreSyncManager(application, database, viewModelScope)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                com.example.data.local.SampleData.clearFromExistingRecords(application, database)
+            } catch (e: Exception) {
+                android.util.Log.w("ProjectViewModel", "Sample data cleanup failed", e)
+            }
+            try {
                 com.example.data.files.Attachments.migrateLegacy(application, database)
                 com.example.data.files.Attachments.collectGarbage(application, database)
             } catch (e: Exception) {
@@ -1081,16 +1086,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             firestoreSyncManager.flushOutbox()
 
-            // Seed default core document checklist for new project
-            val coreDocs = listOf(
-                PendingDocument(projectId = newId, documentName = "Contractor Notice to Proceed (NTP)", status = "Approved", remarks = "Issued", isCoreChecklist = true),
-                PendingDocument(projectId = newId, documentName = "PERT/CPM Schedule Approval", status = "Pending", remarks = "For review", isCoreChecklist = true),
-                PendingDocument(projectId = newId, documentName = "DOLE Approved Safety & Health Plan", status = "Submitted", remarks = "Awaiting DOLE clearance", isCoreChecklist = true),
-                PendingDocument(projectId = newId, documentName = "Environmental Compliance Certificate (ECC)", status = "Pending", remarks = "DENR processing", isCoreChecklist = true),
-                PendingDocument(projectId = newId, documentName = "Quality Control Material Testing Plan", status = "Pending", remarks = "For submission", isCoreChecklist = true),
-                PendingDocument(projectId = newId, documentName = "As-Built Plans & Turnover Docs", status = "Pending", remarks = "Completion stage requirement", isCoreChecklist = true)
-            )
-            coreDocs.forEach { projectDao.insertPendingDocument(it) }
+            // Seed the core document checklist; every item starts Pending with no remarks.
+            com.example.data.local.SampleData.CORE_CHECKLIST.forEach { docName ->
+                projectDao.insertPendingDocument(
+                    PendingDocument(projectId = newId, documentName = docName, status = "Pending", remarks = "", isCoreChecklist = true)
+                )
+            }
 
             logAuditAction(
                 projectId = newId,
@@ -1769,14 +1770,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     ) {
         viewModelScope.launch {
             val currentAccount = currentUserAccount.value
-            val timestamp = "2026-08-02 01:11"
-            val auditLogEntry = """{"role":"$roleType","name":"${currentAccount.name}","action":"$newStatus ($notes)","timestamp":"$timestamp"}"""
-
-            val updatedAudit = if (monthlyReport.auditTrailJson.isBlank()) {
-                "[$auditLogEntry]"
-            } else {
-                monthlyReport.auditTrailJson.dropLast(1) + ",$auditLogEntry]"
-            }
+            val timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            val trail = runCatching { org.json.JSONArray(monthlyReport.auditTrailJson) }.getOrDefault(org.json.JSONArray())
+            trail.put(
+                org.json.JSONObject()
+                    .put("role", roleType)
+                    .put("name", currentAccount.name)
+                    .put("action", "$newStatus ($notes)")
+                    .put("timestamp", timestamp)
+            )
+            val updatedAudit = trail.toString()
 
             val updatedReport = when (roleType) {
                 "ENGINEER" -> monthlyReport.copy(

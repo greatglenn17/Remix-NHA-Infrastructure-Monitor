@@ -814,7 +814,7 @@ fun AddRelatedDocumentDialog(
     var showPresetDropdown by remember { mutableStateOf(false) }
     var customDocName by remember { mutableStateOf("") }
     var categoryRef by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Approved") }
+    var status by remember { mutableStateOf("Pending") }
     var remarksText by remember { mutableStateOf("") }
     var fileUrl by remember { mutableStateOf("") }
     var showStatusDropdown by remember { mutableStateOf(false) }

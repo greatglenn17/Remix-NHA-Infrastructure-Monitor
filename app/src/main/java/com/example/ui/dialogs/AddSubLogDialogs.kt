@@ -20,12 +20,13 @@ fun AddTimeExtensionDialog(
     onDismiss: () -> Unit,
     onSubmit: (extNo: Int, days: Int, period: String, reason: String, revisedDate: String, remarks: String) -> Unit
 ) {
-    var extNo by remember { mutableStateOf("1") }
-    var days by remember { mutableStateOf("30") }
-    var period by remember { mutableStateOf("Aug 1 - Aug 30") }
-    var reason by remember { mutableStateOf("Weather") }
-    var revisedDate by remember { mutableStateOf("2026-09-01") }
-    var remarks by remember { mutableStateOf("Approved") }
+    var extNo by remember { mutableStateOf("") }
+    var days by remember { mutableStateOf("") }
+    var period by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    // Not entered here: the revised completion date is computed from the extension days.
+    val revisedDate = ""
+    var remarks by remember { mutableStateOf("") }
 
     AlertDialog(
         modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
@@ -59,11 +60,11 @@ fun AddWorkSuspensionDialog(
     onDismiss: () -> Unit,
     onSubmit: (name: String, effectivityDate: String, durationDays: Int, endDate: String, reason: String, remarks: String) -> Unit
 ) {
-    var name by remember { mutableStateOf("Order No. 2") }
-    var effectivityDate by remember { mutableStateOf("2026-08-01") }
-    var durationStr by remember { mutableStateOf("7") }
-    var reason by remember { mutableStateOf("Typhoon Signal No. 2 torrential rainfall") }
-    var remarks by remember { mutableStateOf("Work suspended until further notice") }
+    var name by remember { mutableStateOf("") }
+    var effectivityDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var durationStr by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    var remarks by remember { mutableStateOf("") }
 
     val endDate = remember(effectivityDate, durationStr) {
         try {
@@ -107,10 +108,10 @@ fun AddWorkResumptionDialog(
     onDismiss: () -> Unit,
     onSubmit: (name: String, dateResumed: String, reason: String, remarks: String) -> Unit
 ) {
-    var name by remember { mutableStateOf("Resumption Order No. 2") }
-    var dateResumed by remember { mutableStateOf("2026-08-05") }
-    var reason by remember { mutableStateOf("Weather condition cleared") }
-    var remarks by remember { mutableStateOf("Work resumed") }
+    var name by remember { mutableStateOf("") }
+    var dateResumed by remember { mutableStateOf(LocalDate.now().toString()) }
+    var reason by remember { mutableStateOf("") }
+    var remarks by remember { mutableStateOf("") }
 
     AlertDialog(
         modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),

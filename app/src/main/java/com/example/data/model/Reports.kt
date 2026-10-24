@@ -149,12 +149,13 @@ data class MonthlyReport(
     val workableDaysCount: Int,
     val cpesIssuesJson: String, // List of CpesIssue
     val recommendations: String,
-    val preparedByName: String = "Engr. Juan Dela Cruz",
-    val preparedByStatus: String = "Reviewed", // "Pending Review", "Reviewed", "Noted"
-    val checkedByName: String = "Engr. Roberto Santos",
-    val checkedByStatus: String = "Reviewed",
-    val notedByName: String = "Director Maria Perez",
-    val notedByStatus: String = "Noted",
+    // Sign-offs start empty; each is filled in by the person who signs.
+    val preparedByName: String = "",
+    val preparedByStatus: String = "Pending Review", // "Pending Review", "Reviewed", "Noted"
+    val checkedByName: String = "",
+    val checkedByStatus: String = "Pending Review",
+    val notedByName: String = "",
+    val notedByStatus: String = "Pending Review",
     val auditTrailJson: String = "", // Timestamps & approval notes
     val accomplishmentItemsJson: String = "[]", // List of AccomplishmentItem
     // Cross-device sync identity and version; see RecordSyncSchema.

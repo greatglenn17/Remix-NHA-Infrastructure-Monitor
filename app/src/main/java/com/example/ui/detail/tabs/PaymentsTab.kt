@@ -386,8 +386,8 @@ fun AddPaymentDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var dvNo by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("2026-08-31") }
-    var periodCovered by remember { mutableStateOf("August 1 - 31, 2026") }
+    var date by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
+    var periodCovered by remember { mutableStateOf(currentMonthPeriod()) }
     var amountStr by remember { mutableStateOf("") }
     var fileUrl by remember { mutableStateOf("") }
 
@@ -629,4 +629,11 @@ fun ViewDvScanDialog(
             }
         }
     )
+}
+
+/** This month as a payment period, e.g. "October 1 - 31, 2026". */
+private fun currentMonthPeriod(): String {
+    val today = java.time.LocalDate.now()
+    val month = today.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+    return "$month 1 - ${today.lengthOfMonth()}, ${today.year}"
 }
