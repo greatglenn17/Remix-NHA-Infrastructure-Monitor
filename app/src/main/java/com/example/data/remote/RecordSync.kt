@@ -96,15 +96,16 @@ class RecordSync(private val db: AppDatabase) {
         val revision = (doc["revision"] as? Number)?.toLong() ?: 1L
         val isDeleted = doc["isDeleted"] == true
 
-        val local = sql.query("SELECT id, revision FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c ->
-            if (c.moveToFirst()) c.getLong(0) to c.getLong(1) else null
+        val remoteUpdatedAt = (doc["updatedAt"] as? Number)?.toLong() ?: 0L
+        val local = sql.query("SELECT id, revision, updatedAt FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c ->
+            if (c.moveToFirst()) Triple(c.getLong(0), c.getLong(1), c.getLong(2)) else null
         }
 
         if (isDeleted) {
             if (local != null) writeRemote { it.delete("`$table`", "id = ?", arrayOf(local.first)) }
             return true
         }
-        if (local != null && local.second >= revision) return true
+        if (local != null && !RemoteVersion.isNewer(local.second, local.third, revision, remoteUpdatedAt)) return true
 
         val projectId = sql.query(
             "SELECT id FROM projects WHERE projectUuid = ? LIMIT 1", arrayOf(doc["projectUuid"] as? String ?: "")
@@ -115,7 +116,7 @@ class RecordSync(private val db: AppDatabase) {
             put("projectId", projectId)
             put("uuid", uuid)
             put("revision", revision)
-            put("updatedAt", (doc["updatedAt"] as? Number)?.toLong() ?: System.currentTimeMillis())
+            put("updatedAt", remoteUpdatedAt)
         }
 
         writeRemote { w ->
@@ -148,6 +149,12 @@ class RecordSync(private val db: AppDatabase) {
             it.execSQL(
                 "UPDATE `$table` SET revision = ? WHERE uuid = ? AND revision <= ?",
                 arrayOf(remoteRevision + 1, doc["uuid"], remoteRevision)
+            )
+            // The upload already queued may have read the old revision; queue one more.
+            it.execSQL(
+                "INSERT INTO sync_outbox (eventId, entityType, entityUuid, operation, revision, payloadJson, createdAt, attemptCount, state, lastError) " +
+                    "VALUES (lower(hex(randomblob(16))), ?, ?, 'UPSERT', ?, '{}', ?, 0, 'PENDING', '')",
+                arrayOf(RecordSyncSchema.ENTITY_PREFIX + table, doc["uuid"], remoteRevision + 1, System.currentTimeMillis())
             )
         }
     }

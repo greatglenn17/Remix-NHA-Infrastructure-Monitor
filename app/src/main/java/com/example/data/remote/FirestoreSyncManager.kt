@@ -225,7 +225,11 @@ class FirestoreSyncManager(
                     }
                 } else if (localProject.revision > revision) {
                     enqueueProjectEvent(localProject.projectUuid, "UPDATE", localProject.revision)
-                } else if (revision > localProject.revision) {
+                } else if (
+                    // A doc without updatedAt can only be compared by revision.
+                    RemoteVersion.isNewer(localProject.revision, localProject.updatedAt, revision, doc.getLong("updatedAt") ?: localProject.updatedAt) &&
+                    (revision > localProject.revision || !db.syncOutboxDao().hasPendingFor(projectUuid))
+                ) {
                     // Remote version is newer — update local Room entity
                     val updatedProj = localProject.copy(
                         name = name,
