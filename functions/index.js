@@ -159,12 +159,17 @@ function assignedUidsKey(uids) {
 }
 
 /**
- * Triggered whenever a project is written. When its assignedUids change, copies the new
- * list onto every record of that project so Firestore rules can check access per record.
- * Only assignedUids is written: revision and updatedAt stay untouched so the app does not
- * treat this as a content edit.
+ * Triggered whenever a project is written. When its assignedUids change, copies the
+ * project's current list onto every record of that project so Firestore rules can check
+ * access per record. The list is re-read from the project document right before writing,
+ * so a retried or out-of-order event never writes a stale list. Only assignedUids is
+ * written: revision and updatedAt stay untouched so the app does not treat this as a
+ * content edit. Errors are rethrown so the event is retried (failurePolicy); the update
+ * is idempotent.
  */
-exports.syncProjectAssignmentToRecords = functions.region(REGION).firestore
+exports.syncProjectAssignmentToRecords = functions.region(REGION)
+  .runWith({ failurePolicy: true })
+  .firestore
   .document("projects/{projectId}")
   .onWrite(async (change, context) => {
     const projectId = context.params.projectId;
@@ -181,18 +186,24 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION).firestore
 
     try {
       const db = admin.firestore();
+      const current = await db.collection("projects").doc(projectId).get();
+      if (!current.exists) return null;
+      const assignedUids = current.data().assignedUids;
+      if (!Array.isArray(assignedUids)) return null;
+
       const snap = await db.collection("records").where("projectUuid", "==", projectId).get();
       const BATCH_SIZE = 400;
       for (let i = 0; i < snap.docs.length; i += BATCH_SIZE) {
         const batch = db.batch();
         snap.docs.slice(i, i + BATCH_SIZE).forEach((doc) => {
-          batch.update(doc.ref, { assignedUids: after.assignedUids });
+          batch.update(doc.ref, { assignedUids });
         });
         await batch.commit();
       }
       console.log(`Updated assignedUids on ${snap.size} records of project ${projectId}`);
     } catch (error) {
       console.error(`Failed to sync assignments to records of project ${projectId}:`, error);
+      throw error;
     }
 
     return null;

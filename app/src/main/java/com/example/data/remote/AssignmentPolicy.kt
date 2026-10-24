@@ -47,9 +47,14 @@ object AssignmentPolicy {
     fun recordUploadList(localAssignedUids: String): List<String>? =
         if (localAssignedUids.isBlank()) null else AssignedUids.parse(localAssignedUids)
 
-    /** Dashboard filter: the Super Admin sees every project, others only projects naming their uid. */
-    fun isVisible(isSuperAdmin: Boolean, myUid: String?, assignedUids: String): Boolean =
-        isSuperAdmin || (myUid != null && AssignedUids.contains(assignedUids, myUid))
+    /**
+     * Dashboard filter: the Super Admin sees every project, others only projects naming their
+     * uid. While the list is unknown on this phone ("", e.g. offline right after the 22 -> 23
+     * upgrade) the project's creator still sees it; a known list always decides.
+     */
+    fun isVisible(isSuperAdmin: Boolean, myUid: String?, assignedUids: String, createdByUid: String): Boolean =
+        isSuperAdmin || (!myUid.isNullOrBlank() &&
+            (AssignedUids.contains(assignedUids, myUid) || (assignedUids.isBlank() && createdByUid == myUid)))
 
     /** A missing role claim counts as a writer, as in the cloud rules. */
     fun canWrite(role: String?): Boolean = role != VIEWER

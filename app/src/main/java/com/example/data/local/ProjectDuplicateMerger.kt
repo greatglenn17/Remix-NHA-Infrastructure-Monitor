@@ -1,6 +1,7 @@
 package com.example.data.local
 
 import android.util.Log
+import com.example.data.files.Attachments
 import com.example.data.remote.ProjectReconciler
 
 /**
@@ -26,6 +27,7 @@ object ProjectDuplicateMerger {
         )
         if (merges.isEmpty()) return 0
 
+        val uuidOf = projects.associate { it.id to it.projectUuid }
         val sql = db.openHelper.writableDatabase
         db.runInTransaction {
             for ((duplicateId, keepId) in merges) {
@@ -34,6 +36,10 @@ object ProjectDuplicateMerger {
                     // duplicate and is removed with it by the ON DELETE CASCADE.
                     sql.execSQL("UPDATE OR IGNORE $table SET projectId = ? WHERE projectId = ?", arrayOf<Any>(keepId, duplicateId))
                 }
+                // The moved records' attachment references must name the surviving project.
+                val from = uuidOf[duplicateId]
+                val to = uuidOf[keepId]
+                if (from != null && to != null) Attachments.moveProjectRefs(sql, from, to)
                 sql.execSQL("DELETE FROM projects WHERE id = ?", arrayOf<Any>(duplicateId))
             }
         }

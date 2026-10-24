@@ -225,7 +225,13 @@ class FirestoreSyncManager(
             Log.d(tag, "Reconciled remote tombstone deletion for local project $id")
         }
         for ((id, uuid) in plan.adoptUuid) {
-            projectDao.updateProjectUuid(id, uuid)
+            val oldUuid = locals.firstOrNull { it.id == id }?.projectUuid
+            val sql = db.openHelper.writableDatabase
+            db.runInTransaction {
+                sql.execSQL("UPDATE projects SET projectUuid = ? WHERE id = ?", arrayOf<Any>(uuid, id))
+                // Attachment references name the project; they must follow its new uuid.
+                if (oldUuid != null) Attachments.moveProjectRefs(sql, oldUuid, uuid)
+            }
             Log.d(tag, "Local project $id now uses cloud uuid $uuid (duplicate prevented)")
         }
 
@@ -478,8 +484,9 @@ class FirestoreSyncManager(
 
         for (event in pending) {
             try {
-                if (!canWrite && (event.entityType == "project" || event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX))) {
-                    // A Viewer can't write projects or records; the change stays on this phone only.
+                if (!canWrite && (event.entityType == "project" || event.entityType == Attachments.ENTITY_TYPE ||
+                        event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX))) {
+                    // A Viewer can't write projects, records or files; the change stays on this phone only.
                     db.syncOutboxDao().markSynced(event.eventId)
                     continue
                 }

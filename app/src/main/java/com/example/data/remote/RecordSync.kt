@@ -185,9 +185,15 @@ class RecordSync(private val db: AppDatabase) {
             if (c.moveToFirst()) c.getString(0).orEmpty() else null
         }
 
-    /** Stores the cloud's list of assigned accounts on the local project, without queuing an upload. */
+    /**
+     * Stores the cloud's list of assigned accounts on the local project, without queuing an
+     * upload. An identical list is not written again, so open screens aren't refreshed for nothing.
+     */
     fun setAssignedUidsLocally(projectUuid: String, assignedUidsJson: String) = writeRemote {
-        it.execSQL("UPDATE projects SET assignedUids = ? WHERE projectUuid = ?", arrayOf(assignedUidsJson, projectUuid))
+        it.execSQL(
+            "UPDATE projects SET assignedUids = ? WHERE projectUuid = ? AND assignedUids IS NOT ?",
+            arrayOf(assignedUidsJson, projectUuid, assignedUidsJson)
+        )
     }
 
     /**
@@ -207,8 +213,10 @@ class RecordSync(private val db: AppDatabase) {
      * meanwhile can't be lost:
      * - something still to upload: nothing happens ([Unassigned.KEPT]);
      * - rows that only exist on this phone (inspections, time extensions, SDP data, audit
-     *   logs...): the row stays and only gets the server's [serverAssignedUids], which hides
-     *   it; a later re-assignment brings it back ([Unassigned.HIDDEN]);
+     *   logs...), or a legacy attachment (`nhafile:<id>`, whose cloud copy only the Super
+     *   Admin can read, so the local file could never be downloaded again): the row stays
+     *   and only gets the server's [serverAssignedUids], which hides it; a later
+     *   re-assignment brings it back ([Unassigned.HIDDEN]). An identical list isn't rewritten;
      * - otherwise the project and its synced records are deleted ([Unassigned.REMOVED]).
      *   [deleteFiles] gets the project's attachment file names before the delete commits,
      *   so the garbage collector never sees them unreferenced (it would delete the cloud copies).
@@ -222,12 +230,16 @@ class RecordSync(private val db: AppDatabase) {
         var result = Unassigned.KEPT
         writeRemote { w ->
             if (hasPendingUpload(projectId, projectUuid)) return@writeRemote
-            if (hasLocalOnlyRows(projectId)) {
-                w.execSQL("UPDATE projects SET assignedUids = ? WHERE id = ?", arrayOf(serverAssignedUids, projectId))
+            val refs = attachmentRefsOf(projectId)
+            if (hasLocalOnlyRows(projectId) || refs.any { Attachments.projectOf(it) == null }) {
+                w.execSQL(
+                    "UPDATE projects SET assignedUids = ? WHERE id = ? AND assignedUids IS NOT ?",
+                    arrayOf(serverAssignedUids, projectId, serverAssignedUids)
+                )
                 result = Unassigned.HIDDEN
                 return@writeRemote
             }
-            deleteFiles(attachmentNamesOf(projectId))
+            deleteFiles(refs.map(::fileNameOf).toSet())
             w.delete("projects", "id = ?", arrayOf(projectId))
             result = Unassigned.REMOVED
         }
@@ -290,21 +302,24 @@ class RecordSync(private val db: AppDatabase) {
     }
 
     /** Local file names of the attachments the project and its records refer to. */
-    fun attachmentNamesOf(projectId: Long): Set<String> {
-        val names = mutableSetOf<String>()
+    fun attachmentNamesOf(projectId: Long): Set<String> = attachmentRefsOf(projectId).map(::fileNameOf).toSet()
+
+    private fun fileNameOf(ref: String) = ref.removePrefix("${Attachments.SCHEME}:").substringAfterLast('/')
+
+    /** The attachment references (`nhafile:...`) the project and its records hold. */
+    fun attachmentRefsOf(projectId: Long): Set<String> {
+        val refs = mutableSetOf<String>()
         fun collect(query: String) = sql.query(query, arrayOf(projectId)).use { c ->
             while (c.moveToNext()) {
                 for (i in 0 until c.columnCount) {
                     if (c.getType(i) != Cursor.FIELD_TYPE_STRING) continue
-                    Attachments.refsIn(c.getString(i)).forEach { ref ->
-                        names.add(ref.removePrefix("${Attachments.SCHEME}:").substringAfterLast('/'))
-                    }
+                    refs.addAll(Attachments.refsIn(c.getString(i)))
                 }
             }
         }
         collect("SELECT * FROM projects WHERE id = ?")
         for (table in RecordSyncSchema.TABLES) collect("SELECT * FROM `$table` WHERE projectId = ?")
-        return names
+        return refs
     }
 
     /** Only columns this version of the app has, so a newer phone's extra fields are ignored. */

@@ -46,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap
 object Attachments {
     const val SCHEME = "nhafile"
     const val ENTITY_TYPE = "file"
+    /** Files must be smaller than this: the same limit as storage.rules (`size < 20 * 1024 * 1024`). */
     const val MAX_BYTES = 20L * 1024 * 1024
 
     private const val TAG = "Attachments"
@@ -64,7 +65,7 @@ object Attachments {
     enum class Kind(val maxEdge: Int) { PHOTO(2048), SCAN(2500) }
 
     class UnsupportedFileException : Exception("Only photos and PDF files can be attached.")
-    class FileTooLargeException : Exception("The file is larger than 20 MB.")
+    class FileTooLargeException : Exception("The file must be smaller than 20 MB.")
 
     fun isRef(value: String) = value.startsWith("$SCHEME:")
 
@@ -160,7 +161,7 @@ object Attachments {
         val id = UUID.randomUUID().toString()
         val name: String
         if (isPdf) {
-            if (bytes.size > MAX_BYTES) throw FileTooLargeException()
+            if (bytes.size >= MAX_BYTES) throw FileTooLargeException()
             name = "$id.pdf"
             File(dir(context), name).writeBytes(bytes)
         } else {
@@ -281,7 +282,9 @@ object Attachments {
             try {
                 cloud.delete().await()
             } catch (e: StorageException) {
-                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND) throw e
+                // Gone already, or not this account's to delete (another project, or the legacy
+                // path only the Super Admin may touch): a retry could never succeed.
+                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
             }
         } else {
             val file = File(dir(context), name)
@@ -291,12 +294,53 @@ object Attachments {
     }
 
     /** Columns that hold attachment references. */
-    private val referencingColumns = listOf(
+    val referencingColumns = listOf(
         "weekly_reports" to "attachedPhotoUrlsJson",
         "pending_documents" to "fileUrl",
         "project_payments" to "fileUrl",
         "projects" to "latestUpdatePhotoUrl"
     )
+
+    /**
+     * Points every attachment reference of project [oldUuid] at [newUuid], after the local
+     * project took over the cloud's uuid or was merged into another row. Runs inside the
+     * caller's transaction, with the sync triggers on: every changed record is queued, so
+     * the cloud copies (and through them other phones) get the new references. The project's
+     * own photo column has no trigger and is only rewritten here.
+     *
+     * The files follow: uploads not done yet are re-keyed to the new project, and files this
+     * phone already uploaded are queued once more, so a copy exists at the new Storage path
+     * (the old copy is left where it is).
+     */
+    fun moveProjectRefs(sql: androidx.sqlite.db.SupportSQLiteDatabase, oldUuid: String, newUuid: String) {
+        if (oldUuid == newUuid || !projectUuidPattern.matches(oldUuid) || !projectUuidPattern.matches(newUuid)) return
+        val from = "$SCHEME:$oldUuid/"
+        val to = "$SCHEME:$newUuid/"
+        for ((table, column) in referencingColumns) {
+            sql.execSQL(
+                "UPDATE `$table` SET `$column` = REPLACE(`$column`, ?, ?) WHERE instr(`$column`, ?) > 0",
+                arrayOf(from, to, from)
+            )
+        }
+
+        val oldPrefix = "$oldUuid/"
+        val newPrefix = "$newUuid/"
+        val rest = oldPrefix.length + 1
+        val isOld = "entityType = '$ENTITY_TYPE' AND operation = 'UPSERT' AND substr(entityUuid, 1, ${oldPrefix.length}) = ?"
+        sql.execSQL(
+            "INSERT INTO sync_outbox (eventId, entityType, entityUuid, operation, revision, payloadJson, createdAt, attemptCount, state, lastError) " +
+                "SELECT lower(hex(randomblob(16))), '$ENTITY_TYPE', moved, 'UPSERT', 1, '{}', ?, 0, '${SyncOutboxEvent.STATE_PENDING}', '' FROM (" +
+                "SELECT DISTINCT ? || substr(entityUuid, $rest) AS moved FROM sync_outbox " +
+                "WHERE $isOld AND state = '${SyncOutboxEvent.STATE_SYNCED}') " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sync_outbox o WHERE o.entityType = '$ENTITY_TYPE' AND o.operation = 'UPSERT' " +
+                "AND o.state != '${SyncOutboxEvent.STATE_SYNCED}' AND (o.entityUuid = moved OR o.entityUuid = ? || substr(moved, ${newPrefix.length + 1})))",
+            arrayOf<Any>(System.currentTimeMillis(), newPrefix, oldPrefix, oldPrefix)
+        )
+        sql.execSQL(
+            "UPDATE sync_outbox SET entityUuid = ? || substr(entityUuid, $rest) WHERE $isOld AND state != '${SyncOutboxEvent.STATE_SYNCED}'",
+            arrayOf<Any>(newPrefix, oldPrefix)
+        )
+    }
 
     /**
      * Deletes local files, and their cloud copies, that no record refers to any more,
@@ -316,8 +360,9 @@ object Attachments {
             if (file.name.endsWith(".part")) { file.delete(); return@forEach }
             if (!validName.matches(file.name) || file.name in referenced) return@forEach
             file.delete()
-            // The project is only known from the upload event this phone queued; other phones' downloads fall back to the legacy path.
-            val entity = db.syncOutboxDao().fileEntityFor(file.name) ?: file.name
+            // Only a file this phone uploaded has a cloud copy whose path it knows; a downloaded
+            // one is left to the phone that added it (a guessed path would fail on every retry).
+            val entity = db.syncOutboxDao().fileEntityFor(file.name) ?: return@forEach
             db.syncOutboxDao().enqueue(
                 SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = entity, operation = "DELETE", revision = 1, payloadJson = "{}")
             )

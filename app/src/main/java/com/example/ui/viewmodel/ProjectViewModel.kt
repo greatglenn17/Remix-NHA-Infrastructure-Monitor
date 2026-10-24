@@ -101,6 +101,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _selectedProjectId = MutableStateFlow<Long?>(null)
     val selectedProjectId: StateFlow<Long?> = _selectedProjectId.asStateFlow()
 
+    /**
+     * Project writes run on this handler: a write for a project that left this phone meanwhile
+     * (unassigned, merged, deleted elsewhere) fails its foreign key and is dropped instead of
+     * crashing the app. Any other error is passed on as before.
+     */
+    private val missingProjectGuard = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        if (e is android.database.sqlite.SQLiteConstraintException && e.message.orEmpty().contains("FOREIGN KEY", ignoreCase = true)) {
+            android.util.Log.w("ProjectViewModel", "Change dropped: its project is no longer on this phone", e)
+        } else {
+            Thread.currentThread().let { t -> t.uncaughtExceptionHandler?.uncaughtException(t, e) }
+        }
+    }
+
     // All raw projects
     val rawProjects: StateFlow<List<Project>>
     val debugError = kotlinx.coroutines.flow.MutableStateFlow<String>("")
@@ -224,7 +237,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val isSuperAdmin = user.role == UserRole.SUPER_ADMIN
             val myUid = authManager.currentFirebaseUser?.uid
             projects
-                .filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids) }
+                .filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids, it.createdByUid) }
                 .distinctBy { project ->
                     "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
                 }
@@ -233,6 +246,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+        // Close the open project when it leaves this phone or is hidden (e.g. the account was
+        // unassigned), so its screen can't keep writing into a row that is gone.
+        viewModelScope.launch {
+            combine(_selectedProjectId, repository.allProjects, currentUserAccount) { id, projects, user ->
+                Triple(id, projects.firstOrNull { it.id == id }, user.role == UserRole.SUPER_ADMIN)
+            }.collect { (id, project, isSuperAdmin) ->
+                if (id == null) return@collect
+                // The list may predate a project selected right after it was saved; ask the database.
+                val current = project ?: database.projectDao().getProjectByIdOnce(id)
+                val visible = current != null && AssignmentPolicy.isVisible(
+                    isSuperAdmin, authManager.currentFirebaseUser?.uid, current.assignedUids, current.createdByUid
+                )
+                if (!visible) _selectedProjectId.compareAndSet(id, null)
+            }
+        }
 
         // Only the Super Admin may assign projects, so only they read the account list.
         viewModelScope.launch {
@@ -522,7 +551,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         val activeCount = projects.count { it.status.equals("On-going", ignoreCase = true) }
         val slippageCount = projects.count { it.variance < 0 || it.status.equals("Behind Schedule", ignoreCase = true) }
         val projectIds = projects.map { it.id }.toSet()
-        val pendingCount = docs.count { it.status != "Approved" && (projects.isEmpty() || it.projectId in projectIds) }
+        // Only documents of projects this account can see; none visible means none counted.
+        val pendingCount = docs.count { it.status != "Approved" && it.projectId in projectIds }
         com.example.data.model.DashboardSummaryStats(
             activeProjectsCount = activeCount,
             slippageProjectsCount = slippageCount,
@@ -1036,7 +1066,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         completionDateOriginal: String,
         assignedStaff: String = currentUserAccount.value.name
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             if (currentUserAccount.value.isDemoAccount) {
                 logAuditAction(
                     projectId = null,
@@ -1122,7 +1152,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     /** Loads the cloud `users` list for the assignment picker; a failure leaves it empty and not loaded. */
     fun refreshRegisteredUsers() {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             try {
                 val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                     .collection("users").get().await()
@@ -1146,7 +1176,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
      * assignment) the same save also carries the new assignment, as one outbox event.
      */
     fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val previousStatus = selectedProject.value?.status ?: "Unknown"
             val admin = currentUserAccount.value.role == UserRole.SUPER_ADMIN
             val current = projectDao.getProjectByIdOnce(project.id)
@@ -1177,7 +1207,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateProjectStatus(projectId: Long, newStatus: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             selectedProject.value?.let { current ->
                 if (current.id == projectId) {
                     val updated = current.copy(
@@ -1231,7 +1261,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteProject(projectId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             // Look the project up by id: deletes come from the dashboard, where no project is selected.
             val projectToDelete = projectDao.getProjectByIdOnce(projectId)
             logAuditAction(
@@ -1268,7 +1298,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         revisedCompletionDate: String,
         remarks: String
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val p = selectedProject.value ?: return@launch
             val existingExtensions = projectDao.getTimeExtensionsForProject(projectId).first()
             val sumOfDays = existingExtensions.sumOf { it.noOfDays } + noOfDays
@@ -1314,7 +1344,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         reason: String,
         remarks: String
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val suspension = WorkSuspensionOrder(
                 projectId = projectId,
                 name = name,
@@ -1346,7 +1376,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         reason: String,
         remarks: String
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val resumption = WorkResumptionLog(
                 projectId = projectId,
                 name = name,
@@ -1372,7 +1402,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private fun String?.isNull_or_blank(): Boolean = this == null || this.trim().isEmpty()
 
     fun addPendingDocument(projectId: Long, documentName: String, remarks: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val doc = PendingDocument(
                 projectId = projectId,
                 documentName = documentName,
@@ -1398,7 +1428,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         remarks: String = "",
         fileUrl: String = ""
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val doc = PendingDocument(
                 projectId = projectId,
                 documentName = documentName,
@@ -1419,7 +1449,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updatePendingDocumentStatus(doc: PendingDocument, newStatus: String, remarks: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val updated = doc.copy(status = newStatus, remarks = remarks)
             projectDao.updatePendingDocument(updated)
             logAuditAction(
@@ -1433,7 +1463,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updatePendingDocumentFileUrl(doc: PendingDocument, fileUrl: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val updated = doc.copy(fileUrl = fileUrl)
             projectDao.updatePendingDocument(updated)
             logAuditAction(
@@ -1447,7 +1477,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deletePendingDocument(docId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.deletePendingDocument(docId)
         }
     }
@@ -1461,7 +1491,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         newValue: String = "",
         user: String? = null
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             if (oldValue.isNotBlank() && oldValue == newValue) return@launch
 
             val currentAccount = currentUserAccount.value
@@ -1529,19 +1559,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun markNotificationAsRead(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             notificationDao.markAsRead(id)
         }
     }
 
     fun markAllNotificationsAsRead() {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             notificationDao.markAllAsRead()
         }
     }
 
     fun clearAllNotifications() {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             notificationDao.clearAll()
         }
     }
@@ -1562,7 +1592,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         attachedPhotoUrl: String,
         weatherDrafts: List<DailyHourlyWeather>
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             try {
                 // The form passes its photo list as a JSON array.
                 val photos = com.example.data.files.Attachments.parseList(attachedPhotoUrl)
@@ -1611,7 +1641,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     // Submit Monthly Report
     fun updateWeeklyReport(report: WeeklyReport) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             reportDao.updateWeeklyReport(report)
             logAuditAction(report.projectId, "Edited Weekly Report", "Modified report for ${report.reportingWeek}")
             
@@ -1629,7 +1659,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateWeeklyReportWithWeather(report: WeeklyReport, weatherDrafts: List<DailyHourlyWeather>) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             try {
                 weeklyReportWeatherWriter.update(report, weatherDrafts)
                 logAuditAction(report.projectId, "Edited Weekly Report", "Modified report and weather for ${report.reportingWeek}")
@@ -1650,7 +1680,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteWeeklyReport(report: WeeklyReport) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             reportDao.deleteWeeklyReport(report.id)
             logAuditAction(report.projectId, "Deleted Weekly Report", "Deleted report for ${report.reportingWeek}")
         }
@@ -1668,7 +1698,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         paymentsJson: String,
         accomplishmentItemsJson: String = "[]"
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val report = MonthlyReport(
                 projectId = projectId,
                 reportingMonth = reportingMonth,
@@ -1697,7 +1727,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     // Update Monthly Sign-off Chain Status
     fun updateMonthlyReportFull(report: MonthlyReport) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             reportDao.updateMonthlyReport(report)
             logAuditAction(
                 projectId = report.projectId,
@@ -1710,7 +1740,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteMonthlyReport(report: MonthlyReport) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             reportDao.deleteMonthlyReport(report.id)
             logAuditAction(
                 projectId = report.projectId,
@@ -1724,7 +1754,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
 
     fun addProjectPayment(projectId: Long, name: String, dvNo: String, date: String, periodCovered: String, grossAmount: Double, percentage: Double, balanceAmount: Double, balancePercentage: Double, fileUrl: String = "") {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.insertProjectPayment(
                 ProjectPayment(
                     projectId = projectId,
@@ -1750,7 +1780,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateProjectPayment(payment: ProjectPayment) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.updateProjectPayment(payment)
             logAuditAction(
                 projectId = payment.projectId,
@@ -1763,13 +1793,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
     
     fun deleteProjectPayment(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.deleteProjectPayment(id)
         }
     }
 
     fun addProjectIssue(issue: ProjectIssue) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.insertProjectIssue(issue.copy(loggedBy = currentUserAccount.value.name))
             logAuditAction(
                 projectId = issue.projectId,
@@ -1782,7 +1812,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateProjectIssue(issue: ProjectIssue) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.updateProjectIssue(issue)
             logAuditAction(
                 projectId = issue.projectId,
@@ -1795,7 +1825,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteProjectIssue(issue: ProjectIssue) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             projectDao.deleteProjectIssue(issue.id)
             logAuditAction(
                 projectId = issue.projectId,
@@ -1813,7 +1843,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         newStatus: String,
         notes: String
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val currentAccount = currentUserAccount.value
             val timestamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
             val trail = runCatching { org.json.JSONArray(monthlyReport.auditTrailJson) }.getOrDefault(org.json.JSONArray())
@@ -1852,7 +1882,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     // Google Drive Sync Operations
     fun backupToGoogleDrive(accessToken: String? = null, onResult: (DriveSyncResult) -> Unit = {}) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             if (currentUserAccount.value.isDemoAccount) {
                 onResult(DriveSyncResult.Error("Google Drive Sync is disabled for Quick Demo Access. Please sign in with your official NHA account to upload to Google Drive."))
                 return@launch
@@ -1882,7 +1912,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun restoreFromGoogleDrive(accessToken: String? = null, onResult: (DriveSyncResult) -> Unit = {}) {
-        viewModelScope.launch {
+        viewModelScope.launch(missingProjectGuard) {
             val result = googleDriveSyncManager.restoreFromGoogleDrive(accessToken)
             val success = result is DriveSyncResult.Success
             val msg = when (result) {

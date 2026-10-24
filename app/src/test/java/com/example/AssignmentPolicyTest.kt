@@ -68,12 +68,24 @@ class AssignmentPolicyTest {
 
     @Test
     fun isVisible_superAdminSeesAll_othersOnlyAssigned() {
-        assertTrue(AssignmentPolicy.isVisible(true, null, ""))
-        assertTrue(AssignmentPolicy.isVisible(false, "u", "[\"u\"]"))
-        assertFalse(AssignmentPolicy.isVisible(false, "u", "[\"x\"]"))
-        assertFalse(AssignmentPolicy.isVisible(false, "u", "[]"))
-        assertFalse(AssignmentPolicy.isVisible(false, "u", ""))
-        assertFalse(AssignmentPolicy.isVisible(false, null, "[\"u\"]"))
+        assertTrue(AssignmentPolicy.isVisible(true, null, "", createdByUid = ""))
+        assertTrue(AssignmentPolicy.isVisible(false, "u", "[\"u\"]", createdByUid = "x"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[\"x\"]", createdByUid = "x"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[]", createdByUid = "x"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "", createdByUid = "x"))
+        assertFalse(AssignmentPolicy.isVisible(false, null, "[\"u\"]", createdByUid = "u"))
+    }
+
+    @Test
+    fun isVisible_unknownList_showsTheCreatorTheirOwnProject() {
+        // After the 22 -> 23 upgrade every list is "" until the cloud answers; offline the creator still sees their projects.
+        assertTrue(AssignmentPolicy.isVisible(false, "u", "", createdByUid = "u"))
+        // A known list decides, even for the creator (the Super Admin may have moved them off it).
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[]", createdByUid = "u"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[\"x\"]", createdByUid = "u"))
+        // No uid never matches a project without a creator.
+        assertFalse(AssignmentPolicy.isVisible(false, "", "", createdByUid = ""))
+        assertFalse(AssignmentPolicy.isVisible(false, null, "", createdByUid = ""))
     }
 
     private fun project(uids: String, staff: String) =

@@ -65,6 +65,13 @@ describe('outsider', () => {
     if (snap.size !== 0) throw new Error('expected empty');
   });
   it('unfiltered project query denied', () => assertFails(getDocs(collection(asOther().firestore(), 'projects'))));
+  describe('assigned to another project Q', () => {
+    beforeEach(() => testEnv.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'projects/Q'), { assignedUids: ['other'], name: 'Q' })));
+    it('can create a new record in Q (control)', () =>
+      assertSucceeds(setDoc(doc(asOther().firestore(), 'records/RQ'), { uuid: 'RQ', projectUuid: 'Q', revision: 1, assignedUids: ['other'] })));
+    it('cannot take over a stored record of P by moving it into Q', () =>
+      assertFails(setDoc(doc(asOther().firestore(), 'records/R'), { uuid: 'R', projectUuid: 'Q', revision: 2, assignedUids: ['other'] })));
+  });
   it('cannot write record for a missing project', () =>
     assertFails(setDoc(doc(asOther().firestore(), 'records/R2'), { uuid: 'R2', projectUuid: 'NOPE', revision: 1, assignedUids: ['other'] })));
   it('cannot read file of a missing project', () => assertFails(getBytes(ref(asOther().storage(), 'attachments/NOPE/f.jpg'))));
