@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.4.2%20%28Build%20142%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.5.0%20%28Build%20150%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.4.2`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.4.2_Build142.apk`** to download the installation package.
+2. Tap the latest release (`v1.5.0`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.5.0_Build150.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.5.0`** | **`150`** | 🔐 Account-Based Project Access: Engineers and viewers see and sync only the projects assigned to their account, enforced in the cloud. The Super Admin sees every project and assigns people from a checklist on the edit screen; a new project is assigned to its creator. Photos and scans are stored per project |
 | **`v1.4.2`** | **`142`** | 🧹 Sample Data Removed: New projects start with every checklist document Pending and no remarks. Forms no longer prefill sample names, statuses or fixed dates (payments, project start, monthly sign-offs, suspension/resumption orders), and untouched sample values already saved are cleared |
 | **`v1.4.1`** | **`141`** | 👷 Project Assignment Fix: A new project is assigned to the engineer who creates it (instead of the placeholder "Juan Dela Cruz"), so it appears on their phone straight away |
 | **`v1.4.0`** | **`140`** | 📷 Photo & Scan Sync: Weekly report photos and document/payment scans upload to Firebase Storage and appear on every phone. Photos are shrunk to 2048 px (scans 2500 px, PDFs unchanged); the camera keeps the full original in the Gallery. Take Photo with Camera now attaches the real photo, attachments keep working after a restart, and the sample pictures were removed |

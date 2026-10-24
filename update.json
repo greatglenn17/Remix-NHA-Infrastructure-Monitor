@@ -1,8 +1,8 @@
 {
-  "versionCode": 142,
-  "versionName": "1.4.2",
-  "releaseNotes": "v1.4.2: New projects start with every checklist document Pending and no made-up remarks. Sample names, statuses and fixed dates were removed from forms (payments, project start date, monthly report sign-offs, suspension and resumption orders), and untouched sample values already saved are cleared.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.4.2/NHA_Monitor_v1.4.2_Build142.apk",
-  "apkSha256": "beb690d12408f4ef09d12e0b72f15e55c967ba5189f8f425ad7e441226a4c427",
+  "versionCode": 150,
+  "versionName": "1.5.0",
+  "releaseNotes": "v1.5.0: Projects are linked to user accounts. Engineers and viewers see and sync only the projects assigned to them; the Super Admin sees every project and assigns people from a checklist on the project edit screen. A new project is assigned to the engineer who creates it. Photos and scans are stored per project.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.5.0/NHA_Monitor_v1.5.0_Build150.apk",
+  "apkSha256": "f9d6df23b62bbe8464b597e5a96a7511ed5d684bf8cd4e22ffc1b7ae3da46ff7",
   "isMandatory": true
 }
