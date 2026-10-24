@@ -11,6 +11,8 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.PrepopulateData
 import com.example.data.local.WeeklyReportWeatherWriter
 import com.example.data.model.*
+import kotlinx.coroutines.tasks.await
+import com.example.data.remote.AssignmentPolicy
 import com.example.data.remote.DriveSyncResult
 import com.example.data.remote.FirestoreSyncManager
 import com.example.data.remote.GoogleDriveSyncManager
@@ -105,6 +107,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     // User-scoped projects based on role/assignment
     val userScopedProjects: StateFlow<List<Project>>
+
+    // Accounts a project can be assigned to (Super Admin only). The list is trusted for
+    // editing only once it has loaded; a failed load leaves it empty and not loaded.
+    private val _registeredUsers = MutableStateFlow<List<RegisteredUser>>(emptyList())
+    val registeredUsers: StateFlow<List<RegisteredUser>> = _registeredUsers.asStateFlow()
+    private val _registeredUsersLoaded = MutableStateFlow(false)
+    val registeredUsersLoaded: StateFlow<Boolean> = _registeredUsersLoaded.asStateFlow()
 
     // Filtered and Sorted Projects
     val filteredProjects: StateFlow<List<Project>>
@@ -214,24 +223,29 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val uniqueProjects = projects.distinctBy { project ->
                 "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
             }
-            if (user.role == UserRole.SUPER_ADMIN) {
-                // Super Admin sees ALL projects created by all subordinates & engineer admins
-                uniqueProjects
-            } else {
-                // Engineer Admins / Subordinates only see projects created by or assigned to them
-                uniqueProjects.filter { project ->
-                    (user.assignedProjectId != null && project.id == user.assignedProjectId) ||
-                    project.assignedStaff.equals(user.name, ignoreCase = true) ||
-                    project.assignedStaff.contains(user.name, ignoreCase = true) ||
-                    user.name.contains(project.assignedStaff, ignoreCase = true) ||
-                    (user.name.contains("Jam", ignoreCase = true) && project.assignedStaff.contains("Jam", ignoreCase = true))
-                }
-            }
+            // Super Admin sees everything; everyone else only the projects naming their account.
+            val isSuperAdmin = user.role == UserRole.SUPER_ADMIN
+            val myUid = authManager.currentFirebaseUser?.uid
+            uniqueProjects.filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids) }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+        // Only the Super Admin may assign projects, so only they read the account list.
+        viewModelScope.launch {
+            currentUserAccount
+                .map { it.role == UserRole.SUPER_ADMIN }
+                .distinctUntilChanged()
+                .collect { isSuperAdmin ->
+                    if (isSuperAdmin) refreshRegisteredUsers()
+                    else {
+                        _registeredUsers.value = emptyList()
+                        _registeredUsersLoaded.value = false
+                    }
+                }
+        }
 
         val filterParams = combine(searchQuery, statusFilter, typeFilter, sortOrder, currentUserAccount) { query, status, type, sort, user ->
             FilterParams(query, status, type, sort, user)
@@ -1051,7 +1065,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
                 return@launch
             }
+            val creatorUid = authManager.currentFirebaseUser?.uid
             val newProject = Project(
+                assignedUids = if (creatorUid.isNullOrBlank()) "" else AssignedUids.toJson(listOf(creatorUid)),
                 createdByUid = authManager.currentFirebaseUser?.uid.orEmpty(),
                 updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty(),
                 name = name,
@@ -1103,10 +1119,49 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun updateProjectMaster(project: Project) {
+    /** Loads the cloud `users` list for the assignment picker; a failure leaves it empty and not loaded. */
+    fun refreshRegisteredUsers() {
+        viewModelScope.launch {
+            try {
+                val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").get().await()
+                _registeredUsers.value = snapshot.documents.map { doc ->
+                    val name = doc.getString("displayName")?.takeIf { it.isNotBlank() }
+                        ?: doc.getString("email")?.takeIf { it.isNotBlank() }
+                        ?: doc.id
+                    RegisteredUser(uid = doc.id, name = name)
+                }.sortedBy { it.name.lowercase() }
+                _registeredUsersLoaded.value = true
+            } catch (e: Exception) {
+                android.util.Log.w("ProjectViewModel", "Loading registered users failed: ${e.message}")
+                _registeredUsers.value = emptyList()
+                _registeredUsersLoaded.value = false
+            }
+        }
+    }
+
+    private fun Project.withAssignment(users: List<RegisteredUser>): Project =
+        copy(
+            assignedUids = AssignedUids.toJson(users.map { it.uid }),
+            assignedStaff = users.joinToString(", ") { it.name }
+        )
+
+    /** Assigns [users] to the project (Super Admin) and syncs it like any other edit. */
+    fun updateProjectAssignment(project: Project, users: List<RegisteredUser>) {
+        if (currentUserAccount.value.role != UserRole.SUPER_ADMIN) return
+        viewModelScope.launch { saveProjectChange(project.withAssignment(users)) }
+    }
+
+    /**
+     * Saves the edit dialog. When [assignedUsers] is given (Super Admin editing the
+     * assignment) the same save also carries the new assignment, as one outbox event.
+     */
+    fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null) {
         viewModelScope.launch {
             val previousStatus = selectedProject.value?.status ?: "Unknown"
-            val updatedProject = project.copy(
+            val base = if (assignedUsers != null && currentUserAccount.value.role == UserRole.SUPER_ADMIN)
+                project.withAssignment(assignedUsers) else project
+            val updatedProject = base.copy(
                 revision = project.revision + 1,
                 updatedAt = System.currentTimeMillis(),
                 updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty()

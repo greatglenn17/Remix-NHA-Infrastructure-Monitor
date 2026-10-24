@@ -39,6 +39,9 @@ import org.json.JSONObject
 @Composable
 fun EditProjectDialog(
     project: Project,
+    canAssign: Boolean = false,
+    registeredUsers: List<com.example.data.model.RegisteredUser> = emptyList(),
+    registeredUsersLoaded: Boolean = false,
     onDismiss: () -> Unit,
     onEdit: (
         name: String,
@@ -53,12 +56,14 @@ fun EditProjectDialog(
         contractDurationDays: Int,
         dateStarted: String,
         completionDateOriginal: String,
-        assignedStaff: String
+        assignedStaff: String,
+        assignedUsers: List<com.example.data.model.RegisteredUser>?
     ) -> Unit
 ) {
     var name by remember { mutableStateOf(project.name) }
     var location by remember { mutableStateOf(project.location) }
-    var assignedStaff by remember { mutableStateOf(project.assignedStaff) }
+    val assignedStaff = project.assignedStaff
+    var selectedUids by remember { mutableStateOf(com.example.data.model.AssignedUids.parse(project.assignedUids)) }
     var implementingOffice by remember { mutableStateOf(project.implementingOffice) }
     var contractor by remember { mutableStateOf(project.contractor) }
     val scopeItems = remember { mutableStateListOf<com.example.data.model.ScopeItem>().apply { 
@@ -447,13 +452,13 @@ fun EditProjectDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                OutlinedTextField(
-                    value = assignedStaff,
-                    onValueChange = { assignedStaff = it },
-                    label = { Text("Assigned Field Staff / Manager") },
-                    colors = darkTextFieldColors,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                AssignStaffField(
+                    editable = canAssign,
+                    usersLoaded = registeredUsersLoaded,
+                    users = registeredUsers,
+                    selectedUids = selectedUids,
+                    assignedStaff = assignedStaff,
+                    onSelectedChange = { selectedUids = it }
                 )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(modifier = Modifier.weight(1f)) {
@@ -516,7 +521,10 @@ fun EditProjectDialog(
                             duration,
                             dateStarted,
                             completionDateOriginal,
-                            assignedStaff
+                            assignedStaff,
+                            if (canAssign && registeredUsersLoaded) {
+                                selectedUids.map { uid -> registeredUsers.firstOrNull { it.uid == uid } ?: com.example.data.model.RegisteredUser(uid, uid) }
+                            } else null
                         )
                     }
                 },

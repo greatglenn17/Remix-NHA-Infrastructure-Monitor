@@ -65,4 +65,14 @@ class AssignmentPolicyTest {
         // A list this phone never received is left out, so it can't wipe the cloud's.
         assertNull(AssignmentPolicy.projectUploadFields(isSuperAdmin = true, exists = true, myUid = "a", localAssignedUids = ""))
     }
+
+    @Test
+    fun isVisible_superAdminSeesAll_othersOnlyAssigned() {
+        assertTrue(AssignmentPolicy.isVisible(true, null, ""))
+        assertTrue(AssignmentPolicy.isVisible(false, "u", "[\"u\"]"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[\"x\"]"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[]"))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", ""))
+        assertFalse(AssignmentPolicy.isVisible(false, null, "[\"u\"]"))
+    }
 }

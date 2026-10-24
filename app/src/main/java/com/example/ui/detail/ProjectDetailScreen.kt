@@ -38,6 +38,8 @@ fun ProjectDetailScreen(
     onAddIssueClick: () -> Unit
 ) {
     val currentUser by viewModel.currentUserAccount.collectAsState()
+    val registeredUsers by viewModel.registeredUsers.collectAsState()
+    val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val project by viewModel.selectedProject.collectAsState()
     val timeExtensions by viewModel.timeExtensions.collectAsState()
@@ -439,10 +441,16 @@ fun ProjectDetailScreen(
     }
 
     if (projectToEdit != null) {
+        LaunchedEffect(Unit) {
+            if (currentUser.role == com.example.data.model.UserRole.SUPER_ADMIN && !registeredUsersLoaded) viewModel.refreshRegisteredUsers()
+        }
         com.example.ui.dialogs.EditProjectDialog(
             project = projectToEdit!!,
+            canAssign = currentUser.role == com.example.data.model.UserRole.SUPER_ADMIN,
+            registeredUsers = registeredUsers,
+            registeredUsersLoaded = registeredUsersLoaded,
             onDismiss = { projectToEdit = null },
-            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff ->
+            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers ->
                 val updated = projectToEdit!!.copy(
                     name = name,
                     location = location,
@@ -458,7 +466,7 @@ fun ProjectDetailScreen(
                     completionDateOriginal = completionDateOriginal,
                     assignedStaff = assignedStaff
                 )
-                viewModel.updateProjectMaster(updated)
+                viewModel.updateProjectMaster(updated, assignedUsers)
                 projectToEdit = null
             }
         )
