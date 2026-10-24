@@ -139,6 +139,7 @@ class MainActivity : ComponentActivity() {
                         selectedProjectId?.let { pId ->
                             val selectedProject = viewModel.selectedProject.value
                             val reportToEdit = viewModel.weeklyReportToEdit.value
+                            CompositionLocalProvider(com.example.ui.components.LocalProjectUuid provides selectedProject?.projectUuid.orEmpty()) {
                             AddWeeklyReportDialog(
                                 project = selectedProject,
                                 projectId = pId,
@@ -217,6 +218,7 @@ class MainActivity : ComponentActivity() {
                                     viewModel.weeklyReportToEdit.value = null
                                 }
                             )
+                            }
                         }
                     }
 

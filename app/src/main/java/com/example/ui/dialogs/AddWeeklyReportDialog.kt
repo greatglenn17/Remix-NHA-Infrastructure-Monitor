@@ -177,6 +177,7 @@ fun AddWeeklyReportDialog(
     // Picked and captured photos are copied into the app (shrunk) and attached by reference.
     val context = androidx.compose.ui.platform.LocalContext.current
     val photoScope = rememberCoroutineScope()
+    val projectUuid = com.example.ui.components.LocalProjectUuid.current
     fun attachFailed(e: Exception) {
         android.widget.Toast.makeText(context, "Photo not attached: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
@@ -186,7 +187,7 @@ fun AddWeeklyReportDialog(
         photoScope.launch {
             for (uri in uris) {
                 try {
-                    photoUrls.add(Attachments.import(context, uri, Attachments.Kind.PHOTO))
+                    photoUrls.add(Attachments.import(context, uri, Attachments.Kind.PHOTO, projectUuid))
                 } catch (e: Exception) {
                     attachFailed(e)
                 }
@@ -206,7 +207,7 @@ fun AddWeeklyReportDialog(
         }
         photoScope.launch {
             try {
-                photoUrls.add(Attachments.importCameraPhoto(context, file))
+                photoUrls.add(Attachments.importCameraPhoto(context, file, projectUuid))
             } catch (e: Exception) {
                 attachFailed(e)
             }

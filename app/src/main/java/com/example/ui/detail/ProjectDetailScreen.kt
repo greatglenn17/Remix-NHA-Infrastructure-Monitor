@@ -97,6 +97,7 @@ fun ProjectDetailScreen(
     val appThemeMode by viewModel.appThemeMode.collectAsState()
     var showNotificationsDialog by remember { mutableStateOf(false) }
 
+    CompositionLocalProvider(com.example.ui.components.LocalProjectUuid provides currentProject.projectUuid) {
     Scaffold(
         topBar = {
             TopAppBarHeader(
@@ -433,6 +434,8 @@ fun ProjectDetailScreen(
                 }
             }
         }
+    }
+
     }
 
     if (projectToEdit != null) {
