@@ -24,6 +24,10 @@ interface SyncOutboxDao {
     @Query("UPDATE sync_outbox SET state = 'SYNCED', lastError = '' WHERE eventId = :eventId")
     suspend fun markSynced(eventId: String)
 
+    /** New, never-attempted events only; FAILED ones are retried on startup and sync events. */
+    @Query("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'")
+    fun newPendingCount(): Flow<Int>
+
     @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityUuid = :entityUuid AND state IN ('PENDING', 'FAILED'))")
     suspend fun hasPendingFor(entityUuid: String): Boolean
 }

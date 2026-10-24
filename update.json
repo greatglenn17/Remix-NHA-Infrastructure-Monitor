@@ -1,8 +1,8 @@
 {
-  "versionCode": 125,
-  "versionName": "1.2.5",
-  "releaseNotes": "v1.2.5: Projects now sync to every phone through the cloud, duplicate project cards are merged automatically, and new projects send notifications. Please sign in again once after updating to turn on cloud sync.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.5/NHA_Monitor_v1.2.5_Build125.apk",
-  "apkSha256": "a30ecf301ebfdad28a1efe4eb642d6685869536ce092068309dbec2fd067feba",
+  "versionCode": 126,
+  "versionName": "1.2.6",
+  "releaseNotes": "v1.2.6: Deleting a project now removes it on every phone, edits sync to the cloud right away, weekly reports show the real elapsed and remaining days, the weekly form no longer starts with sample data, and editing a weekly report keeps its manpower, equipment, issues and activities.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.2.6/NHA_Monitor_v1.2.6_Build126.apk",
+  "apkSha256": "5e554504089ac6362259f19517ba5272ced09977f0a79e9cc28621fff49ebc3b",
   "isMandatory": true
 }

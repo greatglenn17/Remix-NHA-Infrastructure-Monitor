@@ -39,6 +39,10 @@ import com.example.data.model.DailyActivity
 import com.example.data.model.EquipmentItem
 import com.example.data.model.ManpowerItem
 import com.example.data.model.WeeklyIssue
+import com.example.ui.detail.tabs.parseActivitiesList
+import com.example.ui.detail.tabs.parseEquipmentList
+import com.example.ui.detail.tabs.parseIssuesList
+import com.example.ui.detail.tabs.parseManpowerList
 import com.example.ui.theme.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -149,11 +153,11 @@ fun AddWeeklyReportDialog(
     val overallActual by remember { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (accomplishmentMap[it.name]?.second?.toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallVariance by remember { androidx.compose.runtime.derivedStateOf { overallActual - overallTarget } }
     
+    // When editing, start from the report's saved rows instead of blank defaults.
     var activityItems by remember {
         mutableStateOf(
-            listOf(
-                DailyActivity("Monday", "", "")
-            )
+            existingReport?.let { parseActivitiesList(it.activitiesJson) }?.takeIf { it.isNotEmpty() }
+                ?: listOf(DailyActivity("Monday", "", ""))
         )
     }
     val photoUrls = remember { mutableStateListOf<String>().apply {
@@ -203,35 +207,28 @@ fun AddWeeklyReportDialog(
     var selectedWeatherDayName by remember(daysOfWeekWithDates) { mutableStateOf(daysOfWeekWithDates.first().first) }
     var selectedHourIndex by remember { mutableStateOf(12) }
 
-    // Manpower Table State
+    // Manpower Table State: the usual designations with zero counts, so no sample
+    // headcount is ever submitted as if it were real.
     var manpowerItems by remember {
         mutableStateOf(
-            listOf(
-                ManpowerItem("Project Engineer", 1),
-                ManpowerItem("Foreman", 2),
-                ManpowerItem("Masons / Carpenters", 10),
-                ManpowerItem("Laborers", 8)
-            )
+            existingReport?.let { parseManpowerList(it.manpowerJson) }?.takeIf { it.isNotEmpty() }
+                ?: listOf(
+                    ManpowerItem("Project Engineer", 0),
+                    ManpowerItem("Foreman", 0),
+                    ManpowerItem("Masons / Carpenters", 0),
+                    ManpowerItem("Laborers", 0)
+                )
         )
     }
 
     // Equipment Summary Table State
     var equipmentItems by remember {
-        mutableStateOf(
-            listOf(
-                EquipmentItem("Backhoe / Excavator", 1, "Operational"),
-                EquipmentItem("Concrete Mixer (1-bagger)", 2, "Operational")
-            )
-        )
+        mutableStateOf(existingReport?.let { parseEquipmentList(it.equipmentJson) } ?: emptyList())
     }
 
     // Issues Encountered / Action Taken Table State
     var issuesItems by remember {
-        mutableStateOf(
-            listOf(
-                WeeklyIssue("Delay in ready-mix concrete delivery", "Coordinated with backup batching plant")
-            )
-        )
+        mutableStateOf(existingReport?.let { parseIssuesList(it.issuesJson) } ?: emptyList())
     }
 
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }

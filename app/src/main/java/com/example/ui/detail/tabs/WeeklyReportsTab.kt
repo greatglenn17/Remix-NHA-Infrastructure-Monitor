@@ -559,7 +559,7 @@ private fun WeeklyReportCard(
 }
 
 // Helpers to parse JSON safely
-private fun parseManpowerList(jsonStr: String): List<ManpowerItem> {
+internal fun parseManpowerList(jsonStr: String): List<ManpowerItem> {
     if (jsonStr.isBlank()) return emptyList()
     return try {
         val array = JSONArray(jsonStr)
@@ -580,7 +580,7 @@ private fun parseManpowerList(jsonStr: String): List<ManpowerItem> {
     }
 }
 
-private fun parseEquipmentList(jsonStr: String): List<EquipmentItem> {
+internal fun parseEquipmentList(jsonStr: String): List<EquipmentItem> {
     if (jsonStr.isBlank()) return emptyList()
     return try {
         val array = JSONArray(jsonStr)
@@ -602,7 +602,7 @@ private fun parseEquipmentList(jsonStr: String): List<EquipmentItem> {
     }
 }
 
-private fun parseIssuesList(jsonStr: String): List<WeeklyIssue> {
+internal fun parseIssuesList(jsonStr: String): List<WeeklyIssue> {
     if (jsonStr.isBlank()) return emptyList()
     return try {
         val array = JSONArray(jsonStr)
@@ -623,7 +623,7 @@ private fun parseIssuesList(jsonStr: String): List<WeeklyIssue> {
     }
 }
 
-private fun parseActivitiesList(jsonStr: String): List<DailyActivity> {
+internal fun parseActivitiesList(jsonStr: String): List<DailyActivity> {
     if (jsonStr.isBlank()) return emptyList()
     return try {
         val array = JSONArray(jsonStr)

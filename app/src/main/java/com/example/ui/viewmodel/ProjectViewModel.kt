@@ -1159,9 +1159,32 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Saves a change to a project's master record and queues it for upload. Writing to
+     * the DAO directly skips the revision bump and the outbox, so other phones never see it.
+     */
+    private suspend fun saveProjectChange(updated: Project) {
+        val versioned = updated.copy(
+            revision = updated.revision + 1,
+            updatedAt = System.currentTimeMillis(),
+            updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty()
+        )
+        projectDao.updateProject(versioned)
+        syncOutboxDao.enqueue(
+            SyncOutboxEvent(
+                entityType = "project",
+                entityUuid = versioned.projectUuid,
+                operation = "UPDATE",
+                revision = versioned.revision,
+                payloadJson = "{\"projectUuid\":\"${versioned.projectUuid}\"}"
+            )
+        )
+    }
+
     fun deleteProject(projectId: Long) {
         viewModelScope.launch {
-            val projectToDelete = selectedProject.value
+            // Look the project up by id: deletes come from the dashboard, where no project is selected.
+            val projectToDelete = projectDao.getProjectByIdOnce(projectId)
             logAuditAction(
                 projectId = null,
                 actionType = "Project Deletion",
@@ -1221,7 +1244,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             projectDao.insertTimeExtension(extension)
 
             val updated = p.copy(completionDateRevised = computedRevisedDate)
-            projectDao.updateProject(updated)
+            saveProjectChange(updated)
 
             logAuditAction(
                 projectId = projectId,
@@ -1256,7 +1279,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
             selectedProject.value?.let { p ->
                 val updated = p.copy(contractCostRevised = newRevisedCost)
-                projectDao.updateProject(updated)
+                saveProjectChange(updated)
             }
 
             logAuditAction(
@@ -1290,7 +1313,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             projectDao.insertWorkSuspensionOrder(suspension)
             selectedProject.value?.let { p ->
-                projectDao.updateProject(p.copy(status = ProjectStatus.SUSPENDED.label))
+                saveProjectChange(p.copy(status = ProjectStatus.SUSPENDED.label))
             }
 
             logAuditAction(
@@ -1320,7 +1343,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             projectDao.insertWorkResumptionLog(resumption)
             selectedProject.value?.let { p ->
-                projectDao.updateProject(p.copy(status = ProjectStatus.ONGOING.label))
+                saveProjectChange(p.copy(status = ProjectStatus.ONGOING.label))
             }
 
             logAuditAction(
@@ -1555,7 +1578,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         actualAccomplishment = actualAccomplishmentPct,
                         latestUpdatePhotoUrl = if (attachedPhotoUrl.isNotBlank()) attachedPhotoUrl else current.latestUpdatePhotoUrl
                     )
-                    projectDao.updateProject(updated)
+                    saveProjectChange(updated)
                 }
 
                 logAuditAction(
@@ -1584,7 +1607,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         targetAccomplishment = report.targetAccomplishmentPct,
                         actualAccomplishment = report.actualAccomplishmentPct
                     )
-                    projectDao.updateProject(updated)
+                    saveProjectChange(updated)
                 }
             }
         }
@@ -1595,6 +1618,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             try {
                 weeklyReportWeatherWriter.update(report, weatherDrafts)
                 logAuditAction(report.projectId, "Edited Weekly Report", "Modified report and weather for ${report.reportingWeek}")
+
+                // Keep the Project Master accomplishment in step with the edited report.
+                val current = projectDao.getProjectByIdOnce(report.projectId)
+                if (current != null && (current.targetAccomplishment != report.targetAccomplishmentPct ||
+                        current.actualAccomplishment != report.actualAccomplishmentPct)) {
+                    saveProjectChange(current.copy(
+                        targetAccomplishment = report.targetAccomplishmentPct,
+                        actualAccomplishment = report.actualAccomplishmentPct
+                    ))
+                }
             } catch (error: Exception) {
                 _authError.value = "Weekly report was not updated: ${error.message ?: "database transaction failed"}"
             }

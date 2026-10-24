@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -44,6 +45,7 @@ class FirestoreSyncManager(
     private var projectListener: ListenerRegistration? = null
     private var authStateListener: FirebaseAuth.AuthStateListener? = null
     private val reconcileMutex = Mutex()
+    private val flushMutex = Mutex()
     /** Set after the first server snapshot, so a fresh install doesn't alert for every existing project. */
     @Volatile private var hasServerSnapshot = false
 
@@ -66,6 +68,14 @@ class FirestoreSyncManager(
             auth.addAuthStateListener(authStateListener!!)
         } catch (e: Exception) {
             Log.w(tag, "Failed to register authStateListener: ${e.message}")
+        }
+
+        // Upload every change as soon as it is queued (edits, deletes, report updates),
+        // not only on startup or sign-in.
+        scope.launch(Dispatchers.IO) {
+            db.syncOutboxDao().newPendingCount().distinctUntilChanged().collect { count ->
+                if (count > 0 && auth.currentUser != null) flushOutbox()
+            }
         }
     }
 
@@ -254,7 +264,7 @@ class FirestoreSyncManager(
     /**
      * Process pending events in the local Room sync_outbox table and upload to Firestore.
      */
-    suspend fun flushOutbox(): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun flushOutbox(): Result<Int> = withContext(Dispatchers.IO) { flushMutex.withLock {
         val currentUser = auth.currentUser
         if (currentUser == null) {
             return@withContext Result.failure(IllegalStateException("User is not authenticated with Firebase."))
@@ -337,6 +347,7 @@ class FirestoreSyncManager(
 
         _syncStatus.value = FirestoreSyncStatus.Synced()
         Result.success(syncedCount)
+    }
     }
 
     /**

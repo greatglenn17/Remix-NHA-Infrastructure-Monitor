@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.util.AppNotificationManager
+import com.example.util.ProjectSchedule
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -146,9 +147,21 @@ class MainActivity : ComponentActivity() {
                                     viewModel.weeklyReportToEdit.value = null
                                 },
                                 onSubmit = { week, target, actual, activities, photoUrl, dailyWeatherMap, dailyWeatherDates, manpowerJson, equipmentJson, issuesJson, accItemsJson ->
+                                    val (daysElapsed, remainingDays) = if (selectedProject != null) {
+                                        ProjectSchedule.elapsedAndRemaining(
+                                            dateStarted = selectedProject.dateStarted,
+                                            completionDate = ProjectSchedule.effectiveCompletion(
+                                                selectedProject.completionDateOriginal,
+                                                selectedProject.completionDateRevised
+                                            ),
+                                            asOf = dailyWeatherDates.values.maxOrNull().orEmpty()
+                                        )
+                                    } else 0 to 0
                                     if (reportToEdit != null) {
                                         val updated = reportToEdit.copy(
                                             reportingWeek = week,
+                                            daysElapsed = daysElapsed,
+                                            remainingDays = remainingDays,
                                             targetAccomplishmentPct = target,
                                             actualAccomplishmentPct = actual,
                                             activitiesJson = activities,
@@ -176,8 +189,8 @@ class MainActivity : ComponentActivity() {
                                         viewModel.submitWeeklyReportWithWeather(
                                             projectId = pId,
                                             reportingWeek = week,
-                                            daysElapsed = 330,
-                                            remainingDays = 75,
+                                            daysElapsed = daysElapsed,
+                                            remainingDays = remainingDays,
                                             targetAccomplishmentPct = target,
                                             actualAccomplishmentPct = actual,
                                             manpowerJson = manpowerJson,
