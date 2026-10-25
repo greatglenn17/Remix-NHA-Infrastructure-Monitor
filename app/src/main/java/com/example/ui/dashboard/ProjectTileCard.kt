@@ -23,8 +23,12 @@ import coil.compose.AsyncImage
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
 import com.example.ui.theme.*
+import com.example.util.BillingProgress
 import java.text.NumberFormat
 import java.util.Locale
+
+// App accent sky blue, kept distinct from the green/red schedule bar.
+private val BillingBarFill = Color(0xFF38BDF8)
 
 private data class TileThemeColors(
     val cardBg: Color,
@@ -38,6 +42,8 @@ private data class TileThemeColors(
 fun ProjectTileCard(
     project: Project,
     pendingDocsCount: Int,
+    billedTotal: Double = 0.0,
+    contractCost: Double = project.contractCostRevised,
     onClick: () -> Unit,
     onDeleteClick: (() -> Unit)? = null,
     onEditClick: (() -> Unit)? = null,
@@ -61,12 +67,12 @@ fun ProjectTileCard(
     val barFill = themeColors.barFill
     val barBg = themeColors.barBg
 
-    val phpFormatString = com.example.utils.CurrencyFormatter.formatPhp(project.contractCostRevised)
+    val phpFormatString = com.example.utils.CurrencyFormatter.formatPhp(contractCost)
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .height(290.dp)
             .clickable { onClick() }
             .testTag("project_tile_${project.id}"),
         shape = RoundedCornerShape(24.dp),
@@ -293,6 +299,31 @@ fun ProjectTileCard(
                         .height(6.dp)
                         .clip(RoundedCornerShape(50.dp)),
                     color = barFill,
+                    trackColor = barBg
+                )
+
+                // Billing Bar: gross billed vs current contract cost (same basis as the Payments tab)
+                val billed = BillingProgress.billedFraction(billedTotal, contractCost)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (billed == null || billedTotal <= 0.0) "Billed: No billings yet"
+                        else "Billed: ${"%.1f".format(billed * 100)}%  ·  ${com.example.utils.CurrencyFormatter.formatPhp(billedTotal)}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (billed == null || billedTotal <= 0.0) GeoTextSecondary else BillingBarFill
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    progress = { billed ?: 0f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50.dp))
+                        .testTag("billing_bar_${project.id}"),
+                    color = BillingBarFill,
                     trackColor = barBg
                 )
             }

@@ -207,17 +207,8 @@ fun OverviewTab(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = DarkBorder)
 
                     // Auto-computed: sum of all scope of work amounts
-                    val computedOriginalCost = remember(project.scopeOfWork) {
-                        try {
-                            val items = org.json.JSONArray(project.scopeOfWork)
-                            var total = 0.0
-                            for (i in 0 until items.length()) {
-                                total += items.getJSONObject(i).optDouble("amount", 0.0)
-                            }
-                            if (total > 0.0) total else project.contractCostOriginal
-                        } catch (e: Exception) {
-                            project.contractCostOriginal
-                        }
+                    val computedOriginalCost = remember(project.scopeOfWork, project.contractCostOriginal) {
+                        com.example.util.ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
                     }
 
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -228,27 +219,9 @@ fun OverviewTab(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             // 1. Approved Variation Orders computation for Revised Contract Cost
-                            val approvedVODocs = remember(pendingDocuments) {
-                                pendingDocuments.filter { 
-                                    it.documentName.contains("Variation Order", ignoreCase = true) && 
-                                    it.status.equals("Approved", ignoreCase = true) 
-                                }
-                            }
-                            val voCostSum = remember(approvedVODocs) {
-                                approvedVODocs.sumOf { vo ->
-                                    val match = Regex("PHP\\s*([0-9,\\.]+)", RegexOption.IGNORE_CASE).find(vo.documentName)
-                                    val amtString = match?.groupValues?.get(1)?.replace(",", "")
-                                    amtString?.toDoubleOrNull() ?: 0.0
-                                }
-                            }
-                            
-                            val revisedContractCostText = remember(approvedVODocs, voCostSum, computedOriginalCost) {
-                                if (approvedVODocs.isNotEmpty()) {
-                                    val totalCost = computedOriginalCost + voCostSum
-                                    com.example.utils.CurrencyFormatter.formatPhp(totalCost)
-                                } else {
-                                    "-"
-                                }
+                            val revisedContractCostText = remember(pendingDocuments, project.scopeOfWork, project.contractCostOriginal) {
+                                com.example.util.ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, pendingDocuments)
+                                    ?.let { com.example.utils.CurrencyFormatter.formatPhp(it) } ?: "-"
                             }
                             DetailItem("Revised Contract Cost", revisedContractCostText)
 

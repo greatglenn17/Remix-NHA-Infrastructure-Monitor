@@ -424,6 +424,7 @@ fun ProjectDetailScreen(
                     "Payments" -> PaymentsTab(
                         project = currentProject,
                         payments = projectPayments,
+                        contractCost = com.example.util.ContractCost.current(currentProject.scopeOfWork, currentProject.contractCostOriginal, pendingDocuments),
                         onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl -> 
                             viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
                         },

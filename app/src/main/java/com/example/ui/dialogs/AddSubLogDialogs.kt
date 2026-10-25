@@ -160,6 +160,8 @@ fun AddCustomDocumentDialog(
 
     // Variation Order
     var voNo by remember { mutableStateOf("") }
+    var voType by remember { mutableStateOf("Additive") }
+    var voTypeExpanded by remember { mutableStateOf(false) }
     var voAmount by remember { mutableStateOf("") }
     var voReason by remember { mutableStateOf("") }
     var voDateApproved by remember { mutableStateOf("") }
@@ -232,7 +234,41 @@ fun AddCustomDocumentDialog(
                     }
                     "Variation Order" -> {
                         OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = voAmount, onValueChange = { voAmount = it }, label = { Text("Amount (PHP)") }, modifier = Modifier.fillMaxWidth())
+                        ExposedDropdownMenuBox(
+                            expanded = voTypeExpanded,
+                            onExpandedChange = { voTypeExpanded = it },
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                readOnly = true,
+                                value = voType,
+                                onValueChange = {},
+                                label = { Text("Type of Variation") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = voTypeExpanded) },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                            )
+                            ExposedDropdownMenu(
+                                expanded = voTypeExpanded,
+                                onDismissRequest = { voTypeExpanded = false },
+                            ) {
+                                listOf("Additive", "Deductive").forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option) },
+                                        onClick = {
+                                            voType = option
+                                            voTypeExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = voAmount,
+                            onValueChange = { voAmount = it },
+                            label = { Text("Amount (PHP)") },
+                            supportingText = { Text(if (voType == "Deductive") "Will be subtracted from the contract cost" else "Will be added to the contract cost") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         OutlinedTextField(value = voReason, onValueChange = { voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(
                             value = voDateApproved,
@@ -290,7 +326,7 @@ fun AddCustomDocumentDialog(
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
                     "Time Extension" -> "Time Extension No. $teNo - $teDays Days"
-                    "Variation Order" -> "Variation Order No. $voNo - PHP $voAmount"
+                    "Variation Order" -> "Variation Order No. $voNo ($voType) - PHP $voAmount"
                     "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
                     "Work Resumption Order" -> "Work Resumption No. $wrNo"
                     else -> "New Document"

@@ -40,6 +40,8 @@ import com.example.ui.theme.*
 fun PaymentsTab(
     project: Project,
     payments: List<ProjectPayment>,
+    // Cost billings are measured against; see ContractCost.current.
+    contractCost: Double,
     onAddPayment: (String, String, String, String, Double, Double, Double, Double, String) -> Unit,
     onUpdatePayment: ((ProjectPayment) -> Unit)? = null,
     onDeletePayment: (ProjectPayment) -> Unit
@@ -282,9 +284,9 @@ fun PaymentsTab(
                                 HorizontalDivider(modifier = Modifier.widthIn(min = 820.dp), color = DarkBorder)
                             }
 
-                            val totalPct = if (project.contractCostRevised > 0) (totalGross / project.contractCostRevised) * 100.0 else 0.0
-                            val finalBalAmt = project.contractCostRevised - totalGross
-                            val finalBalPct = if (project.contractCostRevised > 0) (finalBalAmt / project.contractCostRevised) * 100.0 else 0.0
+                            val totalPct = if (contractCost > 0) (totalGross / contractCost) * 100.0 else 0.0
+                            val finalBalAmt = contractCost - totalGross
+                            val finalBalPct = if (contractCost > 0) (finalBalAmt / contractCost) * 100.0 else 0.0
 
                             Row(
                                 modifier = Modifier
@@ -352,13 +354,13 @@ fun PaymentsTab(
 
     if (showAddDialog) {
         AddPaymentDialog(
-            baseCost = project.contractCostRevised,
+            baseCost = contractCost,
             currentTotalPaid = payments.sumOf { it.grossAmount },
             onDismiss = { showAddDialog = false },
             onSubmit = { name, dvNo, date, period, gross, fileUrl ->
-                val pct = if (project.contractCostRevised > 0) (gross / project.contractCostRevised) * 100 else 0.0
-                val newBal = project.contractCostRevised - (payments.sumOf { it.grossAmount } + gross)
-                val balPct = if (project.contractCostRevised > 0) (newBal / project.contractCostRevised) * 100 else 0.0
+                val pct = if (contractCost > 0) (gross / contractCost) * 100 else 0.0
+                val newBal = contractCost - (payments.sumOf { it.grossAmount } + gross)
+                val balPct = if (contractCost > 0) (newBal / contractCost) * 100 else 0.0
                 onAddPayment(name, dvNo, date, period, gross, pct, newBal, balPct, fileUrl)
                 showAddDialog = false
             }

@@ -547,6 +547,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     @OptIn(ExperimentalCoroutinesApi::class)
     val allPendingDocuments: StateFlow<List<PendingDocument>> = repository.getAllPendingDocuments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** Total gross billed per project id, for the dashboard billing bars. */
+    val billedTotalsByProject: StateFlow<Map<Long, Double>> = projectDao.getAllPayments()
+        .map { payments -> payments.groupBy { it.projectId }.mapValues { (_, p) -> p.sumOf { it.grossAmount } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     val dashboardSummaryStats: StateFlow<com.example.data.model.DashboardSummaryStats> = combine(userScopedProjects, allPendingDocuments) { projects, docs ->
         val activeCount = projects.count { it.status.equals("On-going", ignoreCase = true) }
         val slippageCount = projects.count { it.variance < 0 || it.status.equals("Behind Schedule", ignoreCase = true) }

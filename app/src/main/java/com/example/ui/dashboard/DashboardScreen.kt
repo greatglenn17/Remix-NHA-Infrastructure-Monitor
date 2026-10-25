@@ -54,6 +54,7 @@ fun DashboardScreen(
     val sortOrder by viewModel.sortOrder.collectAsState()
     val allPendingDocs by viewModel.allPendingDocuments.collectAsState()
     val summaryStats by viewModel.dashboardSummaryStats.collectAsState()
+    val billedTotals by viewModel.billedTotalsByProject.collectAsState()
 
     var showSortMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -455,6 +456,8 @@ fun DashboardScreen(
                         ProjectTileCard(
                             project = project,
                             pendingDocsCount = pendingCount,
+                            billedTotal = billedTotals[project.id] ?: 0.0,
+                            contractCost = com.example.util.ContractCost.current(project.scopeOfWork, project.contractCostOriginal, allPendingDocs.filter { it.projectId == project.id }),
                             onClick = {
                                 viewModel.selectProject(project.id)
                                 onProjectClick(project)
