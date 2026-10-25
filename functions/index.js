@@ -1,7 +1,10 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const functions = require("firebase-functions/v1");
+const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 
-admin.initializeApp();
+initializeApp();
 
 // Same region as the Firestore database, so triggers do not cross regions.
 const REGION = "asia-southeast1";
@@ -30,7 +33,7 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
     // Read the real email from Firebase Auth, not from the client-written profile.
     let email;
     try {
-      const authUser = await admin.auth().getUser(uid);
+      const authUser = await getAuth().getUser(uid);
       email = (authUser.email || "").trim().toLowerCase();
     } catch (err) {
       console.error(`Could not read Auth user ${uid}; claims not set:`, err);
@@ -44,7 +47,7 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
     }
 
     try {
-      await admin.auth().setCustomUserClaims(uid, { role: requestedRole });
+      await getAuth().setCustomUserClaims(uid, { role: requestedRole });
       console.log(`Assigned claim { role: "${requestedRole}" } to ${uid} (${email})`);
     } catch (err) {
       console.error(`Failed to assign custom claim to ${uid}:`, err);
@@ -84,7 +87,7 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
     const body = `${projectName} has been added by ${after.assignedStaff || "a team member"}.`;
 
     try {
-      const usersSnapshot = await admin.firestore().collection("users").get();
+      const usersSnapshot = await getFirestore().collection("users").get();
       const tokens = [];
 
       for (const userDoc of usersSnapshot.docs) {
@@ -95,7 +98,7 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
           assignedUids.includes(userDoc.id) || userDoc.get("role") === "SUPER_ADMIN";
         if (!isRecipient) continue;
 
-        const tokenDocs = await admin.firestore()
+        const tokenDocs = await getFirestore()
           .collection("users").doc(userDoc.id).collection("fcmTokens").get();
 
         tokenDocs.forEach((t) => {
@@ -109,7 +112,7 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
         return null;
       }
 
-      const response = await admin.messaging().sendEachForMulticast({
+      const response = await getMessaging().sendEachForMulticast({
         tokens,
         data: {
           type: "PROJECT_CREATED",
@@ -134,7 +137,7 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
             code === "messaging/registration-token-not-registered"
           ) {
             staleCleanup.push(
-              admin.firestore().collectionGroup("fcmTokens")
+              getFirestore().collectionGroup("fcmTokens")
                 .where("token", "==", tokens[idx]).get()
                 .then((snap) => snap.forEach((doc) => doc.ref.delete()))
             );
@@ -185,7 +188,7 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION)
     }
 
     try {
-      const db = admin.firestore();
+      const db = getFirestore();
       const current = await db.collection("projects").doc(projectId).get();
       if (!current.exists) return null;
       const assignedUids = current.data().assignedUids;
@@ -214,12 +217,12 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION)
  */
 async function notifySuperAdminsOnRegistration(userData) {
   try {
-    const superAdminUsers = await admin.firestore()
+    const superAdminUsers = await getFirestore()
       .collection("users").where("role", "==", "SUPER_ADMIN").get();
 
     const tokens = [];
     for (const doc of superAdminUsers.docs) {
-      const tokenDocs = await admin.firestore()
+      const tokenDocs = await getFirestore()
         .collection("users").doc(doc.id).collection("fcmTokens").get();
       tokenDocs.forEach((t) => {
         const token = t.data().token;
@@ -229,7 +232,7 @@ async function notifySuperAdminsOnRegistration(userData) {
 
     if (tokens.length === 0) return;
 
-    await admin.messaging().sendEachForMulticast({
+    await getMessaging().sendEachForMulticast({
       tokens,
       data: {
         type: "REGISTRATION_ALERT",
