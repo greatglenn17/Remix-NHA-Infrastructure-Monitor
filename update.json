@@ -1,8 +1,8 @@
 {
-  "versionCode": 151,
-  "versionName": "1.5.1",
-  "releaseNotes": "v1.5.1: A new weekly report starts on the current week (Monday to Sunday) instead of a fixed August date, and its daily weather follows that week.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.5.1/NHA_Monitor_v1.5.1_Build151.apk",
-  "apkSha256": "5954785631551e42237069bfc26c7ccc6303b6ed212a5975506e5db47d101bea",
+  "versionCode": 160,
+  "versionName": "1.6.0",
+  "releaseNotes": "v1.6.0: Each dashboard project card shows how much of the contract has been billed. Variation Orders are marked Additive or Deductive (deductive amounts are subtracted), and the revised contract cost from approved orders is used by the Overview tab, the Payments tab totals and the billing bar.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.6.0/NHA_Monitor_v1.6.0_Build160.apk",
+  "apkSha256": "5a70283c9eac8a1e069c9953786c814f80fcc97edf530a7bb3de8517a0c87e69",
   "isMandatory": true
 }

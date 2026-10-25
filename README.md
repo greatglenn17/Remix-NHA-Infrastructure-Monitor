@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.5.1%20%28Build%20151%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.6.0%20%28Build%20160%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.5.1`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.5.1_Build151.apk`** to download the installation package.
+2. Tap the latest release (`v1.6.0`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.6.0_Build160.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.6.0`** | **`160`** | 💰 Billing Bar & Variation Types: Each dashboard project card shows how much of the contract has been billed. Variation Orders are marked Additive or Deductive (deductive amounts are subtracted), and the revised contract cost from approved orders is used by the Overview tab, the Payments tab totals and the billing bar |
 | **`v1.5.1`** | **`151`** | 🗓️ Weekly Report Week Fix: A new weekly report starts on the current week (Monday to Sunday) instead of a fixed August date, and its daily weather follows that week |
 | **`v1.5.0`** | **`150`** | 🔐 Account-Based Project Access: Engineers and viewers see and sync only the projects assigned to their account, enforced in the cloud. The Super Admin sees every project and assigns people from a checklist on the edit screen; a new project is assigned to its creator. Photos and scans are stored per project |
 | **`v1.4.2`** | **`142`** | 🧹 Sample Data Removed: New projects start with every checklist document Pending and no remarks. Forms no longer prefill sample names, statuses or fixed dates (payments, project start, monthly sign-offs, suspension/resumption orders), and untouched sample values already saved are cleared |
