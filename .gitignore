@@ -31,3 +31,6 @@ users.json
 # Rules test dependencies
 rules-tests/node_modules/
 rules-tests/*-debug.log
+
+# Local Claude Code skills (UI/UX Pro Max), kept out of the public repo
+.claude/
