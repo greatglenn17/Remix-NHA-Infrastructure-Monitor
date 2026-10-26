@@ -42,13 +42,14 @@ Each release ships on its own and passes the testing below.
 
 ## Design system
 
-Found: `ui/theme/Theme.kt` defines light and dark Material 3 schemes, but no screen reads
-`MaterialTheme.colorScheme`. 26 files use fixed `DarkBackground`/`DarkSurface`/... constants
-and 413 hand-written `Color(0x...)` values sit outside `ui/theme`, so light mode has no
-effect today.
+Found: `ui/theme/Theme.kt` defines light and dark Material 3 schemes and the account menu
+has a System/Light/Dark switch (default System). The `DarkBackground`/`DarkSurface`/... names
+used by 26 files are theme-aware getters over `LocalNHAColors`, so those surfaces already
+follow the switch. What does not adapt is the 413 hand-written `Color(0x...)` values outside
+`ui/theme`.
 
-- Screens take colours only from `MaterialTheme.colorScheme` and a small `NhaStatusColors`
-  set provided through a `CompositionLocal` (on track, watch, behind, neutral), each with
+- Screens take colours only from `MaterialTheme.colorScheme` and status roles added to the
+  existing `NHAColors` (`LocalNHAColors`): on track, watch, behind, neutral, each with
   light and dark values.
 - Light palette:
 
@@ -78,7 +79,8 @@ effect today.
 
 Layout, top to bottom:
 
-1. Header: office name, project count, last sync time.
+1. Header: office name and project count. (The app keeps no Firestore last-sync time; the
+   top bar already shows sync status.)
 2. Four counts: Behind schedule, Billing ahead of work, Waiting approval, Due in 30 days.
    Tapping a count filters the project list to those projects.
 3. Needs attention: up to 5 items, red then amber then grey, each opening its project;
