@@ -126,3 +126,7 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+roborazzi {
+  outputDir.set(file("src/test/screenshots"))
+}

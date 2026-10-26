@@ -7,7 +7,13 @@ import org.junit.Test
 // Screens moved to the theme must not hand-set colours; the list grows each stage.
 class ThemeGuardTest {
     companion object {
-        val MIGRATED = listOf("ui/components/TopAppBarHeader.kt")
+        val MIGRATED = listOf(
+            "ui/components/TopAppBarHeader.kt",
+            "ui/dashboard/DashboardScreen.kt",
+            "ui/dashboard/PortfolioContent.kt",
+            "ui/dashboard/PortfolioRow.kt",
+            "ui/dashboard/PortfolioCounts.kt"
+        )
     }
 
     @Test

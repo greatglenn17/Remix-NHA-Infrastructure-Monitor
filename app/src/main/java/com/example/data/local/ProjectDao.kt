@@ -170,14 +170,6 @@ interface ProjectDao {
     @Query("SELECT * FROM sdp_lot_inspections")
     fun getAllSdpLotInspections(): Flow<List<SdpLotInspection>>
 
-    @Query("""
-        SELECT 
-            (SELECT COUNT(*) FROM projects WHERE status IN ('On-going', 'Behind Schedule')) AS activeProjectsCount,
-            (SELECT COUNT(*) FROM projects WHERE status = 'Behind Schedule' OR (status = 'On-going' AND (actualAccomplishment - targetAccomplishment) < 0)) AS slippageProjectsCount,
-            (SELECT COUNT(*) FROM pending_documents WHERE status = 'Pending') AS pendingDocsCount
-    """)
-    fun getDashboardSummaryStats(): Flow<com.example.data.model.DashboardSummaryStats>
-
     // SDP Plans
     @Query("SELECT * FROM sdp_plans WHERE projectId = :projectId ORDER BY version DESC")
     fun getSdpPlansForProject(projectId: Long): Flow<List<SdpPlan>>

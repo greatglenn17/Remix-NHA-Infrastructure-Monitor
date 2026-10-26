@@ -622,23 +622,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PortfolioUiState.EMPTY)
 
-    val dashboardSummaryStats: StateFlow<com.example.data.model.DashboardSummaryStats> = combine(userScopedProjects, allPendingDocuments) { projects, docs ->
-        val activeCount = projects.count { it.status.equals("On-going", ignoreCase = true) }
-        val slippageCount = projects.count { it.variance < 0 || it.status.equals("Behind Schedule", ignoreCase = true) }
-        val projectIds = projects.map { it.id }.toSet()
-        // Only documents of projects this account can see; none visible means none counted.
-        val pendingCount = docs.count { it.status != "Approved" && it.projectId in projectIds }
-        com.example.data.model.DashboardSummaryStats(
-            activeProjectsCount = activeCount,
-            slippageProjectsCount = slippageCount,
-            pendingDocsCount = pendingCount
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = com.example.data.model.DashboardSummaryStats(0, 0, 0)
-    )
-
     @OptIn(ExperimentalCoroutinesApi::class)
     val pendingDocuments: StateFlow<List<PendingDocument>> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getPendingDocuments(id)

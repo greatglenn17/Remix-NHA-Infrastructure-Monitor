@@ -65,7 +65,6 @@ class ProjectRepository(
     // Pending Documents
     fun getPendingDocuments(projectId: Long): Flow<List<PendingDocument>> = projectDao.getPendingDocumentsForProject(projectId)
     fun getAllPendingDocuments(): Flow<List<PendingDocument>> = projectDao.getAllPendingDocuments()
-    fun getDashboardSummaryStats(): Flow<com.example.data.model.DashboardSummaryStats> = projectDao.getDashboardSummaryStats()
 
     suspend fun insertPendingDocument(doc: PendingDocument, role: UserRole? = null) {
         validatePermission(role, Permission.UPLOAD_DOCUMENT)
