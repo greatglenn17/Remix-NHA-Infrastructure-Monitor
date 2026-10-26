@@ -62,6 +62,15 @@ class ProjectAttentionTest {
         assertEquals(WARNING, flags(project(50.0, 40.0)).level(BEHIND))
     }
 
+    @Test fun slippageAtTen_withFloatingPointError_isWarning() {
+        // 6.40 - 16.40 is -9.999999999999998 in doubles.
+        assertEquals(WARNING, flags(project(16.40, 6.40)).level(BEHIND))
+    }
+
+    @Test fun slippageAtFifteen_withFloatingPointError_isCritical() {
+        assertEquals(CRITICAL, flags(project(16.06, 1.06)).level(BEHIND))
+    }
+
     @Test fun slippageAtFifteen_isCritical() {
         val f = flags(project(50.0, 35.0)).of(BEHIND).single()
         assertEquals(CRITICAL, f.level)

@@ -47,7 +47,7 @@ fun PortfolioRow(
     val project = item.project
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
-    val varianceColor = varianceColor(project.variance, colors)
+    val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
 
     Surface(
         onClick = { onOpen(project) },

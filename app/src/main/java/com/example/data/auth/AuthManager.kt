@@ -355,10 +355,9 @@ class AuthManager(private val context: Context) {
     }
 
     /**
-     * Get persisted theme mode; light when none was ever saved.
+     * Get persisted theme mode or default to System (forms are not light-safe until v1.9.0).
      */
     fun getSavedAppThemeMode(): com.example.data.model.AppThemeMode {
-        if (!prefs.contains("app_theme_mode")) return com.example.data.model.AppThemeMode.LIGHT
         val savedName = prefs.getString("app_theme_mode", com.example.data.model.AppThemeMode.SYSTEM.name)
         return try {
             com.example.data.model.AppThemeMode.valueOf(savedName ?: com.example.data.model.AppThemeMode.SYSTEM.name)

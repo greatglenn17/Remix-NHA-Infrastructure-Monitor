@@ -32,7 +32,7 @@ object ProjectAttention {
         val flags = mutableListOf<AttentionFlag>()
         val finished = project.actualAccomplishment >= 100.0
 
-        val slip = project.variance
+        val slip = slippage(project)
         val markedBehind = project.status == ProjectStatus.BEHIND_SCHEDULE.label
         if (slip <= WARNING_SLIPPAGE || markedBehind) {
             val level = if (slip <= CRITICAL_SLIPPAGE) AttentionLevel.CRITICAL else AttentionLevel.WARNING
@@ -82,6 +82,9 @@ object ProjectAttention {
 
         return flags.sortedBy { it.level }
     }
+
+    /** Variance rounded to 2 decimals, so -10.0 / -15.0 boundaries are not missed by floating-point error. */
+    fun slippage(project: Project): Double = Math.round(project.variance * 100) / 100.0
 
     private fun days(n: Long) = if (n == 1L) "1 day" else "$n days"
 

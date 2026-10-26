@@ -14,8 +14,9 @@ class ThemeDefaultTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
-    fun unsetTheme_defaultsToLight() {
-        assertEquals(AppThemeMode.LIGHT, AuthManager(context).getSavedAppThemeMode())
+    fun unsetTheme_staysSystemUntilFormsUseTheTheme() {
+        // Forms still hard-code white text until v1.9.0, so a forced light default would hide typed input.
+        assertEquals(AppThemeMode.SYSTEM, AuthManager(context).getSavedAppThemeMode())
     }
 
     @Test
