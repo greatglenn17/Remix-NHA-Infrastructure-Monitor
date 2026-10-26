@@ -24,7 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
-| **`v1.7.0`** | **`170`** | 📊 Portfolio Home: a light oversight dashboard with counts for slippage, billing ahead of work, pending approvals and deadlines, a ranked Needs attention list, and work-done vs billed bars for every project |
+| **`v1.7.0`** | **`170`** | 📊 Portfolio Home: an oversight dashboard with counts for slippage, billing ahead of work, pending approvals and deadlines, a ranked Needs attention list, and work-done vs billed bars for every project |
 | **`v1.6.0`** | **`160`** | 💰 Billing Bar & Variation Types: Each dashboard project card shows how much of the contract has been billed. Variation Orders are marked Additive or Deductive (deductive amounts are subtracted), and the revised contract cost from approved orders is used by the Overview tab, the Payments tab totals and the billing bar |
 | **`v1.5.1`** | **`151`** | 🗓️ Weekly Report Week Fix: A new weekly report starts on the current week (Monday to Sunday) instead of a fixed August date, and its daily weather follows that week |
 | **`v1.5.0`** | **`150`** | 🔐 Account-Based Project Access: Engineers and viewers see and sync only the projects assigned to their account, enforced in the cloud. The Super Admin sees every project and assigns people from a checklist on the edit screen; a new project is assigned to its creator. Photos and scans are stored per project |
