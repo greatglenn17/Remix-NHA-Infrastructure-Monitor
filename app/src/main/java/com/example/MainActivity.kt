@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
@@ -82,6 +83,8 @@ class MainActivity : ComponentActivity() {
                         var showAddIssueDialog by remember { mutableStateOf(false) }
 
                         // Navigation: Null selected project -> Dashboard Screen; Selected -> Detail Screen
+                        // Dialogs and sheets are their own windows, so they take Back before this does.
+                        BackHandler(enabled = selectedProjectId != null) { viewModel.selectProject(null) }
                         if (selectedProjectId == null) {
                             DashboardScreen(
                                 viewModel = viewModel,

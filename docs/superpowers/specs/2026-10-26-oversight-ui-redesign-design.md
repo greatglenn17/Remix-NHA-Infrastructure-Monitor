@@ -26,7 +26,8 @@ sideways-scrolling strip, and the Payments tab is an 820dp table that scrolls si
 - Room database, Firestore sync, roles, permissions and project assignment.
 - Every field and validation rule in the forms. Only their layout changes.
 - Navigation stays state-based in `MainActivity` (no project selected = portfolio,
-  selected = project; Back clears the selection). `navigation-compose` stays unused.
+  selected = project). A `BackHandler` makes system Back clear the selection (v1.7.0 and
+  earlier exited the app instead). `navigation-compose` stays unused.
 - Release process: version bump, debug-signed APK, GitHub release, mandatory update via
   `update.json`.
 
