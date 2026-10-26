@@ -27,6 +27,9 @@ interface ReportDao {
     @Query("SELECT * FROM weekly_reports")
     fun getAllWeeklyReports(): Flow<List<WeeklyReport>>
 
+    @Query("SELECT projectId, MAX(createdAtTimestamp) AS latestAt FROM weekly_reports GROUP BY projectId")
+    fun getLatestWeeklyReportTimes(): Flow<List<ProjectLatestReport>>
+
     // Daily Hourly Weather
     @Query("SELECT * FROM daily_hourly_weather")
     fun getAllDailyWeather(): Flow<List<DailyHourlyWeather>>

@@ -18,6 +18,16 @@ import com.example.data.remote.FirestoreSyncManager
 import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
 import com.example.util.AppNotificationManager
+import com.example.util.AttentionFlag
+import com.example.util.BillingProgress
+import com.example.util.ContractCost
+import com.example.util.Portfolio
+import com.example.util.PortfolioFilter
+import com.example.util.PortfolioItem
+import com.example.util.PortfolioSummary
+import com.example.util.ProjectAttention
+import java.time.Instant
+import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
@@ -30,6 +40,18 @@ private data class FilterParams(
     val sort: String,
     val user: UserAccount
 )
+
+data class PortfolioUiState(
+    val summary: PortfolioSummary,
+    val attention: List<Pair<PortfolioItem, AttentionFlag>>,  // from all scoped projects
+    val rows: List<PortfolioItem>,                            // search, status, type, filter and sort applied
+    val filter: PortfolioFilter?,
+    val totalProjects: Int
+) {
+    companion object {
+        val EMPTY = PortfolioUiState(PortfolioSummary(0, 0, 0, 0), emptyList(), emptyList(), null, 0)
+    }
+}
 
 class ProjectViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -94,7 +116,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _typeFilter = MutableStateFlow("All")
     val typeFilter: StateFlow<String> = _typeFilter.asStateFlow()
 
-    private val _sortOrder = MutableStateFlow("Variance (Worst First)")
+    private val _sortOrder = MutableStateFlow(Portfolio.NEEDS_ATTENTION_SORT)
     val sortOrder: StateFlow<String> = _sortOrder.asStateFlow()
 
     // Selected Project ID for detail view
@@ -302,6 +324,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             }
 
             when (params.sort) {
+                // Ordered later from the attention flags in portfolioState.
+                Portfolio.NEEDS_ATTENTION_SORT -> list
                 "Variance (Worst First)" -> list.sortedBy { it.variance }
                 "Variance (Best First)" -> list.sortedByDescending { it.variance }
                 "Completion Date" -> list.sortedBy { it.completionDateRevised }
@@ -551,6 +575,52 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     val billedTotalsByProject: StateFlow<Map<Long, Double>> = projectDao.getAllPayments()
         .map { payments -> payments.groupBy { it.projectId }.mapValues { (_, p) -> p.sumOf { it.grossAmount } } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    private val _portfolioFilter = MutableStateFlow<PortfolioFilter?>(null)
+
+    /** Tapping the active count again clears it. */
+    fun setPortfolioFilter(filter: PortfolioFilter?) {
+        _portfolioFilter.value = if (_portfolioFilter.value == filter) null else filter
+    }
+
+    private val portfolioItems: Flow<List<PortfolioItem>> = combine(
+        userScopedProjects, allPendingDocuments, billedTotalsByProject, reportDao.getLatestWeeklyReportTimes()
+    ) { projects, docs, billed, latest ->
+        val today = LocalDate.now()
+        val docsByProject = docs.groupBy { it.projectId }
+        val latestByProject = latest.associate {
+            it.projectId to Instant.ofEpochMilli(it.latestAt).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
+        projects.map { project ->
+            val projectDocs = docsByProject[project.id].orEmpty()
+            val billedTotal = billed[project.id] ?: 0.0
+            val cost = ContractCost.current(project.scopeOfWork, project.contractCostOriginal, projectDocs)
+            val lastUpdate = latestByProject[project.id]
+            PortfolioItem(
+                project = project,
+                flags = ProjectAttention.flags(project, projectDocs, billedTotal, lastUpdate, today),
+                billedFraction = BillingProgress.billedFraction(billedTotal, cost),
+                billedTotal = billedTotal,
+                contractCost = cost,
+                pendingDocsCount = projectDocs.count { it.status != "Approved" },
+                lastFieldUpdate = lastUpdate
+            )
+        }
+    }
+
+    val portfolioState: StateFlow<PortfolioUiState> = combine(
+        portfolioItems, filteredProjects, _portfolioFilter, sortOrder
+    ) { items, filtered, filter, sort ->
+        val byId = items.associateBy { it.project.id }
+        val rows = filtered.mapNotNull { byId[it.id] }.filter { Portfolio.matches(it, filter) }
+        PortfolioUiState(
+            summary = Portfolio.summarize(items),
+            attention = Portfolio.attentionQueue(items),
+            rows = if (sort == Portfolio.NEEDS_ATTENTION_SORT) Portfolio.sortByAttention(rows) else rows,
+            filter = filter,
+            totalProjects = items.size
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PortfolioUiState.EMPTY)
 
     val dashboardSummaryStats: StateFlow<com.example.data.model.DashboardSummaryStats> = combine(userScopedProjects, allPendingDocuments) { projects, docs ->
         val activeCount = projects.count { it.status.equals("On-going", ignoreCase = true) }
