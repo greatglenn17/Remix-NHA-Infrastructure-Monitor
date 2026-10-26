@@ -13,6 +13,14 @@ data class NHAColors(
     val textSecondary: Color,
     val border: Color,
     val cardHeader: Color,
+    val onTrack: Color,
+    val watch: Color,
+    val behind: Color,
+    val neutral: Color,
+    val onTrackContainer: Color,
+    val watchContainer: Color,
+    val behindContainer: Color,
+    val neutralContainer: Color,
     val isDark: Boolean
 )
 
@@ -26,12 +34,12 @@ val StaticDarkBorder = Color(0xFF334155)          // Crisp dark outline border
 val StaticDarkCardHeader = Color(0xFF1E293B)
 
 // Executive Light Theme Palette
-val StaticLightBackground = Color(0xFFF1F5F9)     // Crisp light slate background
+val StaticLightBackground = Color(0xFFF8FAFC)     // Crisp light slate background
 val StaticLightSurface = Color(0xFFFFFFFF)        // Clean white card background
 val StaticLightSurfaceVariant = Color(0xFFE2E8F0) // Light input field / chip background
 val StaticLightTextPrimary = Color(0xFF0F172A)    // Crisp dark slate primary text
-val StaticLightTextSecondary = Color(0xFF64748B)  // Clean muted slate text
-val StaticLightBorder = Color(0xFFCBD5E1)         // Clean light outline border
+val StaticLightTextSecondary = Color(0xFF475569)  // Clean muted slate text
+val StaticLightBorder = Color(0xFFE2E8F0)         // Clean light outline border
 val StaticLightCardHeader = Color(0xFFE2E8F0)
 
 val DarkNHAColors = NHAColors(
@@ -42,6 +50,14 @@ val DarkNHAColors = NHAColors(
     textSecondary = StaticDarkTextSecondary,
     border = StaticDarkBorder,
     cardHeader = StaticDarkCardHeader,
+    onTrack = Color(0xFF4ADE80),
+    watch = Color(0xFFFBBF24),
+    behind = Color(0xFFFCA5A5),
+    neutral = Color(0xFF94A3B8),
+    onTrackContainer = Color(0xFF062C1E),
+    watchContainer = Color(0xFF331D08),
+    behindContainer = Color(0xFF371215),
+    neutralContainer = Color(0xFF1E293B),
     isDark = true
 )
 
@@ -53,6 +69,14 @@ val LightNHAColors = NHAColors(
     textSecondary = StaticLightTextSecondary,
     border = StaticLightBorder,
     cardHeader = StaticLightCardHeader,
+    onTrack = Color(0xFF15803D),
+    watch = Color(0xFFB45309),
+    behind = Color(0xFFB91C1C),
+    neutral = Color(0xFF64748B),
+    onTrackContainer = Color(0xFFDCFCE7),
+    watchContainer = Color(0xFFFEF3C7),
+    behindContainer = Color(0xFFFEE2E2),
+    neutralContainer = Color(0xFFF1F5F9),
     isDark = false
 )
 

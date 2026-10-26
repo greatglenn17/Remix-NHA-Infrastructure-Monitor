@@ -34,3 +34,6 @@ val Typography =
     )
     */
   )
+
+// Tabular digits so money and percentages line up in columns.
+val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
