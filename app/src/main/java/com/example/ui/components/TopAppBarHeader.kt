@@ -223,10 +223,10 @@ fun TopAppBarHeader(
                             HeaderBadge(
                                 text = "LOCAL DATA",
                                 icon = Icons.Default.Storage,
-                                iconTint = Color(0xFFFBBF24),
-                                textColor = Color(0xFFFBBF24),
-                                backgroundColor = Color(0xFFF59E0B).copy(alpha = 0.2f),
-                                borderColor = Color(0xFFF59E0B).copy(alpha = 0.8f),
+                                iconTint = LocalNHAColors.current.watch,
+                                textColor = LocalNHAColors.current.watch,
+                                backgroundColor = LocalNHAColors.current.watchContainer,
+                                borderColor = LocalNHAColors.current.watch.copy(alpha = 0.8f),
                                 isSpinning = false
                             )
 
@@ -235,10 +235,10 @@ fun TopAppBarHeader(
                                 HeaderBadge(
                                     text = "MANUAL BACKUP",
                                     icon = Icons.Default.CloudSync,
-                                    iconTint = Color(0xFF38BDF8),
-                                    textColor = Color(0xFF38BDF8),
-                                    backgroundColor = Color(0xFF0F766E).copy(alpha = 0.25f),
-                                    borderColor = Color(0xFF38BDF8).copy(alpha = 0.8f),
+                                    iconTint = MaterialTheme.colorScheme.primary,
+                                    textColor = MaterialTheme.colorScheme.primary,
+                                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                                     onClick = onOpenDriveSync
                                 )
                             }
@@ -272,7 +272,7 @@ fun TopAppBarHeader(
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Notifications",
-                                    tint = if (unreadNotificationCount > 0) Color(0xFF38BDF8) else DarkTextSecondary,
+                                    tint = if (unreadNotificationCount > 0) MaterialTheme.colorScheme.primary else DarkTextSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -301,7 +301,7 @@ fun TopAppBarHeader(
                                 UserRole.VIEWER -> Icons.Default.Visibility
                             },
                             contentDescription = "Role Icon",
-                            tint = Color(0xFF38BDF8),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -347,7 +347,7 @@ fun TopAppBarHeader(
                             )
                             Text(
                                 text = "${currentUser.title} • ${currentUser.office}",
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.SemiBold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             )
                         }
 
@@ -383,8 +383,8 @@ fun TopAppBarHeader(
                                 Surface(
                                     onClick = { onSetThemeMode?.invoke(mode) },
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) Color(0xFF38BDF8).copy(alpha = 0.25f) else DarkSurfaceVariant,
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF38BDF8) else DarkBorder),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else DarkSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else DarkBorder),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Column(
@@ -398,7 +398,7 @@ fun TopAppBarHeader(
                                                 AppThemeMode.DARK -> Icons.Default.DarkMode
                                             },
                                             contentDescription = mode.displayName,
-                                            tint = if (isSelected) Color(0xFF38BDF8) else DarkTextSecondary,
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else DarkTextSecondary,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
@@ -409,7 +409,7 @@ fun TopAppBarHeader(
                                                 AppThemeMode.DARK -> "Dark"
                                             },
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = if (isSelected) Color(0xFF38BDF8) else DarkTextPrimary,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else DarkTextPrimary,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = 10.5.sp
                                             )
@@ -486,7 +486,7 @@ fun TopAppBarHeader(
                                     text = "About NHA Monitor",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF38BDF8)
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 )
                             },
@@ -498,7 +498,7 @@ fun TopAppBarHeader(
                                 Icon(
                                     imageVector = Icons.Default.Info,
                                     contentDescription = "About App",
-                                    tint = Color(0xFF38BDF8)
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         )
@@ -539,7 +539,7 @@ fun TopAppBarHeader(
             onDismissRequest = { showAboutDialog = false },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) {
-                    Text("CLOSE", color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                    Text("CLOSE", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             title = {
@@ -547,7 +547,7 @@ fun TopAppBarHeader(
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
-                        tint = Color(0xFF38BDF8),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -572,7 +572,7 @@ fun TopAppBarHeader(
                             Text(
                                 text = "APPLICATION CREATOR",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF38BDF8),
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             )
@@ -603,7 +603,7 @@ fun TopAppBarHeader(
                             Text(
                                 text = "BUILD & SYSTEM INFO",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF4ADE80),
+                                    color = LocalNHAColors.current.onTrack,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                             )
@@ -647,8 +647,8 @@ fun TopAppBarHeader(
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0284C7),
-                                    contentColor = Color.White
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
