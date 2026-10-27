@@ -4,7 +4,7 @@ package com.example.ui.detail
 enum class ProjectSection(val label: String) {
     SUMMARY("Summary"),
     PROGRESS("Progress"),
-    MONEY("Money"),
+    MONEY("Payments"),
     DOCUMENTS("Documents")
 }
 
@@ -15,7 +15,7 @@ object SectionChips {
         listOfNotNull("Weekly", "Monthly", "Lots".takeIf { isHousing }, "Photos", "Weather", "Issues")
 
     fun documents(canViewAuditLogs: Boolean): List<String> =
-        listOfNotNull("Checklist", "Schedule orders", "Files", "Audit log".takeIf { canViewAuditLogs })
+        listOfNotNull("Related Files", "Audit log".takeIf { canViewAuditLogs })
 
     fun chipOrFirst(chips: List<String>, chip: String?): String = chip?.takeIf { it in chips } ?: chips.first()
 }

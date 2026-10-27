@@ -23,7 +23,7 @@ import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.MoneySection
 import com.example.ui.detail.sections.ProjectHeader
 import com.example.ui.detail.sections.SummarySection
-import com.example.ui.detail.tabs.PendingDocumentsTab
+import com.example.ui.detail.sections.RelatedFilesList
 import com.example.ui.detail.tabs.WeeklyReportsTab
 import com.example.ui.theme.NHATheme
 import com.example.util.AttentionFlag
@@ -112,6 +112,7 @@ class ProjectDetailScreenshotTest {
     @Composable
     private fun Summary() = SummarySection(
         project, flags, docs, reports.first(), openIssues = 2, canEditProject = true, onEditProject = {},
+        currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
         today = LocalDate.of(2026, 10, 27)
     )
 
@@ -119,6 +120,7 @@ class ProjectDetailScreenshotTest {
     private fun Money(payments: List<ProjectPayment> = this.payments, cost: Double = 10_450_000.0) = MoneySection(
         payments = payments, contractCost = cost, actualPercent = project.actualAccomplishment, documents = docs,
         canAddVariationOrder = true, onAddVariationOrder = {},
+        currentUserRole = UserRole.ENGINEER_ADMIN, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
         onAddPayment = { _, _, _, _, _, _, _, _, _ -> }, onUpdatePayment = {}, onDeletePayment = {}
     )
 
@@ -130,8 +132,8 @@ class ProjectDetailScreenshotTest {
 
     @Composable
     private fun Documents() = Column {
-        ChipRow(SectionChips.documents(true), "Checklist") {}
-        PendingDocumentsTab(docs.sortedBy { it.status == "Approved" }, UserRole.ENGINEER_ADMIN, {}, { _, _, _ -> }, { _, _ -> }, {})
+        ChipRow(SectionChips.documents(true), "Related Files") {}
+        RelatedFilesList(docs, UserRole.ENGINEER_ADMIN, { _, _, _, _ -> }, { _, _ -> }, {})
     }
 
     private fun sections(width: String, mode: AppThemeMode) {

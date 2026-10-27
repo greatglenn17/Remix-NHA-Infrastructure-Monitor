@@ -109,6 +109,8 @@ class RecordSync(private val db: AppDatabase) {
             if (local != null) writeRemote { it.delete("`$table`", "id = ?", arrayOf(local.first)) }
             return true
         }
+        // A cached snapshot from before this phone's own delete must not bring the record back.
+        if (local == null && deletedHereAt(uuid) >= revision) return true
         if (local != null && !RemoteVersion.isNewer(local.second, local.third, revision, remoteUpdatedAt)) return true
 
         val projectId = sql.query(
@@ -144,6 +146,11 @@ class RecordSync(private val db: AppDatabase) {
         }
         return true
     }
+
+    /** Revision of this phone's latest delete of [uuid] (the outbox keeps sent events), or 0. */
+    private fun deletedHereAt(uuid: String): Long =
+        sql.query("SELECT IFNULL(MAX(revision), 0) FROM sync_outbox WHERE entityUuid = ? AND operation = 'DELETE'", arrayOf(uuid))
+            .use { c -> if (c.moveToFirst()) c.getLong(0) else 0L }
 
     private fun keepLocalAbove(doc: Map<String, Any?>) {
         val table = doc["type"] as? String ?: return

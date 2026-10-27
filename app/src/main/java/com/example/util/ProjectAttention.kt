@@ -22,6 +22,12 @@ object ProjectAttention {
     const val STALE_DAYS = 14
     val ORDER_TYPES = listOf("Variation Order", "Time Extension", "Work Suspension", "Work Resumption")
 
+    /** Time extensions, suspensions, resumptions and variation orders not yet Approved. */
+    fun waitingApproval(documents: List<PendingDocument>): Int = documents.count { doc ->
+        !doc.status.equals("Approved", ignoreCase = true) &&
+            ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) }
+    }
+
     fun flags(
         project: Project,
         documents: List<PendingDocument>,
@@ -51,10 +57,7 @@ object ProjectAttention {
             }
         }
 
-        val waiting = documents.count { doc ->
-            !doc.status.equals("Approved", ignoreCase = true) &&
-                ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) }
-        }
+        val waiting = waitingApproval(documents)
         if (waiting > 0) {
             val noun = if (waiting == 1) "order" else "orders"
             flags += AttentionFlag(AttentionKind.WAITING_APPROVAL, AttentionLevel.WARNING, "$waiting $noun waiting approval")

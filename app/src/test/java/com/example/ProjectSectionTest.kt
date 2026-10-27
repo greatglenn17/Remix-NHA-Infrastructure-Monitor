@@ -3,7 +3,6 @@ package com.example
 import com.example.ui.detail.SectionChips
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProjectSectionTest {
@@ -16,9 +15,9 @@ class ProjectSectionTest {
 
     @Test
     fun documents_auditOnlyWithPermission() {
-        assertEquals(listOf("Checklist", "Schedule orders", "Files", "Audit log"), SectionChips.documents(true))
+        assertEquals(listOf("Related Files", "Audit log"), SectionChips.documents(true))
         assertFalse("Audit log" in SectionChips.documents(false))
-        assertTrue("Files" in SectionChips.documents(false))
+        assertEquals(listOf("Related Files"), SectionChips.documents(false))
     }
 
     @Test

@@ -105,6 +105,16 @@ class ProjectAttentionTest {
         assertEquals("1 order waiting approval", f.message)
     }
 
+    @Test fun waitingApproval_countsOnlyUnapprovedOrders() {
+        val docs = listOf(
+            PendingDocument(projectId = 1, documentName = "Time Extension No. 1 - 30 Days", status = "Submitted"),
+            PendingDocument(projectId = 1, documentName = "Work Suspension Order No. 1", status = "Pending"),
+            PendingDocument(projectId = 1, documentName = "Variation Order No. 1 (Additive) - PHP 5", status = "approved"),
+            PendingDocument(projectId = 1, documentName = "Program of Works", status = "Pending")
+        )
+        assertEquals(2, ProjectAttention.waitingApproval(docs))
+    }
+
     @Test fun dueInThirtyDays_isWarning() {
         val f = flags(project(completion = "2026-11-25")).of(DUE_SOON).single()
         assertEquals(WARNING, f.level)

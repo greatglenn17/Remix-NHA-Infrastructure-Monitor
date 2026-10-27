@@ -9,7 +9,7 @@ data class PortfolioItem(
     val billedFraction: Float?,
     val billedTotal: Double,
     val contractCost: Double,
-    val pendingDocsCount: Int,       // this project's documents not "Approved"
+    val pendingDocsCount: Int,       // this project's orders waiting approval
     val lastFieldUpdate: LocalDate?
 )
 

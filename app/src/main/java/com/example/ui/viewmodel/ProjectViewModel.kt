@@ -24,6 +24,7 @@ import com.example.util.PortfolioFilter
 import com.example.util.PortfolioItem
 import com.example.util.PortfolioSummary
 import com.example.util.ProjectAttention
+import com.example.util.SitePhotos
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -173,6 +174,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 com.example.data.local.SampleData.clearFromExistingRecords(application, database)
+                com.example.data.local.SampleData.removeUntouchedCoreChecklist(database)
             } catch (e: Exception) {
                 android.util.Log.w("ProjectViewModel", "Sample data cleanup failed", e)
             }
@@ -605,7 +607,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedFraction = BillingProgress.billedFraction(billedTotal, cost),
                 billedTotal = billedTotal,
                 contractCost = cost,
-                pendingDocsCount = projectDocs.count { it.status != "Approved" },
+                pendingDocsCount = ProjectAttention.waitingApproval(projectDocs),
                 lastFieldUpdate = lastUpdate
             )
         }
@@ -1194,13 +1196,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             firestoreSyncManager.flushOutbox()
 
-            // Seed the core document checklist; every item starts Pending with no remarks.
-            com.example.data.local.SampleData.CORE_CHECKLIST.forEach { docName ->
-                projectDao.insertPendingDocument(
-                    PendingDocument(projectId = newId, documentName = docName, status = "Pending", remarks = "", isCoreChecklist = true)
-                )
-            }
-
             logAuditAction(
                 projectId = newId,
                 actionType = "Project Creation",
@@ -1716,6 +1711,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     saveProjectChange(updated)
                 }
             }
+            refreshSitePhoto(report.projectId)
         }
     }
 
@@ -1734,6 +1730,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         actualAccomplishment = report.actualAccomplishmentPct
                     ))
                 }
+                refreshSitePhoto(report.projectId)
             } catch (error: Exception) {
                 _authError.value = "Weekly report was not updated: ${error.message ?: "database transaction failed"}"
             }
@@ -1744,7 +1741,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             reportDao.deleteWeeklyReport(report.id)
             logAuditAction(report.projectId, "Deleted Weekly Report", "Deleted report for ${report.reportingWeek}")
+            refreshSitePhoto(report.projectId)
         }
+    }
+
+    /** Points the project's card photo at the newest report photo left, after an edit or delete. */
+    private suspend fun refreshSitePhoto(projectId: Long) {
+        val photo = SitePhotos.latest(reportDao.getWeeklyReportsForProject(projectId).first())
+        val current = projectDao.getProjectByIdOnce(projectId) ?: return
+        if (current.latestUpdatePhotoUrl != photo) saveProjectChange(current.copy(latestUpdatePhotoUrl = photo))
     }
 
     fun submitMonthlyReport(

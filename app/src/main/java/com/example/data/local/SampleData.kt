@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The core document checklist every new project starts with, and a one-time cleanup of
+ * The core document checklist older versions gave every new project, and cleanups of
  * the sample values older versions filled in (made-up statuses and remarks on that
  * checklist, and made-up monthly report signatories).
  */
@@ -58,5 +58,18 @@ object SampleData {
             )
         }
         prefs.edit().putBoolean("cleared_v1", true).apply()
+    }
+
+    /**
+     * Deletes core checklist items nobody filled in (Pending, no remarks, no file); filled-in
+     * ones stay as related files. Runs every launch so items synced in from older phones go
+     * too; the deletes sync like any other edit.
+     */
+    suspend fun removeUntouchedCoreChecklist(db: AppDatabase) = withContext(Dispatchers.IO) {
+        db.openHelper.writableDatabase.execSQL(
+            "DELETE FROM pending_documents WHERE isCoreChecklist = 1 AND status = 'Pending' AND remarks = '' AND fileUrl = '' " +
+                "AND documentName IN (${CORE_CHECKLIST.joinToString { "?" }})",
+            CORE_CHECKLIST.toTypedArray()
+        )
     }
 }

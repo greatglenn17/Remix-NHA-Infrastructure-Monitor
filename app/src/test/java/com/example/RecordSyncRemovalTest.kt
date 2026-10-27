@@ -240,6 +240,28 @@ class RecordSyncRemovalTest {
         assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", "${keep.projectUuid}/$name"))
     }
 
+    @Test
+    fun staleCloudCopy_doesNotBringBackLocallyDeletedRecord() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "Doc"))
+        val uuid = stringOf("SELECT uuid FROM pending_documents")
+        val revision = count("SELECT revision FROM pending_documents").toLong()
+        sql.execSQL("DELETE FROM pending_documents")
+        markAllSynced()
+
+        val stale = mapOf(
+            "uuid" to uuid, "type" to "pending_documents", "projectUuid" to p.projectUuid, "revision" to revision,
+            "updatedAt" to 1L, "isDeleted" to false, "data" to "{\"documentName\":\"Doc\",\"status\":\"Pending\",\"remarks\":\"\",\"fileUrl\":\"\",\"isCoreChecklist\":0}"
+        )
+        recordSync.applyRemote(listOf(stale))
+        assertEquals(0, count("SELECT COUNT(*) FROM pending_documents"))
+
+        // A newer cloud revision (someone edited it after) still applies.
+        recordSync.applyRemote(listOf(stale + ("revision" to revision + 5)))
+        assertEquals(1, count("SELECT COUNT(*) FROM pending_documents"))
+    }
+
     private fun stringOf(query: String, vararg args: Any?): String =
         sql.query(query, args).use { it.moveToFirst(); it.getString(0) }
 }
