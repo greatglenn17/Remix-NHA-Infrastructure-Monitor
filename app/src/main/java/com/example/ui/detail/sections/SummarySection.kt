@@ -74,7 +74,8 @@ private fun KeyDatesCard(project: Project, revisedCompletion: String?, today: Lo
     SectionCard("Key dates", Icons.Default.Event, modifier) {
         Field("Date started", project.dateStarted.ifBlank { "-" })
         Field("Original completion", project.completionDateOriginal.ifBlank { "-" })
-        Field("Revised completion", revisedCompletion ?: "-")
+        // Same date Days left counts down to: approved orders first, else the stored revised date.
+        Field("Revised completion", revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-")
         Field("Contract duration", "${CurrencyFormatter.formatNumber(project.contractDurationDays)} days")
         Field(
             "Days left",
