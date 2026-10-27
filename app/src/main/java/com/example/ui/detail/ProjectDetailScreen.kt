@@ -18,7 +18,11 @@ import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.ProjectHeader
+import com.example.ui.detail.sections.RelatedFilesList
+import com.example.ui.detail.sections.ScheduleOrdersList
 import com.example.ui.detail.sections.SummarySection
+import com.example.ui.detail.sections.VariationOrdersLog
+import androidx.compose.ui.unit.dp
 import com.example.ui.detail.tabs.*
 import com.example.ui.viewmodel.ProjectViewModel
 import com.example.util.BillingProgress
@@ -299,18 +303,28 @@ fun ProjectDetailScreen(
                             }
                         }
                     }
-                    ProjectSection.MONEY -> PaymentsTab(
-                        project = currentProject,
-                        payments = projectPayments,
-                        contractCost = contractCost,
-                        onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
-                            viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
-                        },
-                        onUpdatePayment = { payment ->
-                            viewModel.updateProjectPayment(payment)
-                        },
-                        onDeletePayment = { viewModel.deleteProjectPayment(it.id) }
-                    )
+                    ProjectSection.MONEY -> Column {
+                        VariationOrdersLog(
+                            documents = pendingDocuments,
+                            canAddVariationOrder = currentUser.role.hasPermission(Permission.UPLOAD_DOCUMENT),
+                            onAddVariationOrder = onAddVariationOrderClick,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                        Box(modifier = Modifier.weight(1f)) {
+                            PaymentsTab(
+                                project = currentProject,
+                                payments = projectPayments,
+                                contractCost = contractCost,
+                                onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
+                                    viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
+                                },
+                                onUpdatePayment = { payment ->
+                                    viewModel.updateProjectPayment(payment)
+                                },
+                                onDeletePayment = { viewModel.deleteProjectPayment(it.id) }
+                            )
+                        }
+                    }
                     ProjectSection.DOCUMENTS -> Column {
                         val chips = SectionChips.documents(canViewAuditLogs)
                         val chip = SectionChips.chipOrFirst(chips, documentsChip)
@@ -332,11 +346,19 @@ fun ProjectDetailScreen(
                                         viewModel.deletePendingDocument(id)
                                     }
                                 )
-                                "Schedule orders", "Files" -> OverviewTab(
-                                    project = currentProject,
-                                    weeklyReports = weeklyReports,
-                                    pendingDocuments = pendingDocuments,
-                                    currentUserRole = currentUser.role
+                                "Schedule orders" -> ScheduleOrdersList(pendingDocuments)
+                                "Files" -> RelatedFilesList(
+                                    documents = pendingDocuments,
+                                    currentUserRole = currentUser.role,
+                                    onAddRelatedDocument = { name, status, remarks, fileUrl ->
+                                        viewModel.addRelatedDocument(currentProject.id, name, status, remarks, fileUrl)
+                                    },
+                                    onUpdateDocumentFileUrl = { doc, fileUrl ->
+                                        viewModel.updatePendingDocumentFileUrl(doc, fileUrl)
+                                    },
+                                    onDeleteDocument = { id ->
+                                        viewModel.deletePendingDocument(id)
+                                    }
                                 )
                                 "Audit log" -> AuditLogTab(auditLogs = auditLogs)
                             }
