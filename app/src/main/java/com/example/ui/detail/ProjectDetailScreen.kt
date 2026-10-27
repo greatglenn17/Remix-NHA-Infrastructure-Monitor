@@ -126,9 +126,7 @@ fun ProjectDetailScreen(
                 unreadNotificationCount = unreadCount,
                 onOpenNotifications = { showNotificationsDialog = true },
                 appThemeMode = appThemeMode,
-                onSetThemeMode = { viewModel.setAppThemeMode(it) },
-                onElevateRole = { viewModel.elevateUserRole(it) },
-                onElevateRoleWithProfile = { role, position, office -> viewModel.elevateUserRole(role, position, office) }
+                onSetThemeMode = { viewModel.setAppThemeMode(it) }
             )
         },
         containerColor = MaterialTheme.colorScheme.background,

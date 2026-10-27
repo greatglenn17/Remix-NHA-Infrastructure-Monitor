@@ -96,10 +96,48 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _currentUserAccount = MutableStateFlow(DefaultUserAccount)
     val currentUserAccount: StateFlow<UserAccount> = _currentUserAccount.asStateFlow()
 
-    fun elevateUserRole(targetRole: UserRole, positionTitle: String? = null, officeRegion: String? = null) {
-        // Role changes are server-only. A mobile client must never elevate a
-        // cached account using a PIN, preferences, or UI state.
-        _authError.value = "Role changes require an authorized backend administrator."
+    /** The signed-in user's role from the server: the token claim, else users/{uid}.role; null when offline. */
+    private suspend fun serverRole(): UserRole? {
+        val user = authManager.currentFirebaseUser ?: return null
+        val name = runCatching { user.getIdToken(true).await().claims["role"] as? String }.getOrNull()
+            ?: runCatching {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(user.uid).get().await().getString("role")
+            }.getOrNull()
+            ?: return null
+        return runCatching { UserRole.valueOf(name.uppercase()) }.getOrNull()
+    }
+
+    /** Applies a role the Super Admin changed since this phone last signed in. */
+    private suspend fun refreshRoleFromServer(email: String) {
+        val role = serverRole() ?: return
+        val account = _currentUserAccount.value
+        if (role == account.role) return
+        val updated = account.copy(role = role)
+        _currentUserAccount.value = updated
+        authManager.saveUserSession(updated, email)
+        authManager.saveRegisteredRole(email, role)
+    }
+
+    /** Super Admin: sets another user's role; syncUserCustomClaims turns it into their claim. [onDone] gets the message to show. */
+    fun setUserRole(user: RegisteredUser, role: UserRole, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(user.uid).update("role", role.name).await()
+                _registeredUsers.value = _registeredUsers.value.map { if (it.uid == user.uid) it.copy(role = role.name) else it }
+                onDone("${user.name} is now ${role.label}. It applies the next time they open the app.")
+                logAuditAction(
+                    projectId = null,
+                    actionType = "Role Change",
+                    details = "Changed role of ${user.name}",
+                    oldValue = user.role,
+                    newValue = role.name
+                )
+            } catch (e: Exception) {
+                onDone("Could not change the role: ${e.localizedMessage}")
+            }
+        }
     }
 
     private val _isSyncing = MutableStateFlow(false)
@@ -233,6 +271,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             }
         } else {
             _isLoggedIn.value = false
+        }
+        authManager.currentFirebaseUser?.email?.let { email ->
+            if (_isLoggedIn.value) viewModelScope.launch { refreshRoleFromServer(email.trim().lowercase()) }
         }
 
         // Start realtime sync if user is already logged in (AuthStateListener in FirestoreSyncManager
@@ -375,6 +416,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             }
 
             if (isSignUp) {
+                // New accounts start as Field Engineer or Viewer; the Super Admin promotes them.
+                val role = if (role == UserRole.VIEWER) UserRole.VIEWER else UserRole.FIELD_ENGINEER
                 val result = authManager.signUp(cleanEmail, cleanPass, displayName, role, position, office)
                 _authLoading.value = false
                 if (result.isSuccess) {
@@ -412,13 +455,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 val result = authManager.signIn(cleanEmail, cleanPass)
                 if (result.isSuccess) {
-                    val userAcc = authManager.getRegisteredUserAccount(
+                    val localAcc = authManager.getRegisteredUserAccount(
                         email = cleanEmail,
-                        fallbackRole = role,
+                        fallbackRole = UserRole.FIELD_ENGINEER,
                         displayName = displayName,
                         position = position,
                         office = office
                     )
+                    // The role is the server's; the on-device copy only covers being offline.
+                    val userAcc = serverRole()?.let { localAcc.copy(role = it) } ?: localAcc
+                    authManager.saveRegisteredRole(cleanEmail, userAcc.role)
                     _currentUserAccount.value = userAcc
                     _isLoggedIn.value = true
                     _authLoading.value = false
@@ -433,7 +479,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                             uid = currentFirebaseUser.uid,
                             email = cleanEmail,
                             displayName = userAcc.name,
-                            role = userAcc.role.name,
+                            role = null,
                             position = position.orEmpty(),
                             office = office.orEmpty()
                         )
@@ -1216,7 +1262,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     val name = doc.getString("displayName")?.takeIf { it.isNotBlank() }
                         ?: doc.getString("email")?.takeIf { it.isNotBlank() }
                         ?: doc.id
-                    RegisteredUser(uid = doc.id, name = name)
+                    RegisteredUser(uid = doc.id, name = name, email = doc.getString("email").orEmpty(), role = doc.getString("role").orEmpty())
                 }.sortedBy { it.name.lowercase() }
                 _registeredUsersLoaded.value = true
             } catch (e: Exception) {

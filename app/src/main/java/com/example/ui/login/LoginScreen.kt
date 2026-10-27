@@ -55,9 +55,7 @@ fun LoginScreen(
     var positionTitle by remember { mutableStateOf("") }
     var officeRegion by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var selectedRole by remember { mutableStateOf(UserRole.ENGINEER_ADMIN) }
-    var adminPin by remember { mutableStateOf("") }
-    var adminPinError by remember { mutableStateOf<String?>(null) }
+    var selectedRole by remember { mutableStateOf(UserRole.FIELD_ENGINEER) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var resetEmailInput by remember { mutableStateOf("") }
 
@@ -434,49 +432,6 @@ fun LoginScreen(
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
                             )
-                            // Admin Secret PIN Field (If registering as Super Admin or Engineer Admin)
-                            if (selectedRole == UserRole.SUPER_ADMIN || selectedRole == UserRole.ENGINEER_ADMIN) {
-                                OutlinedTextField(
-                                    value = adminPin,
-                                    onValueChange = {
-                                        adminPin = it
-                                        adminPinError = null
-                                    },
-                                    label = { Text("Admin Secret PIN (Required for ${selectedRole.label})") },
-                                    placeholder = { Text("Enter 6-digit Secret PIN") },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Key,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.secondary
-                                        )
-                                    },
-                                    isError = adminPinError != null,
-                                    supportingText = {
-                                        if (adminPinError != null) {
-                                            Text(text = adminPinError!!, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                                        } else {
-                                            Text(text = "Secret PIN required to register Admin role", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("input_admin_pin"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.secondary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                        focusedLabelColor = MaterialTheme.colorScheme.secondary,
-                                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(14.dp))
-                            }
                         }
                     }
 
@@ -599,47 +554,18 @@ fun LoginScreen(
                         Spacer(modifier = Modifier.height(14.dp))
                     }
 
-                    // Select User Role Selection
-                    Text(
-                        text = if (isSignUpMode) "Initial User Role:" else "Account Role Level:",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier
-                            .align(Alignment.Start)
-                            .padding(bottom = 8.dp)
-                    )
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            UserRoleChoiceChip(
-                                role = UserRole.SUPER_ADMIN,
-                                title = "Super Admin",
-                                subtitle = "Full System Control",
-                                icon = Icons.Default.AdminPanelSettings,
-                                isSelected = selectedRole == UserRole.SUPER_ADMIN,
-                                onClick = { selectedRole = UserRole.SUPER_ADMIN },
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            UserRoleChoiceChip(
-                                role = UserRole.ENGINEER_ADMIN,
-                                title = "Engineer Admin",
-                                subtitle = "Project Management",
-                                icon = Icons.Default.VerifiedUser,
-                                isSelected = selectedRole == UserRole.ENGINEER_ADMIN,
-                                onClick = { selectedRole = UserRole.ENGINEER_ADMIN },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-
+                    // New accounts start as Field Engineer or Viewer; the Super Admin gives admin roles.
+                    if (isSignUpMode) {
+                        Text(
+                            text = "Initial User Role:",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier
+                                .align(Alignment.Start)
+                                .padding(bottom = 8.dp)
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -664,7 +590,14 @@ fun LoginScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
+                        Text(
+                            text = "Engineer Admin access is given by the Super Admin after you register.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.Start).padding(top = 6.dp)
+                        )
                     }
+
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -672,12 +605,6 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             keyboardController?.hide()
-                            if (isSignUpMode && (selectedRole == UserRole.SUPER_ADMIN || selectedRole == UserRole.ENGINEER_ADMIN)) {
-                                if (adminPin.trim() != "021793") {
-                                    adminPinError = "Invalid Secret PIN! Contact your Principal Engineer or Super Admin for the authorized PIN."
-                                    return@Button
-                                }
-                            }
                             onLoginSuccess(
                                 email.trim(),
                                 password.trim(),

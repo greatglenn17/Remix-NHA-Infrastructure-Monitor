@@ -63,10 +63,17 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
-      // A profile may only claim SUPER_ADMIN for the designated super admin account.
-      allow create, update: if signedIn() && request.auth.uid == userId
-        && (request.resource.data.get('role', '') != 'SUPER_ADMIN'
-            || request.auth.token.email == 'great.glenn17@gmail.com');
+      // syncUserCustomClaims mints the role claim from this doc's role, so only the
+      // Super Admin changes it. A new profile starts as Field Engineer or Viewer;
+      // SUPER_ADMIN only for the designated super admin account.
+      allow create: if signedIn() && request.auth.uid == userId
+        && (request.resource.data.get('role', 'FIELD_ENGINEER') in ['FIELD_ENGINEER', 'VIEWER']
+            || (request.resource.data.get('role', '') == 'SUPER_ADMIN'
+                && request.auth.token.email == 'great.glenn17@gmail.com'));
+      allow update: if signedIn() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+      allow update: if isSuperAdmin() && request.auth.uid != userId
+        && request.resource.data.get('role', '') in ['ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'];
       allow delete: if isSuperAdmin();
 
       match /{subcollection}/{docId} {

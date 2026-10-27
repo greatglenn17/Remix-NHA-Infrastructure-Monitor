@@ -28,7 +28,6 @@ import com.example.R
 import com.example.data.model.AppThemeMode
 import com.example.data.model.UserAccount
 import com.example.data.model.UserRole
-import com.example.ui.dialogs.AdminElevationDialog
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,12 +125,10 @@ fun TopAppBarHeader(
     onOpenNotifications: (() -> Unit)? = null,
     appThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
     onSetThemeMode: ((AppThemeMode) -> Unit)? = null,
-    onElevateRole: ((UserRole) -> Unit)? = null,
-    onElevateRoleWithProfile: ((UserRole, String?, String?) -> Unit)? = null
+    onManageUsers: (() -> Unit)? = null
 ) {
     var showUserMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    var pendingElevationRole by remember { mutableStateOf<UserRole?>(null) }
     var availableUpdate by remember { mutableStateOf<com.example.util.AppUpdateInfo?>(null) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -418,64 +415,17 @@ fun TopAppBarHeader(
                             }
                         }
 
-                        // Role Elevation Section (Super Admin Power & Active Role Switcher)
-                        if (onElevateRole != null) {
+                        if (onManageUsers != null && currentUser.role == UserRole.SUPER_ADMIN) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                                Text(
-                                    text = "Active Role Elevation / Switcher",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    UserRole.entries.forEach { roleOption ->
-                                        val isCurrent = currentUser.role == roleOption
-                                        FilterChip(
-                                            selected = isCurrent,
-                                            onClick = {
-                                                if (roleOption == UserRole.SUPER_ADMIN || roleOption == UserRole.ENGINEER_ADMIN) {
-                                                    pendingElevationRole = roleOption
-                                                } else {
-                                                    if (onElevateRoleWithProfile != null) {
-                                                        onElevateRoleWithProfile(roleOption, null, null)
-                                                    } else {
-                                                        onElevateRole?.invoke(roleOption)
-                                                    }
-                                                }
-                                                showUserMenu = false
-                                            },
-                                            label = {
-                                                Text(
-                                                    text = roleOption.label,
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                                        fontSize = 10.sp
-                                                    )
-                                                )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f),
-                                                selectedLabelColor = MaterialTheme.colorScheme.secondary,
-                                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                            ),
-                                            border = FilterChipDefaults.filterChipBorder(
-                                                enabled = true,
-                                                selected = isCurrent,
-                                                borderColor = MaterialTheme.colorScheme.outlineVariant,
-                                                selectedBorderColor = MaterialTheme.colorScheme.secondary
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                }
-                            }
+                            DropdownMenuItem(
+                                text = { Text("Manage users & roles", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold) },
+                                leadingIcon = { Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+                                onClick = {
+                                    showUserMenu = false
+                                    onManageUsers()
+                                },
+                                modifier = Modifier.testTag("manage_users_button")
+                            )
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -678,26 +628,6 @@ fun TopAppBarHeader(
             onDismiss = { availableUpdate = null }
         )
     }
-
-    if (pendingElevationRole != null) {
-        AdminElevationDialog(
-            currentUser = currentUser,
-            targetRole = pendingElevationRole!!,
-            onDismiss = { pendingElevationRole = null },
-            onElevateSuccess = { role, position, office ->
-                if (onElevateRoleWithProfile != null) {
-                    onElevateRoleWithProfile(role, position, office)
-                } else {
-                    onElevateRole?.invoke(role)
-                }
-                pendingElevationRole = null
-            }
-        )
-    }
 }
 
 }
-
-
-
-

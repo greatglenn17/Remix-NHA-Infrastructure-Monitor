@@ -633,12 +633,13 @@ class FirestoreSyncManager(
 
     /**
      * Synchronize authoritative user profile to Firestore users/{uid} collection.
+     * [role] is sent only at registration; after that only the Super Admin changes it.
      */
     suspend fun syncUserProfile(
         uid: String,
         email: String,
         displayName: String,
-        role: String,
+        role: String?,
         position: String,
         office: String
     ): Result<Unit> = withContext(Dispatchers.IO) {
@@ -647,11 +648,11 @@ class FirestoreSyncManager(
                 "uid" to uid,
                 "email" to email.trim().lowercase(),
                 "displayName" to displayName,
-                "role" to role,
                 "position" to position,
                 "office" to office,
                 "updatedAt" to System.currentTimeMillis()
             )
+            if (role != null) userProfile["role"] = role
             firestore.collection("users")
                 .document(uid)
                 .set(userProfile, SetOptions.merge())

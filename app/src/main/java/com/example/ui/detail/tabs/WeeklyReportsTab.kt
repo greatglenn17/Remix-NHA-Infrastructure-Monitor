@@ -54,7 +54,7 @@ fun WeeklyReportsTab(
                         style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(
+                    if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) Button(
                         onClick = onAddWeeklyReportClick,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                         shape = RoundedCornerShape(50.dp),

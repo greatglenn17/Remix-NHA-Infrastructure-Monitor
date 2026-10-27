@@ -151,3 +151,26 @@ describe('deletion', () => {
     it(`${name} cannot delete project`, () => assertFails(deleteDoc(doc(ctx().firestore(), 'projects/P'))));
   }
 });
+
+describe('user roles', () => {
+  const asOwner = () => testEnv.authenticatedContext('owner', { role: 'SUPER_ADMIN', email: 'great.glenn17@gmail.com' });
+  const asNew = () => testEnv.authenticatedContext('new', { email: 'new@x.com' });
+  beforeEach(() => testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users/eng'), { name: 'E', role: 'FIELD_ENGINEER' });
+    await setDoc(doc(db, 'users/admin'), { name: 'A', role: 'SUPER_ADMIN' });
+  }));
+  it('signs up as field engineer', () => assertSucceeds(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'FIELD_ENGINEER' })));
+  it('signs up as viewer', () => assertSucceeds(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'VIEWER' })));
+  it('signs up without a role', () => assertSucceeds(setDoc(doc(asNew().firestore(), 'users/new'), { name: 'N' })));
+  it('cannot sign up as engineer admin', () => assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'ENGINEER_ADMIN' })));
+  it('cannot sign up as super admin', () => assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'SUPER_ADMIN' })));
+  it('super admin email creates its profile', () => assertSucceeds(setDoc(doc(asOwner().firestore(), 'users/owner'), { role: 'SUPER_ADMIN' })));
+  it('edits own profile without the role', () => assertSucceeds(setDoc(doc(asEng().firestore(), 'users/eng'), { office: 'O' }, { merge: true })));
+  it('cannot change own role', () => assertFails(updateDoc(doc(asEng().firestore(), 'users/eng'), { role: 'ENGINEER_ADMIN' })));
+  it('cannot change another user', () => assertFails(updateDoc(doc(asOther().firestore(), 'users/eng'), { role: 'VIEWER' })));
+  it('super admin promotes a user', () => assertSucceeds(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { role: 'ENGINEER_ADMIN' })));
+  it('super admin cannot make another super admin', () => assertFails(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { role: 'SUPER_ADMIN' })));
+  it('super admin lists users', () => assertSucceeds(getDocs(collection(asAdmin().firestore(), 'users'))));
+  it('engineer cannot list users', () => assertFails(getDocs(collection(asEng().firestore(), 'users'))));
+});

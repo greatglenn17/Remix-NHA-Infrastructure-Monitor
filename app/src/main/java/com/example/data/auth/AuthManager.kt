@@ -295,6 +295,10 @@ class AuthManager(private val context: Context) {
     /**
      * Persist user account session to SharedPreferences so user role and profile persist across restarts.
      */
+    fun saveRegisteredRole(email: String, role: UserRole) {
+        prefs.edit().putString("reg_role_${email.trim().lowercase()}", role.name).apply()
+    }
+
     fun saveUserSession(userAccount: UserAccount, email: String) {
         prefs.edit()
             .putBoolean("is_session_active", true)
@@ -317,8 +321,8 @@ class AuthManager(private val context: Context) {
         val name = prefs.getString("user_name", "Engr. Glenn C. Aprovechado") ?: "Engr. Glenn C. Aprovechado"
         val title = prefs.getString("user_title", "Principal Engineer C") ?: "Principal Engineer C"
         val office = prefs.getString("user_office", "Bulacan District Office") ?: "Bulacan District Office"
-        val roleStr = prefs.getString("user_role", UserRole.SUPER_ADMIN.name) ?: UserRole.SUPER_ADMIN.name
-        val role = try { UserRole.valueOf(roleStr) } catch (_: Exception) { UserRole.SUPER_ADMIN }
+        val roleStr = prefs.getString("user_role", UserRole.FIELD_ENGINEER.name) ?: UserRole.FIELD_ENGINEER.name
+        val role = try { UserRole.valueOf(roleStr) } catch (_: Exception) { UserRole.FIELD_ENGINEER }
         val projId = prefs.getLong("assigned_project_id", -1L).let { if (it == -1L) null else it }
 
         return UserAccount(

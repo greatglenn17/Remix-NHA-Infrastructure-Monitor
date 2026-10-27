@@ -42,6 +42,7 @@ fun DashboardScreen(
     val portfolio by viewModel.portfolioState.collectAsState()
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showManageUsers by remember { mutableStateOf(false) }
     var projectToDelete by remember { mutableStateOf<Long?>(null) }
     var projectToEdit by remember { mutableStateOf<Project?>(null) }
 
@@ -150,8 +151,10 @@ fun DashboardScreen(
                 onOpenNotifications = { showNotificationsDialog = true },
                 appThemeMode = appThemeMode,
                 onSetThemeMode = { viewModel.setAppThemeMode(it) },
-                onElevateRole = { viewModel.elevateUserRole(it) },
-                onElevateRoleWithProfile = { role, position, office -> viewModel.elevateUserRole(role, position, office) }
+                onManageUsers = {
+                    viewModel.refreshRegisteredUsers()
+                    showManageUsers = true
+                }
             )
         },
         floatingActionButton = { if (detailPane == null) newProjectFab() },
@@ -231,6 +234,15 @@ fun DashboardScreen(
                 viewModel.updateUserProfile(name, position, office)
                 showEditProfileDialog = false
             }
+        )
+    }
+
+    if (showManageUsers) {
+        com.example.ui.dialogs.ManageUsersDialog(
+            users = registeredUsers,
+            loaded = registeredUsersLoaded,
+            onSetRole = { user, role, onDone -> viewModel.setUserRole(user, role, onDone) },
+            onDismiss = { showManageUsers = false }
         )
     }
 
