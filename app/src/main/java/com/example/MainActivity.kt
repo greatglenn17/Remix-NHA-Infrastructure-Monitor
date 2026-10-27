@@ -19,7 +19,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.data.model.MonthlyReport
+import androidx.compose.ui.platform.LocalConfiguration
 import com.example.ui.dashboard.DashboardScreen
+import com.example.ui.dashboard.NeedsAttentionPane
 import com.example.ui.detail.ProjectDetailScreen
 import com.example.ui.dialogs.*
 import com.example.ui.login.LoginScreen
@@ -85,17 +87,7 @@ class MainActivity : ComponentActivity() {
                         // Navigation: Null selected project -> Dashboard Screen; Selected -> Detail Screen
                         // Dialogs and sheets are their own windows, so they take Back before this does.
                         BackHandler(enabled = selectedProjectId != null) { viewModel.selectProject(null) }
-                        if (selectedProjectId == null) {
-                            DashboardScreen(
-                                viewModel = viewModel,
-                                onProjectClick = { project ->
-                                    viewModel.selectProject(project.id)
-                                },
-                                onCreateProjectClick = {
-                                    showCreateProjectDialog = true
-                                }
-                            )
-                        } else {
+                        val projectDetail: @Composable (Boolean) -> Unit = { embedded ->
                             ProjectDetailScreen(
                                 viewModel = viewModel,
                                 onBackClick = {
@@ -108,8 +100,34 @@ class MainActivity : ComponentActivity() {
                                 onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
                                 onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
                                 onAddDocumentClick = { addDocumentInitialType = "Custom Document"; showAddDocumentDialog = true },
-                                onAddIssueClick = { showAddIssueDialog = true }
+                                onAddIssueClick = { showAddIssueDialog = true },
+                                embedded = embedded
                             )
+                        }
+                        // Two panes at 840dp and wider (spec "Navigation and tablet layout"); one pane at a time below.
+                        val twoPane = LocalConfiguration.current.screenWidthDp >= 840
+                        if (twoPane || selectedProjectId == null) {
+                            val portfolio by viewModel.portfolioState.collectAsState()
+                            DashboardScreen(
+                                viewModel = viewModel,
+                                onProjectClick = { project ->
+                                    viewModel.selectProject(project.id)
+                                },
+                                onCreateProjectClick = {
+                                    showCreateProjectDialog = true
+                                },
+                                detailPane = if (!twoPane) null else {
+                                    {
+                                        if (selectedProjectId != null) {
+                                            projectDetail(true)
+                                        } else {
+                                            NeedsAttentionPane(portfolio.attention) { viewModel.selectProject(it.id) }
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            projectDetail(false)
                         }
 
                         // Render Active Dialogs

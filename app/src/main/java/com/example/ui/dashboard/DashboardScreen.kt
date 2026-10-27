@@ -24,7 +24,9 @@ import com.example.ui.viewmodel.ProjectViewModel
 fun DashboardScreen(
     viewModel: ProjectViewModel,
     onProjectClick: (Project) -> Unit,
-    onCreateProjectClick: () -> Unit
+    onCreateProjectClick: () -> Unit,
+    // Two panes (840dp and up): the list keeps 380dp and this fills the rest under one top bar.
+    detailPane: (@Composable () -> Unit)? = null
 ) {
     val currentUser by viewModel.currentUserAccount.collectAsState()
     val registeredUsers by viewModel.registeredUsers.collectAsState()
@@ -58,38 +60,21 @@ fun DashboardScreen(
             "Contact your Principal Engineer / Super Admin to assign a project to your account"
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBarHeader(
-                currentUser = currentUser,
-                onSwitchUser = { viewModel.switchUserAccount(it) },
-                isSyncing = isSyncing,
-                onEditProfileClick = { showEditProfileDialog = true },
-                onSignOut = { viewModel.signOutUser() },
-                unreadNotificationCount = unreadCount,
-                onOpenNotifications = { showNotificationsDialog = true },
-                appThemeMode = appThemeMode,
-                onSetThemeMode = { viewModel.setAppThemeMode(it) },
-                onElevateRole = { viewModel.elevateUserRole(it) },
-                onElevateRoleWithProfile = { role, position, office -> viewModel.elevateUserRole(role, position, office) }
+    val newProjectFab: @Composable () -> Unit = {
+        if (!currentUser.isDemoAccount && currentUser.role.hasPermission(Permission.CREATE_PROJECT)) {
+            ExtendedFloatingActionButton(
+                onClick = onCreateProjectClick,
+                icon = { Icon(Icons.Default.Add, contentDescription = "Add") },
+                text = { Text("New Project") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(50.dp),
+                modifier = Modifier.testTag("create_project_fab")
             )
-        },
-        floatingActionButton = {
-            if (!currentUser.isDemoAccount && currentUser.role.hasPermission(Permission.CREATE_PROJECT)) {
-                ExtendedFloatingActionButton(
-                    onClick = onCreateProjectClick,
-                    icon = { Icon(Icons.Default.Add, contentDescription = "Add") },
-                    text = { Text("New Project") },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(50.dp),
-                    modifier = Modifier.testTag("create_project_fab")
-                )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        }
+    }
+    val portfolioList: @Composable (Modifier) -> Unit = { listModifier ->
+        Column(modifier = listModifier) {
             if (currentUser.role == UserRole.FIELD_ENGINEER) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -149,6 +134,40 @@ fun DashboardScreen(
                     }
                 }
             )
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBarHeader(
+                currentUser = currentUser,
+                onSwitchUser = { viewModel.switchUserAccount(it) },
+                isSyncing = isSyncing,
+                onEditProfileClick = { showEditProfileDialog = true },
+                onSignOut = { viewModel.signOutUser() },
+                unreadNotificationCount = unreadCount,
+                onOpenNotifications = { showNotificationsDialog = true },
+                appThemeMode = appThemeMode,
+                onSetThemeMode = { viewModel.setAppThemeMode(it) },
+                onElevateRole = { viewModel.elevateUserRole(it) },
+                onElevateRoleWithProfile = { role, position, office -> viewModel.elevateUserRole(role, position, office) }
+            )
+        },
+        floatingActionButton = { if (detailPane == null) newProjectFab() },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        if (detailPane == null) {
+            portfolioList(Modifier.fillMaxSize().padding(paddingValues))
+        } else {
+            Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                // "New Project" stays with the portfolio list, not over the project pane.
+                Box(modifier = Modifier.width(380.dp).fillMaxHeight()) {
+                    portfolioList(Modifier.fillMaxSize())
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { newProjectFab() }
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outline)
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detailPane() }
+            }
         }
     }
 

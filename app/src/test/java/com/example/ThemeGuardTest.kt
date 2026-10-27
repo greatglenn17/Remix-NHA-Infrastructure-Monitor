@@ -13,6 +13,7 @@ class ThemeGuardTest {
             "ui/dashboard/PortfolioContent.kt",
             "ui/dashboard/PortfolioRow.kt",
             "ui/dashboard/PortfolioCounts.kt",
+            "ui/dashboard/NeedsAttentionPane.kt",
             "ui/detail/ProjectDetailScreen.kt",
             "ui/detail/ProjectSection.kt",
             "ui/detail/sections/ChipRow.kt",

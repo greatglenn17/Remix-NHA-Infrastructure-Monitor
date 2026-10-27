@@ -116,7 +116,7 @@ fun PortfolioContent(
 }
 
 @Composable
-private fun AttentionCard(
+internal fun AttentionCard(
     queue: List<Pair<PortfolioItem, AttentionFlag>>,
     showAll: Boolean,
     onToggleAll: () -> Unit,
