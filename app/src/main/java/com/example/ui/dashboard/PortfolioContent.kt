@@ -365,13 +365,13 @@ private fun filterLabel(filter: PortfolioFilter) = when (filter) {
     PortfolioFilter.DUE_SOON -> "Due in 30 days"
 }
 
-private fun levelIcon(level: AttentionLevel): ImageVector = when (level) {
+internal fun levelIcon(level: AttentionLevel): ImageVector = when (level) {
     AttentionLevel.CRITICAL -> Icons.Default.Error
     AttentionLevel.WARNING -> Icons.Default.Warning
     AttentionLevel.STALE -> Icons.Default.Schedule
 }
 
-private fun levelName(level: AttentionLevel) = when (level) {
+internal fun levelName(level: AttentionLevel) = when (level) {
     AttentionLevel.CRITICAL -> "Critical"
     AttentionLevel.WARNING -> "Warning"
     AttentionLevel.STALE -> "No recent update"

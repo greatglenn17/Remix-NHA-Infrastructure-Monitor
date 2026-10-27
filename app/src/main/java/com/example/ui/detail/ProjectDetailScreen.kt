@@ -18,10 +18,15 @@ import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.ProjectHeader
+import com.example.ui.detail.sections.SummarySection
 import com.example.ui.detail.tabs.*
 import com.example.ui.viewmodel.ProjectViewModel
 import com.example.util.BillingProgress
 import com.example.util.ContractCost
+import com.example.util.ProjectAttention
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,23 +154,27 @@ fun ProjectDetailScreen(
 
             Box(modifier = Modifier.weight(1f).nestedScroll(collapseOnScroll)) {
                 when (section) {
-                    ProjectSection.SUMMARY -> OverviewTab(
-                        project = currentProject,
-                        weeklyReports = weeklyReports,
-                        pendingDocuments = pendingDocuments,
-                        currentUserRole = currentUser.role,
-                        onEditProjectClick = { projectToEdit = currentProject },
-                        onAddVariationOrderClick = onAddVariationOrderClick,
-                        onAddRelatedDocument = { name, status, remarks, fileUrl ->
-                            viewModel.addRelatedDocument(currentProject.id, name, status, remarks, fileUrl)
-                        },
-                        onUpdateDocumentFileUrl = { doc, fileUrl ->
-                            viewModel.updatePendingDocumentFileUrl(doc, fileUrl)
-                        },
-                        onDeleteDocument = { id ->
-                            viewModel.deletePendingDocument(id)
-                        }
-                    )
+                    ProjectSection.SUMMARY -> {
+                        val latestReport = weeklyReports.maxByOrNull { it.createdAtTimestamp }
+                        val today = LocalDate.now()
+                        SummarySection(
+                            project = currentProject,
+                            flags = ProjectAttention.flags(
+                                currentProject, pendingDocuments, billedTotal,
+                                latestReport?.let { Instant.ofEpochMilli(it.createdAtTimestamp).atZone(ZoneId.systemDefault()).toLocalDate() },
+                                today
+                            ),
+                            documents = pendingDocuments,
+                            latestReport = latestReport,
+                            // Same rule as the Issues tab's "Resolved" filter.
+                            openIssues = projectIssues.count {
+                                !it.status.contains("Resolved", ignoreCase = true) && !it.status.contains("Closed", ignoreCase = true)
+                            },
+                            canEditProject = currentUser.role.hasPermission(Permission.EDIT_PROJECT),
+                            onEditProject = { projectToEdit = currentProject },
+                            today = today
+                        )
+                    }
                     ProjectSection.PROGRESS -> Column {
                         val chips = SectionChips.progress(isHousingProject)
                         val chip = SectionChips.chipOrFirst(chips, progressChip)
