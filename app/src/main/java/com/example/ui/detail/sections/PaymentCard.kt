@@ -28,7 +28,8 @@ fun PaymentCard(
     onViewScan: () -> Unit,
     onAttachScan: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canEdit: Boolean = true
 ) {
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
@@ -60,7 +61,7 @@ fun PaymentCard(
                         Icon(Icons.Default.AttachFile, contentDescription = "View scanned DV", tint = scheme.primary)
                     }
                 }
-                PaymentMenu(hasScan, onAttachScan, onDelete)
+                if (canEdit) PaymentMenu(hasScan, onAttachScan, onDelete)
             }
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(

@@ -174,7 +174,8 @@ fun AddPaymentDialog(
 fun ViewDvScanDialog(
     payment: ProjectPayment,
     onDismiss: () -> Unit,
-    onReplaceScan: () -> Unit
+    // Null for roles that cannot manage payments.
+    onReplaceScan: (() -> Unit)?
 ) {
     val phpFormat = remember { java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "PH")) }
     val cs = MaterialTheme.colorScheme
@@ -252,20 +253,26 @@ fun ViewDvScanDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onReplaceScan,
-                shape = RoundedCornerShape(50.dp)
-            ) {
-                Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(if (payment.fileUrl.isNotBlank()) "Change Scan" else "Upload Scan", fontWeight = FontWeight.Bold)
+            if (onReplaceScan != null) {
+                Button(
+                    onClick = onReplaceScan,
+                    shape = RoundedCornerShape(50.dp)
+                ) {
+                    Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (payment.fileUrl.isNotBlank()) "Change Scan" else "Upload Scan", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Close") }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+        dismissButton = if (onReplaceScan != null) {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
             }
-        }
+        } else null
     )
 }
 

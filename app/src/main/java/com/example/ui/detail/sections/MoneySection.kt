@@ -43,6 +43,7 @@ fun MoneySection(
     var showAddDialog by remember { mutableStateOf(false) }
     var viewingDvPayment by remember { mutableStateOf<ProjectPayment?>(null) }
     var paymentToAttachScan by remember { mutableStateOf<ProjectPayment?>(null) }
+    val canManagePayments = currentUserRole.hasPermission(Permission.MANAGE_PAYMENTS)
 
     // Uploads a scanned copy straight to an existing payment
     val singleScanLauncher = rememberAttachmentPicker(Attachments.Kind.SCAN) { ref ->
@@ -74,7 +75,8 @@ fun MoneySection(
                                     singleScanLauncher.launch("image/*")
                                 },
                                 onDelete = { onDeletePayment(payment) },
-                                modifier = Modifier.weight(1f).fillMaxHeight()
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                canEdit = canManagePayments
                             )
                         }
                         if (row.size < perRow) Spacer(Modifier.weight(1f))
@@ -83,7 +85,7 @@ fun MoneySection(
             }
             item { VariationOrdersLog(documents, canAddVariationOrder, onAddVariationOrder, currentUserRole, onUpdateOrderStatus, onDeleteOrder) }
         }
-        ExtendedFloatingActionButton(
+        if (canManagePayments) ExtendedFloatingActionButton(
             onClick = { showAddDialog = true },
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
             text = { Text("Add billing") },
@@ -110,10 +112,12 @@ fun MoneySection(
         ViewDvScanDialog(
             payment = viewingDvPayment!!,
             onDismiss = { viewingDvPayment = null },
-            onReplaceScan = {
-                paymentToAttachScan = viewingDvPayment
-                singleScanLauncher.launch("image/*")
-            }
+            onReplaceScan = if (canManagePayments) {
+                {
+                    paymentToAttachScan = viewingDvPayment
+                    singleScanLauncher.launch("image/*")
+                }
+            } else null
         )
     }
 }
