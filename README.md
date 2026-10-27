@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.9.2`** | **`192`** | 🔐 Roles and Sign-in: only the Super Admin gives roles, from Manage users & roles in the account menu; sign-up offers Field Engineer or Viewer, sign-in no longer picks a role, the admin PIN and the instant password reset are gone, the on-device password copy is salted, and Viewers no longer see billing or weekly-report add buttons |
 | **`v1.9.1`** | **`191`** | 🧾 Payments and Orders: the Money section is now Payments, Documents keeps only Related Files and the Audit log (new projects no longer get an automatic checklist), the Summary shows the project profile second, time extensions and suspensions are listed and approved in Key dates (approval is for Engineer Admins), and project cards and the profile show the latest site photo |
 | **`v1.9.0`** | **`190`** | 📝 Phones and Forms: long forms (weekly, monthly, project and lot inspection) open full-screen on phones, the weekly report is split into 5 steps, every form has date pickers, number keyboards, errors next to the field, a fixed Save button and a "Discard changes?" prompt, and Add weekly report and Add billing sit at the bottom of the screen |
 | **`v1.8.1`** | **`181`** | 🗂️ Project Detail Redesign: projects open in four sections (Summary, Progress, Money, Documents) with a header that shrinks on scroll, billings shown as cards, and the portfolio and project side by side on wide screens |
