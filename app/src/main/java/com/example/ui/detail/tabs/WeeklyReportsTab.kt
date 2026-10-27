@@ -73,7 +73,7 @@ fun WeeklyReportsTab(
                     .fillMaxSize()
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(bottom = 88.dp)
             ) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -84,28 +84,20 @@ fun WeeklyReportsTab(
                                 color = DarkTextPrimary
                             )
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        // Adding new weekly report button directly below title
-                        if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
-                            Button(
-                                onClick = onAddWeeklyReportClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                                shape = RoundedCornerShape(50.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("add_weekly_report_top_button")
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Add New Weekly Report", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
                     }
                 }
 
                 items(weeklyReports, key = { it.id }) { report ->
                     WeeklyReportCard(report = report, currentUserRole = currentUserRole, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) })
                 }
+            }
+            if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
+                ExtendedFloatingActionButton(
+                    onClick = onAddWeeklyReportClick,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Add weekly report") },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("add_weekly_report_top_button")
+                )
             }
         }
     }
