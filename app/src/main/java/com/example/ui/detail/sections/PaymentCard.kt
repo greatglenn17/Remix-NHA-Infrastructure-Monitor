@@ -69,8 +69,10 @@ fun PaymentCard(
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
-                Field("Gross amount", "${CurrencyFormatter.formatPhp(payment.grossAmount)} · ${"%.2f%%".format(payment.percentage)} of contract")
-                Field("Balance after", "${CurrencyFormatter.formatPhp(payment.balanceAmount)} · ${"%.2f%%".format(payment.balancePercentage)}")
+                Field("Gross amount", CurrencyFormatter.formatPhp(payment.grossAmount))
+                Field("Share of contract", "%.2f%%".format(payment.percentage))
+                Field("Balance after", CurrencyFormatter.formatPhp(payment.balanceAmount))
+                Field("Balance share", "%.2f%%".format(payment.balancePercentage))
             }
         }
     }
