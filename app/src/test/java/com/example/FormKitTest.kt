@@ -69,7 +69,7 @@ class FormKitTest {
         rule.setContent {
             NHATheme(themeMode = AppThemeMode.LIGHT) { DateField("Start", "2026-03-01", {}, clearable = true) }
         }
-        rule.onNodeWithText("2026-03-01").performClick()
+        rule.onNodeWithContentDescription("Start, 2026-03-01").performClick()
         rule.onNodeWithText("Clear").assertExists()
     }
 
@@ -77,7 +77,7 @@ class FormKitTest {
         rule.setContent {
             NHATheme(themeMode = AppThemeMode.LIGHT) { DateField("Start", "1850-01-01", {}) }
         }
-        rule.onNodeWithText("1850-01-01").performClick()
+        rule.onNodeWithContentDescription("Start, 1850-01-01").performClick()
         rule.onNodeWithText("Cancel").assertExists()
     }
 

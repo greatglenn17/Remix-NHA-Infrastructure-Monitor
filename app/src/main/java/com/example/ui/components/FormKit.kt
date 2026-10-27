@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -45,6 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -110,7 +115,7 @@ fun LongForm(
                     }
                 },
                 bottomBar = {
-                    Column {
+                    Column(Modifier.navigationBarsPadding()) {
                         HorizontalDivider()
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -154,7 +159,12 @@ fun DateField(
     clearable: Boolean = false
 ) {
     var open by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxWidth()) {
+    val spoken = listOfNotNull(label, value.ifBlank { "not set" }, error).joinToString(", ")
+    Box(modifier.fillMaxWidth().clearAndSetSemantics {
+        contentDescription = spoken
+        role = Role.Button
+        onClick(label = "Pick $label") { open = true; true }
+    }) {
         OutlinedTextField(
             value = value, onValueChange = {}, readOnly = true, label = { Text(label) },
             isError = error != null, supportingText = error?.let { { Text(it) } },
@@ -162,7 +172,7 @@ fun DateField(
             modifier = Modifier.fillMaxWidth()
         )
         // Transparent overlay so a tap anywhere on the field opens the picker.
-        Box(Modifier.matchParentSize().clickable(role = Role.Button, onClickLabel = "Pick $label") { open = true })
+        Box(Modifier.matchParentSize().clickable { open = true })
     }
     if (open) {
         val state = rememberDatePickerState(initialSelectedDateMillis = dateToUtcMillis(value))
