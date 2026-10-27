@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.8.1`** | **`181`** | 🗂️ Project Detail Redesign: projects open in four sections (Summary, Progress, Money, Documents) with a header that shrinks on scroll, billings shown as cards, and the portfolio and project side by side on wide screens |
 | **`v1.7.1`** | **`171`** | ↩️ Back Button Fix: The phone's Back button inside a project returns to the Portfolio home instead of closing the app |
 | **`v1.7.0`** | **`170`** | 📊 Portfolio Home: an oversight dashboard with counts for slippage, billing ahead of work, pending approvals and deadlines, a ranked Needs attention list, and work-done vs billed bars for every project |
 | **`v1.6.0`** | **`160`** | 💰 Billing Bar & Variation Types: Each dashboard project card shows how much of the contract has been billed. Variation Orders are marked Additive or Deductive (deductive amounts are subtracted), and the revised contract cost from approved orders is used by the Overview tab, the Payments tab totals and the billing bar |
