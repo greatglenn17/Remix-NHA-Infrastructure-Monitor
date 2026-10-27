@@ -344,7 +344,7 @@ fun AddCustomDocumentDialog(
             Button(enabled = selectedType != "Variation Order" || (voDateValid && voAmountError == null), onClick = {
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
-                    "Time Extension" -> "Time Extension No. $teNo - $teDays Days"
+                    "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
                     "Variation Order" -> voDocumentName(voNo, voType, voAmount)
                     "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
                     "Work Resumption Order" -> "Work Resumption No. $wrNo"
@@ -368,7 +368,7 @@ fun AddCustomDocumentDialog(
                                 }
                             }
                         } catch (e: Exception) { }
-                        "Duration: $wsDays Days | Effectivity: $wsEffectivity" + if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
+                        "Duration: ${wsDays.trim()} Days | Effectivity: $wsEffectivity" + if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
                     }
                     "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
                     else -> remarks
