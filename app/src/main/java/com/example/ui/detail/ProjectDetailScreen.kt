@@ -21,8 +21,7 @@ import com.example.ui.detail.sections.ProjectHeader
 import com.example.ui.detail.sections.RelatedFilesList
 import com.example.ui.detail.sections.ScheduleOrdersList
 import com.example.ui.detail.sections.SummarySection
-import com.example.ui.detail.sections.VariationOrdersLog
-import androidx.compose.ui.unit.dp
+import com.example.ui.detail.sections.MoneySection
 import com.example.ui.detail.tabs.*
 import com.example.ui.viewmodel.ProjectViewModel
 import com.example.util.BillingProgress
@@ -303,28 +302,21 @@ fun ProjectDetailScreen(
                             }
                         }
                     }
-                    ProjectSection.MONEY -> Column {
-                        VariationOrdersLog(
-                            documents = pendingDocuments,
-                            canAddVariationOrder = currentUser.role.hasPermission(Permission.UPLOAD_DOCUMENT),
-                            onAddVariationOrder = onAddVariationOrderClick,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                        Box(modifier = Modifier.weight(1f)) {
-                            PaymentsTab(
-                                project = currentProject,
-                                payments = projectPayments,
-                                contractCost = contractCost,
-                                onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
-                                    viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
-                                },
-                                onUpdatePayment = { payment ->
-                                    viewModel.updateProjectPayment(payment)
-                                },
-                                onDeletePayment = { viewModel.deleteProjectPayment(it.id) }
-                            )
-                        }
-                    }
+                    ProjectSection.MONEY -> MoneySection(
+                        payments = projectPayments,
+                        contractCost = contractCost,
+                        actualPercent = currentProject.actualAccomplishment,
+                        documents = pendingDocuments,
+                        canAddVariationOrder = currentUser.role.hasPermission(Permission.UPLOAD_DOCUMENT),
+                        onAddVariationOrder = onAddVariationOrderClick,
+                        onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
+                            viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
+                        },
+                        onUpdatePayment = { payment ->
+                            viewModel.updateProjectPayment(payment)
+                        },
+                        onDeletePayment = { viewModel.deleteProjectPayment(it.id) }
+                    )
                     ProjectSection.DOCUMENTS -> Column {
                         val chips = SectionChips.documents(canViewAuditLogs)
                         val chip = SectionChips.chipOrFirst(chips, documentsChip)
