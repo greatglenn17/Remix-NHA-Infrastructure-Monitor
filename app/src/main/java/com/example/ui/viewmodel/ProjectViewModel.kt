@@ -173,6 +173,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 com.example.data.local.SampleData.clearFromExistingRecords(application, database)
+                com.example.data.local.SampleData.removeUntouchedCoreChecklist(database)
             } catch (e: Exception) {
                 android.util.Log.w("ProjectViewModel", "Sample data cleanup failed", e)
             }
@@ -605,7 +606,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedFraction = BillingProgress.billedFraction(billedTotal, cost),
                 billedTotal = billedTotal,
                 contractCost = cost,
-                pendingDocsCount = projectDocs.count { it.status != "Approved" },
+                pendingDocsCount = ProjectAttention.waitingApproval(projectDocs),
                 lastFieldUpdate = lastUpdate
             )
         }
@@ -1193,13 +1194,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
             firestoreSyncManager.flushOutbox()
-
-            // Seed the core document checklist; every item starts Pending with no remarks.
-            com.example.data.local.SampleData.CORE_CHECKLIST.forEach { docName ->
-                projectDao.insertPendingDocument(
-                    PendingDocument(projectId = newId, documentName = docName, status = "Pending", remarks = "", isCoreChecklist = true)
-                )
-            }
 
             logAuditAction(
                 projectId = newId,

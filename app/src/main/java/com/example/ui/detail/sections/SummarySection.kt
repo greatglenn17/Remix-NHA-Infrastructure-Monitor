@@ -5,16 +5,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.data.model.PendingDocument
+import com.example.data.model.Permission
 import com.example.data.model.Project
+import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
+import com.example.data.model.hasPermission
+import com.example.ui.dashboard.SitePhoto
 import com.example.ui.dashboard.levelColor
 import com.example.ui.dashboard.levelIcon
 import com.example.ui.dashboard.levelName
@@ -26,7 +29,7 @@ import com.example.util.ProjectSchedule
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/** Summary: attention flags, key dates, contract cost, latest weekly report, open issues and the master profile. */
+/** Summary: attention flags, the master profile, key dates with their orders, contract cost, and the latest weekly report with open issues. */
 @Composable
 fun SummarySection(
     project: Project,
@@ -36,21 +39,34 @@ fun SummarySection(
     openIssues: Int,
     canEditProject: Boolean,
     onEditProject: () -> Unit,
+    currentUserRole: UserRole,
+    onAddOrder: () -> Unit,
+    onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
+    onDeleteOrder: (Long) -> Unit,
     today: LocalDate = LocalDate.now()
 ) {
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
         ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
     }
     val addedDays = remember(documents) { ProjectSchedule.addedDays(documents) }
+    var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> AttentionCard(flags, m) },
-        { m -> KeyDatesCard(project, revisedCompletion, addedDays, today, m) },
+        { m -> ProfileCard(project, canEditProject, onEditProject, m) },
+        { m ->
+            KeyDatesCard(
+                project, revisedCompletion, addedDays, today, documents,
+                onAddOrder.takeIf { currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT) }, { openOrder = it }, m
+            )
+        },
         { m -> CostCard(project, documents, m) },
-        { m -> LatestReportCard(latestReport, openIssues, m) },
-        { m -> ProfileCard(project, canEditProject, onEditProject, m) }
+        { m -> LatestReportCard(latestReport, openIssues, m) }
     )
     CardColumns(cards)
+    openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateOrderStatus, onDeleteOrder) { openOrder = null } }
 }
+
+private val SCHEDULE_ORDER_TYPES = listOf("Time Extension", "Work Suspension", "Work Resumption")
 
 @Composable
 private fun AttentionCard(flags: List<AttentionFlag>, modifier: Modifier) {
@@ -69,10 +85,33 @@ private fun AttentionCard(flags: List<AttentionFlag>, modifier: Modifier) {
 }
 
 @Composable
-private fun KeyDatesCard(project: Project, revisedCompletion: String?, addedDays: Int, today: LocalDate, modifier: Modifier) {
+private fun KeyDatesCard(
+    project: Project,
+    revisedCompletion: String?,
+    addedDays: Int,
+    today: LocalDate,
+    documents: List<PendingDocument>,
+    onAddOrder: (() -> Unit)?,
+    onOpenOrder: (PendingDocument) -> Unit,
+    modifier: Modifier
+) {
     val end = revisedCompletion ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
     val daysLeft = runCatching { ChronoUnit.DAYS.between(today, LocalDate.parse(end.trim())) }.getOrNull()
-    SectionCard("Key dates", Icons.Default.Event, modifier) {
+    val orders = documents.filter { doc -> SCHEDULE_ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) } }
+    SectionCard(
+        "Key dates",
+        Icons.Default.Event,
+        modifier,
+        action = onAddOrder?.let { add ->
+            {
+                TextButton(onClick = add, modifier = Modifier.testTag("add_schedule_order_button")) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add order")
+                }
+            }
+        }
+    ) {
         Field("Date started", project.dateStarted.ifBlank { "-" })
         Field("Original completion", project.completionDateOriginal.ifBlank { "-" })
         // Same date Days left counts down to: approved orders first, else the stored revised date.
@@ -88,6 +127,12 @@ private fun KeyDatesCard(project: Project, revisedCompletion: String?, addedDays
                 else -> "$daysLeft days"
             }
         )
+        // Only Approved orders move the dates above; tap one to change its status.
+        Text("Time extensions & suspensions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        if (orders.isEmpty()) EmptyLine("No time extension or suspension orders.")
+        orders.forEach { doc ->
+            LogEntry(doc.documentName, MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = { onOpenOrder(doc) })
+        }
     }
 }
 
@@ -135,6 +180,12 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
             }
         } else null
     ) {
+        val hasPhoto = project.latestUpdatePhotoUrl.isNotBlank()
+        SitePhoto(
+            project.latestUpdatePhotoUrl,
+            Modifier.fillMaxWidth().then(if (hasPhoto) Modifier.aspectRatio(16f / 9f) else Modifier.height(64.dp))
+                .padding(bottom = 8.dp).testTag("profile_site_photo")
+        )
         Field("Implementing office", project.implementingOffice.ifBlank { "-" })
         Field("Contractor", project.contractor.ifBlank { "-" })
         Field("Project type", project.projectType.ifBlank { "-" })

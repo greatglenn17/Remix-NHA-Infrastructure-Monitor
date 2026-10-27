@@ -1,6 +1,7 @@
 package com.example.ui.dashboard
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -9,11 +10,14 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -21,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
 import com.example.ui.theme.LocalNHAColors
@@ -58,30 +63,36 @@ fun PortfolioRow(
     ) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = project.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = scheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                Badge(formatVariance(project.variance), varianceColor, containerOf(varianceColor, colors))
-                if (onEdit != null || onDelete != null) RowMenu(project, onEdit, onDelete) else Spacer(Modifier.width(8.dp))
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
-                Text(
-                    text = project.location,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                StatusBadge(project.status, colors)
+                SitePhoto(project.latestUpdatePhotoUrl, Modifier.size(56.dp).testTag("site_photo_${project.id}"))
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = project.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = scheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Badge(formatVariance(project.variance), varianceColor, containerOf(varianceColor, colors))
+                        if (onEdit != null || onDelete != null) RowMenu(project, onEdit, onDelete) else Spacer(Modifier.width(8.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                        Text(
+                            text = project.location,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        StatusBadge(project.status, colors)
+                    }
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -133,9 +144,24 @@ fun PortfolioRow(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val completion = ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
                 MetaItem(Icons.Default.Event, "Completion ${completion.ifBlank { "-" }}")
-                MetaItem(Icons.Default.Description, if (item.pendingDocsCount == 1) "1 document pending" else "${item.pendingDocsCount} documents pending")
+                MetaItem(Icons.Default.Description, if (item.pendingDocsCount == 1) "1 order waiting approval" else "${item.pendingDocsCount} orders waiting approval")
                 MetaItem(Icons.Default.Update, item.lastFieldUpdate?.let { "Field update $it" } ?: "No field update yet")
             }
+        }
+    }
+}
+
+/** The project's latest weekly-report photo, or a camera placeholder when there is none or it fails to load. */
+@Composable
+fun SitePhoto(url: String, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.clip(RoundedCornerShape(8.dp)).background(scheme.surfaceVariant)
+    ) {
+        Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = scheme.onSurfaceVariant)
+        if (url.isNotBlank()) {
+            AsyncImage(model = url, contentDescription = "Latest site photo", contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
         }
     }
 }

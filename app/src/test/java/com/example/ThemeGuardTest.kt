@@ -33,7 +33,6 @@ class ThemeGuardTest {
             "ui/detail/tabs/IssuesTab.kt",
             "ui/detail/tabs/MonthlyReportsTab.kt",
             "ui/detail/tabs/PaymentDialogs.kt",
-            "ui/detail/tabs/PendingDocumentsTab.kt",
             "ui/detail/tabs/PhotoGalleryTab.kt",
             "ui/detail/tabs/SubdivisionPlanTab.kt",
             "ui/detail/tabs/WeatherChartTab.kt",

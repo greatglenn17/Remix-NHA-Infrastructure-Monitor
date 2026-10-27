@@ -19,7 +19,6 @@ import com.example.ui.components.TopAppBarHeader
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.ProjectHeader
 import com.example.ui.detail.sections.RelatedFilesList
-import com.example.ui.detail.sections.ScheduleOrdersList
 import com.example.ui.detail.sections.SummarySection
 import com.example.ui.detail.sections.MoneySection
 import com.example.ui.detail.tabs.*
@@ -182,6 +181,10 @@ fun ProjectDetailScreen(
                             },
                             canEditProject = currentUser.role.hasPermission(Permission.EDIT_PROJECT),
                             onEditProject = { projectToEdit = currentProject },
+                            currentUserRole = currentUser.role,
+                            onAddOrder = onAddDocumentClick,
+                            onUpdateOrderStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
+                            onDeleteOrder = { viewModel.deletePendingDocument(it) },
                             today = today
                         )
                     }
@@ -317,6 +320,9 @@ fun ProjectDetailScreen(
                         documents = pendingDocuments,
                         canAddVariationOrder = currentUser.role.hasPermission(Permission.UPLOAD_DOCUMENT),
                         onAddVariationOrder = onAddVariationOrderClick,
+                        currentUserRole = currentUser.role,
+                        onUpdateOrderStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
+                        onDeleteOrder = { viewModel.deletePendingDocument(it) },
                         onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
                             viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
                         },
@@ -331,23 +337,7 @@ fun ProjectDetailScreen(
                         ChipRow(chips, chip) { documentsChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
                             when (chip) {
-                                "Checklist" -> PendingDocumentsTab(
-                                    // Waiting approval first.
-                                    pendingDocs = pendingDocuments.sortedBy { it.status.equals("Approved", ignoreCase = true) },
-                                    currentUserRole = currentUser.role,
-                                    onAddDocumentClick = onAddDocumentClick,
-                                    onUpdateStatus = { doc, status, remarks ->
-                                        viewModel.updatePendingDocumentStatus(doc, status, remarks)
-                                    },
-                                    onUpdateFileUrl = { doc, url ->
-                                        viewModel.updatePendingDocumentFileUrl(doc, url)
-                                    },
-                                    onDeleteDocument = { id ->
-                                        viewModel.deletePendingDocument(id)
-                                    }
-                                )
-                                "Schedule orders" -> ScheduleOrdersList(pendingDocuments)
-                                "Files" -> RelatedFilesList(
+                                "Related Files" -> RelatedFilesList(
                                     documents = pendingDocuments,
                                     currentUserRole = currentUser.role,
                                     onAddRelatedDocument = { name, status, remarks, fileUrl ->

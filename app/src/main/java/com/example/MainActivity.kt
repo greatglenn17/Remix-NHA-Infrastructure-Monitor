@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                                 onAddVariationOrderClick = { addDocumentInitialType = "Variation Order"; showAddDocumentDialog = true },
                                 onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
                                 onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
-                                onAddDocumentClick = { addDocumentInitialType = "Custom Document"; showAddDocumentDialog = true },
+                                onAddDocumentClick = { addDocumentInitialType = "Time Extension"; showAddDocumentDialog = true },
                                 onAddIssueClick = { showAddIssueDialog = true },
                                 embedded = embedded
                             )

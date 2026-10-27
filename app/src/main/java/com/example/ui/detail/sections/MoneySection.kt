@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.files.Attachments
 import com.example.data.model.PendingDocument
 import com.example.data.model.ProjectPayment
+import com.example.data.model.UserRole
 import com.example.ui.components.rememberAttachmentPicker
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.detail.tabs.AddPaymentDialog
@@ -30,6 +31,9 @@ fun MoneySection(
     documents: List<PendingDocument>,
     canAddVariationOrder: Boolean,
     onAddVariationOrder: () -> Unit,
+    currentUserRole: UserRole,
+    onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
+    onDeleteOrder: (Long) -> Unit,
     onAddPayment: (String, String, String, String, Double, Double, Double, Double, String) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
     onDeletePayment: (ProjectPayment) -> Unit
@@ -75,7 +79,7 @@ fun MoneySection(
                     }
                 }
             }
-            item { VariationOrdersLog(documents, canAddVariationOrder, onAddVariationOrder) }
+            item { VariationOrdersLog(documents, canAddVariationOrder, onAddVariationOrder, currentUserRole, onUpdateOrderStatus, onDeleteOrder) }
         }
         ExtendedFloatingActionButton(
             onClick = { showAddDialog = true },
@@ -151,8 +155,12 @@ fun VariationOrdersLog(
     documents: List<PendingDocument>,
     canAddVariationOrder: Boolean,
     onAddVariationOrder: () -> Unit,
+    currentUserRole: UserRole,
+    onUpdateStatus: (PendingDocument, String, String) -> Unit,
+    onDeleteDocument: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
     val voLogs = documents.filter { it.documentName.contains("Variation Order", ignoreCase = true) }
     SectionCard(
         "Variation orders (${voLogs.size})",
@@ -184,8 +192,10 @@ fun VariationOrdersLog(
             LogEntry(
                 vo.documentName,
                 MaterialTheme.colorScheme.onSurface,
-                listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText)
+                listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText),
+                onClick = { openOrder = vo }
             )
         }
     }
+    openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateStatus, onDeleteDocument) { openOrder = null } }
 }

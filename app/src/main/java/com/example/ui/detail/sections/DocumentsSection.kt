@@ -25,93 +25,71 @@ import com.example.ui.detail.tabs.AddRelatedDocumentDialog
 import com.example.ui.detail.tabs.ViewScannedCopyDialog
 import com.example.ui.theme.LocalNHAColors
 
-/** Documents › Schedule orders: approved or submitted time extensions, suspensions and resumptions. */
+/** One log entry: a title and its detail lines (blank lines skipped). With [onClick] it opens that entry's status. */
 @Composable
-fun ScheduleOrdersList(documents: List<PendingDocument>) {
-    fun logs(type: String) = documents.filter {
-        it.documentName.contains(type, ignoreCase = true) &&
-            (it.status.equals("Approved", ignoreCase = true) || it.status.equals("Submitted", ignoreCase = true))
-    }
-    val colors = LocalNHAColors.current
-    val teLogs = logs("Time Extension")
-    val wsLogs = logs("Work Suspension")
-    val wrLogs = logs("Work Resumption")
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-        item {
-            SectionCard("Time extensions (${teLogs.size})", Icons.Default.MoreTime) {
-                if (teLogs.isEmpty()) EmptyLine("No time extensions recorded.")
-                teLogs.forEach { ext ->
-                    val cleanRemarks = ext.remarks.replace("^Remarks:\\s*".toRegex(RegexOption.IGNORE_CASE), "").trim()
-                    val displayText = if (cleanRemarks.startsWith("Reason:", ignoreCase = true)) {
-                        cleanRemarks
-                    } else if (cleanRemarks.isNotBlank()) {
-                        "Reason: $cleanRemarks"
-                    } else ""
-                    LogEntry(ext.documentName, MaterialTheme.colorScheme.onSurface, listOf("Status: ${ext.status}", displayText))
-                }
-            }
-        }
-        item {
-            SectionCard("Work suspensions (${wsLogs.size})", Icons.Default.PauseCircle) {
-                if (wsLogs.isEmpty()) EmptyLine("No work suspensions recorded.")
-                wsLogs.forEach { so ->
-                    val remarksText = so.remarks
-                    val durMatch = Regex("Duration:\\s*([^|\\n]+)").find(remarksText)?.groupValues?.get(1)?.trim() ?: "7 Days"
-                    val effMatch = Regex("Effectivity:\\s*([^|\\n]+)").find(remarksText)?.groupValues?.get(1)?.trim() ?: "2026-05-18"
-                    var endMatch = Regex("(?:End|End Date):\\s*([^|\\n]+)").find(remarksText)?.groupValues?.get(1)?.trim()
-                    if (endMatch.isNullOrBlank()) {
-                        try {
-                            val days = Regex("\\d+").find(durMatch)?.value?.toIntOrNull() ?: 7
-                            val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                            val parsedDate = format.parse(effMatch)
-                            if (parsedDate != null) {
-                                val cal = java.util.Calendar.getInstance()
-                                cal.time = parsedDate
-                                cal.add(java.util.Calendar.DAY_OF_YEAR, days)
-                                endMatch = format.format(cal.time)
-                            }
-                        } catch (e: Exception) { }
-                    }
-                    val finalEndDate = endMatch ?: "2026-05-25"
-                    LogEntry(
-                        so.documentName, colors.watch,
-                        listOf("Status: ${so.status}", "Duration: $durMatch", "Effectivity Date: $effMatch", "End Date: $finalEndDate")
-                    )
-                }
-            }
-        }
-        item {
-            SectionCard("Work resumptions (${wrLogs.size})", Icons.Default.PlayCircle) {
-                if (wrLogs.isEmpty()) EmptyLine("No work resumptions recorded.")
-                wrLogs.forEach { log ->
-                    val remarksText = log.remarks
-                    val effMatch = Regex("Effectivity:\\s*([^|\\n]+)").find(remarksText)?.groupValues?.get(1)?.trim() ?: "2026-05-25"
-                    var reasonMatch = Regex("(?:Remarks|Reason):\\s*([^|\\n]+)").find(remarksText.replace("Effectivity:\\s*([^|\\n]+)".toRegex(), ""))?.groupValues?.get(1)?.trim()
-                    if (reasonMatch.isNullOrBlank()) {
-                        reasonMatch = "Weather condition cleared"
-                    }
-                    LogEntry(log.documentName, colors.onTrack, listOf("Status: ${log.status}", "Effectivity Date: $effMatch", "Reason: $reasonMatch"))
-                }
-            }
-        }
-    }
-}
-
-/** One log entry: a title and its detail lines (blank lines skipped). */
-@Composable
-fun LogEntry(title: String, titleColor: Color, lines: List<String>) {
+fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null) {
     val scheme = MaterialTheme.colorScheme
-    Surface(color = scheme.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = titleColor)
-            lines.filter { it.isNotBlank() }.forEach {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+    val shape = RoundedCornerShape(8.dp)
+    val modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    val body: @Composable () -> Unit = {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = titleColor)
+                lines.filter { it.isNotBlank() }.forEach {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
             }
+            if (onClick != null) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = scheme.onSurfaceVariant)
         }
     }
+    if (onClick != null) Surface(onClick = onClick, color = scheme.surfaceVariant, shape = shape, modifier = modifier) { body() }
+    else Surface(color = scheme.surfaceVariant, shape = shape, modifier = modifier) { body() }
 }
 
-/** Documents › Files: related project files that are not schedule or cost orders. */
+/** Status and remarks of a time extension, suspension, resumption or variation order; only Approved ones change dates and cost. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun OrderStatusDialog(
+    doc: PendingDocument,
+    currentUserRole: UserRole,
+    onUpdateStatus: (PendingDocument, String, String) -> Unit,
+    onDeleteDocument: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var remarks by remember(doc.id) { mutableStateOf(doc.remarks) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Update status") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(doc.documentName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Pending", "Submitted", "Signed", "Notarized", "Approved").forEach { status ->
+                        FilterChip(
+                            selected = doc.status == status,
+                            onClick = { onUpdateStatus(doc, status, remarks); onDismiss() },
+                            label = { Text(status) },
+                            modifier = Modifier.testTag("order_status_$status")
+                        )
+                    }
+                }
+                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = { TextButton(onClick = { onUpdateStatus(doc, doc.status, remarks); onDismiss() }) { Text("Save remarks") } },
+        dismissButton = {
+            Row {
+                // Same rule as the old checklist: Engineer Admins could delete orders.
+                if (currentUserRole == UserRole.ENGINEER_ADMIN) {
+                    TextButton(onClick = { onDeleteDocument(doc.id); onDismiss() }) { Text("Delete", color = LocalNHAColors.current.behind) }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        }
+    )
+}
+
+/** Documents › Related Files: related project files that are not schedule or cost orders. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RelatedFilesList(
@@ -138,7 +116,7 @@ fun RelatedFilesList(
     LazyColumn(contentPadding = PaddingValues(16.dp), modifier = Modifier.fillMaxSize()) {
         item {
             SectionCard(
-                "Related files (${relatedFiles.size})",
+                "Related Files (${relatedFiles.size})",
                 Icons.Default.FolderOpen,
                 action = if (canUpload) {
                     {
