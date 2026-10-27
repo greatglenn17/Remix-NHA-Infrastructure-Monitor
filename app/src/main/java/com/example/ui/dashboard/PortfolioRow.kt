@@ -170,7 +170,7 @@ private fun RowMenu(project: Project, onEdit: ((Project) -> Unit)?, onDelete: ((
 }
 
 @Composable
-private fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier) {
+internal fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier) {
     Column(modifier = modifier) {
         Row {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -207,7 +207,7 @@ private fun MetaItem(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun StatusBadge(status: String, colors: NHAColors) {
+internal fun StatusBadge(status: String, colors: NHAColors) {
     val color = when (status) {
         ProjectStatus.BEHIND_SCHEDULE.label -> colors.behind
         ProjectStatus.SUSPENDED.label -> colors.neutral
@@ -236,20 +236,20 @@ internal fun levelColor(level: AttentionLevel, colors: NHAColors) = when (level)
     AttentionLevel.STALE -> colors.neutral
 }
 
-private fun varianceColor(variance: Double, colors: NHAColors) = when {
+internal fun varianceColor(variance: Double, colors: NHAColors) = when {
     variance >= 0 -> colors.onTrack
     variance <= ProjectAttention.CRITICAL_SLIPPAGE -> colors.behind
     variance <= ProjectAttention.WARNING_SLIPPAGE -> colors.watch
     else -> colors.neutral
 }
 
-private fun containerOf(color: Color, colors: NHAColors) = when (color) {
+internal fun containerOf(color: Color, colors: NHAColors) = when (color) {
     colors.onTrack -> colors.onTrackContainer
     colors.behind -> colors.behindContainer
     colors.watch -> colors.watchContainer
     else -> colors.neutralContainer
 }
 
-private fun formatVariance(v: Double) = if (v >= 0) "+%.1f%%".format(v) else "−%.1f%%".format(-v)
+internal fun formatVariance(v: Double) = if (v >= 0) "+%.1f%%".format(v) else "−%.1f%%".format(-v)
 
-private fun peso(amount: Double): String = NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(amount)
+internal fun peso(amount: Double): String = NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(amount)
