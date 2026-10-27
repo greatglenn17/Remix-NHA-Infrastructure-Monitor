@@ -58,17 +58,6 @@ fun AddRelatedDocumentDialog(
     var fileUrl by remember { mutableStateOf("") }
     var showStatusDropdown by remember { mutableStateOf(false) }
 
-    val tfColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = DarkTextPrimary,
-        unfocusedTextColor = DarkTextPrimary,
-        focusedBorderColor = Color(0xFF38BDF8),
-        unfocusedBorderColor = DarkBorder,
-        focusedContainerColor = DarkSurfaceVariant,
-        unfocusedContainerColor = DarkSurfaceVariant,
-        focusedLabelColor = Color(0xFF38BDF8),
-        unfocusedLabelColor = DarkTextSecondary
-    )
-
     val filePickerLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
         fileUrl = ref
     }
@@ -79,14 +68,17 @@ fun AddRelatedDocumentDialog(
         selectedPreset
     }
 
+
+    val snapshot = { listOf(selectedPreset, customDocName, categoryRef, status, remarksText, fileUrl) }
+    val initial = remember { snapshot() }
+    val close = com.example.ui.components.rememberDiscardGuard(snapshot() != initial, onDismiss)
     AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkSurface,
+        onDismissRequest = close,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(0xFF38BDF8))
+                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Related Project Document", style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold))
+                Text("Add Related Project Document", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold))
             }
         },
         text = {
@@ -103,23 +95,23 @@ fun AddRelatedDocumentDialog(
                         label = { Text("Select Document Type") },
                         trailingIcon = {
                             IconButton(onClick = { showPresetDropdown = true }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF38BDF8))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             }
                         },
-                        colors = tfColors,
+                        
                         modifier = Modifier.fillMaxWidth().clickable { showPresetDropdown = true }.testTag("dropdown_doc_type")
                     )
                     DropdownMenu(
                         expanded = showPresetDropdown,
                         onDismissRequest = { showPresetDropdown = false },
-                        modifier = Modifier.background(DarkSurfaceVariant)
+                        
                     ) {
                         presetDocumentTypes.forEach { option ->
                             DropdownMenuItem(
                                 text = {
                                     Text(
                                         text = option,
-                                        color = if (option == selectedPreset) Color(0xFF38BDF8) else DarkTextPrimary,
+                                        color = if (option == selectedPreset) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                         fontWeight = if (option == selectedPreset) FontWeight.Bold else FontWeight.Normal
                                     )
                                 },
@@ -139,7 +131,7 @@ fun AddRelatedDocumentDialog(
                         onValueChange = { customDocName = it },
                         label = { Text("Specific Document Title") },
                         placeholder = { Text("e.g. Environmental Compliance Certificate") },
-                        colors = tfColors,
+                        
                         modifier = Modifier.fillMaxWidth().testTag("input_related_doc_title"),
                         singleLine = true
                     )
@@ -150,7 +142,7 @@ fun AddRelatedDocumentDialog(
                     onValueChange = { categoryRef = it },
                     label = { Text("Reference / Serial No. / Date") },
                     placeholder = { Text("e.g. Ref: NHA-2026-001 | Date: 2026-01-15") },
-                    colors = tfColors,
+                    
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -164,20 +156,20 @@ fun AddRelatedDocumentDialog(
                         label = { Text("Document Status") },
                         trailingIcon = {
                             IconButton(onClick = { showStatusDropdown = true }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = DarkTextSecondary)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
-                        colors = tfColors,
+                        
                         modifier = Modifier.fillMaxWidth().clickable { showStatusDropdown = true }
                     )
                     DropdownMenu(
                         expanded = showStatusDropdown,
                         onDismissRequest = { showStatusDropdown = false },
-                        modifier = Modifier.background(DarkSurfaceVariant)
+                        
                     ) {
                         listOf("Approved", "Notarized", "Signed", "Submitted", "Pending").forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option, color = DarkTextPrimary) },
+                                text = { Text(option, color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     status = option
                                     showStatusDropdown = false
@@ -192,7 +184,7 @@ fun AddRelatedDocumentDialog(
                     onValueChange = { remarksText = it },
                     label = { Text("Remarks / Description") },
                     placeholder = { Text("Additional notes or specifications") },
-                    colors = tfColors,
+                    
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -200,13 +192,13 @@ fun AddRelatedDocumentDialog(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Scanned Copy Attachment",
-                        style = MaterialTheme.typography.labelMedium.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     if (fileUrl.isNotBlank()) {
                         Surface(
-                            color = DarkSurfaceVariant,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -217,12 +209,12 @@ fun AddRelatedDocumentDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = StatusGreenText, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = LocalNHAColors.current.onTrack, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = StatusGreenText, fontWeight = FontWeight.Bold))
+                                        Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontWeight = FontWeight.Bold))
                                     }
                                     TextButton(onClick = { fileUrl = "" }) {
-                                        Text("Remove", color = StatusRedText, fontSize = 10.sp)
+                                        Text("Remove", color = LocalNHAColors.current.behind, fontSize = 10.sp)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -240,7 +232,7 @@ fun AddRelatedDocumentDialog(
                     } else {
                         Button(
                             onClick = { filePickerLauncher.launch("*/*") },
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant, contentColor = Color(0xFF38BDF8)),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -266,14 +258,13 @@ fun AddRelatedDocumentDialog(
                     onDismiss()
                 },
                 enabled = finalDocName.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
             ) {
                 Text("Save Document", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = DarkTextSecondary)
+            TextButton(onClick = close) {
+                Text("Cancel")
             }
         }
     )
@@ -292,9 +283,9 @@ fun ViewScannedCopyDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, DarkBorder),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)
@@ -308,15 +299,15 @@ fun ViewScannedCopyDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = doc.documentName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         )
                         Text(
                             text = "Status: ${doc.status} | ${doc.remarks.ifBlank { "No remarks" }}",
-                            style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary)
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = DarkTextPrimary)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
@@ -324,7 +315,7 @@ fun ViewScannedCopyDialog(
 
                 Text(
                     text = "SCANNED COPY PREVIEW",
-                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -333,15 +324,15 @@ fun ViewScannedCopyDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(240.dp)
-                            .background(DarkBackground, RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
                             .clickable { openAttachment(doc.fileUrl) },
                         contentAlignment = Alignment.Center
                     ) {
                         if (com.example.data.files.Attachments.isPdf(doc.fileUrl)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(40.dp))
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("PDF attached. Tap to open.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                                Text("PDF attached. Tap to open.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             }
                         } else {
                             AsyncImage(
@@ -357,20 +348,20 @@ fun ViewScannedCopyDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(140.dp)
-                            .background(DarkBackground, RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.UploadFile, contentDescription = null, tint = DarkTextSecondary, modifier = Modifier.size(32.dp))
+                            Icon(Icons.Default.UploadFile, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp))
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("No scanned copy attached yet.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                            Text("No scanned copy attached yet.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text("Attach or replace scan:", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
+                Text("Attach or replace scan:", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -379,8 +370,8 @@ fun ViewScannedCopyDialog(
                 ) {
                     OutlinedButton(
                         onClick = { filePickerLauncher.launch("*/*") },
-                        border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -388,8 +379,7 @@ fun ViewScannedCopyDialog(
                     }
 
                     Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
+                        onClick = onDismiss
                     ) {
                         Text("Close", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
