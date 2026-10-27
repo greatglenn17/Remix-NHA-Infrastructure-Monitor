@@ -242,7 +242,7 @@ private fun SearchField(query: String, onSearch: (String) -> Unit, modifier: Mod
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = scheme.surface,
-                border = BorderStroke(1.dp, if (query.isNotEmpty()) scheme.primary else scheme.outlineVariant),
+                border = BorderStroke(1.dp, if (query.isNotEmpty()) scheme.primary else scheme.outline),
                 modifier = Modifier.fillMaxSize()
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp)) {

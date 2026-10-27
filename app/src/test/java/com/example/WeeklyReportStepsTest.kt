@@ -27,12 +27,16 @@ class WeeklyReportStepsTest {
     @Test fun weeklyErrors_flagsOutOfRange() {
         assertEquals(
             listOf(WeeklyStep.WEEK to "Drainage: actual 0 to 100"),
-            weeklyErrors(mapOf("Drainage" to ("50" to "120")))
+            weeklyErrors(mapOf("Drainage" to ("50" to "120")), listOf("Drainage"))
         )
     }
 
+    @Test fun weeklyErrors_ignoresRemovedScopeItems() {
+        assertEquals(emptyList<Pair<WeeklyStep, String>>(), weeklyErrors(mapOf("Old" to ("50" to "120")), listOf("Drainage")))
+    }
+
     @Test fun weeklyErrors_blankIsFine() {
-        assertEquals(emptyList<Pair<WeeklyStep, String>>(), weeklyErrors(mapOf("Drainage" to ("" to ""))))
+        assertEquals(emptyList<Pair<WeeklyStep, String>>(), weeklyErrors(mapOf("Drainage" to ("" to "")), listOf("Drainage")))
     }
 
     @Test fun editUnchanged_submitsSameValues() {

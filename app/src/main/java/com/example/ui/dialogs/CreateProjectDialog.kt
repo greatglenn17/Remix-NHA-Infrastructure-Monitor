@@ -73,7 +73,7 @@ fun CreateProjectDialog(
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {
             val start = LocalDate.parse(dateStarted)
-            val duration = durationText.toIntOrNull() ?: 0
+            val duration = durationText.trim().toIntOrNull() ?: 0
             if (duration > 0) {
                 start.plusDays((duration - 1).toLong()).toString()
             } else {
@@ -89,6 +89,7 @@ fun CreateProjectDialog(
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
     val scopeAmountError = FormValidation.amountError(currentScopeAmount, required = false)
+    val durationError = daysError(durationText)
     fun snapshot() = listOf(
         name, location, assignedStaff, implementingOffice, contractor, scopeItems.toList(),
         currentScopeItem, currentScopeAmount, currentScopeWeight, projectType, landAreaValue,
@@ -100,12 +101,12 @@ fun CreateProjectDialog(
     LongForm(
         title = "New project",
         dirty = dirty,
-        saveEnabled = nameError == null && contractorError == null && scopeAmountError == null,
+        saveEnabled = nameError == null && contractorError == null && scopeAmountError == null && durationError == null,
         saveTag = "submit_create_project",
         onDismiss = onDismiss,
         onSave = {
             val cost = scopeItems.sumOf { it.amount }
-            val duration = durationText.toIntOrNull() ?: 365
+            val duration = durationText.trim().toIntOrNull() ?: 365
             val landArea = if (landAreaValue.isBlank()) "" else "${landAreaValue.trim()} $landAreaUnit"
             onCreate(
                 name,
@@ -180,7 +181,7 @@ fun CreateProjectDialog(
                         currentScopeWeight = ""
                     }
                 },
-                modifier = Modifier.height(36.dp),
+                modifier = Modifier.heightIn(min = 48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = cs.primary, contentColor = cs.onPrimary),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
@@ -407,6 +408,8 @@ fun CreateProjectDialog(
             value = durationText,
             onValueChange = { durationText = it },
             label = { Text("Contract Duration (Days)") },
+            isError = durationError != null, supportingText = durationError?.let { { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )

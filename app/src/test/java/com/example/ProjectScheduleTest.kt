@@ -75,6 +75,12 @@ class ProjectScheduleTest {
     }
 
     @Test
+    fun revisedDuration_nullWhenStoredDateNotAfterStart() {
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-01-05"))
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2025-12-01"))
+    }
+
+    @Test
     fun revisedDuration_badDate() {
         assertNull(ProjectSchedule.revisedDurationDays("", 300, 0, "2026-12-01"))
     }

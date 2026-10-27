@@ -92,7 +92,8 @@ fun LongForm(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val close = rememberDiscardGuard(dirty, onDismiss)
-    val phone = LocalConfiguration.current.screenWidthDp < 600
+    val cfg = LocalConfiguration.current
+    val phone = cfg.screenWidthDp < 600 || cfg.screenHeightDp < 480 // landscape phones too
     Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BackHandler(onBack = close)
         Surface(

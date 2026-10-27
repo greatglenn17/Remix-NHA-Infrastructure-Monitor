@@ -230,7 +230,7 @@ private fun WeeklyReportCard(
                                         Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
                                         Text("T: ${"%.1f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("A: ${"%.1f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) WeatherFairGreen else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
+                                        Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                 }

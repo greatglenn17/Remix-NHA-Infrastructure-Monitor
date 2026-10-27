@@ -43,7 +43,7 @@ object ProjectSchedule {
         if (addedDays > 0) return contractDurationDays + addedDays
         val start = parse(dateStarted) ?: return null
         val end = parse(completionDateRevised) ?: return null
-        return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it != contractDurationDays }
+        return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it > 0 && it != contractDurationDays }
     }
 
     /** Days added to the contract by approved Time Extensions (" - N Days") and Work Suspensions ("Duration: N Days"). */

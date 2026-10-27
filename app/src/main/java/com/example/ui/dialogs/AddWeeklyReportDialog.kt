@@ -265,7 +265,7 @@ fun AddWeeklyReportDialog(
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }
 
     var step by remember { mutableStateOf(WeeklyStep.WEEK) }
-    val errors = weeklyErrors(accomplishmentMap)
+    val errors = weeklyErrors(accomplishmentMap, scopeItems.map { it.name })
     fun snapshot() = listOf(
         reportingWeek, accomplishmentMap.toMap(), activityItems, photoUrls.toList(),
         dailyHourlyWeather.mapValues { it.value.toList() }, manpowerItems, equipmentItems, issuesItems

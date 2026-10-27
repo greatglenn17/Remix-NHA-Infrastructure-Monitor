@@ -13,6 +13,7 @@ class FormValidationTest {
         assertEquals(1200.0, FormValidation.parseAmount(" 1 200 ")!!, 0.0)
         assertNull(FormValidation.parseAmount("-5"))
         assertNull(FormValidation.parseAmount("abc"))
+        for (bad in listOf("NaN", "Infinity", "1e5", "1.2.3")) assertNull(bad, FormValidation.parseAmount(bad))
     }
 
     @Test fun amountError() {
@@ -25,6 +26,7 @@ class FormValidationTest {
         assertNull(FormValidation.percentError("100"))
         assertEquals("0 to 100", FormValidation.percentError("100.5"))
         assertNull(FormValidation.percentError(""))
+        for (bad in listOf("NaN", "Infinity", "1e1", "1.2.3")) assertEquals(bad, "0 to 100", FormValidation.percentError(bad))
     }
 
     @Test fun requiredError() {

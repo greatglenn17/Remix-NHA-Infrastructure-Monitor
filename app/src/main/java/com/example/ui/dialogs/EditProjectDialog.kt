@@ -102,7 +102,7 @@ fun EditProjectDialog(
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {
             val start = LocalDate.parse(dateStarted)
-            val duration = durationText.toIntOrNull() ?: 0
+            val duration = durationText.trim().toIntOrNull() ?: 0
             if (duration > 0) {
                 start.plusDays((duration - 1).toLong()).toString()
             } else {
@@ -118,6 +118,7 @@ fun EditProjectDialog(
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
     val scopeAmountError = FormValidation.amountError(currentScopeAmount, required = false)
+    val durationError = daysError(durationText)
     fun snapshot() = listOf(
         name, location, selectedUids.toList(), implementingOffice, contractor, scopeItems.toList(),
         currentScopeItem, currentScopeAmount, currentScopeWeight, projectType, landAreaValue,
@@ -129,12 +130,12 @@ fun EditProjectDialog(
     LongForm(
         title = "Edit project",
         dirty = dirty,
-        saveEnabled = nameError == null && contractorError == null && scopeAmountError == null,
+        saveEnabled = nameError == null && contractorError == null && scopeAmountError == null && durationError == null,
         saveTag = "submit_edit_project",
         onDismiss = onDismiss,
         onSave = {
             val cost = scopeItems.sumOf { it.amount }
-            val duration = durationText.toIntOrNull() ?: 365
+            val duration = durationText.trim().toIntOrNull() ?: 365
             val landArea = if (landAreaValue.isBlank()) "" else "${landAreaValue.trim()} $landAreaUnit"
             val scopeOfWorkJson = JSONArray(scopeItems.map { JSONObject().put("name", it.name).put("amount", it.amount).put("weightPct", it.weightPct) }).toString()
             onEdit(
@@ -438,6 +439,8 @@ fun EditProjectDialog(
             value = durationText,
             onValueChange = { durationText = it },
             label = { Text("Contract Duration (Days)") },
+            isError = durationError != null, supportingText = durationError?.let { { Text(it) } },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )

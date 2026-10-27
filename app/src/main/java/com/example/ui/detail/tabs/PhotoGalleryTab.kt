@@ -68,7 +68,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Update photos attached to weekly reports will appear here chronologically.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = Color.LightGray)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                 }
             }

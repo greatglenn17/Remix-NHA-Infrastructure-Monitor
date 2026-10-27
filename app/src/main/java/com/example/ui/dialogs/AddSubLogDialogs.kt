@@ -388,7 +388,7 @@ fun AddCustomDocumentDialog(
 }
 
 /** Whole-number day counts: blank is fine, anything else must be a non-negative integer. */
-private fun daysError(text: String): String? =
+internal fun daysError(text: String): String? =
     FormValidation.amountError(text, false) ?: if (text.isNotBlank() && text.trim().toIntOrNull() == null) "Whole days only" else null
 
 /** Name stored for a variation order; the amount has spaces stripped so ContractCost can read it back. */

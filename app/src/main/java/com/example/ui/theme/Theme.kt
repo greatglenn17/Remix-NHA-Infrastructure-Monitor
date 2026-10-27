@@ -35,7 +35,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerLowest = Color(0xFF0F1520),
     surfaceContainerLow = DarkNHAColors.surface,
     surfaceContainer = Color(0xFF1B2433),
-    surfaceContainerHigh = DarkNHAColors.surfaceVariant,
+    surfaceContainerHigh = Color(0xFF182030),
     surfaceContainerHighest = Color(0xFF2A3445)
 )
 
@@ -60,7 +60,7 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerLowest = Color(0xFFFFFFFF),
     surfaceContainerLow = Color(0xFFF8FAFC),
     surfaceContainer = Color(0xFFF1F5F9),
-    surfaceContainerHigh = Color(0xFFE9EEF5),
+    surfaceContainerHigh = Color(0xFFF5F8FB),
     surfaceContainerHighest = Color(0xFFE2E8F0)
 )
 

@@ -10,8 +10,8 @@ enum class WeeklyStep(val label: String) {
     REVIEW("Review and save")
 }
 
-fun weeklyErrors(accomplishments: Map<String, Pair<String, String>>): List<Pair<WeeklyStep, String>> =
-    accomplishments.flatMap { (item, vals) ->
+fun weeklyErrors(accomplishments: Map<String, Pair<String, String>>, scopeNames: Collection<String>): List<Pair<WeeklyStep, String>> =
+    accomplishments.filterKeys { it in scopeNames }.flatMap { (item, vals) ->
         listOfNotNull(
             FormValidation.percentError(vals.first)?.let { WeeklyStep.WEEK to "$item: target $it" },
             FormValidation.percentError(vals.second)?.let { WeeklyStep.WEEK to "$item: actual $it" }
