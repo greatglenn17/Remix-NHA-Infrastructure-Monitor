@@ -46,6 +46,7 @@ import com.example.data.model.SdpPlan
 import com.example.data.model.SdpRoad
 import com.example.data.model.UserRole
 import com.example.data.model.hasPermission
+import com.example.ui.components.LongForm
 import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -1696,100 +1697,81 @@ fun RecordInspectionSnapshotDialog(
     val intProgress = progressSlider.toInt().coerceIn(0, 100)
     val derivedColor = getLotProgressFillColor(intProgress)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.FactCheck, contentDescription = "Inspection", tint = Color(0xFF10B981))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Record Inspection for Block ${lot.blockNumber} Lot ${lot.lotNumber}",
-                    style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "This will capture an immutable snapshot of the lot's condition for inspection history and velocity analytics.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
-                )
+    val cs = MaterialTheme.colorScheme
+    val nha = LocalNHAColors.current
+    fun snapshot() = listOf(progressSlider, constructionStatus, currentActivity, contractor, remarks, billingStatus, billingRef)
+    val initial = remember { snapshot() }
+    val dirty = snapshot() != initial
 
-                // Physical Progress Slider
-                Surface(
-                    color = DarkSurface,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, derivedColor.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
+    LongForm(
+        title = "Record inspection: Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+        dirty = dirty,
+        saveEnabled = true,
+        saveTag = "submit_lot_inspection",
+        onDismiss = onDismiss,
+        onSave = {
+            onSubmitInspection(
+                intProgress,
+                constructionStatus,
+                currentActivity,
+                contractor,
+                remarks,
+                billingStatus,
+                billingRef
+            )
+        }
+    ) {
+        Text(
+            text = "This will capture an immutable snapshot of the lot's condition for inspection history and velocity analytics.",
+            style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurfaceVariant)
+        )
+
+        // Physical Progress Slider
+        Surface(
+            color = cs.surfaceVariant,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, derivedColor.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Inspected Progress %", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
-                            Surface(color = derivedColor, shape = RoundedCornerShape(4.dp)) {
-                                Text(
-                                    text = "$intProgress%",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.Black, fontWeight = FontWeight.Bold),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        Slider(
-                            value = progressSlider,
-                            onValueChange = {
-                                progressSlider = it
-                                constructionStatus = when (it.toInt()) {
-                                    0 -> "Not Started"
-                                    in 1..20 -> "Layout / Excavation Started"
-                                    in 21..80 -> "Under Construction"
-                                    in 81..99 -> "Substantially Completed"
-                                    else -> "Completed"
-                                }
-                            },
-                            valueRange = 0f..100f,
-                            colors = SliderDefaults.colors(thumbColor = derivedColor, activeTrackColor = derivedColor, inactiveTrackColor = DarkBorder)
+                    Text("Inspected Progress %", style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurfaceVariant))
+                    Surface(color = derivedColor, shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            text = "$intProgress%",
+                            style = MaterialTheme.typography.labelSmall.copy(color = Color.Black, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
 
-                OutlinedTextField(value = constructionStatus, onValueChange = { constructionStatus = it }, label = { Text("Construction Status") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = currentActivity, onValueChange = { currentActivity = it }, label = { Text("Current Activity") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = contractor, onValueChange = { contractor = it }, label = { Text("Contractor") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Inspection Field Remarks") }, modifier = Modifier.fillMaxWidth())
+                Slider(
+                    value = progressSlider,
+                    onValueChange = {
+                        progressSlider = it
+                        constructionStatus = when (it.toInt()) {
+                            0 -> "Not Started"
+                            in 1..20 -> "Layout / Excavation Started"
+                            in 21..80 -> "Under Construction"
+                            in 81..99 -> "Substantially Completed"
+                            else -> "Completed"
+                        }
+                    },
+                    valueRange = 0f..100f,
+                    colors = SliderDefaults.colors(thumbColor = derivedColor, activeTrackColor = derivedColor, inactiveTrackColor = cs.outline)
+                )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSubmitInspection(
-                        intProgress,
-                        constructionStatus,
-                        currentActivity,
-                        contractor,
-                        remarks,
-                        billingStatus,
-                        billingRef
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.Black)
-            ) {
-                Text("SAVE SNAPSHOT", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("CANCEL", color = DarkTextSecondary) }
         }
-    )
+
+        OutlinedTextField(value = constructionStatus, onValueChange = { constructionStatus = it }, label = { Text("Construction Status") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = currentActivity, onValueChange = { currentActivity = it }, label = { Text("Current Activity") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = contractor, onValueChange = { contractor = it }, label = { Text("Contractor") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Inspection Field Remarks") }, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 // --- DETAILED LOT INFO & HISTORICAL TIMELINE DIALOG (PHASE 7) ---

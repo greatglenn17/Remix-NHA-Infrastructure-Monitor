@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.model.RegisteredUser
-import com.example.ui.theme.DarkBorder
 
 /**
  * The project's assigned accounts. The Super Admin ([editable]) picks from [users] once
@@ -41,9 +40,9 @@ fun AssignStaffField(
             readOnly = true,
             enabled = false,
             colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = Color(0xFFE2E8F0),
-                disabledLabelColor = Color(0xFF94A3B8),
-                disabledBorderColor = DarkBorder
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledBorderColor = MaterialTheme.colorScheme.outline
             ),
             supportingText = if (editable) ({ Text("Account list unavailable; assignment can't be edited right now.") }) else null,
             modifier = modifier.fillMaxWidth().testTag("assigned_staff_readonly"),
@@ -56,16 +55,16 @@ fun AssignStaffField(
     val options = users + selectedUids.filter { it !in knownUids }.distinct().map { RegisteredUser(it, it) }
 
     Column(modifier = modifier.fillMaxWidth().testTag("assigned_staff_picker")) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Surface(
             color = Color.Transparent,
             shape = RoundedCornerShape(4.dp),
-            border = BorderStroke(1.dp, DarkBorder),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
         ) {
             Column(modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
                 if (options.isEmpty()) {
-                    Text("No registered accounts", modifier = Modifier.padding(12.dp), color = Color(0xFF94A3B8))
+                    Text("No registered accounts", modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 options.forEach { user ->
                     val checked = user.uid in selectedUids
@@ -77,7 +76,7 @@ fun AssignStaffField(
                         modifier = Modifier.fillMaxWidth().clickable { toggle() }.padding(horizontal = 8.dp)
                     ) {
                         Checkbox(checked = checked, onCheckedChange = { toggle() })
-                        Text(user.name, color = Color(0xFFE2E8F0))
+                        Text(user.name, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
