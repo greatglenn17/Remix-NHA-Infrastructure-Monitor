@@ -14,7 +14,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
 2. Tap the latest release (`v1.9.2`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.9.1_Build191.apk`** to download the installation package.
+3. Under **Assets**, tap **`NHA_Monitor_v1.9.2_Build192.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
