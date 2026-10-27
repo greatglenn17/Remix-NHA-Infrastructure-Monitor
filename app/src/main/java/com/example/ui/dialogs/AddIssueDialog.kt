@@ -42,7 +42,7 @@ fun AddIssueDialog(
     val descError = if (tried) FormValidation.requiredError(description) else null
     val actionError = if (tried) FormValidation.requiredError(actionTaken) else null
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding().systemBarsPadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding().systemBarsPadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
         title = { Text(if (existingIssue != null) "Edit Issue" else "Log Issue") },
@@ -82,7 +82,7 @@ fun AddIssueDialog(
                     OutlinedButton(
                         onClick = { showStatusDropdown = true },
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(4.dp),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {

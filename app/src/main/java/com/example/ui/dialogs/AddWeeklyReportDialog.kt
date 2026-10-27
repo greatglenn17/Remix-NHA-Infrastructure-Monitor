@@ -74,12 +74,13 @@ fun AddWeeklyReportDialog(
         equipmentJson: String,
         issuesJson: String,
         accomplishmentItemsJson: String
-    ) -> Unit
+    ) -> Unit,
+    today: java.time.LocalDate = java.time.LocalDate.now()
 ) {
-    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(java.time.LocalDate.now())) }
+    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(today)) }
     
     val daysOfWeekWithDates = remember(reportingWeek) {
-        val cal = java.util.Calendar.getInstance()
+        val cal = java.util.Calendar.getInstance().apply { set(today.year, today.monthValue - 1, today.dayOfMonth) }
         try {
             var startDateStr = reportingWeek.split(" - ").first()
             // Remove "Week XX: " if present
@@ -102,7 +103,7 @@ fun AddWeeklyReportDialog(
             if (parsedDate != null) {
                 cal.time = parsedDate
                 if (cal.get(java.util.Calendar.YEAR) == 1970) {
-                    cal.set(java.util.Calendar.YEAR, java.util.Calendar.getInstance().get(java.util.Calendar.YEAR))
+                    cal.set(java.util.Calendar.YEAR, today.year)
                 }
             } else {
                 cal.firstDayOfWeek = java.util.Calendar.MONDAY
@@ -406,20 +407,20 @@ fun AddWeeklyReportDialog(
                 }
 
                 // Grand Total Row
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                         val ovColor = if (overallVariance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
-                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = ovColor))
+                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ovColor))
                     }
                 }
                 // 4. DAILY WEATHER LOG BY DAY OF WEEK (INTERACTIVE 24-SLICE PIE GRAPH)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -441,7 +442,7 @@ fun AddWeeklyReportDialog(
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Day Selector Tabs
@@ -462,7 +463,7 @@ fun AddWeeklyReportDialog(
                                         )
                                     },
                                     shape = RoundedCornerShape(50.dp),
-                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -479,7 +480,7 @@ fun AddWeeklyReportDialog(
                         val currentDayHours = dailyHourlyWeather[selectedWeatherDayName] ?: remember { mutableStateListOf(*Array(24) { "FAIR" }) }
                         val activeDateStr = daysOfWeekWithDates.find { it.first == selectedWeatherDayName }?.second ?: "July 24, 2026"
                         val holeSurfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-                        val holeBorder = MaterialTheme.colorScheme.outline
+                        val holeBorder = MaterialTheme.colorScheme.outlineVariant
                         val sliceLine = MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)
                         val selectedRing = MaterialTheme.colorScheme.onSurface
 
@@ -615,7 +616,7 @@ fun AddWeeklyReportDialog(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
                             Column(
@@ -695,7 +696,7 @@ fun AddWeeklyReportDialog(
                 // 1. MANPOWER TABLE
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
@@ -720,7 +721,7 @@ fun AddWeeklyReportDialog(
                             }
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(4.dp))
 
                         manpowerItems.forEachIndexed { idx, item ->
@@ -743,7 +744,7 @@ fun AddWeeklyReportDialog(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -760,7 +761,7 @@ fun AddWeeklyReportDialog(
                 // 2. EQUIPMENT TABLE
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
@@ -785,7 +786,7 @@ fun AddWeeklyReportDialog(
                             }
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(4.dp))
 
                         equipmentItems.forEachIndexed { idx, item ->
@@ -810,7 +811,7 @@ fun AddWeeklyReportDialog(
                 // ACTIVITIES OF THE WEEK TABLE
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
@@ -835,7 +836,7 @@ fun AddWeeklyReportDialog(
                             }
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(4.dp))
 
                         activityItems.forEachIndexed { idx, item ->
@@ -858,7 +859,7 @@ fun AddWeeklyReportDialog(
                 // 3. ISSUES TABLE
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
@@ -888,7 +889,7 @@ fun AddWeeklyReportDialog(
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(4.dp))
 
                         if (issuesItems.isEmpty()) {
@@ -915,7 +916,7 @@ fun AddWeeklyReportDialog(
                 // SITE PROGRESS PHOTO CARD (CAMERA / GALLERY ACCESS)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
@@ -986,7 +987,7 @@ fun AddWeeklyReportDialog(
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
                                 shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { showPhotoSourceDialog = true }
@@ -1062,7 +1063,7 @@ fun AddWeeklyReportDialog(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -1092,7 +1093,7 @@ fun AddWeeklyReportDialog(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -1215,7 +1216,7 @@ private fun EquipmentInputRow(
                 onClick = { showRemarksDropdown = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
                 Text("Remarks / Status: ${item.status}", color = MaterialTheme.colorScheme.onSurface)

@@ -53,7 +53,7 @@ fun PortfolioRow(
         onClick = { onOpen(project) },
         shape = RoundedCornerShape(12.dp),
         color = scheme.surface,
-        border = BorderStroke(1.dp, scheme.outline),
+        border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().testTag("project_tile_${project.id}")
     ) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
@@ -188,7 +188,7 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
         LinearProgressIndicator(
             progress = { fraction.coerceIn(0f, 1f) },
             color = color,
-            trackColor = MaterialTheme.colorScheme.outline,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
             strokeCap = StrokeCap.Round,
             gapSize = 0.dp,
             drawStopIndicator = {},

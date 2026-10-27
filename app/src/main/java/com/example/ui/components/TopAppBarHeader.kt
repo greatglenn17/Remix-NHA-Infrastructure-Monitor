@@ -140,7 +140,7 @@ fun TopAppBarHeader(
     Surface(
         color = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Column(
             modifier = Modifier
@@ -288,7 +288,7 @@ fun TopAppBarHeader(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.testTag("role_switcher_button")
                     ) {
@@ -361,7 +361,7 @@ fun TopAppBarHeader(
                             )
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Text(
                             text = "APPEARANCE / THEME",
                             style = MaterialTheme.typography.labelSmall.copy(
@@ -383,7 +383,7 @@ fun TopAppBarHeader(
                                     onClick = { onSetThemeMode?.invoke(mode) },
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
-                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Column(
@@ -420,7 +420,7 @@ fun TopAppBarHeader(
 
                         // Role Elevation Section (Super Admin Power & Active Role Switcher)
                         if (onElevateRole != null) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                                 Text(
                                     text = "Active Role Elevation / Switcher",
@@ -468,7 +468,7 @@ fun TopAppBarHeader(
                                             border = FilterChipDefaults.filterChipBorder(
                                                 enabled = true,
                                                 selected = isCurrent,
-                                                borderColor = MaterialTheme.colorScheme.outline,
+                                                borderColor = MaterialTheme.colorScheme.outlineVariant,
                                                 selectedBorderColor = MaterialTheme.colorScheme.secondary
                                             ),
                                             modifier = Modifier.weight(1f)
@@ -478,7 +478,7 @@ fun TopAppBarHeader(
                             }
                         }
 
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -503,7 +503,7 @@ fun TopAppBarHeader(
                         )
 
                         if (onSignOut != null) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -564,7 +564,7 @@ fun TopAppBarHeader(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -595,7 +595,7 @@ fun TopAppBarHeader(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {

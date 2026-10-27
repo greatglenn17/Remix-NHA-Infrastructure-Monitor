@@ -112,7 +112,7 @@ fun IssuesTab(
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
                             selected = selectedFilter == filter,
-                            borderColor = MaterialTheme.colorScheme.outline,
+                            borderColor = MaterialTheme.colorScheme.outlineVariant,
                             selectedBorderColor = MaterialTheme.colorScheme.primary
                         )
                     )
@@ -180,7 +180,7 @@ fun IssueCard(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val borderColor = if (issue.isCritical) LocalNHAColors.current.behind.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline
+    val borderColor = if (issue.isCritical) LocalNHAColors.current.behind.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -264,7 +264,7 @@ fun IssueCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(10.dp))
 
             // Issue Description (Full multiline wrapping)
@@ -336,7 +336,7 @@ fun IssueCard(
 
             // Footer: Logged By & Action Buttons
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(

@@ -119,7 +119,7 @@ private fun WeeklyReportCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -208,7 +208,7 @@ private fun WeeklyReportCard(
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(bottom = 12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(bottom = 12.dp))
 
                     val parsedAccItems = remember(report.accomplishmentItemsJson) { parseAccomplishmentItemsList(report.accomplishmentItemsJson) }
 
@@ -234,7 +234,7 @@ private fun WeeklyReportCard(
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 4.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -269,7 +269,7 @@ private fun WeeklyReportCard(
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (parsedActivities.isNotEmpty()) {
@@ -284,7 +284,7 @@ private fun WeeklyReportCard(
                                     Text("ACTIVITIES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f))
                                     Text("REMARKS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                 parsedActivities.forEachIndexed { index, act ->
                                     Row(
@@ -298,7 +298,7 @@ private fun WeeklyReportCard(
                                         Text(act.remarks.ifEmpty { "-" }, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                     }
                                     if (index < parsedActivities.size - 1) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     }
                                 }
                             }
@@ -323,7 +323,7 @@ private fun WeeklyReportCard(
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -338,10 +338,10 @@ private fun WeeklyReportCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("DESIGNATION", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text("NO. OF PERSONNEL", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             // Rows
                             if (manpowerList.isEmpty()) {
@@ -357,17 +357,17 @@ private fun WeeklyReportCard(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(item.designation, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                         Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < manpowerList.lastIndex) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     }
                                 }
                             }
 
                             // Grand Total Row
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.5.dp)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.5.dp)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -378,7 +378,7 @@ private fun WeeklyReportCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                         }
@@ -396,7 +396,7 @@ private fun WeeklyReportCard(
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -411,12 +411,12 @@ private fun WeeklyReportCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("NAME OF EQUIPMENT", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text("NO.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text("REMARKS / STATUS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.3f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             if (equipmentList.isEmpty()) {
                                 Text("No equipment logged.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(12.dp))
@@ -431,15 +431,15 @@ private fun WeeklyReportCard(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(item.description, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                         Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
 
                                         val (bgColor, textColor, borderColor) = when (item.status.trim()) {
                                             "Operational" -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
                                             "Idle" -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
                                             "For Repair" -> Triple(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind, LocalNHAColors.current.behind.copy(alpha = 0.4f))
-                                            else -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outline)
+                                            else -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outlineVariant)
                                         }
 
                                         Box(
@@ -460,7 +460,7 @@ private fun WeeklyReportCard(
                                         }
                                     }
                                     if (idx < equipmentList.lastIndex) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     }
                                 }
                             }
@@ -479,7 +479,7 @@ private fun WeeklyReportCard(
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -494,10 +494,10 @@ private fun WeeklyReportCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("ISSUES ENCOUNTERED", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text("ACTION TAKEN", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                             if (issuesList.isEmpty()) {
                                 Text("No issues encountered for this reporting period.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(12.dp))
@@ -512,11 +512,11 @@ private fun WeeklyReportCard(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(item.description, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                         Text(item.actionTaken, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < issuesList.lastIndex) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     }
                                 }
                             }

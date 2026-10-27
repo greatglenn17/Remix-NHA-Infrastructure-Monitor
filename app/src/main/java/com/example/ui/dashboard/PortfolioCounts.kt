@@ -65,7 +65,7 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = scheme.surface,
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) scheme.primary else scheme.outline),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) scheme.primary else scheme.outlineVariant),
         modifier = modifier.heightIn(min = 72.dp).testTag("count_${tile.filter.name.lowercase()}")
     ) {
         Column(modifier = Modifier.padding(12.dp)) {

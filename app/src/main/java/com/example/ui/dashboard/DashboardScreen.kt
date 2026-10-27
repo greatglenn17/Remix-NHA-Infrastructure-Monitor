@@ -261,7 +261,7 @@ internal fun TwoPanes(
             list()
             Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
         }
-        VerticalDivider(color = MaterialTheme.colorScheme.outline)
+        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detail() }
     }
 }

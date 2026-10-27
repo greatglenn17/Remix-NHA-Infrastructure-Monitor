@@ -59,7 +59,7 @@ fun AssignStaffField(
         Surface(
             color = Color.Transparent,
             shape = RoundedCornerShape(4.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
         ) {
             Column(modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {

@@ -96,7 +96,7 @@ fun AddMonthlyReportDialog(
         Surface(
             color = cs.surfaceVariant,
             shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, cs.outline),
+            border = BorderStroke(1.dp, cs.outlineVariant),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -123,7 +123,7 @@ fun AddMonthlyReportDialog(
                 }
                 
                 val varTotal = sumActual - sumTarget
-                HorizontalDivider(color = cs.outline, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("GRAND TOTAL", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(sumTarget)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)

@@ -190,7 +190,7 @@ fun AuditLogCard(log: AuditLog) {
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .testTag("audit_log_item_${log.id}")
     ) {
         Column(modifier = Modifier.padding(14.dp)) {

@@ -46,7 +46,8 @@ fun CreateProjectDialog(
         dateStarted: String,
         completionDateOriginal: String,
         assignedStaff: String
-    ) -> Unit
+    ) -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     var name by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -67,7 +68,7 @@ fun CreateProjectDialog(
     // Contract cost is auto-computed from scope items
     
     var durationText by remember { mutableStateOf("") }
-    var dateStarted by remember { mutableStateOf(LocalDate.now().toString()) }
+    var dateStarted by remember { mutableStateOf(today.toString()) }
     
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {
@@ -252,7 +253,7 @@ fun CreateProjectDialog(
                             )
                         }
                     }
-                    HorizontalDivider(color = cs.outline, modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                     val totalWeight = scopeItems.sumOf { it.weightPct }
                     val totalAmount = scopeItems.sumOf { it.amount }
                     Row(
@@ -292,7 +293,7 @@ fun CreateProjectDialog(
             OutlinedButton(
                 onClick = { showProjectTypeDropdown = true },
                 modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, cs.outline),
+                border = BorderStroke(1.dp, cs.outlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = cs.surfaceVariant, contentColor = cs.onSurface)
             ) {
                 Text("Project Type: ${if (isCustomProjectType) "Custom" else projectType}", color = cs.onSurface)
@@ -345,7 +346,7 @@ fun CreateProjectDialog(
                         onClick = { showLandAreaUnitDropdown = true },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(4.dp),
-                        border = BorderStroke(1.dp, cs.outline),
+                        border = BorderStroke(1.dp, cs.outlineVariant),
                         colors = ButtonDefaults.outlinedButtonColors(containerColor = cs.surfaceVariant, contentColor = cs.onSurface),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {

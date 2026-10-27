@@ -27,7 +27,16 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = DarkNHAColors.textPrimary,
     surfaceVariant = DarkNHAColors.surfaceVariant,
     onSurfaceVariant = DarkNHAColors.textSecondary,
-    outline = DarkNHAColors.border
+    outline = Color(0xFF64748B),
+    outlineVariant = DarkNHAColors.border,
+    surfaceTint = DarkNHAColors.surface,
+    surfaceDim = Color(0xFF0F1520),
+    surfaceBright = Color(0xFF2A3445),
+    surfaceContainerLowest = Color(0xFF0F1520),
+    surfaceContainerLow = DarkNHAColors.surface,
+    surfaceContainer = Color(0xFF1B2433),
+    surfaceContainerHigh = DarkNHAColors.surfaceVariant,
+    surfaceContainerHighest = Color(0xFF2A3445)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -43,7 +52,16 @@ private val LightColorScheme = lightColorScheme(
     onSurface = LightNHAColors.textPrimary,
     surfaceVariant = LightNHAColors.surfaceVariant,
     onSurfaceVariant = LightNHAColors.textSecondary,
-    outline = LightNHAColors.border
+    outline = Color(0xFF8391A7),
+    outlineVariant = LightNHAColors.border,
+    surfaceTint = LightNHAColors.surface,
+    surfaceDim = Color(0xFFE2E8F0),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF8FAFC),
+    surfaceContainer = Color(0xFFF1F5F9),
+    surfaceContainerHigh = Color(0xFFE9EEF5),
+    surfaceContainerHighest = Color(0xFFE2E8F0)
 )
 
 @Composable

@@ -458,7 +458,7 @@ fun SubdivisionPlanTab(
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
@@ -547,7 +547,7 @@ fun SubdivisionPlanTab(
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
                                 shape = RoundedCornerShape(6.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable { dropdownExpanded = true }
@@ -592,7 +592,7 @@ fun SubdivisionPlanTab(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(modifier = Modifier.padding(2.dp)) {
                                 Button(
@@ -648,7 +648,7 @@ fun SubdivisionPlanTab(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(42.dp)
@@ -711,7 +711,7 @@ fun SubdivisionPlanTab(
                         // Filter Toggle Button
                         OutlinedButton(
                             onClick = { showFilterPanel = !showFilterPanel },
-                            border = BorderStroke(1.dp, if (isFilterActive) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, if (isFilterActive) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outlineVariant),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (isFilterActive) LocalNHAColors.current.watch.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                             ),
@@ -731,7 +731,7 @@ fun SubdivisionPlanTab(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -830,7 +830,7 @@ fun SubdivisionPlanTab(
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
@@ -868,7 +868,7 @@ fun SubdivisionPlanTab(
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                     .clipToBounds()
             ) {
                 val viewportWidth = constraints.maxWidth.toFloat()
@@ -878,7 +878,7 @@ fun SubdivisionPlanTab(
                 // Labels sit on the PDF page (light paper in both themes) or on the themed backdrop.
                 val onSurfaceMap = if (renderedBitmap != null) Color.Black else MaterialTheme.colorScheme.onSurface
                 val surfaceColor = MaterialTheme.colorScheme.surface
-                val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
 
                 if (isLoadingPdf) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1205,7 +1205,7 @@ fun SubdivisionPlanTab(
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(10.dp)
@@ -1226,7 +1226,7 @@ fun SubdivisionPlanTab(
                                     Surface(
                                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                                         shape = RoundedCornerShape(6.dp),
-                                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                         modifier = Modifier.clickable {
                                             scale = targetScale
                                             if (targetScale == 1.00f) {
@@ -1279,7 +1279,7 @@ fun SubdivisionPlanTab(
                                 Surface(
                                     color = MaterialTheme.colorScheme.surface,
                                     shape = RoundedCornerShape(6.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.clickable {
                                         scale = 1.00f
                                         offset = Offset.Zero
@@ -1302,7 +1302,7 @@ fun SubdivisionPlanTab(
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
@@ -1330,7 +1330,7 @@ fun SubdivisionPlanTab(
                                             Surface(
                                                 color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.surface,
                                                 shape = RoundedCornerShape(4.dp),
-                                                border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outline)
+                                                border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outlineVariant)
                                             ) {
                                                 Text(
                                                     text = if (isBilled) "● BILLED" else "NOT BILLED",
@@ -1410,7 +1410,7 @@ fun SubdivisionPlanTab(
                                     Button(
                                         onClick = { showLotInfoDialog = selectedLot },
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.weight(1f).height(32.dp)
@@ -1768,7 +1768,7 @@ fun RecordInspectionSnapshotDialog(
                         }
                     },
                     valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = derivedColor, activeTrackColor = derivedColor, inactiveTrackColor = cs.outline)
+                    colors = SliderDefaults.colors(thumbColor = derivedColor, activeTrackColor = derivedColor, inactiveTrackColor = cs.onSurfaceVariant.copy(alpha = 0.3f))
                 )
             }
         }
@@ -1853,7 +1853,7 @@ fun LotInfoDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2075,7 +2075,7 @@ fun LotAuditHistoryDialog(
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -2257,7 +2257,7 @@ fun AddSdpPlanDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { pdfPickerLauncher.launch("application/pdf") }
@@ -2346,7 +2346,7 @@ fun FilterDropdownChip(
     Surface(
         color = if (isSelected) LocalNHAColors.current.watch.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(1.dp, if (isSelected) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, if (isSelected) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Row(
@@ -2519,7 +2519,7 @@ fun UpdateLotProgressDialog(
                             colors = SliderDefaults.colors(
                                 thumbColor = derivedColor,
                                 activeTrackColor = derivedColor,
-                                inactiveTrackColor = MaterialTheme.colorScheme.outline
+                                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             )
                         )
                     }
@@ -2572,7 +2572,7 @@ fun UpdateLotProgressDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -178,7 +178,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(
                     modifier = Modifier
@@ -203,7 +203,7 @@ fun LoginScreen(
                                 },
                             shape = RoundedCornerShape(10.dp),
                             color = if (!isSignUpMode) LocalNHAColors.current.cardHeader else Color.Transparent,
-                            border = if (!isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
+                            border = if (!isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
                         ) {
                             Text(
                                 text = "Firebase Sign In",
@@ -229,7 +229,7 @@ fun LoginScreen(
                                 },
                             shape = RoundedCornerShape(10.dp),
                             color = if (isSignUpMode) LocalNHAColors.current.cardHeader else Color.Transparent,
-                            border = if (isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
+                            border = if (isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
                         ) {
                             Text(
                                 text = "Create Account",
@@ -862,7 +862,7 @@ private fun UserRoleChoiceChip(
         color = if (isSelected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(
             width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+            color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant
         ),
         modifier = modifier
     ) {

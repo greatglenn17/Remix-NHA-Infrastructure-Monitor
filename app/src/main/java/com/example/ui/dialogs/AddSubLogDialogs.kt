@@ -36,7 +36,7 @@ fun AddTimeExtensionDialog(
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
         title = { Text("ADD TIME EXTENSION", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
@@ -88,7 +88,7 @@ fun AddWorkSuspensionDialog(
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
         title = { Text("ADD WORK SUSPENSION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
@@ -129,7 +129,7 @@ fun AddWorkResumptionDialog(
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
         title = { Text("ADD WORK RESUMPTION LOG", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
@@ -203,7 +203,7 @@ fun AddCustomDocumentDialog(
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
         title = { Text("ADD DOCUMENT", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },

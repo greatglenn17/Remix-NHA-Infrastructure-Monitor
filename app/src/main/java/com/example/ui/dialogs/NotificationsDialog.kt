@@ -41,7 +41,7 @@ fun NotificationsDialog(
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
@@ -102,7 +102,7 @@ fun NotificationsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Actions Row: Mark All Read & Clear All
@@ -222,7 +222,7 @@ private fun NotificationCard(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = if (item.isRead) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, if (item.isRead) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, if (item.isRead) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -282,7 +282,7 @@ private fun NotificationCard(
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = MaterialTheme.colorScheme.background,
-                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline)
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Text(
                             text = "📍 ${item.projectName}",

@@ -303,7 +303,7 @@ fun WeatherChartTab(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -356,7 +356,7 @@ fun WeatherChartTab(
                                 Surface(
                                     color = MaterialTheme.colorScheme.background,
                                     shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier
                                         .weight(1f)
                                         .aspectRatio(0.85f)
@@ -485,7 +485,7 @@ fun WeatherChartTab(
                                     .weight(1f)
                                     .aspectRatio(1f)
                                     .background(MaterialTheme.colorScheme.background)
-                                    .border(0.5.dp, MaterialTheme.colorScheme.outline)
+                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                                     .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -514,7 +514,7 @@ fun WeatherChartTab(
         Surface(
             color = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -539,7 +539,7 @@ private fun WeatherClock(
     textMeasurer: androidx.compose.ui.text.TextMeasurer
 ) {
     val canvasBg = MaterialTheme.colorScheme.background
-    val canvasBorder = MaterialTheme.colorScheme.outline
+    val canvasBorder = MaterialTheme.colorScheme.outlineVariant
     val canvasTextSec = MaterialTheme.colorScheme.onSurfaceVariant
     val canvasTextPri = MaterialTheme.colorScheme.onSurface
 

@@ -55,12 +55,13 @@ class FormsScreenshotTest {
 
     private val lot = SdpLot(id = 1, projectId = 7, sdpPlanId = 1, blockNumber = "12", lotNumber = "5", polygonNormalizedJson = "[]")
 
+    private val today = java.time.LocalDate.of(2026, 10, 27)
     private var current: @Composable () -> Unit = {}
     private var tick by mutableStateOf(0)
 
     private fun settle() = repeat(6) { rule.mainClock.advanceTimeBy(500); org.robolectric.shadows.ShadowLooper.idleMainLooper() }
 
-    private fun shoot(name: String, mode: AppThemeMode, steps: () -> Unit = {}, content: @Composable () -> Unit) {
+    private fun shoot(name: String, steps: () -> Unit = {}, content: @Composable () -> Unit) {
         current = content; tick++
         settle(); steps(); settle()
         captureScreenRoboImage("src/test/screenshots/$name.png")
@@ -70,21 +71,21 @@ class FormsScreenshotTest {
         val t = "${width}_${mode.name.lowercase()}"
         rule.mainClock.autoAdvance = false
         rule.setContent { NHATheme(themeMode = mode) { tick; current() } }
-        shoot("form_weekly_week_$t", mode) { AddWeeklyReportDialog(project, 7, null, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }) }
-        shoot("form_weekly_review_$t", mode, steps = {
+        shoot("form_weekly_week_$t") { AddWeeklyReportDialog(project, 7, null, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
+        shoot("form_weekly_review_$t", steps = {
             rule.onNodeWithText("Review and save").performSemanticsAction(SemanticsActions.OnClick)
         }) { AddWeeklyReportDialog(project, 7, badReport, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }) }
-        shoot("form_monthly_$t", mode) { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
-        shoot("form_create_project_$t", mode) { CreateProjectDialog({}, "Engr. R. Santos") { _, _, _, _, _, _, _, _, _, _, _, _, _ -> } }
-        shoot("form_lot_inspection_$t", mode) { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
-        shoot("form_add_billing_$t", mode) { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}) { _, _, _, _, _, _ -> } }
-        shoot("form_variation_order_$t", mode) { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }
-        shoot("login_$t", mode) { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
+        shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
+        shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
+        shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
+        shoot("form_add_billing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, { _, _, _, _, _, _ -> }, today) }
+        shoot("form_variation_order_$t") { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }
+        shoot("login_$t") { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
     }
 
     @Config(qualifiers = "w411dp-h891dp") @Test fun phone_light() {
         all("411", AppThemeMode.LIGHT)
-        shoot("form_discard_411_light", AppThemeMode.LIGHT) { DiscardChangesDialog({}, {}) }
+        shoot("form_discard_411_light") { DiscardChangesDialog({}, {}) }
     }
     @Config(qualifiers = "w411dp-h891dp") @Test fun phone_dark() = all("411", AppThemeMode.DARK)
     @Config(qualifiers = "w743dp-h1185dp") @Test fun tablet_portrait_light() = all("743", AppThemeMode.LIGHT)
