@@ -514,26 +514,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         _authSuccessMessage.value = null
     }
 
-    fun sendPasswordReset(email: String, newPassword: String? = null) {
+    fun sendPasswordReset(email: String) {
         viewModelScope.launch {
             val cleanEmail = email.trim().lowercase()
             if (!cleanEmail.contains("@") || !cleanEmail.contains(".")) {
                 _authError.value = "Please enter a valid email address."
-                return@launch
-            }
-
-            if (!newPassword.isNullOrBlank()) {
-                if (newPassword.length < 6) {
-                    _authError.value = "New password must be at least 6 characters long."
-                    return@launch
-                }
-                val success = authManager.resetUserPassword(cleanEmail, newPassword)
-                if (success) {
-                    _authSuccessMessage.value = "Password updated successfully for $cleanEmail! Please sign in with your new password."
-                    _authError.value = null
-                } else {
-                    _authError.value = "Failed to update password for $cleanEmail."
-                }
                 return@launch
             }
 
@@ -543,7 +528,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 _authError.value = null
             } else {
                 val err = result.exceptionOrNull()?.localizedMessage ?: "Firebase Auth email delivery unconfigured."
-                _authError.value = "Firebase Reset Email Error: $err. Please use Instant Password Reset option below."
+                _authError.value = "Could not send the reset email: $err"
             }
         }
     }

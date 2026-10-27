@@ -50,12 +50,6 @@ class AuthManager(private val context: Context) {
     val isUserSignedIn: Boolean
         get() = auth?.currentUser != null || prefs.getBoolean("is_session_active", false)
 
-    private fun hashPassword(password: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest(password.trim().toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
     fun saveRegisteredUser(
         email: String,
         pass: String,
@@ -65,7 +59,7 @@ class AuthManager(private val context: Context) {
         office: String?
     ) {
         val cleanEmail = email.trim().lowercase()
-        val hashedPass = hashPassword(pass)
+        val hashedPass = LocalPassword.hash(pass)
         val registeredEmails = prefs.getStringSet("registered_emails_set", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         registeredEmails.add(cleanEmail)
 
@@ -79,47 +73,9 @@ class AuthManager(private val context: Context) {
             .apply()
     }
 
-    fun getAllRegisteredUsersJson(): org.json.JSONArray {
-        val registeredEmails = prefs.getStringSet("registered_emails_set", emptySet()) ?: emptySet()
-        val array = org.json.JSONArray()
-        registeredEmails.forEach { email ->
-            val obj = org.json.JSONObject().apply {
-                put("email", email)
-                put("pass", prefs.getString("reg_pass_$email", ""))
-                put("name", prefs.getString("reg_name_$email", ""))
-                put("role", prefs.getString("reg_role_$email", UserRole.FIELD_ENGINEER.name))
-                put("position", prefs.getString("reg_pos_$email", ""))
-                put("office", prefs.getString("reg_office_$email", ""))
-            }
-            array.put(obj)
-        }
-        return array
-    }
-
-    fun restoreRegisteredUsersFromJson(array: org.json.JSONArray) {
-        val registeredEmails = prefs.getStringSet("registered_emails_set", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
-        val editor = prefs.edit()
-        for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            val email = obj.optString("email", "").trim().lowercase()
-            if (email.isNotBlank()) {
-                registeredEmails.add(email)
-                editor.putString("reg_pass_$email", obj.optString("pass", ""))
-                editor.putString("reg_name_$email", obj.optString("name", email.substringBefore("@")))
-                editor.putString("reg_role_$email", obj.optString("role", UserRole.FIELD_ENGINEER.name))
-                editor.putString("reg_pos_$email", obj.optString("position", ""))
-                editor.putString("reg_office_$email", obj.optString("office", "Bulacan District Office"))
-            }
-        }
-        editor.putStringSet("registered_emails_set", registeredEmails).apply()
-    }
-
     fun isLocalRegisteredUser(email: String, pass: String): Boolean {
         val cleanEmail = email.trim().lowercase()
-        val inputHash = hashPassword(pass)
-
-        val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
-        return savedPass != null && (savedPass == inputHash || savedPass == pass.trim())
+        return LocalPassword.verify(pass, prefs.getString("reg_pass_$cleanEmail", null))
     }
 
     fun getRegisteredUserAccount(
@@ -158,8 +114,7 @@ class AuthManager(private val context: Context) {
         }
 
         val savedPass = prefs.getString("reg_pass_$cleanEmail", null)
-        val inputHash = hashPassword(cleanPass)
-        val localPasswordMatches = savedPass != null && (savedPass == inputHash || savedPass == cleanPass)
+        val localPasswordMatches = LocalPassword.verify(cleanPass, savedPass)
 
         // 1. Firebase Auth is the source of truth. Without a Firebase user nothing syncs,
         //    so the local fallback below is only for when Firebase is unreachable.
@@ -167,6 +122,10 @@ class AuthManager(private val context: Context) {
         if (firebaseAuth != null) {
             try {
                 val result = firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPass).await()
+                // Keep the offline copy in step with the cloud password (e.g. after an email reset).
+                if (savedPass != null && (!localPasswordMatches || LocalPassword.needsUpgrade(savedPass))) {
+                    prefs.edit().putString("reg_pass_$cleanEmail", LocalPassword.hash(cleanPass)).apply()
+                }
                 return Result.success(result.user)
             } catch (e: FirebaseNetworkException) {
                 android.util.Log.w("AuthManager", "Firebase unreachable, using offline sign-in: ${e.message}")
@@ -185,6 +144,9 @@ class AuthManager(private val context: Context) {
         // 2. Offline fallback: Firebase is unavailable, verify against the local registration.
         if (savedPass != null) {
             if (localPasswordMatches) {
+                if (LocalPassword.needsUpgrade(savedPass)) {
+                    prefs.edit().putString("reg_pass_$cleanEmail", LocalPassword.hash(cleanPass)).apply()
+                }
                 return Result.success(auth?.currentUser)
             } else {
                 return Result.failure(IllegalArgumentException("Incorrect password for $cleanEmail. Please re-type your password."))
@@ -263,26 +225,6 @@ class AuthManager(private val context: Context) {
             }
         }
         return Result.failure(IllegalStateException("Firebase Auth service unavailable or unconfigured."))
-    }
-
-    fun resetUserPassword(email: String, newPass: String): Boolean {
-        val cleanEmail = email.trim().lowercase()
-        val cleanPass = newPass.trim()
-
-        // Security: Only allow password reset for already-registered emails
-        val registeredEmails = prefs.getStringSet("registered_emails_set", emptySet()) ?: emptySet()
-        if (!registeredEmails.contains(cleanEmail)) {
-            return false // Email not registered — block auto-creation of accounts
-        }
-
-        val savedName = prefs.getString("reg_name_$cleanEmail", null)
-        val savedRoleStr = prefs.getString("reg_role_$cleanEmail", UserRole.FIELD_ENGINEER.name)
-        val savedRole = try { UserRole.valueOf(savedRoleStr ?: UserRole.FIELD_ENGINEER.name) } catch (_: Exception) { UserRole.FIELD_ENGINEER }
-        val savedPos = prefs.getString("reg_pos_$cleanEmail", null)
-        val savedOffice = prefs.getString("reg_office_$cleanEmail", null)
-
-        saveRegisteredUser(cleanEmail, cleanPass, savedName, savedRole, savedPos, savedOffice)
-        return true
     }
 
     fun signOut() {

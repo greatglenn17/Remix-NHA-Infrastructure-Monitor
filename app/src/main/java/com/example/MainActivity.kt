@@ -61,9 +61,7 @@ class MainActivity : ComponentActivity() {
                             onLoginSuccess = { email, password, displayName, role, isSignUp, position, office ->
                                 viewModel.authenticateWithFirebase(email, password, displayName, role, isSignUp, position, office)
                             },
-                            onSendPasswordReset = { email, newPassword ->
-                                viewModel.sendPasswordReset(email, newPassword)
-                            },
+                            onSendPasswordReset = { email -> viewModel.sendPasswordReset(email) },
                             isLoading = authLoading,
                             errorMessage = authError,
                             successMessage = authSuccessMessage,

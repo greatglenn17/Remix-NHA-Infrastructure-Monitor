@@ -40,7 +40,7 @@ import com.example.ui.theme.*
 @Composable
 fun LoginScreen(
     onLoginSuccess: (email: String, password: String, displayName: String?, role: UserRole, isSignUp: Boolean, position: String?, office: String?) -> Unit,
-    onSendPasswordReset: (email: String, newPassword: String?) -> Unit = { _, _ -> },
+    onSendPasswordReset: (email: String) -> Unit = {},
     isLoading: Boolean = false,
     errorMessage: String? = null,
     successMessage: String? = null,
@@ -684,7 +684,6 @@ fun LoginScreen(
         }
 
         if (showForgotPasswordDialog) {
-            var newPassInput by remember { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = { showForgotPasswordDialog = false },
                 title = {
@@ -696,7 +695,7 @@ fun LoginScreen(
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Enter your registered email below to send a Firebase email link OR type a new password for instant update.",
+                            text = "Enter your registered email. We will email you a link to set a new password.",
                             style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                         )
                         OutlinedTextField(
@@ -715,49 +714,20 @@ fun LoginScreen(
                             )
                         )
 
-                        OutlinedTextField(
-                            value = newPassInput,
-                            onValueChange = { newPassInput = it },
-                            label = { Text("New Password (Instant In-App Reset)") },
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        )
                     }
                 },
                 confirmButton = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                if (resetEmailInput.isNotBlank()) {
-                                    onSendPasswordReset(resetEmailInput.trim(), null)
-                                    showForgotPasswordDialog = false
-                                }
-                            },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("Send Email Link", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
                         Button(
                             onClick = {
-                                if (resetEmailInput.isNotBlank() && newPassInput.isNotBlank()) {
-                                    onSendPasswordReset(resetEmailInput.trim(), newPassInput.trim())
+                                if (resetEmailInput.isNotBlank()) {
+                                    onSendPasswordReset(resetEmailInput.trim())
                                     showForgotPasswordDialog = false
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
                         ) {
-                            Text("Update Password", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Send Email Link", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
