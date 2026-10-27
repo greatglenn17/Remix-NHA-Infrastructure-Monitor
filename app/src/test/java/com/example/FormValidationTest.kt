@@ -35,5 +35,6 @@ class FormValidationTest {
     @Test fun dateRoundTripsThroughUtcMillis() {
         assertEquals("2026-03-01", utcMillisToDate(dateToUtcMillis("2026-03-01")!!))
         assertNull(dateToUtcMillis("-"))
+        assertNull(dateToUtcMillis("1850-01-01"))
     }
 }

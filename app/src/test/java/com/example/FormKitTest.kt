@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.data.model.AppThemeMode
+import com.example.ui.components.DateField
 import com.example.ui.components.LongForm
 import com.example.ui.theme.NHATheme
 import org.junit.Assert.assertEquals
@@ -62,6 +63,22 @@ class FormKitTest {
         rule.onNodeWithContentDescription("Close").performClick()
         rule.onNodeWithText("Discard").performClick()
         assertEquals(1, dismissed)
+    }
+
+    @Test fun dateField_tapOnFieldOpensPicker() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) { DateField("Start", "2026-03-01", {}, clearable = true) }
+        }
+        rule.onNodeWithText("2026-03-01").performClick()
+        rule.onNodeWithText("Clear").assertExists()
+    }
+
+    @Test fun dateField_outOfRangeValueDoesNotCrash() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) { DateField("Start", "1850-01-01", {}) }
+        }
+        rule.onNodeWithText("1850-01-01").performClick()
+        rule.onNodeWithText("Cancel").assertExists()
     }
 
     @Test fun save_disabled_whenNotEnabled() {

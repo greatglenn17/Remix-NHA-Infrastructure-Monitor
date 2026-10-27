@@ -1,7 +1,9 @@
 package com.example.ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -42,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -85,7 +88,7 @@ fun LongForm(
 ) {
     val close = rememberDiscardGuard(dirty, onDismiss)
     val phone = LocalConfiguration.current.screenWidthDp < 600
-    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BackHandler(onBack = close)
         Surface(
             modifier = if (phone) Modifier.fillMaxSize() else Modifier.width(640.dp).fillMaxHeight(0.9f),
@@ -132,9 +135,11 @@ fun LongForm(
     }
 }
 
-/** "yyyy-MM-dd" to UTC-midnight millis (what M3 DatePicker uses); null when not a date. */
+/** "yyyy-MM-dd" to UTC-midnight millis (what M3 DatePicker uses); null when not a date or outside the picker's 1900-2100 range. */
 fun dateToUtcMillis(date: String): Long? =
-    runCatching { LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull()
+    runCatching { LocalDate.parse(date) }.getOrNull()
+        ?.takeIf { it.year in 1900..2100 }
+        ?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
 
 fun utcMillisToDate(millis: Long): String = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
 
@@ -149,14 +154,16 @@ fun DateField(
     clearable: Boolean = false
 ) {
     var open by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = value, onValueChange = {}, readOnly = true, label = { Text(label) },
-        isError = error != null, supportingText = error?.let { { Text(it) } },
-        trailingIcon = {
-            IconButton(onClick = { open = true }) { Icon(Icons.Default.DateRange, contentDescription = "Pick $label") }
-        },
-        modifier = modifier.fillMaxWidth()
-    )
+    Box(modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value, onValueChange = {}, readOnly = true, label = { Text(label) },
+            isError = error != null, supportingText = error?.let { { Text(it) } },
+            trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        // Transparent overlay so a tap anywhere on the field opens the picker.
+        Box(Modifier.matchParentSize().clickable(role = Role.Button, onClickLabel = "Pick $label") { open = true })
+    }
     if (open) {
         val state = rememberDatePickerState(initialSelectedDateMillis = dateToUtcMillis(value))
         DatePickerDialog(
