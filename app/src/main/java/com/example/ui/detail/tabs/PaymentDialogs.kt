@@ -46,7 +46,7 @@ fun AddPaymentDialog(
     }
 
     val nha = LocalNHAColors.current
-    val amountErr = FormValidation.amountError(amountStr, false)
+    val amountErr = FormValidation.amountError(amountStr, true)
     val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)

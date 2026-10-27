@@ -54,7 +54,7 @@ fun AddTimeExtensionDialog(
             }
         },
         confirmButton = {
-            Button(enabled = daysError(days) == null, onClick = { onSubmit(extNo.toIntOrNull()?:1, days.toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
+            Button(enabled = daysError(days) == null, onClick = { onSubmit(extNo.trim().toIntOrNull()?:1, days.trim().toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
                 Text("Save")
             }
         },
@@ -75,7 +75,7 @@ fun AddWorkSuspensionDialog(
 
     val endDate = remember(effectivityDate, durationStr) {
         try {
-            val duration = durationStr.toIntOrNull() ?: 0
+            val duration = durationStr.trim().toIntOrNull() ?: 0
             val date = LocalDate.parse(effectivityDate, DateTimeFormatter.ISO_LOCAL_DATE)
             date.plusDays(duration.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
         } catch (e: Exception) {
@@ -106,7 +106,7 @@ fun AddWorkSuspensionDialog(
             }
         },
         confirmButton = {
-            Button(enabled = daysError(durationStr) == null, onClick = { onSubmit(name, effectivityDate, durationStr.toIntOrNull()?:0, endDate, reason, remarks) }) {
+            Button(enabled = daysError(durationStr) == null, onClick = { onSubmit(name, effectivityDate, durationStr.trim().toIntOrNull()?:0, endDate, reason, remarks) }) {
                 Text("Save")
             }
         },
@@ -345,7 +345,7 @@ fun AddCustomDocumentDialog(
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
                     "Time Extension" -> "Time Extension No. $teNo - $teDays Days"
-                    "Variation Order" -> "Variation Order No. $voNo ($voType) - PHP $voAmount"
+                    "Variation Order" -> voDocumentName(voNo, voType, voAmount)
                     "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
                     "Work Resumption Order" -> "Work Resumption No. $wrNo"
                     else -> "New Document"
@@ -363,7 +363,7 @@ fun AddCustomDocumentDialog(
                                 if (parsedDate != null) {
                                     val cal = java.util.Calendar.getInstance()
                                     cal.time = parsedDate
-                                    cal.add(java.util.Calendar.DAY_OF_YEAR, wsDays.toInt())
+                                    cal.add(java.util.Calendar.DAY_OF_YEAR, wsDays.trim().toInt())
                                     computedEndDate = format.format(cal.time)
                                 }
                             }
@@ -385,3 +385,7 @@ fun AddCustomDocumentDialog(
 /** Whole-number day counts: blank is fine, anything else must be a non-negative integer. */
 private fun daysError(text: String): String? =
     FormValidation.amountError(text, false) ?: if (text.isNotBlank() && text.trim().toIntOrNull() == null) "Whole days only" else null
+
+/** Name stored for a variation order; the amount has spaces stripped so ContractCost can read it back. */
+internal fun voDocumentName(voNo: String, voType: String, voAmount: String): String =
+    "Variation Order No. $voNo ($voType) - PHP ${voAmount.filterNot { it.isWhitespace() }}"
