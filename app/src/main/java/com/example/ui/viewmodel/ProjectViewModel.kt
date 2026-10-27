@@ -123,6 +123,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _selectedProjectId = MutableStateFlow<Long?>(null)
     val selectedProjectId: StateFlow<Long?> = _selectedProjectId.asStateFlow()
 
+    // Last project section used; kept when switching projects.
+    private val _selectedSection = MutableStateFlow(com.example.ui.detail.ProjectSection.SUMMARY)
+    val selectedSection: StateFlow<com.example.ui.detail.ProjectSection> = _selectedSection.asStateFlow()
+    fun setSection(section: com.example.ui.detail.ProjectSection) { _selectedSection.value = section }
+
     /**
      * Project writes run on this handler: a write for a project that left this phone meanwhile
      * (unassigned, merged, deleted elsewhere) fails its foreign key and is dropped instead of

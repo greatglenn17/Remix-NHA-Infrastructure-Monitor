@@ -1,6 +1,8 @@
 package com.example
 
+import com.example.data.model.PendingDocument
 import com.example.util.ProjectSchedule
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -32,5 +34,27 @@ class ProjectScheduleTest {
         assertEquals("2026-09-15", ProjectSchedule.effectiveCompletion("2026-08-30", "2026-09-15"))
         assertEquals("2026-08-30", ProjectSchedule.effectiveCompletion("2026-08-30", ""))
         assertEquals("2026-08-30", ProjectSchedule.effectiveCompletion("2026-08-30", "-"))
+    }
+
+    private fun doc(name: String, status: String, remarks: String = "") =
+        PendingDocument(projectId = 1, documentName = name, status = status, remarks = remarks)
+
+    @Test
+    fun revisedCompletion_addsApprovedExtensionAndSuspensionDays() {
+        val docs = listOf(
+            doc("Time Extension No. 1 - 30 Days", "Approved"),
+            doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
+        )
+        assertEquals("2026-05-21", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+    }
+
+    @Test
+    fun revisedCompletion_ignoresPending() {
+        assertNull(ProjectSchedule.revisedCompletion("2026-01-01", 100, listOf(doc("Time Extension No. 1 - 30 Days", "Pending"))))
+    }
+
+    @Test
+    fun revisedCompletion_blankStart_isNull() {
+        assertNull(ProjectSchedule.revisedCompletion("", 100, listOf(doc("Time Extension No. 1 - 30 Days", "Approved"))))
     }
 }

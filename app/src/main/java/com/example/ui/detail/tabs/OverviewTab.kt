@@ -226,54 +226,13 @@ fun OverviewTab(
                             DetailItem("Revised Contract Cost", revisedContractCostText)
 
                             // 2. Approved Time Extensions & Work Suspensions computation for Revised Completion Date & Revised Duration
-                            val approvedTEDocs = remember(pendingDocuments) {
-                                pendingDocuments.filter { 
-                                    it.documentName.contains("Time Extension", ignoreCase = true) && 
-                                    it.status.equals("Approved", ignoreCase = true) 
-                                }
+                            val revisedCompletion = remember(pendingDocuments, project.dateStarted, project.contractDurationDays) {
+                                com.example.util.ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, pendingDocuments)
                             }
-                            val approvedSuspDocs = remember(pendingDocuments) {
-                                pendingDocuments.filter { 
-                                    it.documentName.contains("Work Suspension", ignoreCase = true) && 
-                                    it.status.equals("Approved", ignoreCase = true) 
-                                }
-                            }
-                            
-                            val totalApprovedExtDays = remember(approvedTEDocs) {
-                                approvedTEDocs.sumOf { ext ->
-                                    Regex(".* - (\\d+) Days", RegexOption.IGNORE_CASE).find(ext.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                                }
-                            }
-                            val totalApprovedSuspDays = remember(approvedSuspDocs) {
-                                approvedSuspDocs.sumOf { ext ->
-                                    Regex("Duration: (\\d+) Days", RegexOption.IGNORE_CASE).find(ext.remarks)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                                }
-                            }
-
-                            val hasApprovedExtension = approvedTEDocs.isNotEmpty() || approvedSuspDocs.isNotEmpty()
-                            val totalAddedDays = totalApprovedExtDays + totalApprovedSuspDays
-                            
-                            val revisedCompletionDateText = remember(hasApprovedExtension, totalAddedDays, project.dateStarted, project.contractDurationDays) {
-                                if (hasApprovedExtension && totalAddedDays > 0) {
-                                    try {
-                                        val totalDays = project.contractDurationDays + totalAddedDays
-                                        val start = java.time.LocalDate.parse(project.dateStarted)
-                                        start.plusDays(totalDays.toLong()).toString()
-                                    } catch (e: Exception) {
-                                        "-"
-                                    }
-                                } else {
-                                    "-"
-                                }
-                            }
-
-                            val revisedDurationText = remember(hasApprovedExtension, totalAddedDays, project.contractDurationDays) {
-                                if (hasApprovedExtension && totalAddedDays > 0) {
-                                    "${project.contractDurationDays + totalAddedDays} Days"
-                                } else {
-                                    "-"
-                                }
-                            }
+                            val revisedCompletionDateText = revisedCompletion ?: "-"
+                            val revisedDurationText = revisedCompletion?.let {
+                                "${java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(project.dateStarted.trim()), java.time.LocalDate.parse(it))} Days"
+                            } ?: "-"
 
                             DetailItem("Revised Completion Date", revisedCompletionDateText)
                             DetailItem("Revised Duration", revisedDurationText)
