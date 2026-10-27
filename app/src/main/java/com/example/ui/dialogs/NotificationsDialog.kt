@@ -1,6 +1,6 @@
 package com.example.ui.dialogs
 
-import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,8 +40,8 @@ fun NotificationsDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = DarkSurface,
-            border = BorderStroke(1.dp, DarkBorder),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
@@ -62,13 +62,13 @@ fun NotificationsDialog(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .background(Color(0xFF38BDF8).copy(alpha = 0.2f), shape = CircleShape),
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.NotificationsActive,
                                 contentDescription = "Alerts",
-                                tint = Color(0xFF38BDF8),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -78,14 +78,14 @@ fun NotificationsDialog(
                                 text = "Activity Alerts",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = DarkTextPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 17.sp
                                 )
                             )
                             Text(
                                 text = "Field Engineer Project Updates",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = DarkTextSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
                             )
@@ -96,13 +96,13 @@ fun NotificationsDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = DarkTextSecondary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = DarkBorder)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Actions Row: Mark All Read & Clear All
@@ -119,13 +119,13 @@ fun NotificationsDialog(
                             Icon(
                                 imageVector = Icons.Default.DoneAll,
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Mark all read",
-                                style = MaterialTheme.typography.labelMedium.copy(color = Color(0xFF38BDF8))
+                                style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary)
                             )
                         }
 
@@ -136,13 +136,13 @@ fun NotificationsDialog(
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = null,
-                                tint = StatusRedText,
+                                tint = LocalNHAColors.current.behind,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Clear all",
-                                style = MaterialTheme.typography.labelMedium.copy(color = StatusRedText)
+                                style = MaterialTheme.typography.labelMedium.copy(color = LocalNHAColors.current.behind)
                             )
                         }
                     }
@@ -161,13 +161,13 @@ fun NotificationsDialog(
                             Icon(
                                 imageVector = Icons.Default.NotificationsOff,
                                 contentDescription = "No Alerts",
-                                tint = DarkTextSecondary,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(40.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "No Field Engineer alerts yet",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = DarkTextSecondary)
+                                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                             )
                         }
                     }
@@ -197,10 +197,10 @@ fun NotificationsDialog(
                 Button(
                     onClick = onDismiss,
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Close", color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                    Text(text = "Close", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -221,8 +221,8 @@ private fun NotificationCard(
 
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = if (item.isRead) DarkBackground else Color(0xFF1E293B),
-        border = BorderStroke(1.dp, if (item.isRead) DarkBorder else Color(0xFF38BDF8).copy(alpha = 0.5f)),
+        color = if (item.isRead) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (item.isRead) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -238,7 +238,7 @@ private fun NotificationCard(
                     .size(10.dp)
                     .padding(top = 4.dp)
                     .background(
-                        color = if (item.isRead) Color.Transparent else Color(0xFF38BDF8),
+                        color = if (item.isRead) Color.Transparent else MaterialTheme.colorScheme.primary,
                         shape = CircleShape
                     )
             )
@@ -253,7 +253,7 @@ private fun NotificationCard(
                         text = item.title,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DarkTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 13.5.sp
                         ),
                         maxLines = 1,
@@ -264,7 +264,7 @@ private fun NotificationCard(
                     Text(
                         text = formattedTime,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = DarkTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 10.sp
                         )
                     )
@@ -273,7 +273,7 @@ private fun NotificationCard(
                 Text(
                     text = item.message,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = if (item.isRead) DarkTextSecondary else DarkTextPrimary,
+                        color = if (item.isRead) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp
                     )
                 )
@@ -281,13 +281,13 @@ private fun NotificationCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF0F172A),
-                        border = BorderStroke(0.5.dp, DarkBorder)
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Text(
                             text = "📍 ${item.projectName}",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = Color(0xFF38BDF8),
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.SemiBold
                             ),

@@ -28,7 +28,7 @@ fun SectionCard(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = scheme.surface,
-        border = BorderStroke(1.dp, scheme.outline),
+        border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)) {

@@ -4,16 +4,21 @@ import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// Screens moved to the theme must not hand-set colours; the list grows each stage.
+// Every screen takes its colours from the theme; no hand-set colours outside ui/theme.
 class ThemeGuardTest {
     companion object {
+        private val SRC = File("src/main/java/com/example")
+
         val MIGRATED = listOf(
+            "MainActivity.kt",
+            "ui/components/AttachmentPicker.kt",
+            "ui/components/FormKit.kt",
             "ui/components/TopAppBarHeader.kt",
             "ui/dashboard/DashboardScreen.kt",
-            "ui/dashboard/PortfolioContent.kt",
-            "ui/dashboard/PortfolioRow.kt",
-            "ui/dashboard/PortfolioCounts.kt",
             "ui/dashboard/NeedsAttentionPane.kt",
+            "ui/dashboard/PortfolioContent.kt",
+            "ui/dashboard/PortfolioCounts.kt",
+            "ui/dashboard/PortfolioRow.kt",
             "ui/detail/ProjectDetailScreen.kt",
             "ui/detail/ProjectSection.kt",
             "ui/detail/sections/ChipRow.kt",
@@ -24,18 +29,48 @@ class ThemeGuardTest {
             "ui/detail/sections/SectionCard.kt",
             "ui/detail/sections/SummarySection.kt",
             "ui/detail/tabs/AuditLogTab.kt",
+            "ui/detail/tabs/DocumentDialogs.kt",
             "ui/detail/tabs/IssuesTab.kt",
             "ui/detail/tabs/MonthlyReportsTab.kt",
+            "ui/detail/tabs/PaymentDialogs.kt",
             "ui/detail/tabs/PendingDocumentsTab.kt",
             "ui/detail/tabs/PhotoGalleryTab.kt",
-            "ui/detail/tabs/WeeklyReportsTab.kt"
+            "ui/detail/tabs/SubdivisionPlanTab.kt",
+            "ui/detail/tabs/WeatherChartTab.kt",
+            "ui/detail/tabs/WeeklyReportsTab.kt",
+            "ui/dialogs/AddIssueDialog.kt",
+            "ui/dialogs/AddMonthlyReportDialog.kt",
+            "ui/dialogs/AddSubLogDialogs.kt",
+            "ui/dialogs/AddWeeklyReportDialog.kt",
+            "ui/dialogs/AdminElevationDialog.kt",
+            "ui/dialogs/AssignStaffField.kt",
+            "ui/dialogs/CreateProjectDialog.kt",
+            "ui/dialogs/DateRangePickerDialog.kt",
+            "ui/dialogs/EditProfileDialog.kt",
+            "ui/dialogs/EditProjectDialog.kt",
+            "ui/dialogs/GoogleDriveSyncDialog.kt",
+            "ui/dialogs/NotificationsDialog.kt",
+            "ui/dialogs/UpdateAvailableDialog.kt",
+            "ui/dialogs/WeekRange.kt",
+            "ui/dialogs/WeeklyReportSteps.kt",
+            "ui/login/LoginScreen.kt",
+            "ui/viewmodel/ProjectViewModel.kt"
         )
+    }
+
+    @Test
+    fun everyUiFile_isMigrated() {
+        val onDisk = SRC.walkTopDown().filter { it.isFile && it.extension == "kt" }
+            .map { it.relativeTo(SRC).path.replace(File.separatorChar, '/') }
+            .filter { (it.startsWith("ui/") && !it.startsWith("ui/theme/")) || it == "MainActivity.kt" }
+            .sorted().toList()
+        assertEquals("Files missing from MIGRATED / stale entries", onDisk, MIGRATED.sorted())
     }
 
     @Test
     fun migratedScreens_takeColoursFromTheTheme() {
         val offenders = MIGRATED.flatMap { path ->
-            File("src/main/java/com/example", path).readLines().mapIndexedNotNull { i, line ->
+            File(SRC, path).readLines().mapIndexedNotNull { i, line ->
                 if ("Color(0x" in line) "$path:${i + 1}" else null
             }
         }

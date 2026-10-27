@@ -1,10 +1,9 @@
 package com.example.ui.components
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -139,9 +138,9 @@ fun TopAppBarHeader(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     Surface(
-        color = DarkBackground,
+        color = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, DarkBorder.copy(alpha = 0.6f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     ) {
         Column(
             modifier = Modifier
@@ -168,7 +167,7 @@ fun TopAppBarHeader(
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
                                 contentDescription = "Back",
-                                tint = DarkTextPrimary,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -197,7 +196,7 @@ fun TopAppBarHeader(
                         Text(
                             text = "NHA Monitoring Application",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                color = DarkTextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 16.sp,
                                 lineHeight = 18.sp
@@ -208,7 +207,7 @@ fun TopAppBarHeader(
                         Text(
                             text = "BULACAN DISTRICT OFFICE",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = DarkTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.6.sp,
                                 fontSize = 9.5.sp,
@@ -261,8 +260,8 @@ fun TopAppBarHeader(
                                 badge = {
                                     if (unreadNotificationCount > 0) {
                                         Badge(
-                                            containerColor = StatusRedText,
-                                            contentColor = Color.White
+                                            containerColor = LocalNHAColors.current.behind,
+                                            contentColor = MaterialTheme.colorScheme.surface
                                         ) {
                                             Text(text = if (unreadNotificationCount > 9) "9+" else "$unreadNotificationCount")
                                         }
@@ -272,7 +271,7 @@ fun TopAppBarHeader(
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Notifications",
-                                    tint = if (unreadNotificationCount > 0) MaterialTheme.colorScheme.primary else DarkTextSecondary,
+                                    tint = if (unreadNotificationCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -286,10 +285,10 @@ fun TopAppBarHeader(
                         onClick = { showUserMenu = true },
                         shape = CircleShape,
                         colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = DarkSurfaceVariant,
-                            contentColor = DarkTextPrimary
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.testTag("role_switcher_button")
                     ) {
@@ -314,25 +313,25 @@ fun TopAppBarHeader(
                             },
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DarkTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,
                             contentDescription = "Dropdown",
-                            tint = DarkTextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     DropdownMenu(
                         expanded = showUserMenu,
                         onDismissRequest = { showUserMenu = false },
-                        modifier = Modifier.background(DarkSurface)
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
                     ) {
                         Text(
                             text = "LOGGED IN ACCOUNT",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = DarkTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
@@ -342,7 +341,7 @@ fun TopAppBarHeader(
                                 text = currentUser.name,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkTextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                             Text(
@@ -353,8 +352,8 @@ fun TopAppBarHeader(
 
                         if (onEditProfileClick != null) {
                             DropdownMenuItem(
-                                text = { Text("Update Position & Office", color = GoldAccent, fontWeight = FontWeight.Bold) },
-                                leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = GoldAccent) },
+                                text = { Text("Update Position & Office", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold) },
+                                leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                                 onClick = {
                                     showUserMenu = false
                                     onEditProfileClick()
@@ -362,11 +361,11 @@ fun TopAppBarHeader(
                             )
                         }
 
-                        HorizontalDivider(color = DarkBorder)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Text(
                             text = "APPEARANCE / THEME",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = DarkTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
@@ -383,8 +382,8 @@ fun TopAppBarHeader(
                                 Surface(
                                     onClick = { onSetThemeMode?.invoke(mode) },
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else DarkSurfaceVariant,
-                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else DarkBorder),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Column(
@@ -398,7 +397,7 @@ fun TopAppBarHeader(
                                                 AppThemeMode.DARK -> Icons.Default.DarkMode
                                             },
                                             contentDescription = mode.displayName,
-                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else DarkTextSecondary,
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
@@ -409,7 +408,7 @@ fun TopAppBarHeader(
                                                 AppThemeMode.DARK -> "Dark"
                                             },
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else DarkTextPrimary,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = 10.5.sp
                                             )
@@ -421,13 +420,13 @@ fun TopAppBarHeader(
 
                         // Role Elevation Section (Super Admin Power & Active Role Switcher)
                         if (onElevateRole != null) {
-                            HorizontalDivider(color = DarkBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                                 Text(
                                     text = "Active Role Elevation / Switcher",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = GoldAccent
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -461,16 +460,16 @@ fun TopAppBarHeader(
                                                 )
                                             },
                                             colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = GoldAccent.copy(alpha = 0.25f),
-                                                selectedLabelColor = GoldAccent,
-                                                containerColor = DarkSurfaceVariant,
-                                                labelColor = DarkTextSecondary
+                                                selectedContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f),
+                                                selectedLabelColor = MaterialTheme.colorScheme.secondary,
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                             ),
                                             border = FilterChipDefaults.filterChipBorder(
                                                 enabled = true,
                                                 selected = isCurrent,
-                                                borderColor = DarkBorder,
-                                                selectedBorderColor = GoldAccent
+                                                borderColor = MaterialTheme.colorScheme.outlineVariant,
+                                                selectedBorderColor = MaterialTheme.colorScheme.secondary
                                             ),
                                             modifier = Modifier.weight(1f)
                                         )
@@ -479,7 +478,7 @@ fun TopAppBarHeader(
                             }
                         }
 
-                        HorizontalDivider(color = DarkBorder)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -504,14 +503,14 @@ fun TopAppBarHeader(
                         )
 
                         if (onSignOut != null) {
-                            HorizontalDivider(color = DarkBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             DropdownMenuItem(
                                 text = {
                                     Text(
                                         text = "Sign Out",
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = ErrorRed
+                                            color = MaterialTheme.colorScheme.error
                                         )
                                     )
                                 },
@@ -523,7 +522,7 @@ fun TopAppBarHeader(
                                     Icon(
                                         imageVector = Icons.Default.Logout,
                                         contentDescription = "Sign Out",
-                                        tint = ErrorRed
+                                        tint = MaterialTheme.colorScheme.error
                                     )
                                 }
                             )
@@ -555,7 +554,7 @@ fun TopAppBarHeader(
                         text = "About NHA Monitor",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            color = DarkTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -563,9 +562,9 @@ fun TopAppBarHeader(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -580,23 +579,23 @@ fun TopAppBarHeader(
                             Text(
                                 text = "ENGR. GLENN C. APROVECHADO",
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = DarkTextPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
                             Text(
                                 text = "Principal Engineer C • Bulacan District Office",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = DarkTextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                         }
                     }
 
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -611,20 +610,20 @@ fun TopAppBarHeader(
                             Text(
                                 text = "Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = DarkTextPrimary,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
                             Text(
                                 text = "National Housing Authority (NHA) • Region III",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = DarkTextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                             Text(
                                 text = "Engine: Android Jetpack Compose + In-App Auto Updater",
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = DarkTextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -668,7 +667,7 @@ fun TopAppBarHeader(
                     }
                 }
             },
-            containerColor = DarkSurface,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }

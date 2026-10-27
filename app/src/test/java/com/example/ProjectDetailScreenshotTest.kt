@@ -32,6 +32,14 @@ import com.example.util.AttentionLevel
 import com.example.util.PortfolioItem
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.LocalDate
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -195,4 +203,31 @@ class ProjectDetailScreenshotTest {
             }
         }
     }
+
+    // Long lists scrolled to the end: the last row must clear the bottom button.
+    @OptIn(ExperimentalTestApi::class)
+    private fun fabAtEnd(name: String, mode: AppThemeMode, lazy: Boolean = false, content: @Composable () -> Unit) = runComposeUiTest {
+        mainClock.autoAdvance = false
+        setContent { frame(mode) { content() } }
+        repeat(10) { onRoot().performTouchInput { swipeUp() }; mainClock.advanceTimeBy(1000) }
+        if (lazy) { onNode(hasScrollToIndexAction()).performScrollToIndex(12); mainClock.advanceTimeBy(1000) }
+        captureScreenRoboImage("src/test/screenshots/$name.png")
+    }
+
+    private fun progressFab(mode: AppThemeMode) = fabAtEnd("progress_fab_411_${mode.name.lowercase()}", mode, lazy = true) {
+        val many = (1..12).map { report(it.toLong(), "Week $it: October $it - October ${it + 6}, 2026", 50.0 + it, 40.0 + it) }
+        Column {
+            ChipRow(SectionChips.progress(true), "Weekly") {}
+            WeeklyReportsTab(many, UserRole.ENGINEER_ADMIN, {}, {}, {})
+        }
+    }
+
+    private fun moneyFab(mode: AppThemeMode) = fabAtEnd("money_fab_411_${mode.name.lowercase()}", mode) {
+        Money((1..12).map { payments[it % 4].copy(id = it.toLong(), name = "Progress Billing $it") })
+    }
+
+    @Config(qualifiers = "w411dp-h891dp") @Test fun progress_fab_light() = progressFab(AppThemeMode.LIGHT)
+    @Config(qualifiers = "w411dp-h891dp") @Test fun progress_fab_dark() = progressFab(AppThemeMode.DARK)
+    @Config(qualifiers = "w411dp-h891dp") @Test fun money_fab_light() = moneyFab(AppThemeMode.LIGHT)
+    @Config(qualifiers = "w411dp-h891dp") @Test fun money_fab_dark() = moneyFab(AppThemeMode.DARK)
 }

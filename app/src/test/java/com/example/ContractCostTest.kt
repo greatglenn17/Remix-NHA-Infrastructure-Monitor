@@ -71,4 +71,10 @@ class ContractCostTest {
         assertEquals(1_000_000.5, ContractCost.current(scope, 5.0, emptyList()), 0.001)
         assertEquals(1_050_000.5, ContractCost.current(scope, 5.0, listOf(doc("Variation Order PHP 50,000"))), 0.001)
     }
+
+    @Test
+    fun voName_withSpacedAmount_readsBackWhole() {
+        val name = com.example.ui.dialogs.voDocumentName("1", "Additive", "15 000 000")
+        assertEquals(1_000_000.5 + 15_000_000.0, ContractCost.revised(scope, 5.0, listOf(doc(name)))!!, 0.001)
+    }
 }

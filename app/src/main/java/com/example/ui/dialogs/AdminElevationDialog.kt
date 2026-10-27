@@ -12,8 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.data.model.UserAccount
 import com.example.data.model.UserRole
-import com.example.ui.theme.DarkSurface
-import com.example.ui.theme.DarkTextPrimary
 
 /** Client-side elevation is intentionally disabled. Roles are backend claims. */
 @Composable
@@ -25,14 +23,14 @@ fun AdminElevationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurface,
-        title = { Text("Role changes are managed centrally", color = DarkTextPrimary) },
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = { Text("Role changes are managed centrally", color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
                     "This device cannot change roles or privileges. An authorized backend administrator must update the user's server-controlled role.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = DarkTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },

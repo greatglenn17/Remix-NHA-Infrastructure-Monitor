@@ -9,8 +9,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.NavyPrimary
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.ui.components.DateField
+import com.example.ui.components.rememberDiscardGuard
+import com.example.util.FormValidation
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
@@ -28,18 +31,22 @@ fun AddTimeExtensionDialog(
     val revisedDate = ""
     var remarks by remember { mutableStateOf("") }
 
+    val snapshot = { listOf(extNo, days, period, reason, remarks) }
+    val initial = remember { snapshot() }
+    val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
+
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text("ADD TIME EXTENSION", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = NavyPrimary)) },
+        onDismissRequest = close,
+        title = { Text("ADD TIME EXTENSION", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                OutlinedTextField(value = extNo, onValueChange = { extNo = it }, label = { Text("Extension No.") })
-                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("No. of Days") })
+                OutlinedTextField(value = extNo, onValueChange = { extNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                OutlinedTextField(value = days, onValueChange = { days = it }, label = { Text("No. of Days") }, isError = daysError(days) != null, supportingText = daysError(days)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                 OutlinedTextField(value = period, onValueChange = { period = it }, label = { Text("Period Considered") })
                 OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") })
                 
@@ -47,11 +54,11 @@ fun AddTimeExtensionDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(extNo.toIntOrNull()?:1, days.toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
+            Button(enabled = daysError(days) == null, onClick = { onSubmit(extNo.trim().toIntOrNull()?:1, days.trim().toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
                 Text("Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
 }
 
@@ -68,7 +75,7 @@ fun AddWorkSuspensionDialog(
 
     val endDate = remember(effectivityDate, durationStr) {
         try {
-            val duration = durationStr.toIntOrNull() ?: 0
+            val duration = durationStr.trim().toIntOrNull() ?: 0
             val date = LocalDate.parse(effectivityDate, DateTimeFormatter.ISO_LOCAL_DATE)
             date.plusDays(duration.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
         } catch (e: Exception) {
@@ -76,30 +83,34 @@ fun AddWorkSuspensionDialog(
         }
     }
 
+    val snapshot = { listOf(name, effectivityDate, durationStr, reason, remarks) }
+    val initial = remember { snapshot() }
+    val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
+
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text("ADD WORK SUSPENSION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = NavyPrimary)) },
+        onDismissRequest = close,
+        title = { Text("ADD WORK SUSPENSION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-                OutlinedTextField(value = effectivityDate, onValueChange = { effectivityDate = it }, label = { Text("Effectivity Date (YYYY-MM-DD)") })
-                OutlinedTextField(value = durationStr, onValueChange = { durationStr = it }, label = { Text("Duration (Days)") })
+                DateField(label = "Effectivity Date", value = effectivityDate, onValueChange = { effectivityDate = it })
+                OutlinedTextField(value = durationStr, onValueChange = { durationStr = it }, label = { Text("Duration (Days)") }, isError = daysError(durationStr) != null, supportingText = daysError(durationStr)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                 OutlinedTextField(value = endDate, onValueChange = {}, label = { Text("End Date (Auto-computed)") }, readOnly = true)
                 OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") })
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") })
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(name, effectivityDate, durationStr.toIntOrNull()?:0, endDate, reason, remarks) }) {
+            Button(enabled = daysError(durationStr) == null, onClick = { onSubmit(name, effectivityDate, durationStr.trim().toIntOrNull()?:0, endDate, reason, remarks) }) {
                 Text("Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
 }
 
@@ -113,18 +124,22 @@ fun AddWorkResumptionDialog(
     var reason by remember { mutableStateOf("") }
     var remarks by remember { mutableStateOf("") }
 
+    val snapshot = { listOf(name, dateResumed, reason, remarks) }
+    val initial = remember { snapshot() }
+    val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
+
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text("ADD WORK RESUMPTION LOG", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = NavyPrimary)) },
+        onDismissRequest = close,
+        title = { Text("ADD WORK RESUMPTION LOG", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
-                OutlinedTextField(value = dateResumed, onValueChange = { dateResumed = it }, label = { Text("Date Resumed (YYYY-MM-DD)") })
+                DateField(label = "Date Resumed", value = dateResumed, onValueChange = { dateResumed = it })
                 OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") })
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") })
             }
@@ -134,7 +149,7 @@ fun AddWorkResumptionDialog(
                 Text("Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
 }
 
@@ -182,11 +197,16 @@ fun AddCustomDocumentDialog(
     var wrEffectivity by remember { mutableStateOf("") }
     var wrRemarks by remember { mutableStateOf("") }
 
+    val voAmountError = FormValidation.amountError(voAmount, false)
+    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wrNo, wrEffectivity, wrRemarks) }
+    val initial = remember { snapshot() }
+    val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
+
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text("ADD DOCUMENT", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = NavyPrimary)) },
+        onDismissRequest = close,
+        title = { Text("ADD DOCUMENT", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -228,12 +248,12 @@ fun AddCustomDocumentDialog(
                         OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                     }
                     "Time Extension" -> {
-                        OutlinedTextField(value = teNo, onValueChange = { teNo = it }, label = { Text("Extension No.") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = teDays, onValueChange = { teDays = it }, label = { Text("No. of Days") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = teNo, onValueChange = { teNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = teDays, onValueChange = { teDays = it }, label = { Text("No. of Days") }, isError = daysError(teDays) != null, supportingText = daysError(teDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = teReason, onValueChange = { teReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
                     }
                     "Variation Order" -> {
-                        OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         ExposedDropdownMenuBox(
                             expanded = voTypeExpanded,
                             onExpandedChange = { voTypeExpanded = it },
@@ -266,19 +286,18 @@ fun AddCustomDocumentDialog(
                             value = voAmount,
                             onValueChange = { voAmount = it },
                             label = { Text("Amount (PHP)") },
-                            supportingText = { Text(if (voType == "Deductive") "Will be subtracted from the contract cost" else "Will be added to the contract cost") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(value = voReason, onValueChange = { voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(
-                            value = voDateApproved,
-                            onValueChange = { voDateApproved = it },
-                            label = { Text("Date Approved (YYYY-MM-DD)") },
-                            isError = !voDateValid,
-                            supportingText = { Text(if (voDateValid) "Leave blank if not yet approved" else "Use the format YYYY-MM-DD") },
+                            isError = voAmountError != null,
+                            supportingText = { Text(voAmountError ?: if (voType == "Deductive") "Will be subtracted from the contract cost" else "Will be added to the contract cost") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        OutlinedTextField(value = voReason, onValueChange = { voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+                        DateField(
+                            label = "Date Approved", value = voDateApproved, onValueChange = { voDateApproved = it },
+                            clearable = true, error = if (voDateValid) null else "Not a valid date"
+                        )
+                        if (voDateValid) Text("Leave blank if not yet approved", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     "Work Suspension Order" -> {
                         OutlinedTextField(value = wsNo, onValueChange = { wsNo = it }, label = { Text("Suspension No.") }, modifier = Modifier.fillMaxWidth())
@@ -310,23 +329,28 @@ fun AddCustomDocumentDialog(
                                 }
                             }
                         }
-                        OutlinedTextField(value = wsDays, onValueChange = { wsDays = it }, label = { Text("No. of Days") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = wsEffectivity, onValueChange = { wsEffectivity = it }, label = { Text("Effectivity Date (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = wsDays, onValueChange = { wsDays = it }, label = { Text("No. of Days") }, isError = daysError(wsDays) != null, supportingText = daysError(wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                        DateField(label = "Effectivity Date", value = wsEffectivity, onValueChange = { wsEffectivity = it }, clearable = true)
                     }
                     "Work Resumption Order" -> {
                         OutlinedTextField(value = wrNo, onValueChange = { wrNo = it }, label = { Text("Resumption No.") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = wrEffectivity, onValueChange = { wrEffectivity = it }, label = { Text("Effectivity Date (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                        DateField(label = "Effectivity Date", value = wrEffectivity, onValueChange = { wrEffectivity = it }, clearable = true)
                         OutlinedTextField(value = wrRemarks, onValueChange = { wrRemarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
         },
         confirmButton = {
-            Button(enabled = selectedType != "Variation Order" || voDateValid, onClick = {
+            Button(enabled = when (selectedType) {
+                "Variation Order" -> voDateValid && voAmountError == null
+                "Time Extension" -> teDays.isNotBlank() && daysError(teDays) == null
+                "Work Suspension Order" -> wsDays.isNotBlank() && daysError(wsDays) == null
+                else -> true
+            }, onClick = {
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
-                    "Time Extension" -> "Time Extension No. $teNo - $teDays Days"
-                    "Variation Order" -> "Variation Order No. $voNo ($voType) - PHP $voAmount"
+                    "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
+                    "Variation Order" -> voDocumentName(voNo, voType, voAmount)
                     "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
                     "Work Resumption Order" -> "Work Resumption No. $wrNo"
                     else -> "New Document"
@@ -344,12 +368,12 @@ fun AddCustomDocumentDialog(
                                 if (parsedDate != null) {
                                     val cal = java.util.Calendar.getInstance()
                                     cal.time = parsedDate
-                                    cal.add(java.util.Calendar.DAY_OF_YEAR, wsDays.toInt())
+                                    cal.add(java.util.Calendar.DAY_OF_YEAR, wsDays.trim().toInt())
                                     computedEndDate = format.format(cal.time)
                                 }
                             }
                         } catch (e: Exception) { }
-                        "Duration: $wsDays Days | Effectivity: $wsEffectivity" + if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
+                        "Duration: ${wsDays.trim()} Days | Effectivity: $wsEffectivity" + if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
                     }
                     "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
                     else -> remarks
@@ -359,6 +383,14 @@ fun AddCustomDocumentDialog(
                 Text("Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
 }
+
+/** Whole-number day counts: blank is fine, anything else must be a non-negative integer. */
+internal fun daysError(text: String): String? =
+    FormValidation.amountError(text, false) ?: if (text.isNotBlank() && text.trim().toIntOrNull() == null) "Whole days only" else null
+
+/** Name stored for a variation order; the amount has spaces stripped so ContractCost can read it back. */
+internal fun voDocumentName(voNo: String, voType: String, voAmount: String): String =
+    "Variation Order No. $voNo ($voType) - PHP ${voAmount.filterNot { it.isWhitespace() }}"

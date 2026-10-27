@@ -35,7 +35,7 @@ fun PaymentCard(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = scheme.surface,
-        border = BorderStroke(1.dp, scheme.outline),
+        border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().testTag("payment_card_${payment.id}")
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 12.dp)) {

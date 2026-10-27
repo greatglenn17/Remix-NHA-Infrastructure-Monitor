@@ -1,5 +1,6 @@
 package com.example
 
+import androidx.compose.material3.MaterialTheme
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,15 +19,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import com.example.data.model.MonthlyReport
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.ui.dashboard.DashboardScreen
 import com.example.ui.dashboard.NeedsAttentionPane
 import com.example.ui.detail.ProjectDetailScreen
 import com.example.ui.dialogs.*
 import com.example.ui.login.LoginScreen
-import com.example.ui.theme.BackgroundLight
-import com.example.ui.theme.DarkBackground
 import com.example.ui.theme.NHATheme
 import com.example.ui.viewmodel.ProjectViewModel
 
@@ -50,7 +48,7 @@ class MainActivity : ComponentActivity() {
             NHATheme(themeMode = appThemeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize().imePadding(),
-                    color = BackgroundLight
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
                     val authLoading by viewModel.authLoading.collectAsState()

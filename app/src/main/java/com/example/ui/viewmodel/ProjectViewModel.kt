@@ -5,10 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import com.example.data.auth.AuthManager
 import com.example.data.local.AppDatabase
-import com.example.data.local.PrepopulateData
 import com.example.data.local.WeeklyReportWeatherWriter
 import com.example.data.model.*
 import kotlinx.coroutines.tasks.await

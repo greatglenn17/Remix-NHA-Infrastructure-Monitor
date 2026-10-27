@@ -12,11 +12,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.example.data.model.ProjectIssue
-import com.example.ui.theme.*
+import com.example.ui.components.DateField
+import com.example.util.FormValidation
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,38 +35,29 @@ fun AddIssueDialog(
     var status by remember { mutableStateOf(existingIssue?.status ?: "Pending") }
     var showStatusDropdown by remember { mutableStateOf(false) }
 
-    val darkTextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = NavyPrimary,
-        unfocusedBorderColor = DarkBorder,
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        cursorColor = NavyPrimary,
-        focusedLabelColor = NavyPrimary,
-        unfocusedLabelColor = DarkTextSecondary
-    )
-
+    var tried by remember { mutableStateOf(false) }
+    val snapshot = { listOf(date, description, actionTaken, isCritical, status) }
+    val initial = remember { snapshot() }
+    val close = com.example.ui.components.rememberDiscardGuard(snapshot() != initial, onDismiss)
+    val descError = if (tried) FormValidation.requiredError(description) else null
+    val actionError = if (tried) FormValidation.requiredError(actionTaken) else null
     AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding().systemBarsPadding(),
+        modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding().systemBarsPadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        title = { Text(if (existingIssue != null) "Edit Issue" else "Log Issue", color = Color.White) },
+        onDismissRequest = close,
+        title = { Text(if (existingIssue != null) "Edit Issue" else "Log Issue") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
-                    value = date,
-                    onValueChange = { date = it },
-                    label = { Text("Date (YYYY-MM-DD)") },
-                    colors = darkTextFieldColors,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                DateField(label = "Date", value = date, onValueChange = { date = it })
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Issue / Concern") },
-                    colors = darkTextFieldColors,
+                    isError = descError != null, supportingText = descError?.let { { Text(it) } },
+                    
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
@@ -74,26 +65,26 @@ fun AddIssueDialog(
                     value = actionTaken,
                     onValueChange = { actionTaken = it },
                     label = { Text("Action Taken") },
-                    colors = darkTextFieldColors,
+                    isError = actionError != null, supportingText = actionError?.let { { Text(it) } },
+                    
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = isCritical,
-                        onCheckedChange = { isCritical = it },
-                        colors = CheckboxDefaults.colors(checkedColor = NavyPrimary, uncheckedColor = DarkBorder)
+                        onCheckedChange = { isCritical = it }
                     )
-                    Text("Critical Issue", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                    Text("Critical Issue", style = MaterialTheme.typography.bodyMedium)
                 }
                 
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = { showStatusDropdown = true },
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shape = RoundedCornerShape(4.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text(status)
@@ -102,12 +93,11 @@ fun AddIssueDialog(
                     }
                     DropdownMenu(
                         expanded = showStatusDropdown,
-                        onDismissRequest = { showStatusDropdown = false },
-                        modifier = Modifier.background(DarkSurface)
+                        onDismissRequest = { showStatusDropdown = false }
                     ) {
                         listOf("Pending", "Approved", "No Action").forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option, color = Color.White) },
+                                text = { Text(option) },
                                 onClick = { status = option; showStatusDropdown = false }
                             )
                         }
@@ -118,18 +108,17 @@ fun AddIssueDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    tried = true
                     if (date.isNotBlank() && description.isNotBlank() && actionTaken.isNotBlank()) {
                         onSubmit(date, description, actionTaken, status, isCritical)
                     }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                }
             ) {
                 Text("Save")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = DarkTextSecondary) }
+            TextButton(onClick = close) { Text("Cancel") }
         },
-        containerColor = DarkSurface
     )
 }

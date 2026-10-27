@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -171,9 +172,9 @@ fun DashboardScreen(
     if (projectToDelete != null) {
         AlertDialog(
             onDismissRequest = { projectToDelete = null },
-            title = { Text("Delete Project", color = DarkTextPrimary) },
-            text = { Text("Are you sure you want to delete this project? This action cannot be undone.", color = DarkTextSecondary) },
-            containerColor = DarkSurface,
+            title = { Text("Delete Project", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Are you sure you want to delete this project? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            containerColor = MaterialTheme.colorScheme.surface,
             confirmButton = {
                 TextButton(onClick = {
                     projectToDelete?.let { viewModel.deleteProject(it) }
@@ -184,7 +185,7 @@ fun DashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { projectToDelete = null }) {
-                    Text("Cancel", color = DarkTextPrimary)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         )
@@ -260,7 +261,7 @@ internal fun TwoPanes(
             list()
             Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
         }
-        VerticalDivider(color = MaterialTheme.colorScheme.outline)
+        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detail() }
     }
 }

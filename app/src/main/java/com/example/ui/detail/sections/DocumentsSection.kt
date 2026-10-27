@@ -152,7 +152,7 @@ fun RelatedFilesList(
             ) {
                 if (relatedFiles.isEmpty()) EmptyLine("No related project files or scanned documents uploaded yet.")
                 relatedFiles.forEachIndexed { index, doc ->
-                    if (index > 0) HorizontalDivider(color = scheme.outline)
+                    if (index > 0) HorizontalDivider(color = scheme.outlineVariant)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier

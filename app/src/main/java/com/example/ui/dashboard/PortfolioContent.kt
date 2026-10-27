@@ -124,7 +124,7 @@ internal fun AttentionCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
-    Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outline)) {
+    Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant)) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text("Needs attention", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
@@ -281,7 +281,7 @@ private fun Picker(
         OutlinedButton(
             onClick = { open = true },
             shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, if (selected != "All") scheme.primary else scheme.outline),
+            border = BorderStroke(1.dp, if (selected != "All") scheme.primary else scheme.outlineVariant),
             colors = ButtonDefaults.outlinedButtonColors(containerColor = scheme.surface, contentColor = scheme.onSurface),
             contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
             modifier = Modifier.fillMaxWidth().height(48.dp).testTag(tag)
@@ -301,7 +301,7 @@ private fun SortButton(sortOrder: String, onSort: (String) -> Unit) {
         OutlinedButton(
             onClick = { open = true },
             shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, scheme.outline),
+            border = BorderStroke(1.dp, scheme.outlineVariant),
             colors = ButtonDefaults.outlinedButtonColors(containerColor = scheme.surface, contentColor = scheme.onSurface),
             contentPadding = PaddingValues(horizontal = 12.dp),
             modifier = Modifier.height(48.dp).testTag("sort_button")
@@ -330,7 +330,7 @@ private fun OptionsMenu(
             color = scheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        HorizontalDivider(color = scheme.outline)
+        HorizontalDivider(color = scheme.outlineVariant)
         options.forEach { option ->
             DropdownMenuItem(
                 text = { Text(option, fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal) },

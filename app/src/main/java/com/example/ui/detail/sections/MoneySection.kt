@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -50,11 +51,11 @@ fun MoneySection(
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val perRow = if (maxWidth >= 600.dp) 2 else 1
         LazyColumn(
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            item { BillingSummary(payments, contractCost, actualPercent, onAddBilling = { showAddDialog = true }) }
+            item { BillingSummary(payments, contractCost, actualPercent) }
             payments.chunked(perRow).forEach { row ->
                 item(key = row.first().id) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
@@ -76,6 +77,12 @@ fun MoneySection(
             }
             item { VariationOrdersLog(documents, canAddVariationOrder, onAddVariationOrder) }
         }
+        ExtendedFloatingActionButton(
+            onClick = { showAddDialog = true },
+            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+            text = { Text("Add billing") },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("add_billing_button")
+        )
     }
 
     if (showAddDialog) {
@@ -107,19 +114,12 @@ fun MoneySection(
 
 /** The old table's grand-total row: cost, billed, billed vs work done, balance. */
 @Composable
-fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualPercent: Double, onAddBilling: () -> Unit) {
+fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualPercent: Double) {
     val scheme = MaterialTheme.colorScheme
     val totalBilled = payments.sumOf { it.grossAmount }
     SectionCard(
         "Billing summary",
         Icons.Default.Payments,
-        action = {
-            TextButton(onClick = onAddBilling, modifier = Modifier.testTag("add_billing_button")) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Add billing")
-            }
-        }
     ) {
         Field("Current contract cost", CurrencyFormatter.formatPhp(contractCost))
         Field("Total billed", if (payments.isEmpty()) "No billings yet" else CurrencyFormatter.formatPhp(totalBilled))

@@ -78,7 +78,7 @@ private fun KeyDatesCard(project: Project, revisedCompletion: String?, addedDays
         // Same date Days left counts down to: approved orders first, else the stored revised date.
         Field("Revised completion", revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-")
         Field("Contract duration", "${CurrencyFormatter.formatNumber(project.contractDurationDays)} days")
-        Field("Revised duration", if (addedDays > 0) "${CurrencyFormatter.formatNumber(project.contractDurationDays + addedDays)} days" else "-")
+        Field("Revised duration", ProjectSchedule.revisedDurationDays(project.dateStarted, project.contractDurationDays, addedDays, project.completionDateRevised)?.let { "${CurrencyFormatter.formatNumber(it)} days" } ?: "-")
         Field(
             "Days left",
             when {

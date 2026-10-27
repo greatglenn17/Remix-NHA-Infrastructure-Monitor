@@ -12,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,13 +38,13 @@ fun GoogleDriveSyncDialog(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(Color(0xFF0F766E).copy(alpha = 0.2f), shape = CircleShape),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.CloudSync,
                         contentDescription = "Drive Sync",
-                        tint = Color(0xFF38BDF8),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -55,13 +54,13 @@ fun GoogleDriveSyncDialog(
                         text = "Google Drive Database Sync",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DarkTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                     Text(
                         text = "Cloud Backup & Restore",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = DarkTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
                     )
@@ -75,9 +74,9 @@ fun GoogleDriveSyncDialog(
             ) {
                 // Connected Account Info Box
                 Surface(
-                    color = DarkSurfaceVariant,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, DarkBorder)
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
                         modifier = Modifier
@@ -88,13 +87,13 @@ fun GoogleDriveSyncDialog(
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(Color(0xFF38BDF8).copy(alpha = 0.15f), shape = CircleShape),
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AccountCircle,
                                 contentDescription = null,
-                                tint = Color(0xFF38BDF8),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -103,7 +102,7 @@ fun GoogleDriveSyncDialog(
                             Text(
                                 text = "Connected Google Account",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = DarkTextSecondary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 10.sp
                                 )
                             )
@@ -111,26 +110,26 @@ fun GoogleDriveSyncDialog(
                                 text = accountEmail,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkTextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                             Text(
                                 text = "Scope: drive.file (NHA_Project_Monitoring_Backup.json)",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF4ADE80),
+                                    color = LocalNHAColors.current.onTrack,
                                     fontSize = 9.sp
                                 )
                             )
                         }
                         Surface(
-                            color = Color(0xFF16A34A).copy(alpha = 0.2f),
+                            color = LocalNHAColors.current.onTrack.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(50.dp),
-                            border = BorderStroke(1.dp, Color(0xFF16A34A))
+                            border = BorderStroke(1.dp, LocalNHAColors.current.onTrack)
                         ) {
                             Text(
                                 text = "ACTIVE",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = Color(0xFF4ADE80),
+                                    color = LocalNHAColors.current.onTrack,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 9.sp
                                 ),
@@ -142,9 +141,9 @@ fun GoogleDriveSyncDialog(
 
                 // Last Sync Timestamp
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, DarkBorder.copy(alpha = 0.6f))
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 ) {
                     Row(
                         modifier = Modifier
@@ -167,7 +166,7 @@ fun GoogleDriveSyncDialog(
                                 Icon(
                                     imageVector = Icons.Default.Sync,
                                     contentDescription = null,
-                                    tint = Color(0xFFFBBF24),
+                                    tint = LocalNHAColors.current.watch,
                                     modifier = Modifier
                                         .size(16.dp)
                                         .graphicsLayer { rotationZ = angle }
@@ -176,7 +175,7 @@ fun GoogleDriveSyncDialog(
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = Color(0xFF4ADE80),
+                                    tint = LocalNHAColors.current.onTrack,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -185,7 +184,7 @@ fun GoogleDriveSyncDialog(
                                 Text(
                                     text = if (isSyncing) "Syncing with Google Drive..." else "Last Backup to Drive",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        color = DarkTextSecondary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 10.sp
                                     )
                                 )
@@ -193,7 +192,7 @@ fun GoogleDriveSyncDialog(
                                     text = lastSyncTime ?: "Never synced",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = DarkTextPrimary
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
                             }
@@ -214,13 +213,13 @@ fun GoogleDriveSyncDialog(
                             text = "Auto-Sync to Google Drive",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DarkTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                         Text(
                             text = "Automatically back up project records, reports, and weather logs.",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                color = DarkTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp
                             )
                         )
@@ -229,17 +228,17 @@ fun GoogleDriveSyncDialog(
                         checked = isAutoSyncEnabled,
                         onCheckedChange = onToggleAutoSync,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF38BDF8),
-                            checkedTrackColor = Color(0xFF0284C7).copy(alpha = 0.4f)
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                         )
                     )
                 }
 
                 if (!statusMessage.isNullOrBlank()) {
                     val isError = statusMessage.contains("Error", ignoreCase = true) || statusMessage.contains("Failed", ignoreCase = true) || statusMessage.contains("Offline", ignoreCase = true)
-                    val bgColor = if (isError) Color(0xFFEF4444).copy(alpha = 0.15f) else Color(0xFF0284C7).copy(alpha = 0.15f)
-                    val borderColor = if (isError) Color(0xFFEF4444) else Color(0xFF38BDF8)
-                    val textColor = if (isError) Color(0xFFFCA5A5) else Color(0xFF7DD3FC)
+                    val bgColor = if (isError) LocalNHAColors.current.behind.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    val borderColor = if (isError) LocalNHAColors.current.behind else MaterialTheme.colorScheme.primary
+                    val textColor = if (isError) LocalNHAColors.current.behind else MaterialTheme.colorScheme.primary
 
                     Surface(
                         color = bgColor,
@@ -261,8 +260,8 @@ fun GoogleDriveSyncDialog(
                 onClick = onBackupNow,
                 enabled = !isSyncing,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0284C7),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -280,8 +279,8 @@ fun GoogleDriveSyncDialog(
                 OutlinedButton(
                     onClick = onRestoreNow,
                     enabled = !isSyncing,
-                    border = BorderStroke(1.dp, DarkBorder),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DarkTextPrimary),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
@@ -294,13 +293,13 @@ fun GoogleDriveSyncDialog(
                 }
                 TextButton(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.textButtonColors(contentColor = DarkTextSecondary)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Text("Close")
                 }
             }
         },
-        containerColor = DarkSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp)
     )
 }

@@ -1,5 +1,6 @@
 package com.example.ui.dialogs
 
+import androidx.compose.foundation.shape.CircleShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,9 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -45,7 +44,14 @@ import com.example.ui.detail.tabs.parseActivitiesList
 import com.example.ui.detail.tabs.parseEquipmentList
 import com.example.ui.detail.tabs.parseIssuesList
 import com.example.ui.detail.tabs.parseManpowerList
-import com.example.ui.theme.*
+import com.example.ui.components.LongForm
+import com.example.ui.theme.LocalNHAColors
+import com.example.ui.theme.WeatherCloudyYellow
+import com.example.ui.theme.WeatherFairGreen
+import com.example.ui.theme.WeatherRainShowersCyan
+import com.example.ui.theme.WeatherRainyBlue
+import com.example.ui.theme.WeatherStormyRed
+import com.example.util.FormValidation
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.atan2
@@ -68,12 +74,13 @@ fun AddWeeklyReportDialog(
         equipmentJson: String,
         issuesJson: String,
         accomplishmentItemsJson: String
-    ) -> Unit
+    ) -> Unit,
+    today: java.time.LocalDate = java.time.LocalDate.now()
 ) {
-    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(java.time.LocalDate.now())) }
+    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(today)) }
     
     val daysOfWeekWithDates = remember(reportingWeek) {
-        val cal = java.util.Calendar.getInstance()
+        val cal = java.util.Calendar.getInstance().apply { set(today.year, today.monthValue - 1, today.dayOfMonth) }
         try {
             var startDateStr = reportingWeek.split(" - ").first()
             // Remove "Week XX: " if present
@@ -96,7 +103,7 @@ fun AddWeeklyReportDialog(
             if (parsedDate != null) {
                 cal.time = parsedDate
                 if (cal.get(java.util.Calendar.YEAR) == 1970) {
-                    cal.set(java.util.Calendar.YEAR, java.util.Calendar.getInstance().get(java.util.Calendar.YEAR))
+                    cal.set(java.util.Calendar.YEAR, today.year)
                 }
             } else {
                 cal.firstDayOfWeek = java.util.Calendar.MONDAY
@@ -257,45 +264,78 @@ fun AddWeeklyReportDialog(
 
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }
 
-    val darkTextFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        focusedContainerColor = DarkSurfaceVariant,
-        unfocusedContainerColor = DarkSurfaceVariant,
-        focusedLabelColor = Color(0xFF38BDF8),
-        unfocusedLabelColor = Color(0xFF94A3B8),
-        focusedBorderColor = Color(0xFF38BDF8),
-        unfocusedBorderColor = DarkBorder,
-        cursorColor = Color(0xFF38BDF8)
+    var step by remember { mutableStateOf(WeeklyStep.WEEK) }
+    val errors = weeklyErrors(accomplishmentMap, scopeItems.map { it.name })
+    fun snapshot() = listOf(
+        reportingWeek, accomplishmentMap.toMap(), activityItems, photoUrls.toList(),
+        dailyHourlyWeather.mapValues { it.value.toList() }, manpowerItems, equipmentItems, issuesItems
     )
+    val initial = remember { snapshot() }
+    val dirty = snapshot() != initial
 
-    AlertDialog(
-        modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        onDismissRequest = onDismiss,
-        containerColor = DarkSurface,
-        titleContentColor = DarkTextPrimary,
-        textContentColor = DarkTextPrimary,
-        title = {
-            Text(
-                "SUBMIT NHA WEEKLY ENGINEER'S REPORT",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
-            )
+    LongForm(
+        title = if (existingReport == null) "New weekly report" else "Edit weekly report",
+        dirty = dirty,
+        saveEnabled = errors.isEmpty(),
+        onDismiss = onDismiss,
+        saveTag = "submit_weekly_report_button",
+        topContent = {
+            ScrollableTabRow(selectedTabIndex = step.ordinal, edgePadding = 16.dp) {
+                WeeklyStep.entries.forEach { s ->
+                    Tab(selected = s == step, onClick = { step = s }, text = { Text(s.label) })
+                }
+            }
         },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+        bottomStart = {
+            TextButton(onClick = { step = WeeklyStep.entries[step.ordinal - 1] }, enabled = step.ordinal > 0) { Text("Back") }
+            TextButton(onClick = { step = WeeklyStep.entries[step.ordinal + 1] }, enabled = step != WeeklyStep.REVIEW) { Text("Next") }
+        },
+        onSave = {
+            val target = overallTarget
+            val actual = overallActual
+
+            val manpowerJson = encodeManpowerList(manpowerItems)
+            val equipmentJson = encodeEquipmentList(equipmentItems)
+            val issuesJson = encodeIssuesList(issuesItems)
+            val activitiesJson = encodeActivitiesList(activityItems)
+
+            val weatherCsvMap = daysOfWeek.associateWith { dayName ->
+                dailyHourlyWeather[dayName]?.joinToString(",") ?: List(24) { "FAIR" }.joinToString(",")
+            }
+            
+            val dailyWeatherDates = daysOfWeekWithDates.associate { it.first to it.third }
+
+            val accItemsJson = JSONArray(scopeItems.map { item ->
+                val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
+                JSONObject().put("itemDescription", item.name)
+                    .put("targetPct", vals.first.toDoubleOrNull() ?: 0.0)
+                    .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
+                    .put("weightPct", item.weightPct)
+            }).toString()
+
+            onSubmit(
+                reportingWeek,
+                target,
+                actual,
+                activitiesJson,
+                JSONArray(photoUrls).toString(),
+                weatherCsvMap,
+                dailyWeatherDates,
+                manpowerJson,
+                equipmentJson,
+                issuesJson,
+                accItemsJson
+            )
+        }
+    ) {
+        when (step) {
+            WeeklyStep.WEEK -> {
                 Box(modifier = Modifier.fillMaxWidth().clickable { showDateRangePicker = true }) {
                     OutlinedTextField(
                         value = reportingWeek,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Reporting Week Date Range") },
-                        colors = darkTextFieldColors,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("input_weekly_reporting_week"),
@@ -314,16 +354,14 @@ fun AddWeeklyReportDialog(
                         }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary))
+                Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                 
                 // Header
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Item", modifier = Modifier.weight(2f), style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
-                    Text("Target %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
-                    Text("Actual %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
-                    Text("Var", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.End))
+                    Text("Item", modifier = Modifier.weight(2f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Text("Target %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Text("Actual %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Text("Var", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.End))
                 }
 
                 // Scope Items Rows
@@ -335,29 +373,31 @@ fun AddWeeklyReportDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(2f)) {
-                            Text(item.name, style = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontWeight = FontWeight.Bold), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text("Wt: ${"%.2f".format(item.weightPct)}%", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
+                            Text(item.name, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text("Wt: ${"%.2f".format(item.weightPct)}%", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                         OutlinedTextField(
                             value = vals.first,
                             onValueChange = { accomplishmentMap[item.name] = Pair(it, vals.second) },
-                            colors = darkTextFieldColors,
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(1f),
+                            isError = FormValidation.percentError(vals.first) != null,
+                            supportingText = FormValidation.percentError(vals.first)?.let { { Text(it) } },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         OutlinedTextField(
                             value = vals.second,
                             onValueChange = { accomplishmentMap[item.name] = Pair(vals.first, it) },
-                            colors = darkTextFieldColors,
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier.weight(1f),
+                            isError = FormValidation.percentError(vals.second) != null,
+                            supportingText = FormValidation.percentError(vals.second)?.let { { Text(it) } },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         val targetVal = vals.first.toDoubleOrNull() ?: 0.0
                         val actualVal = vals.second.toDoubleOrNull() ?: 0.0
                         val variance = actualVal - targetVal
-                        val varColor = if (variance >= 0) StatusGreenText else StatusRedText
+                        val varColor = if (variance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
                         Text(
                             text = "${if(variance>0) "+" else ""}${"%.2f".format(variance)}",
                             modifier = Modifier.weight(1f),
@@ -367,351 +407,20 @@ fun AddWeeklyReportDialog(
                 }
 
                 // Grand Total Row
-                HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary))
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                        val ovColor = if (overallVariance >= 0) StatusGreenText else StatusRedText
-                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = ovColor))
+                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                        val ovColor = if (overallVariance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ovColor))
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-
-
-
-                // ACTIVITIES OF THE WEEK TABLE
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "ACTIVITIES OF THE WEEK TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                            )
-                            TextButton(
-                                onClick = {
-                                    activityItems = activityItems + DailyActivity("Monday", "", "")
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF38BDF8))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add Row", fontSize = 12.sp, color = Color(0xFF38BDF8))
-                            }
-                        }
-
-                        HorizontalDivider(color = DarkBorder)
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        activityItems.forEachIndexed { idx, item ->
-                            key(idx) {
-                                ActivityInputRow(
-                                    activity = item,
-                                    textFieldColors = darkTextFieldColors,
-                                    onUpdate = { updated ->
-                                        activityItems = activityItems.toMutableList().also { it[idx] = updated }
-                                    },
-                                    onDelete = {
-                                        if (activityItems.size > 1) {
-                                            activityItems = activityItems.toMutableList().also { it.removeAt(idx) }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // 1. MANPOWER TABLE
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "MANPOWER SUMMARY TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                            )
-                            TextButton(
-                                onClick = {
-                                    manpowerItems = manpowerItems + ManpowerItem("New Designation", 1)
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF38BDF8))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add", fontSize = 12.sp, color = Color(0xFF38BDF8))
-                            }
-                        }
-
-                        HorizontalDivider(color = DarkBorder)
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        manpowerItems.forEachIndexed { idx, item ->
-                            key(idx) {
-                                ManpowerInputRow(
-                                    item = item,
-                                    textFieldColors = darkTextFieldColors,
-                                    onUpdate = { updated ->
-                                        manpowerItems = manpowerItems.toMutableList().also { it[idx] = updated }
-                                    },
-                                    onDelete = {
-                                        if (manpowerItems.size > 1) {
-                                            manpowerItems = manpowerItems.toMutableList().also { it.removeAt(idx) }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            color = DarkSurface,
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, DarkBorder),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary))
-                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8)))
-                            }
-                        }
-                    }
-                }
-
-                // 2. EQUIPMENT TABLE
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "EQUIPMENT SUMMARY TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                            )
-                            TextButton(
-                                onClick = {
-                                    equipmentItems = equipmentItems + EquipmentItem("New Equipment", 1, "Operational")
-                                },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF38BDF8))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add", fontSize = 12.sp, color = Color(0xFF38BDF8))
-                            }
-                        }
-
-                        HorizontalDivider(color = DarkBorder)
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        equipmentItems.forEachIndexed { idx, item ->
-                            key(idx) {
-                                EquipmentInputRow(
-                                    item = item,
-                                    textFieldColors = darkTextFieldColors,
-                                    onUpdate = { updated ->
-                                        equipmentItems = equipmentItems.toMutableList().also { it[idx] = updated }
-                                    },
-                                    onDelete = {
-                                        if (equipmentItems.size > 1) {
-                                            equipmentItems = equipmentItems.toMutableList().also { it.removeAt(idx) }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // 3. ISSUES TABLE
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text(
-                            "ISSUES ENCOUNTERED / ACTION TAKEN",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Add issue button directly below the title header
-                        OutlinedButton(
-                            onClick = {
-                                issuesItems = issuesItems + WeeklyIssue("New issue encountered", "Action taken")
-                            },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                            border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("add_issue_button")
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Add Issue / Action Taken", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        HorizontalDivider(color = DarkBorder)
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        if (issuesItems.isEmpty()) {
-                            Text("No issues added yet.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
-                        } else {
-                            issuesItems.forEachIndexed { idx, issue ->
-                                key(idx) {
-                                    IssueInputRow(
-                                        issue = issue,
-                                        textFieldColors = darkTextFieldColors,
-                                        onUpdate = { updated ->
-                                            issuesItems = issuesItems.toMutableList().also { it[idx] = updated }
-                                        },
-                                        onDelete = {
-                                            issuesItems = issuesItems.toMutableList().also { it.removeAt(idx) }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // SITE PROGRESS PHOTO CARD (CAMERA / GALLERY ACCESS)
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "ATTACH SITE PROGRESS PHOTO",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Add Photos Button placed directly below header title
-                        OutlinedButton(
-                            onClick = { showPhotoSourceDialog = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                            border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("add_photo_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AddPhotoAlternate,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Add Photos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        if (photoUrls.isNotEmpty()) {
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(photoUrls) { url ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(120.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(DarkSurface)
-                                    ) {
-                                        AsyncImage(
-                                            model = url,
-                                            contentDescription = "Attached site photo",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-
-                                        IconButton(
-                                            onClick = { photoUrls.remove(url) },
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(6.dp)
-                                                .size(28.dp)
-                                                .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(50.dp))
-                                        ) {
-                                            Icon(Icons.Default.Close, contentDescription = "Remove Photo", tint = Color.White, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            Surface(
-                                color = DarkSurface,
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, DarkBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showPhotoSourceDialog = true }
-                                    .padding(vertical = 16.dp)
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AddAPhoto,
-                                        contentDescription = null,
-                                        tint = Color(0xFF38BDF8),
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        "Tap to attach site photo (Camera or Gallery)",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontWeight = FontWeight.Medium)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // 4. DAILY WEATHER LOG BY DAY OF WEEK (INTERACTIVE 24-SLICE PIE GRAPH)
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                    border = BorderStroke(1.dp, DarkBorder),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -723,17 +432,17 @@ fun AddWeeklyReportDialog(
                             Column {
                                 Text(
                                     "DAILY WEATHER LOG (24-HR PIE GRAPH)",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 Text(
                                     "Click pie slice to cycle: Fair (Grn) → Cloudy (Yel) → Showers (Cyan) → Rainy (Blu) → Stormy (Red) → Reset",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = DarkTextSecondary)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        HorizontalDivider(color = DarkBorder)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Day Selector Tabs
@@ -754,12 +463,12 @@ fun AddWeeklyReportDialog(
                                         )
                                     },
                                     shape = RoundedCornerShape(50.dp),
-                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF38BDF8) else DarkBorder),
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF38BDF8),
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = DarkSurface,
-                                        labelColor = DarkTextSecondary
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )
                             }
@@ -770,8 +479,10 @@ fun AddWeeklyReportDialog(
                         // 24-Slice Interactive Pie Chart Canvas
                         val currentDayHours = dailyHourlyWeather[selectedWeatherDayName] ?: remember { mutableStateListOf(*Array(24) { "FAIR" }) }
                         val activeDateStr = daysOfWeekWithDates.find { it.first == selectedWeatherDayName }?.second ?: "July 24, 2026"
-                        val holeSurfaceVariant = DarkSurfaceVariant
-                        val holeBorder = DarkBorder
+                        val holeSurfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+                        val holeBorder = MaterialTheme.colorScheme.outlineVariant
+                        val sliceLine = MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)
+                        val selectedRing = MaterialTheme.colorScheme.onSurface
 
                         Box(
                             modifier = Modifier
@@ -845,7 +556,7 @@ fun AddWeeklyReportDialog(
                                     val endX = center.x + radius * Math.cos(angleRad).toFloat()
                                     val endY = center.y + radius * Math.sin(angleRad).toFloat()
                                     drawLine(
-                                        color = Color.Black.copy(alpha = 0.5f),
+                                        color = sliceLine,
                                         start = center,
                                         end = Offset(endX, endY),
                                         strokeWidth = 1.5f
@@ -855,7 +566,7 @@ fun AddWeeklyReportDialog(
                                 // Selected Hour Highlight Ring
                                 val selStartAngle = -90f + (selectedHourIndex * sliceAngle)
                                 drawArc(
-                                    color = Color.White,
+                                    color = selectedRing,
                                     startAngle = selStartAngle,
                                     sweepAngle = sliceAngle,
                                     useCenter = false,
@@ -882,15 +593,15 @@ fun AddWeeklyReportDialog(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "$selectedWeatherDayName",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 Text(
                                     text = "$activeDateStr",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = Color(0xFF38BDF8))
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                                 )
                                 Text(
                                     text = "Tap slice to log",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, color = DarkTextSecondary)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                             }
                         }
@@ -903,9 +614,9 @@ fun AddWeeklyReportDialog(
                         else "${selectedHourIndex - 12}:00 PM (${selectedHourIndex}:00)"
 
                         Surface(
-                            color = DarkSurface,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, DarkBorder),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
                             Column(
@@ -930,7 +641,7 @@ fun AddWeeklyReportDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Hour $formattedHourText:",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontSize = 11.sp)
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
@@ -938,7 +649,7 @@ fun AddWeeklyReportDialog(
                                             "RAIN_SHOWERS" -> "RAIN SHOWERS"
                                             else -> activeHourCond
                                         },
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color.White, fontSize = 11.sp)
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
                                     )
                                 }
 
@@ -946,7 +657,7 @@ fun AddWeeklyReportDialog(
 
                                 Text(
                                     text = "(Tap slice again to cycle)",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF38BDF8), fontSize = 10.sp)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
                                 )
                             }
                         }
@@ -981,76 +692,378 @@ fun AddWeeklyReportDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val target = overallTarget
-                    val actual = overallActual
+            WeeklyStep.CREW -> {
+                // 1. MANPOWER TABLE
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "MANPOWER SUMMARY TABLE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            )
+                            TextButton(
+                                onClick = {
+                                    manpowerItems = manpowerItems + ManpowerItem("New Designation", 1)
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
 
-                    val manpowerJson = encodeManpowerList(manpowerItems)
-                    val equipmentJson = encodeEquipmentList(equipmentItems)
-                    val issuesJson = encodeIssuesList(issuesItems)
-                    val activitiesJson = encodeActivitiesList(activityItems)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    val weatherCsvMap = daysOfWeek.associateWith { dayName ->
-                        dailyHourlyWeather[dayName]?.joinToString(",") ?: List(24) { "FAIR" }.joinToString(",")
+                        manpowerItems.forEachIndexed { idx, item ->
+                            key(idx) {
+                                ManpowerInputRow(
+                                    item = item,
+                                    onUpdate = { updated ->
+                                        manpowerItems = manpowerItems.toMutableList().also { it[idx] = updated }
+                                    },
+                                    onDelete = {
+                                        if (manpowerItems.size > 1) {
+                                            manpowerItems = manpowerItems.toMutableList().also { it.removeAt(idx) }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
+                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                            }
+                        }
                     }
-                    
-                    val dailyWeatherDates = daysOfWeekWithDates.associate { it.first to it.third }
+                }
+                // 2. EQUIPMENT TABLE
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "EQUIPMENT SUMMARY TABLE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            )
+                            TextButton(
+                                onClick = {
+                                    equipmentItems = equipmentItems + EquipmentItem("New Equipment", 1, "Operational")
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
 
-                    val accItemsJson = JSONArray(scopeItems.map { item ->
-                        val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
-                        JSONObject().put("itemDescription", item.name)
-                            .put("targetPct", vals.first.toDoubleOrNull() ?: 0.0)
-                            .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
-                            .put("weightPct", item.weightPct)
-                    }).toString()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    onSubmit(
-                        reportingWeek,
-                        target,
-                        actual,
-                        activitiesJson,
-                        JSONArray(photoUrls).toString(),
-                        weatherCsvMap,
-                        dailyWeatherDates,
-                        manpowerJson,
-                        equipmentJson,
-                        issuesJson,
-                        accItemsJson
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
-                shape = RoundedCornerShape(50.dp),
-                modifier = Modifier.testTag("submit_weekly_report_button")
-            ) {
-                Text("Submit Weekly Report", fontWeight = FontWeight.Bold)
+                        equipmentItems.forEachIndexed { idx, item ->
+                            key(idx) {
+                                EquipmentInputRow(
+                                    item = item,
+                                    onUpdate = { updated ->
+                                        equipmentItems = equipmentItems.toMutableList().also { it[idx] = updated }
+                                    },
+                                    onDelete = {
+                                        if (equipmentItems.size > 1) {
+                                            equipmentItems = equipmentItems.toMutableList().also { it.removeAt(idx) }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = DarkTextSecondary) }
+            WeeklyStep.WORK -> {
+                // ACTIVITIES OF THE WEEK TABLE
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "ACTIVITIES OF THE WEEK TABLE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            )
+                            TextButton(
+                                onClick = {
+                                    activityItems = activityItems + DailyActivity("Monday", "", "")
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add Row", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        activityItems.forEachIndexed { idx, item ->
+                            key(idx) {
+                                ActivityInputRow(
+                                    activity = item,
+                                    onUpdate = { updated ->
+                                        activityItems = activityItems.toMutableList().also { it[idx] = updated }
+                                    },
+                                    onDelete = {
+                                        if (activityItems.size > 1) {
+                                            activityItems = activityItems.toMutableList().also { it.removeAt(idx) }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                // 3. ISSUES TABLE
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            "ISSUES ENCOUNTERED / ACTION TAKEN",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Add issue button directly below the title header
+                        OutlinedButton(
+                            onClick = {
+                                issuesItems = issuesItems + WeeklyIssue("New issue encountered", "Action taken")
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("add_issue_button")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Issue / Action Taken", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        if (issuesItems.isEmpty()) {
+                            Text("No issues added yet.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                        } else {
+                            issuesItems.forEachIndexed { idx, issue ->
+                                key(idx) {
+                                    IssueInputRow(
+                                        issue = issue,
+                                        onUpdate = { updated ->
+                                            issuesItems = issuesItems.toMutableList().also { it[idx] = updated }
+                                        },
+                                        onDelete = {
+                                            issuesItems = issuesItems.toMutableList().also { it.removeAt(idx) }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            WeeklyStep.PHOTOS -> {
+                // SITE PROGRESS PHOTO CARD (CAMERA / GALLERY ACCESS)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "ATTACH SITE PROGRESS PHOTO",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Add Photos Button placed directly below header title
+                        OutlinedButton(
+                            onClick = { showPhotoSourceDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("add_photo_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddPhotoAlternate,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Photos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (photoUrls.isNotEmpty()) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(photoUrls) { url ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(120.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                    ) {
+                                        AsyncImage(
+                                            model = url,
+                                            contentDescription = "Attached site photo",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+
+                                        IconButton(
+                                            onClick = { photoUrls.remove(url) },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Remove Photo", tint = Color.White, modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), shape = CircleShape).padding(6.dp).size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showPhotoSourceDialog = true }
+                                    .padding(vertical = 16.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AddAPhoto,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        "Tap to attach site photo (Camera or Gallery)",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            WeeklyStep.REVIEW -> {
+                listOf(
+                    "Reporting week" to reportingWeek,
+                    "Overall target" to "%.2f%%".format(overallTarget),
+                    "Overall actual" to "%.2f%%".format(overallActual),
+                    "Variance" to "${if (overallVariance > 0) "+" else ""}${"%.2f".format(overallVariance)}%",
+                    "Manpower" to "$grandTotalManpower personnel",
+                    "Equipment" to "${equipmentItems.size}",
+                    "Activities" to "${activityItems.size}",
+                    "Issues" to "${issuesItems.size}",
+                    "Photos" to "${photoUrls.size}"
+                ).forEach { (label, value) ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                    }
+                }
+                errors.forEach { (errStep, message) ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { step = errStep },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(8.dp))
+                        Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                        Text(errStep.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
         }
-    )
+    }
 
     if (showPhotoSourceDialog) {
         AlertDialog(
         modifier = Modifier.fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
             onDismissRequest = { showPhotoSourceDialog = false },
-            containerColor = DarkSurface,
+            containerColor = MaterialTheme.colorScheme.surface,
             title = {
                 Text(
                     "SELECT SITE PHOTO SOURCE",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -1068,19 +1081,19 @@ fun AddWeeklyReportDialog(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = Color(0xFF38BDF8))
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("Take Photo with Camera", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                                Text("Capture real-time construction site photo", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontSize = 11.sp))
+                                Text("Take Photo with Camera", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("Capture real-time construction site photo", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp))
                             }
                         }
                     }
 
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -1096,11 +1109,11 @@ fun AddWeeklyReportDialog(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color(0xFF38BDF8))
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("Choose from Phone Gallery", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                                Text("Select an existing picture from your device gallery", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontSize = 11.sp))
+                                Text("Choose from Phone Gallery", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("Select an existing picture from your device gallery", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp))
                             }
                         }
                     }
@@ -1109,7 +1122,7 @@ fun AddWeeklyReportDialog(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showPhotoSourceDialog = false }) {
-                    Text("Cancel", color = DarkTextSecondary)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -1119,7 +1132,6 @@ fun AddWeeklyReportDialog(
 @Composable
 private fun ManpowerInputRow(
     item: ManpowerItem,
-    textFieldColors: TextFieldColors,
     onUpdate: (ManpowerItem) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1134,7 +1146,6 @@ private fun ManpowerInputRow(
             value = item.designation,
             onValueChange = { newDesignation -> onUpdate(item.copy(designation = newDesignation)) },
             label = { Text("Designation") },
-            colors = textFieldColors,
             modifier = Modifier.weight(2f),
             singleLine = true
         )
@@ -1146,13 +1157,12 @@ private fun ManpowerInputRow(
                 onUpdate(item.copy(count = cnt))
             },
             label = { Text("No.") },
-            colors = textFieldColors,
             modifier = Modifier.weight(1f),
             singleLine = true
         )
 
-        IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusRedText, modifier = Modifier.size(18.dp))
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -1160,7 +1170,6 @@ private fun ManpowerInputRow(
 @Composable
 private fun EquipmentInputRow(
     item: EquipmentItem,
-    textFieldColors: TextFieldColors,
     onUpdate: (EquipmentItem) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1180,7 +1189,6 @@ private fun EquipmentInputRow(
                 value = item.description,
                 onValueChange = { newDesc -> onUpdate(item.copy(description = newDesc)) },
                 label = { Text("Name of Equipment") },
-                colors = textFieldColors,
                 modifier = Modifier.weight(2f),
                 singleLine = true
             )
@@ -1192,13 +1200,12 @@ private fun EquipmentInputRow(
                     onUpdate(item.copy(count = cnt))
                 },
                 label = { Text("No.") },
-                colors = textFieldColors,
                 modifier = Modifier.weight(1f),
                 singleLine = true
             )
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusRedText, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1209,22 +1216,22 @@ private fun EquipmentInputRow(
                 onClick = { showRemarksDropdown = true },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, DarkBorder),
-                colors = ButtonDefaults.outlinedButtonColors(containerColor = DarkSurface, contentColor = Color.White)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
-                Text("Remarks / Status: ${item.status}", color = Color.White)
+                Text("Remarks / Status: ${item.status}", color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
             }
 
             DropdownMenu(
                 expanded = showRemarksDropdown,
                 onDismissRequest = { showRemarksDropdown = false },
-                modifier = Modifier.background(DarkSurface)
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
                 listOf("Operational", "Idle", "For Repair").forEach { opt ->
                     DropdownMenuItem(
-                        text = { Text(opt, color = Color.White) },
+                        text = { Text(opt, color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             onUpdate(item.copy(status = opt))
                             showRemarksDropdown = false
@@ -1239,7 +1246,6 @@ private fun EquipmentInputRow(
 @Composable
 private fun IssueInputRow(
     issue: WeeklyIssue,
-    textFieldColors: TextFieldColors,
     onUpdate: (WeeklyIssue) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1257,12 +1263,11 @@ private fun IssueInputRow(
                 value = issue.description,
                 onValueChange = { newDesc -> onUpdate(issue.copy(description = newDesc)) },
                 label = { Text("Issue Encountered") },
-                colors = textFieldColors,
                 modifier = Modifier.weight(1f)
             )
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusRedText, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1270,7 +1275,6 @@ private fun IssueInputRow(
             value = issue.actionTaken,
             onValueChange = { newAction -> onUpdate(issue.copy(actionTaken = newAction)) },
             label = { Text("Action Taken") },
-            colors = textFieldColors,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -1329,7 +1333,6 @@ private fun encodeActivitiesList(list: List<DailyActivity>): String {
 @Composable
 private fun ActivityInputRow(
     activity: DailyActivity,
-    textFieldColors: TextFieldColors,
     onUpdate: (DailyActivity) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -1356,7 +1359,6 @@ private fun ActivityInputRow(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Day of Week") },
-                    colors = textFieldColors,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     singleLine = true
@@ -1377,8 +1379,8 @@ private fun ActivityInputRow(
                 }
             }
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusRedText, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1390,7 +1392,6 @@ private fun ActivityInputRow(
                 value = activity.description,
                 onValueChange = { newDesc -> onUpdate(activity.copy(description = newDesc)) },
                 label = { Text("Activities") },
-                colors = textFieldColors,
                 modifier = Modifier.weight(1.8f)
             )
 
@@ -1398,7 +1399,6 @@ private fun ActivityInputRow(
                 value = activity.remarks,
                 onValueChange = { newRem -> onUpdate(activity.copy(remarks = newRem)) },
                 label = { Text("Remarks") },
-                colors = textFieldColors,
                 modifier = Modifier.weight(1f),
                 singleLine = true
             )

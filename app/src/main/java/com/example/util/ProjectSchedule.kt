@@ -35,6 +35,17 @@ object ProjectSchedule {
         return parse(dateStarted)?.plusDays((contractDurationDays + added).toLong())?.toString()
     }
 
+    /**
+     * Contract duration plus approved order days, else the span from the start to the stored revised date.
+     * Null when neither applies, the dates are unparseable, or the span equals the contract duration.
+     */
+    fun revisedDurationDays(dateStarted: String, contractDurationDays: Int, addedDays: Int, completionDateRevised: String): Int? {
+        if (addedDays > 0) return contractDurationDays + addedDays
+        val start = parse(dateStarted) ?: return null
+        val end = parse(completionDateRevised) ?: return null
+        return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it > 0 && it != contractDurationDays }
+    }
+
     /** Days added to the contract by approved Time Extensions (" - N Days") and Work Suspensions ("Duration: N Days"). */
     fun addedDays(documents: List<PendingDocument>): Int {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
