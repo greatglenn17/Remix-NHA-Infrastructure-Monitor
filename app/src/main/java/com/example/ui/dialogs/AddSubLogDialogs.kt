@@ -341,7 +341,12 @@ fun AddCustomDocumentDialog(
             }
         },
         confirmButton = {
-            Button(enabled = selectedType != "Variation Order" || (voDateValid && voAmountError == null), onClick = {
+            Button(enabled = when (selectedType) {
+                "Variation Order" -> voDateValid && voAmountError == null
+                "Time Extension" -> teDays.isNotBlank() && daysError(teDays) == null
+                "Work Suspension Order" -> wsDays.isNotBlank() && daysError(wsDays) == null
+                else -> true
+            }, onClick = {
                 val finalDocName = when (selectedType) {
                     "Custom Document" -> docName.ifBlank { "New Document" }
                     "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
