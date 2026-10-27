@@ -159,15 +159,12 @@ fun DashboardScreen(
         if (detailPane == null) {
             portfolioList(Modifier.fillMaxSize().padding(paddingValues))
         } else {
-            Row(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                // "New Project" stays with the portfolio list, not over the project pane.
-                Box(modifier = Modifier.width(380.dp).fillMaxHeight()) {
-                    portfolioList(Modifier.fillMaxSize())
-                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { newProjectFab() }
-                }
-                VerticalDivider(color = MaterialTheme.colorScheme.outline)
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detailPane() }
-            }
+            TwoPanes(
+                list = { portfolioList(Modifier.fillMaxSize()) },
+                fab = newProjectFab,
+                detail = detailPane,
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            )
         }
     }
 
@@ -247,5 +244,23 @@ fun DashboardScreen(
                 projects.find { it.id == projId }?.let { onProjectClick(it) }
             }
         )
+    }
+}
+
+/** Portfolio list (380dp, with its "New Project" button) beside the project pane. */
+@Composable
+internal fun TwoPanes(
+    list: @Composable () -> Unit,
+    fab: @Composable () -> Unit,
+    detail: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier) {
+        Box(modifier = Modifier.width(380.dp).fillMaxHeight()) {
+            list()
+            Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
+        }
+        VerticalDivider(color = MaterialTheme.colorScheme.outline)
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detail() }
     }
 }

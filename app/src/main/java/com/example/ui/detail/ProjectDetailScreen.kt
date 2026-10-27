@@ -134,7 +134,9 @@ fun ProjectDetailScreen(
                 onElevateRoleWithProfile = { role, position, office -> viewModel.elevateUserRole(role, position, office) }
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        // Embedded, the portfolio's Scaffold has already padded for the system bars.
+        contentWindowInsets = if (embedded) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets
     ) { paddingValues ->
         Column(
             modifier = Modifier

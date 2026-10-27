@@ -14,6 +14,10 @@ import com.example.data.model.ProjectPayment
 import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
 import com.example.ui.dashboard.NeedsAttentionPane
+import com.example.ui.dashboard.PortfolioContent
+import com.example.ui.dashboard.TwoPanes
+import com.example.ui.viewmodel.PortfolioUiState
+import com.example.util.Portfolio
 import com.example.ui.detail.SectionChips
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.MoneySection
@@ -161,4 +165,33 @@ class ProjectDetailScreenshotTest {
 
     @Config(qualifiers = "w1185dp-h743dp")
     @Test fun tablet_landscape_dark() = sections("1185", AppThemeMode.DARK)
+
+    // The real two-pane row: 380dp portfolio list, divider, project in the remaining width.
+    @Config(qualifiers = "w1185dp-h743dp")
+    @Test fun two_pane_project() {
+        val item = PortfolioItem(project, flags, 0.64f, 6_400_000.0, 10_450_000.0, 1, LocalDate.of(2026, 10, 11))
+        val state = PortfolioUiState(
+            summary = Portfolio.summarize(listOf(item)), attention = Portfolio.attentionQueue(listOf(item)),
+            rows = listOf(item), filter = null, totalProjects = 1
+        )
+        captureRoboImage("src/test/screenshots/detail_two_pane_project_1185_light.png") {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+                    TwoPanes(
+                        list = {
+                            PortfolioContent(
+                                state = state, officeName = "Bulacan District Office",
+                                searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = "All", typeFilter = "All",
+                                typeOptions = listOf("All"), emptyMessage = "" to "",
+                                onFilter = {}, onSearch = {}, onSort = {}, onStatus = {}, onType = {},
+                                onOpen = {}, onEdit = {}, onDelete = {}
+                            )
+                        },
+                        fab = {},
+                        detail = { frame(AppThemeMode.LIGHT) { Money() } }
+                    )
+                }
+            }
+        }
+    }
 }
