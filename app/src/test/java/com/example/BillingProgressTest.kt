@@ -27,4 +27,11 @@ class BillingProgressTest {
         assertNull(BillingProgress.billedFraction(100.0, 0.0))
         assertNull(BillingProgress.billedFraction(100.0, -5.0))
     }
+
+    @Test
+    fun label_saysWhyThereIsNoPercent() {
+        assertEquals("No billings yet", BillingProgress.label(0.0, 1_000_000.0))
+        assertEquals("No contract cost", BillingProgress.label(100.0, 0.0))
+        assertEquals("25.0%", BillingProgress.label(250_000.0, 1_000_000.0))
+    }
 }

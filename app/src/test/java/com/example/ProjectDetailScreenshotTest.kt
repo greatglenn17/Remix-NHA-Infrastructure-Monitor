@@ -90,11 +90,11 @@ class ProjectDetailScreenshotTest {
     )
 
     @Composable
-    private fun frame(mode: AppThemeMode, collapsed: Boolean = false, content: @Composable () -> Unit) {
+    private fun frame(mode: AppThemeMode, collapsed: Boolean = false, onClose: (() -> Unit)? = null, content: @Composable () -> Unit) {
         NHATheme(themeMode = mode) {
             Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                 Column {
-                    ProjectHeader(project, billedFraction = 0.64f, collapsed = collapsed)
+                    ProjectHeader(project, billedTotal = 6_400_000.0, contractCost = 10_000_000.0, collapsed = collapsed, onClose = onClose)
                     Box(modifier = Modifier.weight(1f)) { content() }
                 }
             }
@@ -139,6 +139,7 @@ class ProjectDetailScreenshotTest {
         sections("411", AppThemeMode.LIGHT)
         captureRoboImage("src/test/screenshots/detail_header_collapsed_411_light.png") { frame(AppThemeMode.LIGHT, collapsed = true) { Summary() } }
         captureRoboImage("src/test/screenshots/detail_money_empty_411_light.png") { frame(AppThemeMode.LIGHT) { Money(emptyList(), 0.0) } }
+        captureRoboImage("src/test/screenshots/detail_money_no_cost_411_light.png") { frame(AppThemeMode.LIGHT) { Money(cost = 0.0) } }
     }
 
     @Config(qualifiers = "w411dp-h891dp")
@@ -188,7 +189,7 @@ class ProjectDetailScreenshotTest {
                             )
                         },
                         fab = {},
-                        detail = { frame(AppThemeMode.LIGHT) { Money() } }
+                        detail = { frame(AppThemeMode.LIGHT, onClose = {}) { Money() } }
                     )
                 }
             }

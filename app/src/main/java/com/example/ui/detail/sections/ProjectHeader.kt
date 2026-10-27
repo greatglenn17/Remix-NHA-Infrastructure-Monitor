@@ -3,11 +3,13 @@ package com.example.ui.detail.sections
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -19,11 +21,20 @@ import com.example.ui.dashboard.containerOf
 import com.example.ui.dashboard.formatVariance
 import com.example.ui.dashboard.varianceColor
 import com.example.ui.theme.LocalNHAColors
+import com.example.util.BillingProgress
 import com.example.util.ProjectAttention
 
-/** Name, location, status, variance and the two bars; [collapsed] keeps only one line. */
+/** Name, location, status, variance and the two bars; [collapsed] keeps only one line; [onClose] shows an X (two panes). */
 @Composable
-fun ProjectHeader(project: Project, billedFraction: Float?, collapsed: Boolean, modifier: Modifier = Modifier) {
+fun ProjectHeader(
+    project: Project,
+    billedTotal: Double,
+    contractCost: Double,
+    collapsed: Boolean,
+    modifier: Modifier = Modifier,
+    onClose: (() -> Unit)? = null
+) {
+    val billedFraction = BillingProgress.billedFraction(billedTotal, contractCost)?.takeIf { billedTotal > 0 }
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
     val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
@@ -43,6 +54,11 @@ fun ProjectHeader(project: Project, billedFraction: Float?, collapsed: Boolean, 
                 StatusBadge(project.status, colors)
                 Spacer(Modifier.width(6.dp))
                 Badge(formatVariance(project.variance), varianceColor, containerOf(varianceColor, colors))
+                if (onClose != null) {
+                    IconButton(onClick = onClose, modifier = Modifier.testTag("close_project_button")) {
+                        Icon(Icons.Default.Close, contentDescription = "Close project", tint = scheme.onSurfaceVariant)
+                    }
+                }
             }
             AnimatedVisibility(visible = !collapsed) {
                 Column {
@@ -68,7 +84,7 @@ fun ProjectHeader(project: Project, billedFraction: Float?, collapsed: Boolean, 
                         )
                         ProgressLine(
                             label = "Billed",
-                            value = billedFraction?.let { "%.1f%%".format(it * 100) } ?: "No billings yet",
+                            value = BillingProgress.label(billedTotal, contractCost),
                             fraction = billedFraction ?: 0f,
                             color = scheme.primary,
                             modifier = Modifier.weight(1f)

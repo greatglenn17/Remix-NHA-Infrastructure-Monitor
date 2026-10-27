@@ -24,7 +24,6 @@ import com.example.ui.detail.sections.SummarySection
 import com.example.ui.detail.sections.MoneySection
 import com.example.ui.detail.tabs.*
 import com.example.ui.viewmodel.ProjectViewModel
-import com.example.util.BillingProgress
 import com.example.util.ContractCost
 import com.example.util.ProjectAttention
 import java.time.Instant
@@ -96,7 +95,6 @@ fun ProjectDetailScreen(
 
     val contractCost = ContractCost.current(currentProject.scopeOfWork, currentProject.contractCostOriginal, pendingDocuments)
     val billedTotal = projectPayments.sumOf { it.grossAmount }
-    val billedFraction = BillingProgress.billedFraction(billedTotal, contractCost)?.takeIf { billedTotal > 0 }
 
     // The header folds to one line while the section scrolls up and opens again at the top.
     var headerCollapsed by remember(currentProject.id, section) { mutableStateOf(false) }
@@ -143,7 +141,14 @@ fun ProjectDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            ProjectHeader(project = currentProject, billedFraction = billedFraction, collapsed = headerCollapsed)
+            ProjectHeader(
+                project = currentProject,
+                billedTotal = billedTotal,
+                contractCost = contractCost,
+                collapsed = headerCollapsed,
+                // Two panes have no top bar back arrow.
+                onClose = if (embedded) onBackClick else null
+            )
 
             // Four fixed sections; no sideways scrolling.
             TabRow(selectedTabIndex = section.ordinal, containerColor = MaterialTheme.colorScheme.surface) {
@@ -183,7 +188,8 @@ fun ProjectDetailScreen(
                     ProjectSection.PROGRESS -> Column {
                         val chips = SectionChips.progress(isHousingProject)
                         val chip = SectionChips.chipOrFirst(chips, progressChip)
-                        ChipRow(chips, chip) { progressChip = it }
+                        // A new chip may not scroll, so open the header again.
+                        ChipRow(chips, chip) { progressChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
                             when (chip) {
                                 "Weekly" -> WeeklyReportsTab(
@@ -322,7 +328,7 @@ fun ProjectDetailScreen(
                     ProjectSection.DOCUMENTS -> Column {
                         val chips = SectionChips.documents(canViewAuditLogs)
                         val chip = SectionChips.chipOrFirst(chips, documentsChip)
-                        ChipRow(chips, chip) { documentsChip = it }
+                        ChipRow(chips, chip) { documentsChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
                             when (chip) {
                                 "Checklist" -> PendingDocumentsTab(

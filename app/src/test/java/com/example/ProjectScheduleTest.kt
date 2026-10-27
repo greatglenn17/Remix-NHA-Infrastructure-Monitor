@@ -57,4 +57,15 @@ class ProjectScheduleTest {
     fun revisedCompletion_blankStart_isNull() {
         assertNull(ProjectSchedule.revisedCompletion("", 100, listOf(doc("Time Extension No. 1 - 30 Days", "Approved"))))
     }
+
+    @Test
+    fun addedDays_sumsApprovedOrdersOnly() {
+        val docs = listOf(
+            doc("Time Extension No. 1 - 30 Days", "Approved"),
+            doc("Time Extension No. 2 - 15 Days", "Pending"),
+            doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
+        )
+        assertEquals(40, ProjectSchedule.addedDays(docs))
+        assertEquals(0, ProjectSchedule.addedDays(emptyList()))
+    }
 }

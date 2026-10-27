@@ -16,6 +16,7 @@ import com.example.ui.components.rememberAttachmentPicker
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.detail.tabs.ViewDvScanDialog
+import com.example.util.BillingProgress
 import com.example.utils.CurrencyFormatter
 
 /** Money: billing summary, payments as cards (2 columns from 600dp) and the variation orders log. */
@@ -128,7 +129,7 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
             val billedPct = if (contractCost > 0 && totalBilled > 0) totalBilled / contractCost * 100 else null
             ProgressLine(
                 label = "Billed",
-                value = billedPct?.let { "%.1f%%".format(it) } ?: "No billings yet",
+                value = BillingProgress.label(totalBilled, contractCost),
                 fraction = ((billedPct ?: 0.0) / 100).toFloat(),
                 color = scheme.primary,
                 modifier = Modifier.weight(1f)

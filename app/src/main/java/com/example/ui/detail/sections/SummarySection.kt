@@ -41,9 +41,10 @@ fun SummarySection(
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
         ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
     }
+    val addedDays = remember(documents) { ProjectSchedule.addedDays(documents) }
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> AttentionCard(flags, m) },
-        { m -> KeyDatesCard(project, revisedCompletion, today, m) },
+        { m -> KeyDatesCard(project, revisedCompletion, addedDays, today, m) },
         { m -> CostCard(project, documents, m) },
         { m -> LatestReportCard(latestReport, openIssues, m) },
         { m -> ProfileCard(project, canEditProject, onEditProject, m) }
@@ -68,7 +69,7 @@ private fun AttentionCard(flags: List<AttentionFlag>, modifier: Modifier) {
 }
 
 @Composable
-private fun KeyDatesCard(project: Project, revisedCompletion: String?, today: LocalDate, modifier: Modifier) {
+private fun KeyDatesCard(project: Project, revisedCompletion: String?, addedDays: Int, today: LocalDate, modifier: Modifier) {
     val end = revisedCompletion ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
     val daysLeft = runCatching { ChronoUnit.DAYS.between(today, LocalDate.parse(end.trim())) }.getOrNull()
     SectionCard("Key dates", Icons.Default.Event, modifier) {
@@ -77,6 +78,7 @@ private fun KeyDatesCard(project: Project, revisedCompletion: String?, today: Lo
         // Same date Days left counts down to: approved orders first, else the stored revised date.
         Field("Revised completion", revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-")
         Field("Contract duration", "${CurrencyFormatter.formatNumber(project.contractDurationDays)} days")
+        Field("Revised duration", if (addedDays > 0) "${CurrencyFormatter.formatNumber(project.contractDurationDays + addedDays)} days" else "-")
         Field(
             "Days left",
             when {

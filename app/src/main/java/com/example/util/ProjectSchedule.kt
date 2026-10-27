@@ -30,6 +30,13 @@ object ProjectSchedule {
      * Null when nothing approved adds days or the start date is unparseable.
      */
     fun revisedCompletion(dateStarted: String, contractDurationDays: Int, documents: List<PendingDocument>): String? {
+        val added = addedDays(documents)
+        if (added <= 0) return null
+        return parse(dateStarted)?.plusDays((contractDurationDays + added).toLong())?.toString()
+    }
+
+    /** Days added to the contract by approved Time Extensions (" - N Days") and Work Suspensions ("Duration: N Days"). */
+    fun addedDays(documents: List<PendingDocument>): Int {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
         val extensionDays = approved.filter { it.documentName.contains("Time Extension", ignoreCase = true) }.sumOf {
             Regex(".* - (\\d+) Days", RegexOption.IGNORE_CASE).find(it.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
@@ -37,9 +44,7 @@ object ProjectSchedule {
         val suspensionDays = approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.sumOf {
             Regex("Duration: (\\d+) Days", RegexOption.IGNORE_CASE).find(it.remarks)?.groupValues?.get(1)?.toIntOrNull() ?: 0
         }
-        val added = extensionDays + suspensionDays
-        if (added <= 0) return null
-        return parse(dateStarted)?.plusDays((contractDurationDays + added).toLong())?.toString()
+        return extensionDays + suspensionDays
     }
 
     private fun parse(date: String): LocalDate? = try {
