@@ -875,7 +875,8 @@ fun SubdivisionPlanTab(
                 val viewportHeight = constraints.maxHeight.toFloat()
                 val nhaMap = LocalNHAColors.current
                 val primaryMap = MaterialTheme.colorScheme.primary
-                val onSurfaceMap = MaterialTheme.colorScheme.onSurface
+                // Labels sit on the PDF page (light paper in both themes) or on the themed backdrop.
+                val onSurfaceMap = if (renderedBitmap != null) Color.Black else MaterialTheme.colorScheme.onSurface
                 val surfaceColor = MaterialTheme.colorScheme.surface
                 val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
 
@@ -2399,11 +2400,8 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
                 Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
                 LegendRow(color = getLotProgressFillColor(0), label = "0% / Layout / Excavation Started")
-                LegendRow(color = getLotProgressFillColor(10), label = "1 – 20% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(30), label = "21 – 40% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(50), label = "41 – 60% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(70), label = "61 – 80% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(90), label = "81 – 99% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(20), label = "1 – 40% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(70), label = "41 – 99% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(100), label = "100% Completed")
 
                 Spacer(modifier = Modifier.height(6.dp))
