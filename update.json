@@ -1,8 +1,8 @@
 {
-  "versionCode": 171,
-  "versionName": "1.7.1",
-  "releaseNotes": "v1.7.1: The phone's Back button inside a project now returns to the Portfolio home instead of closing the app.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.7.1/NHA_Monitor_v1.7.1_Build171.apk",
-  "apkSha256": "35abd211c65300d785e8444c1923f79064bfd8ef2ecaa3727ea56e305071e801",
+  "versionCode": 192,
+  "versionName": "1.9.2",
+  "releaseNotes": "v1.9.2: The Super Admin now gives roles in the app (Manage users & roles). Sign-in no longer asks for a role, the admin PIN and instant password reset are gone, and Viewers no longer see billing or weekly-report add buttons.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.2/NHA_Monitor_v1.9.2_Build192.apk",
+  "apkSha256": "30438206272d64f4737e721a03ce68c89e15d8c511da35d180622282e78e4c74",
   "isMandatory": true
 }
