@@ -1,5 +1,6 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,12 +16,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.*
 import com.example.ui.theme.*
@@ -34,7 +33,7 @@ fun WeeklyReportsTab(
     onEditWeeklyReportClick: (WeeklyReport) -> Unit,
     onDeleteWeeklyReportClick: (WeeklyReport) -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (weeklyReports.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -46,13 +45,13 @@ fun WeeklyReportsTab(
                     Icon(
                         imageVector = Icons.Default.EventNote,
                         contentDescription = null,
-                        tint = DarkTextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "No Weekly Engineer Reports Submitted Yet",
-                        style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
@@ -81,7 +80,7 @@ fun WeeklyReportsTab(
                             text = "NHA WEEKLY PROJECT ENGINEER'S REPORT",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DarkTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -118,9 +117,9 @@ private fun WeeklyReportCard(
     val grandTotalManpower = remember(manpowerList) { manpowerList.sumOf { it.count } }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, DarkBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -143,34 +142,34 @@ private fun WeeklyReportCard(
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = DarkTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) {
                                 IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = DarkTextSecondary, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
                                 }
                             }
                             if (currentUserRole.hasPermission(Permission.DELETE_REPORT)) {
                                 var showDeleteConfirm by remember { mutableStateOf(false) }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusRedText, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(24.dp))
                                 }
                                 
                                 if (showDeleteConfirm) {
                                     AlertDialog(
                                         onDismissRequest = { showDeleteConfirm = false },
                                         title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
-                                        text = { Text("Are you sure you want to delete this report?", color = DarkTextPrimary) },
+                                        text = { Text("Are you sure you want to delete this report?", color = MaterialTheme.colorScheme.onSurface) },
                                         confirmButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = StatusRedText) }
+                                            TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = LocalNHAColors.current.behind) }
                                         },
                                         dismissButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = DarkTextSecondary) }
+                                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                         },
-                                        containerColor = DarkSurface
+                                        containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 }
                             }
@@ -179,20 +178,20 @@ private fun WeeklyReportCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Submitted by: ${report.submittedByStaff}  |  Elapsed: ${report.daysElapsed}d, Remaining: ${report.remainingDays}d",
-                        style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                 }
 
                 Surface(
-                    color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) StatusGreenBg else StatusRedBg,
+                    color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
                     shape = RoundedCornerShape(50.dp),
-                    border = BorderStroke(1.dp, if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) StatusGreenBorder else StatusRedBorder)
+                    border = BorderStroke(1.dp, if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrack.copy(alpha = 0.4f) else LocalNHAColors.current.behind.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = "Actual: ${"%.1f".format(report.actualAccomplishmentPct)}%",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) StatusGreenText else StatusRedText
+                            color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
                         ),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
@@ -202,25 +201,25 @@ private fun WeeklyReportCard(
                     Icon(
                         imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = "Expand",
-                        tint = DarkTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
-                    HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(bottom = 12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(bottom = 12.dp))
 
                     val parsedAccItems = remember(report.accomplishmentItemsJson) { parseAccomplishmentItemsList(report.accomplishmentItemsJson) }
 
                     // 1. Weekly Accomplishment Status (Scope of Works)
                     Text(
                         text = "1. Weekly Accomplishment Status",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
-                        color = DarkSurfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -229,27 +228,27 @@ private fun WeeklyReportCard(
                                 parsedAccItems.forEach { acc ->
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
-                                        Text("T: ${"%.1f".format(acc.targetPct)}%", color = DarkTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("A: ${"%.1f".format(acc.actualPct)}%", color = DarkTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) WeatherFairGreen else StatusRedText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
+                                        Text("T: ${"%.1f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                        Text("A: ${"%.1f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                        Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) WeatherFairGreen else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                 }
-                                HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(vertical = 4.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 4.dp))
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text("GRAND TOTAL", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                                Text("T: ${"%.2f".format(report.targetAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = DarkTextPrimary))
-                                Text("A: ${"%.2f".format(report.actualAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary))
+                                Text("T: ${"%.2f".format(report.targetAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("A: ${"%.2f".format(report.actualAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                                 val varPct = report.actualAccomplishmentPct - report.targetAccomplishmentPct
                                 Text(
                                     "V: ${if (varPct >= 0) "+${"%.2f".format(varPct)}" else "%.2f".format(varPct)}%",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = if (varPct >= 0) StatusGreenText else StatusRedText
+                                        color = if (varPct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
                                     )
                                 )
                             }
@@ -263,14 +262,14 @@ private fun WeeklyReportCard(
 
                     Text(
                         text = "2. Activities of the Week",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Surface(
-                        color = DarkSurface,
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (parsedActivities.isNotEmpty()) {
@@ -278,14 +277,14 @@ private fun WeeklyReportCard(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(DarkSurfaceVariant)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
-                                    Text("DAY OF WEEK", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1.1f))
-                                    Text("ACTIVITIES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(2f))
-                                    Text("REMARKS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1f))
+                                    Text("DAY OF WEEK", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.1f))
+                                    Text("ACTIVITIES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f))
+                                    Text("REMARKS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                 }
-                                HorizontalDivider(color = DarkBorder)
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                                 parsedActivities.forEachIndexed { index, act ->
                                     Row(
@@ -295,18 +294,18 @@ private fun WeeklyReportCard(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(act.day, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1.1f))
-                                        Text(act.description, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary), modifier = Modifier.weight(2f))
-                                        Text(act.remarks.ifEmpty { "-" }, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary), modifier = Modifier.weight(1f))
+                                        Text(act.description, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f))
+                                        Text(act.remarks.ifEmpty { "-" }, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                     }
                                     if (index < parsedActivities.size - 1) {
-                                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                                     }
                                 }
                             }
                         } else {
                             Text(
                                 text = report.activitiesJson,
-                                style = MaterialTheme.typography.bodyMedium.copy(color = DarkTextPrimary),
+                                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                                 modifier = Modifier.padding(12.dp)
                             )
                         }
@@ -317,14 +316,14 @@ private fun WeeklyReportCard(
                     // 3. Manpower Summary Table
                     Text(
                         text = "3. Manpower Summary Table",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Surface(
-                        color = DarkSurface,
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -333,20 +332,20 @@ private fun WeeklyReportCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(IntrinsicSize.Min)
-                                    .background(DarkSurfaceVariant)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("DESIGNATION", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                Text("NO. OF PERSONNEL", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("DESIGNATION", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                Text("NO. OF PERSONNEL", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = DarkBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                             // Rows
                             if (manpowerList.isEmpty()) {
-                                Text("No manpower logged.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary), modifier = Modifier.padding(12.dp))
+                                Text("No manpower logged.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(12.dp))
                             } else {
                                 manpowerList.forEachIndexed { idx, item ->
                                     Row(
@@ -357,29 +356,29 @@ private fun WeeklyReportCard(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(item.designation, style = MaterialTheme.typography.bodyMedium.copy(color = DarkTextPrimary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                        Text(item.designation, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < manpowerList.lastIndex) {
-                                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                                     }
                                 }
                             }
 
                             // Grand Total Row
-                            HorizontalDivider(color = DarkBorder, thickness = 1.5.dp)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.5.dp)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(IntrinsicSize.Min)
-                                    .background(DarkSurfaceVariant)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                                 Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                         }
@@ -390,14 +389,14 @@ private fun WeeklyReportCard(
                     // 4. Equipment Summary Table
                     Text(
                         text = "4. Equipment Summary Table",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Surface(
-                        color = DarkSurface,
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -406,21 +405,21 @@ private fun WeeklyReportCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(IntrinsicSize.Min)
-                                    .background(DarkSurfaceVariant)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("NAME OF EQUIPMENT", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                Text("NO.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                Text("REMARKS / STATUS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1.3f).padding(horizontal = 12.dp))
+                                Text("NAME OF EQUIPMENT", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                Text("NO.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                Text("REMARKS / STATUS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.3f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = DarkBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                             if (equipmentList.isEmpty()) {
-                                Text("No equipment logged.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary), modifier = Modifier.padding(12.dp))
+                                Text("No equipment logged.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(12.dp))
                             } else {
                                 equipmentList.forEachIndexed { idx, item ->
                                     Row(
@@ -431,16 +430,16 @@ private fun WeeklyReportCard(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(item.description, style = MaterialTheme.typography.bodyMedium.copy(color = DarkTextPrimary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                                        Text(item.description, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
 
                                         val (bgColor, textColor, borderColor) = when (item.status.trim()) {
-                                            "Operational" -> Triple(StatusGreenBg, StatusGreenText, StatusGreenBorder)
-                                            "Idle" -> Triple(StatusOrangeBg, StatusOrangeText, StatusOrangeBorder)
-                                            "For Repair" -> Triple(StatusRedBg, StatusRedText, StatusRedBorder)
-                                            else -> Triple(DarkSurfaceVariant, DarkTextPrimary, DarkBorder)
+                                            "Operational" -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
+                                            "Idle" -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
+                                            "For Repair" -> Triple(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind, LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                                            else -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outline)
                                         }
 
                                         Box(
@@ -461,7 +460,7 @@ private fun WeeklyReportCard(
                                         }
                                     }
                                     if (idx < equipmentList.lastIndex) {
-                                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                                     }
                                 }
                             }
@@ -473,14 +472,14 @@ private fun WeeklyReportCard(
                     // 5. Issues Encountered / Action Taken Table
                     Text(
                         text = "5. Issues Encountered / Action Taken",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Surface(
-                        color = DarkSurface,
+                        color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column {
@@ -489,19 +488,19 @@ private fun WeeklyReportCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(IntrinsicSize.Min)
-                                    .background(DarkSurfaceVariant)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("ISSUES ENCOUNTERED", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                Text("ACTION TAKEN", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextSecondary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("ISSUES ENCOUNTERED", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                Text("ACTION TAKEN", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
-                            HorizontalDivider(color = DarkBorder)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                             if (issuesList.isEmpty()) {
-                                Text("No issues encountered for this reporting period.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary), modifier = Modifier.padding(12.dp))
+                                Text("No issues encountered for this reporting period.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.padding(12.dp))
                             } else {
                                 issuesList.forEachIndexed { idx, item ->
                                     Row(
@@ -512,12 +511,12 @@ private fun WeeklyReportCard(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(item.description, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
-                                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                        Text(item.actionTaken, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary, fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                        Text(item.description, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                                        Text(item.actionTaken, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < issuesList.lastIndex) {
-                                        HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                                     }
                                 }
                             }
@@ -529,7 +528,7 @@ private fun WeeklyReportCard(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (photos.size > 1) "Attached Site Photos (${photos.size}, all in the Photos tab):" else "Attached Site Photo:",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         )
                         run {
                             AsyncImage(

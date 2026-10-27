@@ -1,5 +1,6 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,7 +56,7 @@ fun IssuesTab(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(DarkBackground)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -67,11 +67,11 @@ fun IssuesTab(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("Search issues or actions taken...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = DarkTextSecondary) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = DarkTextSecondary)
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
@@ -81,11 +81,11 @@ fun IssuesTab(
                     .testTag("search_issues_input"),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = DarkBorder,
-                    focusedContainerColor = DarkSurface,
-                    unfocusedContainerColor = DarkSurface,
-                    focusedTextColor = DarkTextPrimary,
-                    unfocusedTextColor = DarkTextPrimary
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
 
@@ -106,13 +106,13 @@ fun IssuesTab(
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
                             selectedLabelColor = MaterialTheme.colorScheme.primary,
-                            containerColor = DarkSurface,
-                            labelColor = DarkTextSecondary
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
                             selected = selectedFilter == filter,
-                            borderColor = DarkBorder,
+                            borderColor = MaterialTheme.colorScheme.outline,
                             selectedBorderColor = MaterialTheme.colorScheme.primary
                         )
                     )
@@ -129,11 +129,11 @@ fun IssuesTab(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(56.dp), tint = DarkTextSecondary)
+                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = if (searchQuery.isNotEmpty() || selectedFilter != "All") "No matching issues found" else "No Issues Logged",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         )
                     }
                 }
@@ -180,10 +180,10 @@ fun IssueCard(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val borderColor = if (issue.isCritical) StatusRedBorder else DarkBorder
+    val borderColor = if (issue.isCritical) LocalNHAColors.current.behind.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline
 
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, borderColor),
         modifier = Modifier.fillMaxWidth()
@@ -202,7 +202,7 @@ fun IssueCard(
                     Icon(
                         imageVector = Icons.Default.Event,
                         contentDescription = null,
-                        tint = DarkTextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -210,7 +210,7 @@ fun IssueCard(
                         text = issue.date,
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = DarkTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -223,15 +223,15 @@ fun IssueCard(
                 ) {
                     if (issue.isCritical) {
                         Surface(
-                            color = StatusRedBg,
+                            color = LocalNHAColors.current.behindContainer,
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(1.dp, StatusRedBorder)
+                            border = BorderStroke(1.dp, LocalNHAColors.current.behind.copy(alpha = 0.4f))
                         ) {
                             Text(
                                 text = "CRITICAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = StatusRedText,
+                                    color = LocalNHAColors.current.behind,
                                     fontSize = 10.sp
                                 ),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -240,9 +240,9 @@ fun IssueCard(
                     }
 
                     val (statusBg, statusText, statusBorder) = when {
-                        issue.status.contains("Resolved", ignoreCase = true) -> Triple(StatusGreenBg, StatusGreenText, StatusGreenBorder)
-                        issue.status.contains("Critical", ignoreCase = true) -> Triple(StatusRedBg, StatusRedText, StatusRedBorder)
-                        else -> Triple(StatusOrangeBg, StatusOrangeText, StatusOrangeBorder)
+                        issue.status.contains("Resolved", ignoreCase = true) -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
+                        issue.status.contains("Critical", ignoreCase = true) -> Triple(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind, LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                        else -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
                     }
 
                     Surface(
@@ -264,7 +264,7 @@ fun IssueCard(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(10.dp))
 
             // Issue Description (Full multiline wrapping)
@@ -272,7 +272,7 @@ fun IssueCard(
                 text = "ISSUE DESCRIPTION",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = DarkTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -302,7 +302,7 @@ fun IssueCard(
                 Text(
                     text = issue.actionTaken,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        color = DarkTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 20.sp
                     ),
                     softWrap = true,
@@ -318,14 +318,14 @@ fun IssueCard(
                     text = "REMARKS / NOTES",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
-                        color = DarkTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = issue.remarks,
                     style = MaterialTheme.typography.bodySmall.copy(
-                        color = DarkTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     ),
                     softWrap = true,
@@ -336,7 +336,7 @@ fun IssueCard(
 
             // Footer: Logged By & Action Buttons
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = DarkBorder.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
@@ -348,7 +348,7 @@ fun IssueCard(
                     Text(
                         text = "Logged by: ${issue.loggedBy}",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = DarkTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         ),
                         softWrap = true,
@@ -371,7 +371,7 @@ fun IssueCard(
                     }
                     if (currentUserRole.hasPermission(Permission.DELETE_ISSUE)) {
                         IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete Issue", tint = StatusRedText, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Issue", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -386,17 +386,17 @@ fun IssueCard(
             text = { Text("Are you sure you want to delete this issue entry? This action cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) {
-                    Text("Delete", color = StatusRedText, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = LocalNHAColors.current.behind, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel", color = DarkTextSecondary)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            containerColor = DarkSurface,
+            containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = DarkTextSecondary
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

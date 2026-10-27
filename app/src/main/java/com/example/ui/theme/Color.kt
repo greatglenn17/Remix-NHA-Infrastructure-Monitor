@@ -24,32 +24,14 @@ data class NHAColors(
     val isDark: Boolean
 )
 
-// Executive Dark Theme Palette
-val StaticDarkBackground = Color(0xFF090D16)      // Deep black-slate canvas background
-val StaticDarkSurface = Color(0xFF151C28)         // Sleek dark card container
-val StaticDarkSurfaceVariant = Color(0xFF222B3B)  // Dark input field / chip background
-val StaticDarkTextPrimary = Color(0xFFF8FAFC)     // Crisp white primary text
-val StaticDarkTextSecondary = Color(0xFF94A3B8)   // Clean muted text
-val StaticDarkBorder = Color(0xFF334155)          // Crisp dark outline border
-val StaticDarkCardHeader = Color(0xFF1E293B)
-
-// Executive Light Theme Palette
-val StaticLightBackground = Color(0xFFF8FAFC)     // Crisp light slate background
-val StaticLightSurface = Color(0xFFFFFFFF)        // Clean white card background
-val StaticLightSurfaceVariant = Color(0xFFE2E8F0) // Light input field / chip background
-val StaticLightTextPrimary = Color(0xFF0F172A)    // Crisp dark slate primary text
-val StaticLightTextSecondary = Color(0xFF475569)  // Clean muted slate text
-val StaticLightBorder = Color(0xFFE2E8F0)         // Clean light outline border
-val StaticLightCardHeader = Color(0xFFE2E8F0)
-
 val DarkNHAColors = NHAColors(
-    background = StaticDarkBackground,
-    surface = StaticDarkSurface,
-    surfaceVariant = StaticDarkSurfaceVariant,
-    textPrimary = StaticDarkTextPrimary,
-    textSecondary = StaticDarkTextSecondary,
-    border = StaticDarkBorder,
-    cardHeader = StaticDarkCardHeader,
+    background = Color(0xFF090D16),
+    surface = Color(0xFF151C28),
+    surfaceVariant = Color(0xFF222B3B),
+    textPrimary = Color(0xFFF8FAFC),
+    textSecondary = Color(0xFF94A3B8),
+    border = Color(0xFF334155),
+    cardHeader = Color(0xFF1E293B),
     onTrack = Color(0xFF4ADE80),
     watch = Color(0xFFFBBF24),
     behind = Color(0xFFFCA5A5),
@@ -62,13 +44,13 @@ val DarkNHAColors = NHAColors(
 )
 
 val LightNHAColors = NHAColors(
-    background = StaticLightBackground,
-    surface = StaticLightSurface,
-    surfaceVariant = StaticLightSurfaceVariant,
-    textPrimary = StaticLightTextPrimary,
-    textSecondary = StaticLightTextSecondary,
-    border = StaticLightBorder,
-    cardHeader = StaticLightCardHeader,
+    background = Color(0xFFF8FAFC),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFE2E8F0),
+    textPrimary = Color(0xFF0F172A),
+    textSecondary = Color(0xFF475569),
+    border = Color(0xFFE2E8F0),
+    cardHeader = Color(0xFFE2E8F0),
     onTrack = Color(0xFF15803D),
     watch = Color(0xFFB45309),
     behind = Color(0xFFB91C1C),
@@ -81,80 +63,6 @@ val LightNHAColors = NHAColors(
 )
 
 val LocalNHAColors = staticCompositionLocalOf { DarkNHAColors }
-
-// Dynamic Theme Getters for Seamless Composable UI Adaptation
-val DarkBackground: Color
-    @Composable get() = LocalNHAColors.current.background
-
-val DarkSurface: Color
-    @Composable get() = LocalNHAColors.current.surface
-
-val DarkSurfaceVariant: Color
-    @Composable get() = LocalNHAColors.current.surfaceVariant
-
-val DarkTextPrimary: Color
-    @Composable get() = LocalNHAColors.current.textPrimary
-
-val DarkTextSecondary: Color
-    @Composable get() = LocalNHAColors.current.textSecondary
-
-val DarkBorder: Color
-    @Composable get() = LocalNHAColors.current.border
-
-val DarkCardHeader: Color
-    @Composable get() = LocalNHAColors.current.cardHeader
-
-// Accent Colors
-val NavyPrimary = Color(0xFF38BDF8)
-val NavySecondary = Color(0xFF1E293B)
-val GoldAccent = Color(0xFFF59E0B)
-val ErrorRed = Color(0xFFEF4444)
-val NhaBlue = Color(0xFF0284C7)
-val GreenAccent = Color(0xFF22C55E)
-
-// Dynamic Color Tokens
-val GeoBackground: Color @Composable get() = LocalNHAColors.current.background
-val GeoTextPrimary: Color @Composable get() = LocalNHAColors.current.textPrimary
-val GeoTextSecondary: Color @Composable get() = LocalNHAColors.current.textSecondary
-val GeoNeutralBg: Color @Composable get() = LocalNHAColors.current.surfaceVariant
-val GeoNeutralBorder: Color @Composable get() = LocalNHAColors.current.border
-
-val BackgroundLight: Color @Composable get() = LocalNHAColors.current.background
-val SurfaceLight: Color @Composable get() = LocalNHAColors.current.surface
-val SurfaceVariantLight: Color @Composable get() = LocalNHAColors.current.surfaceVariant
-
-// Status Indicators (Theme Adaptive)
-// Green (On-Track / Positive)
-val StatusGreenBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF062C1E) else Color(0xFFDCFCE7)
-val StatusGreenBorder: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF166534) else Color(0xFF86EFAC)
-val StatusGreenText: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF4ADE80) else Color(0xFF15803D)
-val StatusGreenSubtext: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF86EFAC) else Color(0xFF166534)
-val StatusGreenBarBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF064E3B) else Color(0xFFBBF7D0)
-val StatusGreenBarFill = Color(0xFF22C55E)
-
-// Red (Critical / Slippage)
-val StatusRedBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF371215) else Color(0xFFFEE2E2)
-val StatusRedBorder: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF991B1B) else Color(0xFFFCA5A5)
-val StatusRedText: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFFCA5A5) else Color(0xFFB91C1C)
-val StatusRedSubtext: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFFECACA) else Color(0xFF991B1B)
-val StatusRedBarBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF7F1D1D) else Color(0xFFFECACA)
-val StatusRedBarFill = Color(0xFFEF4444)
-
-// Orange (Behind Schedule)
-val StatusOrangeBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF331D08) else Color(0xFFFFEDD5)
-val StatusOrangeBorder: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF9A3412) else Color(0xFFFDBA74)
-val StatusOrangeText: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFFDBA74) else Color(0xFFC2410C)
-val StatusOrangeSubtext: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFFED7AA) else Color(0xFF9A3412)
-val StatusOrangeBarBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF7C2D12) else Color(0xFFFED7AA)
-val StatusOrangeBarFill = Color(0xFFF97316)
-
-// Gray (Suspended / Neutral)
-val StatusGrayBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF18181B) else Color(0xFFF4F4F5)
-val StatusGrayBorder: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF3F3F46) else Color(0xFFD4D4D8)
-val StatusGrayText: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFE4E4E7) else Color(0xFF3F3F46)
-val StatusGraySubtext: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFFA1A1AA) else Color(0xFF71717A)
-val StatusGrayBarBg: Color @Composable get() = if (LocalNHAColors.current.isDark) Color(0xFF27272A) else Color(0xFFE4E4E7)
-val StatusGrayBarFill = Color(0xFF71717A)
 
 // Weather Condition Colors
 val WeatherFairGreen = Color(0xFF22C55E)

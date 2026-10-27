@@ -1,12 +1,10 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,22 +13,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import coil.compose.AsyncImage
 import com.example.data.model.*
 import com.example.ui.theme.*
-import java.text.NumberFormat
-import java.util.Locale
 
 // Add and view dialogs for related documents, used by Documents › Files; they move to the theme in v1.9.0.
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,8 +94,7 @@ fun AddRelatedDocumentDialog(
                     )
                     DropdownMenu(
                         expanded = showPresetDropdown,
-                        onDismissRequest = { showPresetDropdown = false },
-                        
+                        onDismissRequest = { showPresetDropdown = false }
                     ) {
                         presetDocumentTypes.forEach { option ->
                             DropdownMenuItem(
@@ -164,8 +154,7 @@ fun AddRelatedDocumentDialog(
                     )
                     DropdownMenu(
                         expanded = showStatusDropdown,
-                        onDismissRequest = { showStatusDropdown = false },
-                        
+                        onDismissRequest = { showStatusDropdown = false }
                     ) {
                         listOf("Approved", "Notarized", "Signed", "Submitted", "Pending").forEach { option ->
                             DropdownMenuItem(

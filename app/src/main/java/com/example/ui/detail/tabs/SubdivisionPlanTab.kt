@@ -1,5 +1,7 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.NHAColors
+import com.example.ui.theme.LocalNHAColors
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
@@ -140,18 +142,17 @@ fun isLotMatchingFilter(
     return true
 }
 
-fun getLotProgressFillColor(progress: Int): Color {
-    return when {
-        progress == 0 -> Color(0xFFEF4444)
-        progress in 1..20 -> Color(0xFFF97316)
-        progress in 21..40 -> Color(0xFFEAB308)
-        progress in 41..60 -> Color(0xFF22C55E)
-        progress in 61..80 -> Color(0xFFEC4899)
-        progress in 81..99 -> Color(0xFF3B82F6)
-        progress >= 100 -> Color(0xFF10B981)
-        else -> Color(0xFFEF4444)
-    }
+fun lotProgressFill(progress: Int, nha: NHAColors, inProgress: Color): Color = when {
+    progress == 0 -> nha.behind
+    progress in 1..40 -> nha.watch
+    progress in 41..99 -> inProgress
+    progress >= 100 -> nha.onTrack
+    else -> nha.behind
 }
+
+@Composable
+fun getLotProgressFillColor(progress: Int): Color =
+    lotProgressFill(progress, LocalNHAColors.current, MaterialTheme.colorScheme.primary)
 
 // --- GEOMETRY & MATH UTILITIES ---
 fun normalizedToJson(points: List<Offset>): String {
@@ -450,14 +451,14 @@ fun SubdivisionPlanTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(12.dp)
     ) {
         // --- TOP TOOLBAR & HEADER ---
         Surface(
-            color = DarkSurfaceVariant,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, DarkBorder),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp)
@@ -472,7 +473,7 @@ fun SubdivisionPlanTab(
                         Text(
                             text = "SUBDIVISION PLAN",
                             style = MaterialTheme.typography.titleSmall.copy(
-                                color = DarkTextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                         )
@@ -482,7 +483,7 @@ fun SubdivisionPlanTab(
                             } else {
                                 "No Approved Site Development Plan Uploaded"
                             },
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8))
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
                         )
                     }
 
@@ -491,15 +492,15 @@ fun SubdivisionPlanTab(
                             onClick = { showLegendDialog = true },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Icon(Icons.Default.Palette, contentDescription = "Legend", tint = Color(0xFFF59E0B), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Palette, contentDescription = "Legend", tint = LocalNHAColors.current.watch, modifier = Modifier.size(18.dp))
                         }
 
                         if (canManageSdp) {
                             Button(
                                 onClick = { showUploadDialog = true },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF38BDF8),
-                                    contentColor = Color.Black
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 shape = RoundedCornerShape(6.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -524,11 +525,11 @@ fun SubdivisionPlanTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        KpiChip(label = "TOTAL LOTS", value = "$totalLots", color = DarkTextPrimary, modifier = Modifier.weight(1f))
-                        KpiChip(label = "BILLED", value = "$billedLotsCount", color = Color(0xFF38BDF8), modifier = Modifier.weight(1f))
-                        KpiChip(label = "NOT BILLED", value = "$notBilledLotsCount", color = Color(0xFF94A3B8), modifier = Modifier.weight(1f))
-                        KpiChip(label = "COMPLETED", value = "$completedLotsCount", color = Color(0xFF10B981), modifier = Modifier.weight(1f))
-                        KpiChip(label = "AVG PROGRESS", value = String.format("%.1f%%", avgPhysicalProgress), color = Color(0xFFEAB308), modifier = Modifier.weight(1.2f))
+                        KpiChip(label = "TOTAL LOTS", value = "$totalLots", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        KpiChip(label = "BILLED", value = "$billedLotsCount", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                        KpiChip(label = "NOT BILLED", value = "$notBilledLotsCount", color = LocalNHAColors.current.neutral, modifier = Modifier.weight(1f))
+                        KpiChip(label = "COMPLETED", value = "$completedLotsCount", color = LocalNHAColors.current.onTrack, modifier = Modifier.weight(1f))
+                        KpiChip(label = "AVG PROGRESS", value = String.format("%.1f%%", avgPhysicalProgress), color = LocalNHAColors.current.watch, modifier = Modifier.weight(1.2f))
                     }
                 }
 
@@ -544,28 +545,28 @@ fun SubdivisionPlanTab(
                         if (sdpPlans.size > 1) {
                             var dropdownExpanded by remember { mutableStateOf(false) }
                             Surface(
-                                color = DarkSurface,
+                                color = MaterialTheme.colorScheme.surface,
                                 shape = RoundedCornerShape(6.dp),
-                                border = BorderStroke(1.dp, DarkBorder),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable { dropdownExpanded = true }
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.History, contentDescription = "Version", tint = DarkTextSecondary, modifier = Modifier.size(12.dp))
+                                    Icon(Icons.Default.History, contentDescription = "Version", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "v${activeSdpPlan.version}",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = DarkTextPrimary)
+                                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurface)
                                     )
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown", tint = DarkTextSecondary)
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
 
                                 DropdownMenu(
                                     expanded = dropdownExpanded,
                                     onDismissRequest = { dropdownExpanded = false },
-                                    modifier = Modifier.background(DarkSurfaceVariant)
+                                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
                                     sdpPlans.forEach { plan ->
                                         DropdownMenuItem(
@@ -573,7 +574,7 @@ fun SubdivisionPlanTab(
                                                 Text(
                                                     text = "v${plan.version} - ${plan.planName} ${if (plan.isActive) "(Active)" else ""}",
                                                     style = MaterialTheme.typography.bodySmall.copy(
-                                                        color = if (plan.isActive) Color(0xFF38BDF8) else DarkTextPrimary
+                                                        color = if (plan.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 )
                                             },
@@ -589,9 +590,9 @@ fun SubdivisionPlanTab(
 
                         // Mode Segmented Buttons
                         Surface(
-                            color = DarkSurface,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, DarkBorder)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                         ) {
                             Row(modifier = Modifier.padding(2.dp)) {
                                 Button(
@@ -600,8 +601,8 @@ fun SubdivisionPlanTab(
                                         draftPoints.clear()
                                     },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (interactionMode == SdpInteractionMode.MONITORING) Color(0xFF0F172A) else Color.Transparent,
-                                        contentColor = if (interactionMode == SdpInteractionMode.MONITORING) Color(0xFF38BDF8) else DarkTextSecondary
+                                        containerColor = if (interactionMode == SdpInteractionMode.MONITORING) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                        contentColor = if (interactionMode == SdpInteractionMode.MONITORING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     shape = RoundedCornerShape(6.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -619,8 +620,8 @@ fun SubdivisionPlanTab(
                                             draftPoints.clear()
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (interactionMode != SdpInteractionMode.MONITORING) Color(0xFFF59E0B) else Color.Transparent,
-                                            contentColor = if (interactionMode != SdpInteractionMode.MONITORING) Color.Black else DarkTextSecondary
+                                            containerColor = if (interactionMode != SdpInteractionMode.MONITORING) LocalNHAColors.current.watch else Color.Transparent,
+                                            contentColor = if (interactionMode != SdpInteractionMode.MONITORING) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -645,9 +646,9 @@ fun SubdivisionPlanTab(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Surface(
-                            color = DarkSurface,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, if (searchQuery.isNotEmpty()) Color(0xFF38BDF8) else DarkBorder),
+                            border = BorderStroke(1.dp, if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(42.dp)
@@ -661,7 +662,7 @@ fun SubdivisionPlanTab(
                                 Icon(
                                     imageVector = Icons.Default.Search,
                                     contentDescription = "Search",
-                                    tint = Color(0xFF38BDF8),
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -673,7 +674,7 @@ fun SubdivisionPlanTab(
                                         Text(
                                             text = "Search Block / Lot / Unit...",
                                             style = MaterialTheme.typography.bodyMedium.copy(
-                                                color = DarkTextSecondary,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontSize = 12.sp
                                             )
                                         )
@@ -683,11 +684,11 @@ fun SubdivisionPlanTab(
                                         onValueChange = { searchQuery = it },
                                         singleLine = true,
                                         textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                            color = DarkTextPrimary,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold
                                         ),
-                                        cursorBrush = SolidColor(Color(0xFF38BDF8)),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
@@ -699,7 +700,7 @@ fun SubdivisionPlanTab(
                                         Icon(
                                             imageVector = Icons.Default.Close,
                                             contentDescription = "Clear",
-                                            tint = DarkTextSecondary,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(14.dp)
                                         )
                                     }
@@ -710,17 +711,17 @@ fun SubdivisionPlanTab(
                         // Filter Toggle Button
                         OutlinedButton(
                             onClick = { showFilterPanel = !showFilterPanel },
-                            border = BorderStroke(1.dp, if (isFilterActive) Color(0xFFF59E0B) else DarkBorder),
+                            border = BorderStroke(1.dp, if (isFilterActive) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outline),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (isFilterActive) Color(0xFFF59E0B).copy(alpha = 0.15f) else DarkSurface
+                                containerColor = if (isFilterActive) LocalNHAColors.current.watch.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                             ),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                             modifier = Modifier.height(42.dp)
                         ) {
-                            Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = if (isFilterActive) Color(0xFFF59E0B) else DarkTextSecondary, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = if (isFilterActive) LocalNHAColors.current.watch else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("FILTER", fontSize = 11.sp, color = if (isFilterActive) Color(0xFFF59E0B) else DarkTextPrimary, fontWeight = FontWeight.Bold)
+                            Text("FILTER", fontSize = 11.sp, color = if (isFilterActive) LocalNHAColors.current.watch else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -728,13 +729,13 @@ fun SubdivisionPlanTab(
                     if (showFilterPanel) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Surface(
-                            color = DarkSurface,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, DarkBorder),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("FILTER SUBDIVISION LOTS", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                                Text("FILTER SUBDIVISION LOTS", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     // Progress Filter Dropdown
@@ -792,13 +793,13 @@ fun SubdivisionPlanTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
-                                color = Color(0xFFF59E0B).copy(alpha = 0.20f),
+                                color = LocalNHAColors.current.watch.copy(alpha = 0.20f),
                                 shape = RoundedCornerShape(4.dp),
-                                border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                                border = BorderStroke(1.dp, LocalNHAColors.current.watch)
                             ) {
                                 Text(
                                     text = "● FILTER ACTIVE: ${matchingLots.size} OF $totalLots LOTS MATCHING",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.watch, fontWeight = FontWeight.Bold),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
@@ -812,7 +813,7 @@ fun SubdivisionPlanTab(
                                 },
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                             ) {
-                                Text("CLEAR FILTERS", fontSize = 10.sp, color = StatusRedText, fontWeight = FontWeight.Bold)
+                                Text("CLEAR FILTERS", fontSize = 10.sp, color = LocalNHAColors.current.behind, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -828,18 +829,18 @@ fun SubdivisionPlanTab(
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(DarkSurfaceVariant)
-                    .border(1.dp, DarkBorder, RoundedCornerShape(12.dp)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
-                    Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Plan", tint = Color(0xFF38BDF8), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Plan", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("No Approved Subdivision Plan Loaded", style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold))
+                    Text("No Approved Subdivision Plan Loaded", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "Upload the official Approved Subdivision Plan (SDP) PDF or launch the interactive CAD blueprint demo workspace.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary),
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(20.dp))
@@ -851,7 +852,7 @@ fun SubdivisionPlanTab(
                                 "Interactive CAD Blueprint Demo Layout initialized for testing vector lot monitoring"
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -866,20 +867,25 @@ fun SubdivisionPlanTab(
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
                     .clipToBounds()
             ) {
                 val viewportWidth = constraints.maxWidth.toFloat()
                 val viewportHeight = constraints.maxHeight.toFloat()
+                val nhaMap = LocalNHAColors.current
+                val primaryMap = MaterialTheme.colorScheme.primary
+                val onSurfaceMap = MaterialTheme.colorScheme.onSurface
+                val surfaceColor = MaterialTheme.colorScheme.surface
+                val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
 
                 if (isLoadingPdf) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF38BDF8))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 } else if (pdfError != null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(pdfError!!, color = StatusRedText)
+                        Text(pdfError!!, color = LocalNHAColors.current.behind)
                     }
                 } else {
                     val bitmapWidth = renderedBitmap?.width?.toFloat() ?: 1600f
@@ -1018,13 +1024,13 @@ fun SubdivisionPlanTab(
                                         transformOrigin = TransformOrigin(0f, 0f)
                                     )
                             ) {
-                                drawRect(color = Color(0xFF07111E))
+                                drawRect(color = surfaceColor)
 
                                 val gridStep = 80f
                                 var x = 0f
                                 while (x < bitmapWidth) {
                                     drawLine(
-                                        color = Color(0xFF1E293B).copy(alpha = 0.6f),
+                                        color = gridColor,
                                         start = Offset(x, 0f),
                                         end = Offset(x, bitmapHeight),
                                         strokeWidth = 1f
@@ -1034,7 +1040,7 @@ fun SubdivisionPlanTab(
                                 var y = 0f
                                 while (y < bitmapHeight) {
                                     drawLine(
-                                        color = Color(0xFF1E293B).copy(alpha = 0.6f),
+                                        color = gridColor,
                                         start = Offset(0f, y),
                                         end = Offset(bitmapWidth, y),
                                         strokeWidth = 1f
@@ -1043,7 +1049,7 @@ fun SubdivisionPlanTab(
                                 }
 
                                 drawRect(
-                                    color = Color(0xFF38BDF8).copy(alpha = 0.35f),
+                                    color = primaryMap.copy(alpha = 0.35f),
                                     topLeft = Offset(16f, 16f),
                                     size = androidx.compose.ui.geometry.Size(bitmapWidth - 32f, bitmapHeight - 32f),
                                     style = Stroke(width = 2.5f)
@@ -1078,7 +1084,7 @@ fun SubdivisionPlanTab(
                                 val isSelected = selectedRoad?.id == road.id
                                 drawPath(
                                     path = path,
-                                    color = if (isSelected) Color(0xFFF59E0B) else Color(0xFF10B981),
+                                    color = if (isSelected) nhaMap.watch else nhaMap.onTrack,
                                     style = Stroke(width = if (isSelected) 8f else 4f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 6f), 0f))
                                 )
                             }
@@ -1104,7 +1110,7 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = getLotProgressFillColor(progressValue)
+                                val baseProgressColor = lotProgressFill(progressValue, nhaMap, primaryMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -1113,15 +1119,15 @@ fun SubdivisionPlanTab(
                                 }
 
                                     val strokeColor = when {
-                                        isSelected -> Color(0xFFF59E0B)
+                                        isSelected -> nhaMap.watch
                                         isMatching -> baseProgressColor
-                                        else -> Color(0xFF94A3B8).copy(alpha = 0.25f)
+                                        else -> nhaMap.neutral.copy(alpha = 0.25f)
                                     }
 
                                     // Fill Layer
                                     drawPath(
                                         path = path,
-                                        color = if (isSelected) Color(0xFFF59E0B).copy(alpha = fillAlpha) else baseProgressColor.copy(alpha = fillAlpha)
+                                        color = if (isSelected) nhaMap.watch.copy(alpha = fillAlpha) else baseProgressColor.copy(alpha = fillAlpha)
                                     )
 
                                     // Normal Lot Border Stroke Layer
@@ -1135,7 +1141,7 @@ fun SubdivisionPlanTab(
                                     if (isBilled && isMatching) {
                                         drawPath(
                                             path = path,
-                                            color = Color(0xFF38BDF8),
+                                            color = primaryMap,
                                             style = Stroke(
                                                 width = 7.5f,
                                                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 8f), 0f)
@@ -1151,7 +1157,7 @@ fun SubdivisionPlanTab(
                                         val textLayoutResult = textMeasurer.measure(
                                             text = labelText,
                                             style = TextStyle(
-                                                color = if (isMatching) Color.White else Color(0xFF94A3B8).copy(alpha = 0.5f),
+                                                color = if (isMatching) onSurfaceMap else nhaMap.neutral.copy(alpha = 0.5f),
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -1180,13 +1186,13 @@ fun SubdivisionPlanTab(
 
                                 drawPath(
                                     path = draftPath,
-                                    color = Color(0xFFF59E0B),
+                                    color = nhaMap.watch,
                                     style = Stroke(width = 3.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 4f), 0f))
                                 )
 
                                 for (pt in draftPoints) {
                                     drawCircle(
-                                        color = Color(0xFFF59E0B),
+                                        color = nhaMap.watch,
                                         radius = 6f,
                                         center = Offset(pt.x * bitmapWidth, pt.y * bitmapHeight)
                                     )
@@ -1196,9 +1202,9 @@ fun SubdivisionPlanTab(
 
                         // FLOATING INTERACTIVE ZOOM CONTROLS TOOLBAR (TOP-RIGHT OVERLAY)
                         Surface(
-                            color = DarkSurfaceVariant.copy(alpha = 0.95f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                             shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, DarkBorder),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(10.dp)
@@ -1217,9 +1223,9 @@ fun SubdivisionPlanTab(
                                 ).forEach { (targetScale, label) ->
                                     val isSelected = kotlin.math.abs(scale - targetScale) < 0.08f
                                     Surface(
-                                        color = if (isSelected) Color(0xFF0284C7) else DarkSurface,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                                         shape = RoundedCornerShape(6.dp),
-                                        border = BorderStroke(1.dp, if (isSelected) Color(0xFF38BDF8) else DarkBorder),
+                                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
                                         modifier = Modifier.clickable {
                                             scale = targetScale
                                             if (targetScale == 1.00f) {
@@ -1230,7 +1236,7 @@ fun SubdivisionPlanTab(
                                         Text(
                                             text = label,
                                             style = MaterialTheme.typography.labelSmall.copy(
-                                                color = if (isSelected) Color.White else DarkTextPrimary,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 11.sp
                                             ),
@@ -1246,14 +1252,14 @@ fun SubdivisionPlanTab(
                                     onClick = { scale = (scale / 1.25f).coerceIn(0.2f, 5.0f) },
                                     modifier = Modifier.size(30.dp)
                                 ) {
-                                    Icon(Icons.Default.Remove, contentDescription = "Zoom Out", tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Remove, contentDescription = "Zoom Out", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 }
 
                                 // Live Percentage Readout
                                 Text(
                                     text = "${(scale * 100).toInt()}%",
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        color = Color(0xFF38BDF8),
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp
                                     ),
@@ -1265,14 +1271,14 @@ fun SubdivisionPlanTab(
                                     onClick = { scale = (scale * 1.25f).coerceIn(0.2f, 5.0f) },
                                     modifier = Modifier.size(30.dp)
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = "Zoom In", tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Add, contentDescription = "Zoom In", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 }
 
                                 // Recenter View / Reset Target Button
                                 Surface(
-                                    color = DarkSurface,
+                                    color = MaterialTheme.colorScheme.surface,
                                     shape = RoundedCornerShape(6.dp),
-                                    border = BorderStroke(1.dp, DarkBorder),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                     modifier = Modifier.clickable {
                                         scale = 1.00f
                                         offset = Offset.Zero
@@ -1282,9 +1288,9 @@ fun SubdivisionPlanTab(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Recenter View", tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.CenterFocusWeak, contentDescription = "Recenter View", tint = LocalNHAColors.current.watch, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("RESET", fontSize = 10.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold)
+                                        Text("RESET", fontSize = 10.sp, color = LocalNHAColors.current.watch, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1293,9 +1299,9 @@ fun SubdivisionPlanTab(
                 // BOTTOM SELECTION INFO CARD (WITH PHASE 7 RECORD INSPECTION & HISTORY ACTIONS)
                 if (selectedLot != null || selectedRoad != null) {
                     Surface(
-                        color = DarkSurfaceVariant.copy(alpha = 0.95f),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                        border = BorderStroke(1.dp, DarkBorder),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
@@ -1317,18 +1323,18 @@ fun SubdivisionPlanTab(
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = "Block ${selectedLot!!.blockNumber} / Lot ${selectedLot!!.lotNumber}",
-                                                style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                                                style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Surface(
-                                                color = if (isBilled) Color(0xFF10B981) else DarkSurface,
+                                                color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.surface,
                                                 shape = RoundedCornerShape(4.dp),
-                                                border = BorderStroke(1.dp, if (isBilled) Color(0xFF10B981) else DarkBorder)
+                                                border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outline)
                                             ) {
                                                 Text(
                                                     text = if (isBilled) "● BILLED" else "NOT BILLED",
                                                     style = MaterialTheme.typography.labelSmall.copy(
-                                                        color = if (isBilled) Color.Black else DarkTextSecondary,
+                                                        color = if (isBilled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant,
                                                         fontWeight = FontWeight.Bold
                                                     ),
                                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1337,28 +1343,28 @@ fun SubdivisionPlanTab(
                                         }
                                         Text(
                                             text = "Progress: ${progressVal}% (${progressRecord?.constructionStatus ?: "Not Started"}) • Area: ${selectedLot!!.lotAreaSqM} sq.m • Unit: ${selectedLot!!.housingUnitNumber.ifBlank { "N/A" }}",
-                                            style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         )
                                         if (progressRecord?.lastModifiedBy?.isNotBlank() == true) {
                                             Text(
                                                 text = "Last Updated: ${progressRecord.lastModifiedDate} by ${progressRecord.lastModifiedBy}",
-                                                style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8))
+                                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
                                             )
                                         }
                                     }
                                 } else if (selectedRoad != null) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Timeline, contentDescription = "Road", tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Default.Timeline, contentDescription = "Road", tint = LocalNHAColors.current.onTrack, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = selectedRoad!!.roadName,
-                                                style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                                                style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                             )
                                         }
                                         Text(
                                             text = "Type: ${selectedRoad!!.roadType} • Internal ID: ${selectedRoad!!.id}",
-                                            style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         )
                                     }
                                 }
@@ -1367,7 +1373,7 @@ fun SubdivisionPlanTab(
                                     selectedLot = null
                                     selectedRoad = null
                                 }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = DarkTextSecondary)
+                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
 
@@ -1380,7 +1386,7 @@ fun SubdivisionPlanTab(
                                 ) {
                                     Button(
                                         onClick = { showProgressDialogLot = selectedLot },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.weight(1f).height(32.dp)
@@ -1390,7 +1396,7 @@ fun SubdivisionPlanTab(
 
                                     Button(
                                         onClick = { showRecordInspectionDialogLot = selectedLot },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.Black),
+                                        colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.onTrack, contentColor = MaterialTheme.colorScheme.surface),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.weight(1.1f).height(32.dp)
@@ -1402,8 +1408,8 @@ fun SubdivisionPlanTab(
 
                                     Button(
                                         onClick = { showLotInfoDialog = selectedLot },
-                                        colors = ButtonDefaults.buttonColors(containerColor = DarkSurface, contentColor = DarkTextPrimary),
-                                        border = BorderStroke(1.dp, DarkBorder),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.weight(1f).height(32.dp)
@@ -1489,14 +1495,14 @@ fun SubdivisionPlanTab(
 
         AlertDialog(
             onDismissRequest = { lotToToggleBilling = null },
-            containerColor = DarkSurfaceVariant,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ReceiptLong, contentDescription = "Billing", tint = if (markAsBilled) Color(0xFF10B981) else StatusRedText)
+                    Icon(Icons.Default.ReceiptLong, contentDescription = "Billing", tint = if (markAsBilled) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (markAsBilled) "Mark Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as BILLED?" else "Mark Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as NOT BILLED?",
-                        style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     )
                 }
             },
@@ -1507,7 +1513,7 @@ fun SubdivisionPlanTab(
                             "This lot will be highlighted with a distinct cyan billing border on the Interactive SDP."
                         else
                             "Developer billing border will be removed from this lot.",
-                        style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                     if (markAsBilled) {
                         OutlinedTextField(
@@ -1532,8 +1538,8 @@ fun SubdivisionPlanTab(
                         lotToToggleBilling = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (markAsBilled) Color(0xFF10B981) else StatusRedText,
-                        contentColor = Color.Black
+                        containerColor = if (markAsBilled) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
+                        contentColor = MaterialTheme.colorScheme.surface
                     )
                 ) {
                     Text(if (markAsBilled) "CONFIRM BILLED" else "CONFIRM UNBILL", fontWeight = FontWeight.Bold)
@@ -1541,7 +1547,7 @@ fun SubdivisionPlanTab(
             },
             dismissButton = {
                 TextButton(onClick = { lotToToggleBilling = null }) {
-                    Text("CANCEL", color = DarkTextSecondary)
+                    Text("CANCEL", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -1617,9 +1623,9 @@ fun SubdivisionPlanTab(
     if (lotToDeactivate != null) {
         AlertDialog(
             onDismissRequest = { lotToDeactivate = null },
-            containerColor = DarkSurfaceVariant,
-            title = { Text("Deactivate Lot Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = DarkTextPrimary) },
-            text = { Text("Deactivated lots will be hidden from monitoring mode but preserved in audit logs and history.", color = DarkTextSecondary) },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Deactivate Lot Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Deactivated lots will be hidden from monitoring mode but preserved in audit logs and history.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1627,10 +1633,10 @@ fun SubdivisionPlanTab(
                         selectedLot = null
                         lotToDeactivate = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatusRedText, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface)
                 ) { Text("Deactivate") }
             },
-            dismissButton = { TextButton(onClick = { lotToDeactivate = null }) { Text("Cancel", color = DarkTextSecondary) } }
+            dismissButton = { TextButton(onClick = { lotToDeactivate = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
@@ -1638,9 +1644,9 @@ fun SubdivisionPlanTab(
     if (roadToDeactivate != null) {
         AlertDialog(
             onDismissRequest = { roadToDeactivate = null },
-            containerColor = DarkSurfaceVariant,
-            title = { Text("Deactivate Road '${roadToDeactivate!!.roadName}'?", color = DarkTextPrimary) },
-            text = { Text("Deactivated roads will be hidden from monitoring mode but preserved in history.", color = DarkTextSecondary) },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Deactivate Road '${roadToDeactivate!!.roadName}'?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Deactivated roads will be hidden from monitoring mode but preserved in history.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1648,10 +1654,10 @@ fun SubdivisionPlanTab(
                         selectedRoad = null
                         roadToDeactivate = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = StatusRedText, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface)
                 ) { Text("Deactivate") }
             },
-            dismissButton = { TextButton(onClick = { roadToDeactivate = null }) { Text("Cancel", color = DarkTextSecondary) } }
+            dismissButton = { TextButton(onClick = { roadToDeactivate = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
@@ -1698,7 +1704,6 @@ fun RecordInspectionSnapshotDialog(
     val derivedColor = getLotProgressFillColor(intProgress)
 
     val cs = MaterialTheme.colorScheme
-    val nha = LocalNHAColors.current
     fun snapshot() = listOf(progressSlider, constructionStatus, currentActivity, contractor, remarks, billingStatus, billingRef)
     val initial = remember { snapshot() }
     val dirty = snapshot() != initial
@@ -1743,7 +1748,7 @@ fun RecordInspectionSnapshotDialog(
                     Surface(color = derivedColor, shape = RoundedCornerShape(4.dp)) {
                         Text(
                             text = "$intProgress%",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color.Black, fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelSmall.copy(color = cs.surface, fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -1796,14 +1801,14 @@ fun LotInfoDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, contentDescription = "Info", tint = Color(0xFF38BDF8))
+                Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Lot B${lot.blockNumber}-L${lot.lotNumber} Metadata & History",
-                    style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
         },
@@ -1816,38 +1821,38 @@ fun LotInfoDialog(
             ) {
                 // CURRENT STATUS CARD
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, derivedColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("CURRENT LOT STATUS", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                        Text("CURRENT LOT STATUS", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Physical Progress", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                            Text("Physical Progress", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Text("${progressVal}% (${currentProgress?.constructionStatus ?: "Not Started"})", style = MaterialTheme.typography.bodySmall.copy(color = derivedColor, fontWeight = FontWeight.Bold))
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Developer Billing", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
-                            Text(if (isBilled) "● BILLED" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) Color(0xFF10B981) else DarkTextSecondary, fontWeight = FontWeight.Bold))
+                            Text("Developer Billing", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            Text(if (isBilled) "● BILLED" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
                         }
-                        Text("Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary))
-                        Text("Housing Unit: ${lot.housingUnitNumber.ifBlank { "N/A" }} • Area: ${lot.lotAreaSqM} sq.m", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary))
-                        Text("SDP Plan Version: v$sdpVersion • Internal ID: ${lot.id}", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
+                        Text("Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
+                        Text("Housing Unit: ${lot.housingUnitNumber.ifBlank { "N/A" }} • Area: ${lot.lotAreaSqM} sq.m", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
+                        Text("SDP Plan Version: v$sdpVersion • Internal ID: ${lot.id}", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
                 }
 
                 // PHASE 7 HISTORICAL TIMELINE SECTION
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, DarkBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1856,12 +1861,12 @@ fun LotInfoDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("INSPECTION HISTORY & TIMELINE", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF10B981), fontWeight = FontWeight.Bold))
+                            Text("INSPECTION HISTORY & TIMELINE", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontWeight = FontWeight.Bold))
 
                             if (canEdit) {
                                 Button(
                                     onClick = onRecordInspectionRequested,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.Black),
+                                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.onTrack, contentColor = MaterialTheme.colorScheme.surface),
                                     shape = RoundedCornerShape(4.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                     modifier = Modifier.height(26.dp)
@@ -1881,10 +1886,10 @@ fun LotInfoDialog(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.History, contentDescription = "No History", tint = DarkTextSecondary, modifier = Modifier.size(28.dp))
+                                    Icon(Icons.Default.History, contentDescription = "No History", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text("NO INSPECTION HISTORY", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary, fontWeight = FontWeight.Bold))
-                                    Text(if (canEdit) "Tap RECORD SNAPSHOT above to log an official inspection point." else "No inspection snapshots recorded yet.", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary), fontSize = 10.sp)
+                                    Text("NO INSPECTION HISTORY", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                                    Text(if (canEdit) "Tap RECORD SNAPSHOT above to log an official inspection point." else "No inspection snapshots recorded yet.", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), fontSize = 10.sp)
                                 }
                             }
                         } else {
@@ -1893,13 +1898,13 @@ fun LotInfoDialog(
                             val timelineStr = chronological.joinToString(" → ") { "${it.physicalProgress}%" }
 
                             Surface(
-                                color = DarkSurfaceVariant,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
                                     text = "Timeline: $timelineStr",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -1932,7 +1937,7 @@ fun LotInfoDialog(
                                 }
 
                                 Surface(
-                                    color = DarkSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
                                     shape = RoundedCornerShape(6.dp),
                                     border = BorderStroke(1.dp, color),
                                     modifier = Modifier.fillMaxWidth()
@@ -1955,24 +1960,24 @@ fun LotInfoDialog(
                                             ) {
                                                 Text(
                                                     text = "${inspection.physicalProgress}% • ${inspection.constructionStatus}",
-                                                    style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                                 )
                                                 Text(
                                                     text = inspection.billingStatus,
                                                     style = MaterialTheme.typography.labelSmall.copy(
-                                                        color = if (inspection.billingStatus == "BILLED") Color(0xFF10B981) else DarkTextSecondary,
+                                                        color = if (inspection.billingStatus == "BILLED") LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 )
                                             }
                                             Text(
                                                 text = "${inspection.inspectionDate} by ${inspection.inspectedBy}$changeText",
-                                                style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp)
+                                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                                             )
                                             if (inspection.remarks.isNotBlank()) {
                                                 Text(
                                                     text = "Remarks: ${inspection.remarks}",
-                                                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontSize = 10.sp)
+                                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
                                                 )
                                             }
                                         }
@@ -1988,7 +1993,7 @@ fun LotInfoDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onViewAuditTrailRequested,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) {
                     Icon(Icons.Default.Shield, contentDescription = "Audit Trail", modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -1998,7 +2003,7 @@ fun LotInfoDialog(
                 if (canEdit) {
                     Button(
                         onClick = onEditGeometry,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B), contentColor = Color.Black)
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.watch, contentColor = MaterialTheme.colorScheme.surface)
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Geometry", modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -2009,7 +2014,7 @@ fun LotInfoDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CLOSE", color = DarkTextSecondary)
+                Text("CLOSE", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -2024,14 +2029,14 @@ fun LotAuditHistoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Shield, contentDescription = "Audit", tint = Color(0xFF38BDF8))
+                Icon(Icons.Default.Shield, contentDescription = "Audit", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Audit History — Lot B${lot.blockNumber}-L${lot.lotNumber}",
-                    style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
         },
@@ -2044,7 +2049,7 @@ fun LotAuditHistoryDialog(
             ) {
                 Text(
                     text = "Read-only system audit log entries for Block ${lot.blockNumber} Lot ${lot.lotNumber}.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
 
                 val lotAuditLogs = remember(auditLogs, lot.id) {
@@ -2062,14 +2067,14 @@ fun LotAuditHistoryDialog(
                             .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No audit log records found for this lot.", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                        Text("No audit log records found for this lot.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
                 } else {
                     lotAuditLogs.forEach { log ->
                         Surface(
-                            color = DarkSurface,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(1.dp, DarkBorder),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -2077,19 +2082,19 @@ fun LotAuditHistoryDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(log.actionType, style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                                    Text(log.actionType, style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
                                     val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(java.util.Date(log.timestamp))
-                                    Text(dateStr, style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
+                                    Text(dateStr, style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp))
                                 }
-                                Text("By: ${log.user} (${log.device})", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary, fontSize = 10.sp))
-                                Text(log.details, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary))
+                                Text("By: ${log.user} (${log.device})", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp))
+                                Text(log.details, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                                 if (log.oldValue.isNotBlank() || log.newValue.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (log.oldValue.isNotBlank()) {
-                                        Text("Previous: ${log.oldValue}", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFFEF4444), fontSize = 10.sp))
+                                        Text("Previous: ${log.oldValue}", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.behind, fontSize = 10.sp))
                                     }
                                     if (log.newValue.isNotBlank()) {
-                                        Text("New: ${log.newValue}", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF10B981), fontSize = 10.sp))
+                                        Text("New: ${log.newValue}", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontSize = 10.sp))
                                     }
                                 }
                             }
@@ -2101,7 +2106,7 @@ fun LotAuditHistoryDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("CLOSE", fontWeight = FontWeight.Bold)
             }
@@ -2123,8 +2128,8 @@ fun AddLotDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
-        title = { Text("Save Digitized Lot Geometry", style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)) },
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Save Digitized Lot Geometry", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = blockNumber, onValueChange = { blockNumber = it }, label = { Text("Block Number (e.g., 3)") }, modifier = Modifier.fillMaxWidth())
@@ -2143,10 +2148,10 @@ fun AddLotDialog(
                     }
                 },
                 enabled = blockNumber.isNotBlank() && lotNumber.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) { Text("Save Lot", fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = DarkTextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     )
 }
 
@@ -2160,8 +2165,8 @@ fun AddRoadDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
-        title = { Text("Save Digitized Road Geometry", style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)) },
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Save Digitized Road Geometry", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = roadName, onValueChange = { roadName = it }, label = { Text("Road Name (e.g., Main Avenue)") }, modifier = Modifier.fillMaxWidth())
@@ -2176,10 +2181,10 @@ fun AddRoadDialog(
                     }
                 },
                 enabled = roadName.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.onTrack, contentColor = MaterialTheme.colorScheme.surface)
             ) { Text("Save Road", fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = DarkTextSecondary) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     )
 }
 
@@ -2205,14 +2210,14 @@ fun AddSdpPlanDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.PictureAsPdf, contentDescription = "SDP", tint = Color(0xFF38BDF8))
+                Icon(Icons.Default.PictureAsPdf, contentDescription = "SDP", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Upload Approved SDP (Version $currentVersion)",
-                    style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
         },
@@ -2227,10 +2232,10 @@ fun AddSdpPlanDialog(
                     label = { Text("Plan Document Name") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = DarkBorder,
-                        focusedLabelColor = Color(0xFF38BDF8),
-                        unfocusedLabelColor = DarkTextSecondary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
 
@@ -2240,18 +2245,18 @@ fun AddSdpPlanDialog(
                     label = { Text("Description / Remarks") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = DarkBorder,
-                        focusedLabelColor = Color(0xFF38BDF8),
-                        unfocusedLabelColor = DarkTextSecondary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
 
                 // Select PDF File Button
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (selectedPdfUri != null) Color(0xFF38BDF8) else DarkBorder),
+                    border = BorderStroke(1.dp, if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { pdfPickerLauncher.launch("application/pdf") }
@@ -2263,18 +2268,18 @@ fun AddSdpPlanDialog(
                         Icon(
                             imageVector = if (selectedPdfUri != null) Icons.Default.CheckCircle else Icons.Default.FileUpload,
                             contentDescription = "PDF",
-                            tint = if (selectedPdfUri != null) Color(0xFF38BDF8) else DarkTextSecondary
+                            tint = if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (selectedPdfUri != null) "PDF Selected" else "Select Approved SDP PDF",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             )
                             if (pdfFileName.isNotBlank()) {
                                 Text(
                                     text = pdfFileName,
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8)),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary),
                                     maxLines = 1
                                 )
                             }
@@ -2292,14 +2297,14 @@ fun AddSdpPlanDialog(
                     }
                 },
                 enabled = selectedPdfUri != null,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("Save SDP Plan", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = DarkTextSecondary)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -2314,7 +2319,7 @@ fun KpiChip(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = DarkSurface,
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(6.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.4f)),
         modifier = modifier
@@ -2323,7 +2328,7 @@ fun KpiChip(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = DarkTextSecondary))
+            Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant))
             Text(text = value, style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = color, fontWeight = FontWeight.Bold))
         }
     }
@@ -2338,9 +2343,9 @@ fun FilterDropdownChip(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = if (isSelected) Color(0xFFF59E0B).copy(alpha = 0.2f) else DarkSurfaceVariant,
+        color = if (isSelected) LocalNHAColors.current.watch.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(1.dp, if (isSelected) Color(0xFFF59E0B) else DarkBorder),
+        border = BorderStroke(1.dp, if (isSelected) LocalNHAColors.current.watch else MaterialTheme.colorScheme.outline),
         modifier = modifier.clickable(onClick = onClick)
     ) {
         Row(
@@ -2351,13 +2356,13 @@ fun FilterDropdownChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color = if (isSelected) Color(0xFFF59E0B) else DarkTextPrimary,
+                    color = if (isSelected) LocalNHAColors.current.watch else MaterialTheme.colorScheme.onSurface,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 ),
                 maxLines = 1
             )
-            Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown", tint = DarkTextSecondary, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
         }
     }
 }
@@ -2372,7 +2377,7 @@ fun LegendRow(color: Color, label: String) {
                 .background(color)
         )
         Spacer(modifier = Modifier.width(10.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary))
+        Text(label, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
     }
 }
 
@@ -2381,42 +2386,42 @@ fun LegendRow(color: Color, label: String) {
 fun SdpLegendDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Palette, contentDescription = "Legend", tint = Color(0xFFF59E0B))
+                Icon(Icons.Default.Palette, contentDescription = "Legend", tint = LocalNHAColors.current.watch)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("SDP Color & Billing Legend", style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold))
+                Text("SDP Color & Billing Legend", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold))
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
-                LegendRow(color = Color(0xFFEF4444), label = "0% / Layout / Excavation Started")
-                LegendRow(color = Color(0xFFF97316), label = "1 – 20% Physical Progress")
-                LegendRow(color = Color(0xFFEAB308), label = "21 – 40% Physical Progress")
-                LegendRow(color = Color(0xFF22C55E), label = "41 – 60% Physical Progress")
-                LegendRow(color = Color(0xFFEC4899), label = "61 – 80% Physical Progress (Pink)")
-                LegendRow(color = Color(0xFF3B82F6), label = "81 – 99% Physical Progress")
-                LegendRow(color = Color(0xFF10B981), label = "100% Completed")
+                LegendRow(color = getLotProgressFillColor(0), label = "0% / Layout / Excavation Started")
+                LegendRow(color = getLotProgressFillColor(10), label = "1 – 20% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(30), label = "21 – 40% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(50), label = "41 – 60% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(70), label = "61 – 80% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(90), label = "81 – 99% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed")
 
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("DEVELOPER BILLING STATUS (LOT BORDER):", style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                Text("DEVELOPER BILLING STATUS (LOT BORDER):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(24.dp)
                             .background(Color.Transparent)
-                            .border(BorderStroke(3.dp, Color(0xFF38BDF8)), shape = RoundedCornerShape(4.dp))
+                            .border(BorderStroke(3.dp, MaterialTheme.colorScheme.primary), shape = RoundedCornerShape(4.dp))
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("BILLED = Thick Cyan Dashed Outer Border", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary))
+                    Text("BILLED = Thick Cyan Dashed Outer Border", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black)) {
+            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
                 Text("CLOSE", fontWeight = FontWeight.Bold)
             }
         }
@@ -2456,14 +2461,14 @@ fun UpdateLotProgressDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkSurfaceVariant,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.HomeWork, contentDescription = "Lot", tint = derivedColor)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Lot B${lot.blockNumber}-L${lot.lotNumber} Construction & Billing",
-                    style = MaterialTheme.typography.titleMedium.copy(color = DarkTextPrimary, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
         },
@@ -2476,7 +2481,7 @@ fun UpdateLotProgressDialog(
             ) {
                 // Physical Progress Slider & Visual Color Preview
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, derivedColor),
                     modifier = Modifier.fillMaxWidth()
@@ -2487,14 +2492,14 @@ fun UpdateLotProgressDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary))
+                            Text("Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Surface(
                                 color = derivedColor,
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
                                     text = "$intProgress%",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.Black, fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
@@ -2516,7 +2521,7 @@ fun UpdateLotProgressDialog(
                             colors = SliderDefaults.colors(
                                 thumbColor = derivedColor,
                                 activeTrackColor = derivedColor,
-                                inactiveTrackColor = DarkBorder
+                                inactiveTrackColor = MaterialTheme.colorScheme.outline
                             )
                         )
                     }
@@ -2567,9 +2572,9 @@ fun UpdateLotProgressDialog(
 
                 // DEVELOPER BILLING CONTROL SECTION
                 Surface(
-                    color = DarkSurface,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (isBilled) Color(0xFF10B981) else DarkBorder),
+                    border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2579,11 +2584,11 @@ fun UpdateLotProgressDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("DEVELOPER BILLING STATUS", style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary))
+                                Text("DEVELOPER BILLING STATUS", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                                 Text(
                                     text = if (isBilled) "● BILLED" else "NOT BILLED",
                                     style = MaterialTheme.typography.titleSmall.copy(
-                                        color = if (isBilled) Color(0xFF10B981) else DarkTextSecondary,
+                                        color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -2593,8 +2598,8 @@ fun UpdateLotProgressDialog(
                                 Button(
                                     onClick = { onToggleBillingRequested(!isBilled) },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isBilled) StatusRedText else Color(0xFF10B981),
-                                        contentColor = Color.White
+                                        containerColor = if (isBilled) LocalNHAColors.current.behind else LocalNHAColors.current.onTrack,
+                                        contentColor = MaterialTheme.colorScheme.surface
                                     ),
                                     shape = RoundedCornerShape(6.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -2612,12 +2617,12 @@ fun UpdateLotProgressDialog(
                         if (isBilled) {
                             Text(
                                 text = "Billed Date: ${currentProgress?.billingDate ?: "N/A"} • By: ${currentProgress?.billedBy ?: "N/A"}",
-                                style = MaterialTheme.typography.labelSmall.copy(color = DarkTextSecondary)
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                             )
                             if (currentProgress?.billingReference?.isNotBlank() == true) {
                                 Text(
                                     text = "Ref No: ${currentProgress.billingReference}",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8))
+                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
                                 )
                             }
                         }
@@ -2638,14 +2643,14 @@ fun UpdateLotProgressDialog(
                         remarks
                     )
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = derivedColor, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = derivedColor, contentColor = MaterialTheme.colorScheme.surface)
             ) {
                 Text("SAVE PROGRESS", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = DarkTextSecondary)
+                Text("CANCEL", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

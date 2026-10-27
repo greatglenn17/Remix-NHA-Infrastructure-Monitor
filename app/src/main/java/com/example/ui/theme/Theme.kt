@@ -19,15 +19,15 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color(0xFF0F172A),
     primaryContainer = Color(0xFF1E293B),
     onPrimaryContainer = Color(0xFFF8FAFC),
-    secondary = GoldAccent,
+    secondary = Color(0xFFF59E0B),
     onSecondary = Color(0xFF451A03),
-    background = StaticDarkBackground,
-    onBackground = StaticDarkTextPrimary,
-    surface = StaticDarkSurface,
-    onSurface = StaticDarkTextPrimary,
-    surfaceVariant = StaticDarkSurfaceVariant,
-    onSurfaceVariant = StaticDarkTextSecondary,
-    outline = StaticDarkBorder
+    background = DarkNHAColors.background,
+    onBackground = DarkNHAColors.textPrimary,
+    surface = DarkNHAColors.surface,
+    onSurface = DarkNHAColors.textPrimary,
+    surfaceVariant = DarkNHAColors.surfaceVariant,
+    onSurfaceVariant = DarkNHAColors.textSecondary,
+    outline = DarkNHAColors.border
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -37,13 +37,13 @@ private val LightColorScheme = lightColorScheme(
     onPrimaryContainer = Color(0xFF0369A1),
     secondary = Color(0xFFD97706),
     onSecondary = Color(0xFFFFFFFF),
-    background = StaticLightBackground,
-    onBackground = StaticLightTextPrimary,
-    surface = StaticLightSurface,
-    onSurface = StaticLightTextPrimary,
-    surfaceVariant = StaticLightSurfaceVariant,
-    onSurfaceVariant = StaticLightTextSecondary,
-    outline = StaticLightBorder
+    background = LightNHAColors.background,
+    onBackground = LightNHAColors.textPrimary,
+    surface = LightNHAColors.surface,
+    onSurface = LightNHAColors.textPrimary,
+    surfaceVariant = LightNHAColors.surfaceVariant,
+    onSurfaceVariant = LightNHAColors.textSecondary,
+    outline = LightNHAColors.border
 )
 
 @Composable

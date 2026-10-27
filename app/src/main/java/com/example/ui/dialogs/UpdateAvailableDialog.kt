@@ -8,12 +8,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,13 +42,13 @@ fun UpdateAvailableDialog(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .background(Color(0xFF0284C7).copy(alpha = 0.2f), shape = CircleShape),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.RocketLaunch,
                         contentDescription = null,
-                        tint = Color(0xFF38BDF8),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -59,14 +57,14 @@ fun UpdateAvailableDialog(
                         text = "New Update Available!",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            color = DarkTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 17.sp
                         )
                     )
                     Text(
                         text = "Build ${updateInfo.latestVersionName} (${updateInfo.latestVersionCode})",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = Color(0xFF4ADE80),
+                            color = LocalNHAColors.current.onTrack,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp
                         )
@@ -81,20 +79,20 @@ fun UpdateAvailableDialog(
             ) {
                 Text(
                     text = "A new version of NHA Infrastructure Monitor is ready for your device.",
-                    style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
 
                 Surface(
-                    color = DarkSurfaceVariant,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, DarkBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
                             text = "WHAT'S NEW IN THIS RELEASE",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = Color(0xFF38BDF8),
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 9.5.sp,
                                 letterSpacing = 0.5.sp
@@ -104,7 +102,7 @@ fun UpdateAvailableDialog(
                         Text(
                             text = updateInfo.releaseNotes.ifEmpty { "Includes performance optimizations, live CAD SDP plan features, and bug fixes." },
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                color = DarkTextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 12.5.sp,
                                 lineHeight = 16.sp
                             )
@@ -120,13 +118,13 @@ fun UpdateAvailableDialog(
                     ) {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF38BDF8),
-                            trackColor = DarkSurfaceVariant
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Downloading update in background... Please wait.",
-                            style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         )
                     }
                 }
@@ -149,8 +147,8 @@ fun UpdateAvailableDialog(
                     )
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF0284C7),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(8.dp),
                 enabled = !isDownloading
@@ -173,14 +171,14 @@ fun UpdateAvailableDialog(
                     Text(
                         text = "REMIND ME LATER",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            color = DarkTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Bold
                         )
                     )
                 }
             }
         },
-        containerColor = DarkSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp)
     )
 }

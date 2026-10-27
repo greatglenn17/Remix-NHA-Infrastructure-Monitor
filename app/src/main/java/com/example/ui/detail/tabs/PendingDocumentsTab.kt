@@ -1,6 +1,6 @@
 package com.example.ui.detail.tabs
 
-import androidx.compose.foundation.background
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -18,11 +18,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
-import android.content.Intent
-import androidx.compose.ui.platform.LocalContext
 import com.example.data.model.PendingDocument
 import com.example.data.model.Permission
 import com.example.data.model.UserRole
@@ -50,7 +45,7 @@ fun PendingDocumentsTab(
     ) {
         // Stats Summary
         Surface(
-            color = SurfaceVariantLight,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -60,9 +55,9 @@ fun PendingDocumentsTab(
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatusBadge("PENDING", pendingCount, StatusRedText, StatusRedBg)
-                StatusBadge("SUBMITTED", submittedCount, StatusOrangeText, StatusOrangeBg)
-                StatusBadge("APPROVED", approvedCount, StatusGreenText, StatusGreenBg)
+                StatusBadge("PENDING", pendingCount, LocalNHAColors.current.behind, LocalNHAColors.current.behindContainer)
+                StatusBadge("SUBMITTED", submittedCount, LocalNHAColors.current.watch, LocalNHAColors.current.watchContainer)
+                StatusBadge("APPROVED", approvedCount, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrackContainer)
             }
         }
 
@@ -70,7 +65,7 @@ fun PendingDocumentsTab(
 
         Text(
             text = "STATUS OF DOCUMENTARY REQUIREMENTS",
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary)
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         )
         Spacer(modifier = Modifier.height(8.dp))
         if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) {
@@ -95,7 +90,7 @@ fun PendingDocumentsTab(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No pending documentary requirements.", style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray))
+                Text("No pending documentary requirements.", style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
             }
         } else {
             LazyColumn(
@@ -149,15 +144,15 @@ private fun PendingDocCard(
     val openAttachment = com.example.ui.components.rememberAttachmentOpener()
 
     val (badgeBg, badgeText) = when (doc.status) {
-        "Approved" -> Pair(StatusGreenBg, StatusGreenText)
-        "Submitted" -> Pair(StatusOrangeBg, StatusOrangeText)
-        else -> Pair(StatusRedBg, StatusRedText)
+        "Approved" -> Pair(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack)
+        "Submitted" -> Pair(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch)
+        else -> Pair(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind)
     }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, DarkBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -176,7 +171,7 @@ private fun PendingDocCard(
                         }
                         Text(
                             text = doc.documentName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = if (doc.fileUrl.isNotBlank()) NavyPrimary else DarkTextPrimary),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = if (doc.fileUrl.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface),
                             modifier = Modifier.clickable(enabled = doc.fileUrl.isNotBlank()) {
                                 openAttachment(doc.fileUrl)
                             }
@@ -186,7 +181,7 @@ private fun PendingDocCard(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Remarks: ${doc.remarks}",
-                            style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary)
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                         )
                     }
                 }
@@ -219,7 +214,7 @@ private fun PendingDocCard(
                                 modifier = Modifier.height(32.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 shape = RoundedCornerShape(4.dp),
-                                border = BorderStroke(1.dp, NavyPrimary),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Icon(Icons.Default.Upload, contentDescription = "Upload", modifier = Modifier.size(16.dp))
@@ -234,7 +229,7 @@ private fun PendingDocCard(
                                 modifier = Modifier.height(32.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 shape = RoundedCornerShape(4.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary, contentColor = Color.White)
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                             ) {
                                 Icon(Icons.Default.Visibility, contentDescription = "View", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -254,7 +249,7 @@ private fun PendingDocCard(
             title = { Text("Update Document Status") },
             text = {
                 Column {
-                    Text(doc.documentName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary))
+                    Text(doc.documentName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text("Select Status:", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
@@ -307,7 +302,7 @@ private fun PendingDocCard(
                             showStatusDialog = false
                         }
                     ) {
-                        Text("Delete", color = StatusRedText)
+                        Text("Delete", color = LocalNHAColors.current.behind)
                     }
                 } else {
                     TextButton(onClick = { showStatusDialog = false }) {

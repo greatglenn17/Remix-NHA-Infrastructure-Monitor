@@ -1,5 +1,6 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -62,30 +63,30 @@ fun AuditLogTab(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         // Search & Filter Row
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search audit logs (user, action, details, device)...", color = DarkTextSecondary) },
+            placeholder = { Text("Search audit logs (user, action, details, device)...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
             trailingIcon = if (searchQuery.isNotEmpty()) {
                 {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = DarkTextSecondary)
+                        Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else null,
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DarkSurface,
-                unfocusedContainerColor = DarkSurface,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = DarkBorder,
-                focusedTextColor = DarkTextPrimary,
-                unfocusedTextColor = DarkTextPrimary
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
@@ -113,8 +114,8 @@ fun AuditLogTab(
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        containerColor = DarkSurface,
-                        labelColor = DarkTextSecondary
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     modifier = Modifier
                         .padding(end = 6.dp)
@@ -136,13 +137,13 @@ fun AuditLogTab(
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = null,
-                        tint = DarkTextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "No audit log records found",
-                        color = DarkTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -185,11 +186,11 @@ fun AuditLogCard(log: AuditLog) {
     }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
             .testTag("audit_log_item_${log.id}")
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -225,7 +226,7 @@ fun AuditLogCard(log: AuditLog) {
 
                 Text(
                     text = formattedDate,
-                    color = DarkTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
             }
@@ -246,7 +247,7 @@ fun AuditLogCard(log: AuditLog) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = log.user,
-                    color = DarkTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp
                 )
@@ -256,13 +257,13 @@ fun AuditLogCard(log: AuditLog) {
                 Icon(
                     imageVector = Icons.Default.PhoneAndroid,
                     contentDescription = null,
-                    tint = DarkTextSecondary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = log.device.ifBlank { "Android Device" },
-                    color = DarkTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
             }
@@ -271,7 +272,7 @@ fun AuditLogCard(log: AuditLog) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = log.details,
-                    color = DarkTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 13.sp
                 )
             }
@@ -283,7 +284,7 @@ fun AuditLogCard(log: AuditLog) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(DarkSurfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(10.dp)
                 ) {
                     if (log.oldValue.isNotBlank()) {
@@ -296,7 +297,7 @@ fun AuditLogCard(log: AuditLog) {
                             )
                             Text(
                                 text = log.oldValue,
-                                color = DarkTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
@@ -316,7 +317,7 @@ fun AuditLogCard(log: AuditLog) {
                             )
                             Text(
                                 text = log.newValue,
-                                color = DarkTextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 12.sp
                             )
                         }

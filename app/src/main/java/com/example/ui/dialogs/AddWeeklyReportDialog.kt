@@ -1,5 +1,6 @@
 package com.example.ui.dialogs
 
+import androidx.compose.foundation.shape.CircleShape
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -975,10 +976,8 @@ fun AddWeeklyReportDialog(
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
                                                 .padding(6.dp)
-                                                .size(28.dp)
-                                                .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(50.dp))
                                         ) {
-                                            Icon(Icons.Default.Close, contentDescription = "Remove Photo", tint = Color.White, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Close, contentDescription = "Remove Photo", tint = Color.White, modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), shape = CircleShape).padding(6.dp).size(16.dp))
                                         }
                                     }
                                 }
@@ -1161,7 +1160,7 @@ private fun ManpowerInputRow(
             singleLine = true
         )
 
-        IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
+        IconButton(onClick = onDelete) {
             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
         }
     }
@@ -1204,7 +1203,7 @@ private fun EquipmentInputRow(
                 singleLine = true
             )
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
+            IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }
@@ -1266,7 +1265,7 @@ private fun IssueInputRow(
                 modifier = Modifier.weight(1f)
             )
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
+            IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }
@@ -1379,7 +1378,7 @@ private fun ActivityInputRow(
                 }
             }
 
-            IconButton(onClick = onDelete, modifier = Modifier.size(44.dp)) {
+            IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
             }
         }

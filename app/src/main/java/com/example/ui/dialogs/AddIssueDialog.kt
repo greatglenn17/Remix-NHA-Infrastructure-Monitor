@@ -12,7 +12,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.example.data.model.ProjectIssue
@@ -74,8 +73,7 @@ fun AddIssueDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = isCritical,
-                        onCheckedChange = { isCritical = it },
-                        
+                        onCheckedChange = { isCritical = it }
                     )
                     Text("Critical Issue", style = MaterialTheme.typography.bodyMedium)
                 }
@@ -95,8 +93,7 @@ fun AddIssueDialog(
                     }
                     DropdownMenu(
                         expanded = showStatusDropdown,
-                        onDismissRequest = { showStatusDropdown = false },
-                        
+                        onDismissRequest = { showStatusDropdown = false }
                     ) {
                         listOf("Pending", "Approved", "No Action").forEach { option ->
                             DropdownMenuItem(
@@ -115,8 +112,7 @@ fun AddIssueDialog(
                     if (date.isNotBlank() && description.isNotBlank() && actionTaken.isNotBlank()) {
                         onSubmit(date, description, actionTaken, status, isCritical)
                     }
-                },
-                
+                }
             ) {
                 Text("Save")
             }

@@ -1,6 +1,5 @@
 package com.example.ui.detail.tabs
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -59,13 +57,13 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                     Icon(
                         imageVector = Icons.Default.Collections,
                         contentDescription = null,
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "No Site Update Photos Uploaded Yet",
-                        style = MaterialTheme.typography.titleMedium.copy(color = Color.Gray)
+                        style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -78,7 +76,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "PROJECT UPDATE PHOTO GALLERY (${photos.size} Photos)",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 

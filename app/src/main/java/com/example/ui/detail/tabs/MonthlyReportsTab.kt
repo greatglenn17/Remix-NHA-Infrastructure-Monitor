@@ -1,21 +1,19 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.theme.LocalNHAColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.model.*
 import com.example.ui.theme.*
 
@@ -87,7 +85,7 @@ fun MonthlyReportsTab(
                     text = "NHA MONTHLY PROJECT ENGINEER'S REPORTS",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = DarkTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -103,11 +101,11 @@ fun MonthlyReportsTab(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = DarkBorder,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = DarkSurfaceVariant,
-                            unfocusedContainerColor = DarkSurfaceVariant
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         ),
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
@@ -115,7 +113,7 @@ fun MonthlyReportsTab(
                     ExposedDropdownMenu(
                         expanded = dropdownExpanded,
                         onDismissRequest = { dropdownExpanded = false },
-                        modifier = Modifier.background(DarkSurfaceVariant)
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         availableMonths.forEach { month ->
                             DropdownMenuItem(
@@ -152,9 +150,9 @@ private fun MonthlyReportSingleTableCard(
     sumVariance: Double
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, DarkBorder),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth().testTag("monthly_report_single_table_card")
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -164,20 +162,20 @@ private fun MonthlyReportSingleTableCard(
                     text = "Monthly Accomplishment Report - $selectedMonth",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = DarkTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
                 val isAhead = sumVariance >= 0
                 Surface(
-                    color = if (isAhead) StatusGreenBg else StatusRedBg,
+                    color = if (isAhead) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         text = if (isAhead) "AHEAD (+${"%.2f".format(sumVariance)}%)" else "SLIPPAGE (${"%.2f".format(sumVariance)}%)",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = if (isAhead) StatusGreenText else StatusRedText,
+                            color = if (isAhead) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -189,9 +187,9 @@ private fun MonthlyReportSingleTableCard(
 
             // Single Table synced with weekly reports
             Surface(
-                color = DarkSurfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, DarkBorder),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -203,21 +201,21 @@ private fun MonthlyReportSingleTableCard(
                             .height(IntrinsicSize.Min),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Reporting Week", modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = DarkTextSecondary, fontWeight = FontWeight.Bold))
-                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                        Text("Target %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = DarkTextSecondary, fontWeight = FontWeight.Bold))
-                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                        Text("Actual %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = DarkTextSecondary, fontWeight = FontWeight.Bold))
-                        VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                        Text("Variance %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = DarkTextSecondary, fontWeight = FontWeight.Bold))
+                        Text("Reporting Week", modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                        Text("Target %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                        Text("Actual %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
+                        Text("Variance %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
                     }
 
-                    HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 4.dp))
 
                     if (monthWeeklyReports.isEmpty()) {
                         Text(
                             text = "No weekly reports found for $selectedMonth.",
-                            style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary),
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                             modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp)
                         )
                     } else {
@@ -237,29 +235,29 @@ private fun MonthlyReportSingleTableCard(
                                     modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                                 )
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                                 Text(
                                     text = "${"%.2f".format(target)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface)
                                 )
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                                 Text(
                                     text = "${"%.2f".format(actual)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface)
                                 )
-                                VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                                VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                                 Text(
                                     text = "${if (varVal >= 0) "+" else ""}${"%.2f".format(varVal)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (varVal >= 0) StatusGreenText else StatusRedText,
+                                        color = if (varVal >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
                             }
-                            HorizontalDivider(color = DarkBorder, modifier = Modifier.padding(vertical = 2.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(vertical = 2.dp))
                         }
 
                         Row(
@@ -274,24 +272,24 @@ private fun MonthlyReportSingleTableCard(
                                 modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
-                            VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                            VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumTarget)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
-                            VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                            VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumActual)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
-                            VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
+                            VerticalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${if (sumVariance >= 0) "+" else ""}${"%.2f".format(sumVariance)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (sumVariance >= 0) StatusGreenText else StatusRedText,
+                                    color = if (sumVariance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
