@@ -74,7 +74,7 @@ class FormsScreenshotTest {
         shoot("form_weekly_week_$t") { AddWeeklyReportDialog(project, 7, null, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_weekly_review_$t", steps = {
             rule.onNodeWithText("Review and save").performSemanticsAction(SemanticsActions.OnClick)
-        }) { AddWeeklyReportDialog(project, 7, badReport, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }) }
+        }) { AddWeeklyReportDialog(project, 7, badReport, {}, { _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
         shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
