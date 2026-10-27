@@ -76,7 +76,7 @@ fun PendingDocumentsTab(
         if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) {
             Button(
                 onClick = onAddDocumentClick,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 modifier = Modifier.fillMaxWidth().testTag("add_custom_document_button")
             ) {
@@ -169,8 +169,8 @@ private fun PendingDocCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (doc.isCoreChecklist) {
-                            Surface(color = Color(0xFF38BDF8).copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
-                                Text("CORE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+                                Text("CORE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                         }
@@ -220,7 +220,7 @@ private fun PendingDocCard(
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 shape = RoundedCornerShape(4.dp),
                                 border = BorderStroke(1.dp, NavyPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Icon(Icons.Default.Upload, contentDescription = "Upload", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))

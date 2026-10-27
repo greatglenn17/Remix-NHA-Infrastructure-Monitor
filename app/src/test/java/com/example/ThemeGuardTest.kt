@@ -12,7 +12,22 @@ class ThemeGuardTest {
             "ui/dashboard/DashboardScreen.kt",
             "ui/dashboard/PortfolioContent.kt",
             "ui/dashboard/PortfolioRow.kt",
-            "ui/dashboard/PortfolioCounts.kt"
+            "ui/dashboard/PortfolioCounts.kt",
+            "ui/detail/ProjectDetailScreen.kt",
+            "ui/detail/ProjectSection.kt",
+            "ui/detail/sections/ChipRow.kt",
+            "ui/detail/sections/DocumentsSection.kt",
+            "ui/detail/sections/MoneySection.kt",
+            "ui/detail/sections/PaymentCard.kt",
+            "ui/detail/sections/ProjectHeader.kt",
+            "ui/detail/sections/SectionCard.kt",
+            "ui/detail/sections/SummarySection.kt",
+            "ui/detail/tabs/AuditLogTab.kt",
+            "ui/detail/tabs/IssuesTab.kt",
+            "ui/detail/tabs/MonthlyReportsTab.kt",
+            "ui/detail/tabs/PendingDocumentsTab.kt",
+            "ui/detail/tabs/PhotoGalleryTab.kt",
+            "ui/detail/tabs/WeeklyReportsTab.kt"
         )
     }
 

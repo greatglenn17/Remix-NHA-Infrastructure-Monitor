@@ -57,7 +57,7 @@ fun WeeklyReportsTab(
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onAddWeeklyReportClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                         shape = RoundedCornerShape(50.dp),
                         modifier = Modifier.testTag("add_weekly_report_empty_button")
                     ) {
@@ -89,7 +89,7 @@ fun WeeklyReportsTab(
                         if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
                             Button(
                                 onClick = onAddWeeklyReportClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                 shape = RoundedCornerShape(50.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -170,7 +170,7 @@ private fun WeeklyReportCard(
                                 if (showDeleteConfirm) {
                                     AlertDialog(
                                         onDismissRequest = { showDeleteConfirm = false },
-                                        title = { Text("Delete Report", color = Color.White) },
+                                        title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
                                         text = { Text("Are you sure you want to delete this report?", color = DarkTextPrimary) },
                                         confirmButton = {
                                             TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = StatusRedText) }
@@ -236,7 +236,7 @@ private fun WeeklyReportCard(
                             if (parsedAccItems.isNotEmpty()) {
                                 parsedAccItems.forEach { acc ->
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
+                                        Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
                                         Text("T: ${"%.1f".format(acc.targetPct)}%", color = DarkTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("A: ${"%.1f".format(acc.actualPct)}%", color = DarkTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) WeatherFairGreen else StatusRedText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
@@ -249,7 +249,7 @@ private fun WeeklyReportCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("GRAND TOTAL", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                                Text("GRAND TOTAL", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                                 Text("T: ${"%.2f".format(report.targetAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = DarkTextPrimary))
                                 Text("A: ${"%.2f".format(report.actualAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary))
                                 val varPct = report.actualAccomplishmentPct - report.targetAccomplishmentPct
@@ -302,7 +302,7 @@ private fun WeeklyReportCard(
                                             .padding(horizontal = 12.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(act.day, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color.White), modifier = Modifier.weight(1.1f))
+                                        Text(act.day, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1.1f))
                                         Text(act.description, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextPrimary), modifier = Modifier.weight(2f))
                                         Text(act.remarks.ifEmpty { "-" }, style = MaterialTheme.typography.bodySmall.copy(color = DarkTextSecondary), modifier = Modifier.weight(1f))
                                     }
@@ -388,7 +388,7 @@ private fun WeeklyReportCard(
                             ) {
                                 Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DarkTextPrimary), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
-                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8)), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                         }
                     }

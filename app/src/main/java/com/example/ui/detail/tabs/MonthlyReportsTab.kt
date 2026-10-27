@@ -102,10 +102,10 @@ fun MonthlyReportsTab(
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF38BDF8),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                             focusedContainerColor = DarkSurfaceVariant,
                             unfocusedContainerColor = DarkSurfaceVariant
                         ),
@@ -119,7 +119,7 @@ fun MonthlyReportsTab(
                     ) {
                         availableMonths.forEach { month ->
                             DropdownMenuItem(
-                                text = { Text(month, color = Color.White) },
+                                text = { Text(month, color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     selectedMonth = month
                                     dropdownExpanded = false
@@ -235,19 +235,19 @@ private fun MonthlyReportSingleTableCard(
                                 Text(
                                     text = rep.reportingWeek,
                                     modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontWeight = FontWeight.Medium)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                                 )
                                 VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                                 Text(
                                     text = "${"%.2f".format(target)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Color.White)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                                 Text(
                                     text = "${"%.2f".format(actual)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.bodySmall.copy(color = Color.White)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                                 Text(
@@ -272,19 +272,19 @@ private fun MonthlyReportSingleTableCard(
                             Text(
                                 text = "MONTH TOTAL",
                                 modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
                             VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumTarget)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
                             VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumActual)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
                             VerticalDivider(color = DarkBorder, modifier = Modifier.fillMaxHeight())
                             Text(

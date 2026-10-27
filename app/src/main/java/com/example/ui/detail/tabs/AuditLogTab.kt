@@ -70,7 +70,7 @@ fun AuditLogTab(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             placeholder = { Text("Search audit logs (user, action, details, device)...", color = DarkTextSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF38BDF8)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
             trailingIcon = if (searchQuery.isNotEmpty()) {
                 {
                     IconButton(onClick = { searchQuery = "" }) {
@@ -82,7 +82,7 @@ fun AuditLogTab(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = DarkSurface,
                 unfocusedContainerColor = DarkSurface,
-                focusedBorderColor = Color(0xFF38BDF8),
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = DarkBorder,
                 focusedTextColor = DarkTextPrimary,
                 unfocusedTextColor = DarkTextPrimary
@@ -99,7 +99,7 @@ fun AuditLogTab(
         ScrollableTabRow(
             selectedTabIndex = filterOptions.indexOf(selectedFilter).coerceAtLeast(0),
             containerColor = Color.Transparent,
-            contentColor = Color(0xFF38BDF8),
+            contentColor = MaterialTheme.colorScheme.primary,
             edgePadding = 0.dp,
             divider = {},
             modifier = Modifier.fillMaxWidth()
@@ -111,8 +111,8 @@ fun AuditLogTab(
                     onClick = { selectedFilter = filter },
                     label = { Text(filter, fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF0284C7),
-                        selectedLabelColor = Color.White,
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         containerColor = DarkSurface,
                         labelColor = DarkTextSecondary
                     ),
@@ -171,17 +171,17 @@ fun AuditLogCard(log: AuditLog) {
     }
 
     val (badgeColor, icon) = when {
-        log.actionType.contains("Creation", ignoreCase = true) -> Color(0xFF10B981) to Icons.Default.AddCircle
-        log.actionType.contains("Edit", ignoreCase = true) || log.actionType.contains("Update", ignoreCase = true) -> Color(0xFF3B82F6) to Icons.Default.Edit
-        log.actionType.contains("Deletion", ignoreCase = true) -> Color(0xFFEF4444) to Icons.Default.Delete
-        log.actionType.contains("Login", ignoreCase = true) -> Color(0xFF8B5CF6) to Icons.Default.Login
-        log.actionType.contains("Logout", ignoreCase = true) -> Color(0xFF6B7280) to Icons.Default.Logout
-        log.actionType.contains("Sync", ignoreCase = true) -> Color(0xFF06B6D4) to Icons.Default.Sync
-        log.actionType.contains("Backup", ignoreCase = true) -> Color(0xFFF59E0B) to Icons.Default.CloudUpload
-        log.actionType.contains("Restore", ignoreCase = true) -> Color(0xFF14B8A6) to Icons.Default.CloudDownload
-        log.actionType.contains("Migration", ignoreCase = true) -> Color(0xFFA855F7) to Icons.Default.Storage
-        log.actionType.contains("Upload", ignoreCase = true) || log.actionType.contains("Document", ignoreCase = true) -> Color(0xFFEC4899) to Icons.Default.UploadFile
-        else -> Color(0xFF38BDF8) to Icons.Default.Info
+        log.actionType.contains("Creation", ignoreCase = true) -> LocalNHAColors.current.onTrack to Icons.Default.AddCircle
+        log.actionType.contains("Edit", ignoreCase = true) || log.actionType.contains("Update", ignoreCase = true) -> MaterialTheme.colorScheme.primary to Icons.Default.Edit
+        log.actionType.contains("Deletion", ignoreCase = true) -> LocalNHAColors.current.behind to Icons.Default.Delete
+        log.actionType.contains("Login", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Login
+        log.actionType.contains("Logout", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Logout
+        log.actionType.contains("Sync", ignoreCase = true) -> MaterialTheme.colorScheme.primary to Icons.Default.Sync
+        log.actionType.contains("Backup", ignoreCase = true) -> LocalNHAColors.current.watch to Icons.Default.CloudUpload
+        log.actionType.contains("Restore", ignoreCase = true) -> LocalNHAColors.current.onTrack to Icons.Default.CloudDownload
+        log.actionType.contains("Migration", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Storage
+        log.actionType.contains("Upload", ignoreCase = true) || log.actionType.contains("Document", ignoreCase = true) -> MaterialTheme.colorScheme.primary to Icons.Default.UploadFile
+        else -> MaterialTheme.colorScheme.primary to Icons.Default.Info
     }
 
     Card(
@@ -240,7 +240,7 @@ fun AuditLogCard(log: AuditLog) {
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = null,
-                    tint = Color(0xFF38BDF8),
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
@@ -290,7 +290,7 @@ fun AuditLogCard(log: AuditLog) {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
                                 text = "Old Value: ",
-                                color = Color(0xFFEF4444),
+                                color = LocalNHAColors.current.behind,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
@@ -310,7 +310,7 @@ fun AuditLogCard(log: AuditLog) {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
                                 text = "New Value: ",
-                                color = Color(0xFF10B981),
+                                color = LocalNHAColors.current.onTrack,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )

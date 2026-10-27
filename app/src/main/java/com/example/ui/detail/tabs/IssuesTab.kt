@@ -80,7 +80,7 @@ fun IssuesTab(
                     .fillMaxWidth()
                     .testTag("search_issues_input"),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF38BDF8),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = DarkBorder,
                     focusedContainerColor = DarkSurface,
                     unfocusedContainerColor = DarkSurface,
@@ -104,8 +104,8 @@ fun IssuesTab(
                         onClick = { selectedFilter = filter },
                         label = { Text(filter, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF38BDF8).copy(alpha = 0.25f),
-                            selectedLabelColor = Color(0xFF38BDF8),
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                            selectedLabelColor = MaterialTheme.colorScheme.primary,
                             containerColor = DarkSurface,
                             labelColor = DarkTextSecondary
                         ),
@@ -113,7 +113,7 @@ fun IssuesTab(
                             enabled = true,
                             selected = selectedFilter == filter,
                             borderColor = DarkBorder,
-                            selectedBorderColor = Color(0xFF38BDF8)
+                            selectedBorderColor = MaterialTheme.colorScheme.primary
                         )
                     )
                 }
@@ -158,8 +158,8 @@ fun IssuesTab(
         if (currentUserRole.hasPermission(Permission.LOG_ISSUE)) {
             FloatingActionButton(
                 onClick = onAddClick,
-                containerColor = Color(0xFF38BDF8),
-                contentColor = Color.Black,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
@@ -279,7 +279,7 @@ fun IssueCard(
             Text(
                 text = issue.description,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     lineHeight = 20.sp
                 ),
@@ -295,7 +295,7 @@ fun IssueCard(
                     text = "ACTION TAKEN",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF38BDF8)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -366,7 +366,7 @@ fun IssueCard(
                 ) {
                     if (currentUserRole.hasPermission(Permission.EDIT_ISSUE)) {
                         IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Issue", tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Issue", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }
                     }
                     if (currentUserRole.hasPermission(Permission.DELETE_ISSUE)) {
@@ -395,7 +395,7 @@ fun IssueCard(
                 }
             },
             containerColor = DarkSurface,
-            titleContentColor = Color.White,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
             textContentColor = DarkTextSecondary
         )
     }
