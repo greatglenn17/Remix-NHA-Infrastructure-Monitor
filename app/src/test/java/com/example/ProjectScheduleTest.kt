@@ -59,6 +59,27 @@ class ProjectScheduleTest {
     }
 
     @Test
+    fun revisedDuration_fromApprovedOrders() {
+        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 30, "-"))
+    }
+
+    @Test
+    fun revisedDuration_fromStoredDate() {
+        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-12-01"))
+    }
+
+    @Test
+    fun revisedDuration_noneWhenSameOrBlank() {
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "-"))
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-01"))
+    }
+
+    @Test
+    fun revisedDuration_badDate() {
+        assertNull(ProjectSchedule.revisedDurationDays("", 300, 0, "2026-12-01"))
+    }
+
+    @Test
     fun addedDays_sumsApprovedOrdersOnly() {
         val docs = listOf(
             doc("Time Extension No. 1 - 30 Days", "Approved"),
