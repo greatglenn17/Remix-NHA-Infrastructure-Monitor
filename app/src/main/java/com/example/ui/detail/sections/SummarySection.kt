@@ -50,13 +50,14 @@ fun SummarySection(
     }
     val addedDays = remember(documents) { ProjectSchedule.addedDays(documents) }
     var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
+    val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> AttentionCard(flags, m) },
         { m -> ProfileCard(project, canEditProject, onEditProject, m) },
         { m ->
             KeyDatesCard(
                 project, revisedCompletion, addedDays, today, documents,
-                onAddOrder.takeIf { currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT) }, { openOrder = it }, m
+                onAddOrder.takeIf { canUpdateOrders }, if (canUpdateOrders) { order: PendingDocument -> openOrder = order } else null, m
             )
         },
         { m -> CostCard(project, documents, m) },
@@ -92,7 +93,7 @@ private fun KeyDatesCard(
     today: LocalDate,
     documents: List<PendingDocument>,
     onAddOrder: (() -> Unit)?,
-    onOpenOrder: (PendingDocument) -> Unit,
+    onOpenOrder: ((PendingDocument) -> Unit)?,
     modifier: Modifier
 ) {
     val end = revisedCompletion ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
@@ -131,7 +132,7 @@ private fun KeyDatesCard(
         Text("Time extensions & suspensions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         if (orders.isEmpty()) EmptyLine("No time extension or suspension orders.")
         orders.forEach { doc ->
-            LogEntry(doc.documentName, MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = { onOpenOrder(doc) })
+            LogEntry(doc.documentName, MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpenOrder?.let { open -> { open(doc) } })
         }
     }
 }

@@ -13,7 +13,9 @@ import androidx.compose.ui.unit.dp
 import com.example.data.files.Attachments
 import com.example.data.model.PendingDocument
 import com.example.data.model.ProjectPayment
+import com.example.data.model.Permission
 import com.example.data.model.UserRole
+import com.example.data.model.hasPermission
 import com.example.ui.components.rememberAttachmentPicker
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.detail.tabs.AddPaymentDialog
@@ -193,7 +195,7 @@ fun VariationOrdersLog(
                 vo.documentName,
                 MaterialTheme.colorScheme.onSurface,
                 listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText),
-                onClick = { openOrder = vo }
+                onClick = if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) { { openOrder = vo } } else null
             )
         }
     }

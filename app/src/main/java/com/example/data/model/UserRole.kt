@@ -35,7 +35,9 @@ enum class Permission {
     BACKUP_RESTORE,
     MANAGE_USERS,
     VIEW_AUDIT_LOGS,
-    MANAGE_SDP_PLANS
+    MANAGE_SDP_PLANS,
+    // Approve or reject time extensions, suspensions, resumptions and variation orders.
+    APPROVE_ORDER
 }
 
 fun UserRole.hasPermission(permission: Permission): Boolean {
@@ -49,7 +51,8 @@ fun UserRole.hasPermission(permission: Permission): Boolean {
             Permission.DELETE_ISSUE,
             Permission.BACKUP_RESTORE,
             Permission.MANAGE_USERS,
-            Permission.MANAGE_SDP_PLANS -> false
+            Permission.MANAGE_SDP_PLANS,
+            Permission.APPROVE_ORDER -> false
             else -> true
         }
         UserRole.VIEWER -> false

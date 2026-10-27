@@ -57,6 +57,9 @@ fun OrderStatusDialog(
     onDismiss: () -> Unit
 ) {
     var remarks by remember(doc.id) { mutableStateOf(doc.remarks) }
+    val canApprove = currentUserRole.hasPermission(Permission.APPROVE_ORDER)
+    // Only approvers set or undo Approved; others may update an order still in progress.
+    val canEdit = canApprove || (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT) && doc.status != "Approved")
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Update status") },
@@ -67,26 +70,42 @@ fun OrderStatusDialog(
                     listOf("Pending", "Submitted", "Signed", "Notarized", "Approved").forEach { status ->
                         FilterChip(
                             selected = doc.status == status,
-                            onClick = { onUpdateStatus(doc, status, remarks); onDismiss() },
+                            onClick = { onUpdateStatus(doc, status, keepOrderFields(doc.remarks, remarks)); onDismiss() },
+                            enabled = canEdit && (canApprove || status != "Approved"),
                             label = { Text(status) },
                             modifier = Modifier.testTag("order_status_$status")
                         )
                     }
                 }
-                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+                if (!canApprove) Text("Only an Engineer Admin can approve.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, enabled = canEdit, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
             }
         },
-        confirmButton = { TextButton(onClick = { onUpdateStatus(doc, doc.status, remarks); onDismiss() }) { Text("Save remarks") } },
+        confirmButton = {
+            TextButton(onClick = { onUpdateStatus(doc, doc.status, keepOrderFields(doc.remarks, remarks)); onDismiss() }, enabled = canEdit) { Text("Save remarks") }
+        },
         dismissButton = {
             Row {
-                // Same rule as the old checklist: Engineer Admins could delete orders.
-                if (currentUserRole == UserRole.ENGINEER_ADMIN) {
+                if (canApprove) {
                     TextButton(onClick = { onDeleteDocument(doc.id); onDismiss() }) { Text("Delete", color = LocalNHAColors.current.behind) }
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         }
     )
+}
+
+/**
+ * [edited] remarks with any "Duration/Effectivity/End/Date Approved: …" field of [original] put back
+ * when the edit dropped it, so revised dates and the VO log keep reading them. A field whose value
+ * was changed (its key still present) is left as edited.
+ */
+internal fun keepOrderFields(original: String, edited: String): String {
+    val dropped = Regex("\\b(Duration|Effectivity|End|Date Approved):[^|]*", RegexOption.IGNORE_CASE).findAll(original)
+        .filter { field -> !Regex("\\b${field.groupValues[1]}:", RegexOption.IGNORE_CASE).containsMatchIn(edited) }
+        .map { it.value.trim() }
+        .toList()
+    return (dropped + edited.trim()).filter { it.isNotBlank() }.joinToString(" | ")
 }
 
 /** Documents › Related Files: related project files that are not schedule or cost orders. */

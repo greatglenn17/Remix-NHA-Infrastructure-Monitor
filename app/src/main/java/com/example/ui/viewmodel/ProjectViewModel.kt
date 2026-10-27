@@ -24,6 +24,7 @@ import com.example.util.PortfolioFilter
 import com.example.util.PortfolioItem
 import com.example.util.PortfolioSummary
 import com.example.util.ProjectAttention
+import com.example.util.SitePhotos
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1710,6 +1711,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     saveProjectChange(updated)
                 }
             }
+            refreshSitePhoto(report.projectId)
         }
     }
 
@@ -1728,6 +1730,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         actualAccomplishment = report.actualAccomplishmentPct
                     ))
                 }
+                refreshSitePhoto(report.projectId)
             } catch (error: Exception) {
                 _authError.value = "Weekly report was not updated: ${error.message ?: "database transaction failed"}"
             }
@@ -1738,7 +1741,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             reportDao.deleteWeeklyReport(report.id)
             logAuditAction(report.projectId, "Deleted Weekly Report", "Deleted report for ${report.reportingWeek}")
+            refreshSitePhoto(report.projectId)
         }
+    }
+
+    /** Points the project's card photo at the newest report photo left, after an edit or delete. */
+    private suspend fun refreshSitePhoto(projectId: Long) {
+        val photo = SitePhotos.latest(reportDao.getWeeklyReportsForProject(projectId).first())
+        val current = projectDao.getProjectByIdOnce(projectId) ?: return
+        if (current.latestUpdatePhotoUrl != photo) saveProjectChange(current.copy(latestUpdatePhotoUrl = photo))
     }
 
     fun submitMonthlyReport(
