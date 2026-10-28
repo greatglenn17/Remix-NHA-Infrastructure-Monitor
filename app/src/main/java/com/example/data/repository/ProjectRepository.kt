@@ -199,6 +199,11 @@ class ProjectRepository(
         projectDao.updateSdpLot(lot)
     }
 
+    suspend fun updateSdpLots(lots: List<SdpLot>, role: UserRole? = null) {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        projectDao.updateSdpLots(lots)
+    }
+
     suspend fun deactivateSdpLot(lotId: Long, modifiedBy: String, role: UserRole? = null) {
         validatePermission(role, Permission.EDIT_PROJECT)
         val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())

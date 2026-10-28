@@ -18,6 +18,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.util.BlockNumbering
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -282,7 +286,8 @@ fun SubdivisionPlanTab(
     onDetectLots: (SdpPlan, (List<com.example.util.LotDetector.Area>?) -> Unit) -> Unit = { _, done -> done(null) },
     onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> },
     onTraceLot: (SdpPlan, Float, Float, (List<Pair<Float, Float>>?) -> Unit) -> Unit = { _, _, _, done -> done(null) },
-    onRemoveDetectedLots: (SdpPlan) -> Unit = {}
+    onRemoveDetectedLots: (SdpPlan) -> Unit = {},
+    onRenumberLots: (renumbered: List<SdpLot>, oldBlock: String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -325,6 +330,24 @@ fun SubdivisionPlanTab(
     val isDrawMode = interactionMode != SdpInteractionMode.MONITORING && interactionMode != SdpInteractionMode.TAP_ADD_LOT
     var selectedLot by remember { mutableStateOf<SdpLot?>(null) }
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
+
+    // Renumbering one block: a panel replaces the lot card and the plan shows the new numbers.
+    var renumberBlock by remember { mutableStateOf<String?>(null) }
+    var renumberTo by remember { mutableStateOf("") }
+    var renumberFirst by remember { mutableStateOf("1") }
+    var renumberPattern by remember { mutableStateOf(BlockNumbering.Pattern.ODD_EVEN) }
+    var renumberOtherEnd by remember { mutableStateOf(false) }
+    var renumberOtherRow by remember { mutableStateOf(false) }
+    val startRenumber = { lot: SdpLot ->
+        renumberBlock = lot.blockNumber
+        renumberTo = lot.blockNumber
+        renumberFirst = "1"
+        renumberPattern = BlockNumbering.Pattern.ODD_EVEN
+        renumberOtherEnd = false
+        renumberOtherRow = false
+        selectedLot = null
+        selectedRoad = null
+    }
 
     // Draft Geometry Points (Normalized 0.0 to 1.0)
     val draftPoints = remember { mutableStateListOf<Offset>() }
@@ -396,6 +419,18 @@ fun SubdivisionPlanTab(
                 ParsedSdpLot(lot, polygon, bounds, centroid)
             } else null
         }
+    }
+
+    // New lot numbers of the block being renumbered, by lot id.
+    val renumberPreview = remember(renumberBlock, renumberFirst, renumberPattern, renumberOtherEnd, renumberOtherRow, parsedLots, renderedBitmap) {
+        val block = renumberBlock ?: return@remember emptyMap<Long, Int>()
+        val lots = parsedLots.filter { it.lot.blockNumber == block }
+        val w = (renderedBitmap?.width ?: 1600).toDouble(); val h = (renderedBitmap?.height ?: 1200).toDouble()
+        val numbers = BlockNumbering.number(
+            lots.map { it.centroid.x * w to it.centroid.y * h },
+            renumberFirst.toIntOrNull() ?: 1, renumberPattern, renumberOtherEnd, renumberOtherRow
+        )
+        lots.zip(numbers).associate { (p, n) -> p.lot.id to n }
     }
 
     val parsedRoads = remember(activeRoads) {
@@ -1031,7 +1066,11 @@ fun SubdivisionPlanTab(
                                         val normY = ((tapOffset.y - offset.y) / (bitmapHeight * scale)).coerceIn(0f, 1f)
                                         val tappedNorm = Offset(normX, normY)
 
-                                        if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
+                                        if (renumberBlock != null) {
+                                            // While renumbering, a tap on a lot moves on to that lot's block.
+                                            parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }
+                                                ?.let { startRenumber(it.lot) }
+                                        } else if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
                                             interactionMode == SdpInteractionMode.DIGITIZING_ROAD) {
                                             draftPoints.add(tappedNorm)
                                         } else if (interactionMode == SdpInteractionMode.TAP_ADD_LOT && activeSdpPlan != null && !isTracing) {
@@ -1086,7 +1125,7 @@ fun SubdivisionPlanTab(
                                         }
                                     },
                                     onLongPress = { tapOffset ->
-                                        if (interactionMode == SdpInteractionMode.MONITORING) {
+                                        if (interactionMode == SdpInteractionMode.MONITORING && renumberBlock == null) {
                                             val normX = ((tapOffset.x - offset.x) / (bitmapWidth * scale)).coerceIn(0f, 1f)
                                             val normY = ((tapOffset.y - offset.y) / (bitmapHeight * scale)).coerceIn(0f, 1f)
                                             val tappedNorm = Offset(normX, normY)
@@ -1230,7 +1269,8 @@ fun SubdivisionPlanTab(
                                     }
                                     close()
                                 }
-                                val isSelected = selectedLot?.id == lot.id
+                                val previewNumber = renumberPreview[lot.id]
+                                val isSelected = selectedLot?.id == lot.id || previewNumber != null
                                 val progressRecord = lotProgressMap[lot.id]
                                 val progressValue = progressRecord?.physicalProgress ?: 0
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
@@ -1279,7 +1319,8 @@ fun SubdivisionPlanTab(
                                     if (isMatching || scale > 1.8f) {
                                         val centroid = parsedLot.centroid
                                         val billedTag = if (isBilled) " • BILLED" else ""
-                                        val labelText = "B${lot.blockNumber}-L${lot.lotNumber}\n${progressValue}%$billedTag"
+                                        // The preview shows just the lot number so a row of narrow lots stays readable.
+                                        val labelText = if (previewNumber != null) "$previewNumber" else "B${lot.blockNumber}-L${lot.lotNumber}\n${progressValue}%$billedTag"
                                         val textLayoutResult = textMeasurer.measure(
                                             text = labelText,
                                             style = TextStyle(
@@ -1425,8 +1466,91 @@ fun SubdivisionPlanTab(
                             }
                         }
 
+                // RENUMBER BLOCK PANEL: the plan above previews the numbers as they are set.
+                if (renumberBlock != null) {
+                    val block = renumberBlock!!
+                    val blockLots = activeLots.filter { it.blockNumber == block }
+                    val target = renumberTo.trim()
+                    val first = renumberFirst.trim().toIntOrNull()
+                    val othersInTarget = activeLots.count { it.blockNumber == target && it.blockNumber != block }
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                "Renumber Block $block (${blockLots.size} lots)",
+                                style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                "Check the numbers on the shaded lots against the plan. Tap another lot to go to its block.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = renumberTo,
+                                    onValueChange = { renumberTo = it.take(10) },
+                                    label = { Text("Block on plan") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f).testTag("renumber_block_field")
+                                )
+                                OutlinedTextField(
+                                    value = renumberFirst,
+                                    onValueChange = { v -> renumberFirst = v.filter { it.isDigit() }.take(4) },
+                                    label = { Text("First lot") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f).testTag("renumber_first_field")
+                                )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.horizontalScroll(rememberScrollState())
+                            ) {
+                                FilterChip(
+                                    selected = renumberPattern == BlockNumbering.Pattern.ODD_EVEN,
+                                    onClick = { renumberPattern = BlockNumbering.Pattern.ODD_EVEN },
+                                    label = { Text("Odd / even rows") }
+                                )
+                                FilterChip(
+                                    selected = renumberPattern == BlockNumbering.Pattern.CONSECUTIVE,
+                                    onClick = { renumberPattern = BlockNumbering.Pattern.CONSECUTIVE },
+                                    label = { Text("Consecutive") }
+                                )
+                                FilterChip(selected = renumberOtherEnd, onClick = { renumberOtherEnd = !renumberOtherEnd }, label = { Text("Start from other end") })
+                                FilterChip(selected = renumberOtherRow, onClick = { renumberOtherRow = !renumberOtherRow }, label = { Text("Start on other row") })
+                            }
+                            if (othersInTarget > 0) {
+                                Text(
+                                    "Block $target already has $othersInTarget other ${if (othersInTarget == 1) "lot" else "lots"}. They keep their numbers until you renumber them.",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind)
+                                )
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { renumberBlock = null }) {
+                                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    enabled = target.isNotEmpty() && first != null && blockLots.isNotEmpty(),
+                                    onClick = {
+                                        onRenumberLots(
+                                            blockLots.mapNotNull { lot -> renumberPreview[lot.id]?.let { lot.copy(blockNumber = target, lotNumber = it.toString()) } },
+                                            block
+                                        )
+                                        renumberBlock = null
+                                    },
+                                    modifier = Modifier.testTag("renumber_save_button")
+                                ) { Text("Save numbers") }
+                            }
+                        }
+                    }
+                }
+
                 // BOTTOM SELECTION INFO CARD (WITH PHASE 7 RECORD INSPECTION & HISTORY ACTIONS)
-                if (selectedLot != null || selectedRoad != null) {
+                if (renumberBlock == null && (selectedLot != null || selectedRoad != null)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1557,6 +1681,17 @@ fun SubdivisionPlanTab(
                                         ) {
                                             Text("REMOVE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                         }
+                                    }
+                                }
+                                if (canDigitize && selectedLot != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    OutlinedButton(
+                                        onClick = { startRenumber(selectedLot!!) },
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().height(32.dp).testTag("renumber_block_button")
+                                    ) {
+                                        Text("RENUMBER BLOCK ${selectedLot!!.blockNumber}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }

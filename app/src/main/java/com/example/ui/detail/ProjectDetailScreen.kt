@@ -226,6 +226,7 @@ fun ProjectDetailScreen(
                                 onAddDetectedLots = viewModel::addDetectedSdpLots,
                                 onTraceLot = viewModel::traceSdpLot,
                                 onRemoveDetectedLots = viewModel::removeDetectedSdpLots,
+                                onRenumberLots = viewModel::renumberSdpLots,
                                 onSelectActiveVersion = { planId: Long ->
                                     viewModel.setActiveSdpPlan(currentProject.id, planId)
                                 },

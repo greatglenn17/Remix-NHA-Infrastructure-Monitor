@@ -196,6 +196,9 @@ interface ProjectDao {
     @Update
     suspend fun updateSdpLot(lot: SdpLot)
 
+    @Update
+    suspend fun updateSdpLots(lots: List<SdpLot>)
+
     @Query("UPDATE sdp_lots SET isActive = 0, lastModifiedBy = :modifiedBy, lastModifiedDate = :modifiedDate WHERE id = :lotId")
     suspend fun deactivateSdpLot(lotId: Long, modifiedBy: String, modifiedDate: String)
 

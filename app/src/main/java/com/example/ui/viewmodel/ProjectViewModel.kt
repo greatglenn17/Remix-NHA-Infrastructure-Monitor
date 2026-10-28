@@ -1154,6 +1154,24 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */
+    fun renumberSdpLots(renumbered: List<SdpLot>, oldBlock: String) {
+        if (renumbered.isEmpty()) return
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            repository.updateSdpLots(renumbered.map { it.copy(lastModifiedBy = user, lastModifiedDate = currentDate) }, currentUserAccount.value.role)
+            val numbers = renumbered.map { it.lotNumber.toIntOrNull() ?: 0 }
+            logAuditAction(
+                projectId = renumbered.first().projectId,
+                actionType = "Lot Geometry Changed",
+                details = "Renumbered ${renumbered.size} lots of Block $oldBlock",
+                oldValue = "Block $oldBlock",
+                newValue = "Block ${renumbered.first().blockNumber}, Lots ${numbers.min()}-${numbers.max()}"
+            )
+        }
+    }
+
     fun deactivateSdpLot(lot: SdpLot) {
         viewModelScope.launch {
             val user = currentUserAccount.value.name
