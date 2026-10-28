@@ -40,6 +40,12 @@ class LotDetectorTest {
             assertTrue(lot.polygon.size in 4..8)
             assertTrue(lot.polygon.all { (x, y) -> x in 0f..1f && y in 0f..1f })
         }
+        // Outlines reach the middle of the lot lines, so a 30 x 50 px lot measures close to 1500 px.
+        lots.filter { it.block == 1 }.forEach { lot ->
+            val px = lot.polygon.map { (x, y) -> x * c.w to y * c.h }
+            val area = kotlin.math.abs(px.indices.sumOf { i -> val (x1, y1) = px[i]; val (x2, y2) = px[(i + 1) % px.size]; (x1 * y2 - x2 * y1).toDouble() }) / 2
+            assertTrue("area $area", area in 1400.0..1600.0)
+        }
     }
 
     @Test

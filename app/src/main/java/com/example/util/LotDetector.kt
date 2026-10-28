@@ -70,6 +70,7 @@ object LotDetector {
                 it.cx in siteMinX.toFloat()..siteMaxX.toFloat() && it.cy in siteMinY.toFloat()..siteMaxY.toFloat()
         }.sortedWith(compareBy({ it.cy }, { it.cx }))
 
+        growIntoWalls(labels, wall, width, height)
         val outline = { r: Region -> normalize(simplify(outlineOf(r, labels, width), 1.5), width, height) }
         val numbered = numberLots(lots, touchGap = (sqrt(typical) * 0.15 + 4).toInt())
         return numbered.map { (r, block, lot) -> Area(block, lot, outline(r), isLot = true) } +
@@ -103,7 +104,28 @@ object LotDetector {
         val labels = IntArray(width * height)
         val r = fill(start.second * width + start.first, Region(1), wall, labels, width, height, IntArray(4096))
         if (r.touchesEdge || r.area < 50 || r.area > width.toLong() * height / 50) return null
+        growIntoWalls(labels, wall, width, height)
         return normalize(simplify(outlineOf(r, labels, width), 1.5), width, height)
+    }
+
+    private const val GROW = 2
+
+    /** Lots are drawn to the middle of their lines: let each area take the line pixels next to it, [GROW] deep. */
+    private fun growIntoWalls(labels: IntArray, wall: BooleanArray, w: Int, h: Int) {
+        repeat(GROW) {
+            val before = labels.copyOf()
+            for (p in labels.indices) {
+                if (!wall[p] || before[p] != 0) continue
+                val x = p % w
+                labels[p] = when {
+                    x > 0 && before[p - 1] != 0 -> before[p - 1]
+                    x < w - 1 && before[p + 1] != 0 -> before[p + 1]
+                    p >= w && before[p - w] != 0 -> before[p - w]
+                    p + w < labels.size && before[p + w] != 0 -> before[p + w]
+                    else -> 0
+                }
+            }
+        }
     }
 
     private fun label(wall: BooleanArray, labels: IntArray, w: Int, h: Int): List<Region> {
@@ -191,9 +213,10 @@ object LotDetector {
     private fun outlineOf(r: Region, labels: IntArray, w: Int): List<Pair<Double, Double>> {
         val left = mutableListOf<Pair<Double, Double>>()
         val right = mutableListOf<Pair<Double, Double>>()
-        for (y in r.minY..r.maxY) {
+        val h = labels.size / w
+        for (y in max(r.minY - GROW, 0)..min(r.maxY + GROW, h - 1)) {
             var lo = -1; var hi = -1
-            for (x in r.minX..r.maxX) if (labels[y * w + x] == r.id) { if (lo < 0) lo = x; hi = x }
+            for (x in max(r.minX - GROW, 0)..min(r.maxX + GROW, w - 1)) if (labels[y * w + x] == r.id) { if (lo < 0) lo = x; hi = x }
             if (lo < 0) continue
             left += lo.toDouble() to y.toDouble()
             right += (hi + 1).toDouble() to (y + 1).toDouble()
