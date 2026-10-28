@@ -69,7 +69,8 @@ class RecordSyncRemovalTest {
         val tables = recordSync.localOnlyChildTables()
         assertEquals("projectId", tables["time_extensions"])
         assertTrue("audit_logs" in tables)
-        assertTrue(tables.keys.any { it.startsWith("sdp_") })
+        // Subdivision plans and lots sync since v1.9.3.
+        assertFalse(tables.keys.any { it.startsWith("sdp_") })
         for (synced in RecordSyncSchema.TABLES + "daily_hourly_weather") assertFalse(synced in tables)
     }
 
