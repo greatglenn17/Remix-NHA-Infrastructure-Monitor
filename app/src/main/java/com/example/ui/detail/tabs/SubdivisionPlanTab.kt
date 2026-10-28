@@ -1136,8 +1136,8 @@ fun SubdivisionPlanTab(
                                             if (hitLot != null) {
                                                 selectedLot = hitLot
                                                 selectedRoad = null
-                                                // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL
-                                                showProgressDialogLot = hitLot
+                                                // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL (viewers only see the lot card)
+                                                if (canDigitize) showProgressDialogLot = hitLot
                                             } else {
                                                 // Test roads
                                                 var hitRoad: SdpRoad? = null
@@ -1698,7 +1698,7 @@ fun SubdivisionPlanTab(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Button(
+                                    if (canDigitize) Button(
                                         onClick = { showProgressDialogLot = selectedLot },
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                         shape = RoundedCornerShape(6.dp),
@@ -1708,7 +1708,7 @@ fun SubdivisionPlanTab(
                                         Text("UPDATE PROGRESS", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
 
-                                    Button(
+                                    if (canDigitize) Button(
                                         onClick = { showRecordInspectionDialogLot = selectedLot },
                                         colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.onTrack, contentColor = MaterialTheme.colorScheme.surface),
                                         shape = RoundedCornerShape(6.dp),
