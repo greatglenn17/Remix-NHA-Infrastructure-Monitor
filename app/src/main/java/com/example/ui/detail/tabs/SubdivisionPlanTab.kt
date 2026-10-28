@@ -940,8 +940,11 @@ fun SubdivisionPlanTab(
                         Text(pdfError!!, color = LocalNHAColors.current.behind)
                     }
                 } else {
-                    val bitmapWidth = renderedBitmap?.width?.toFloat() ?: 1600f
-                    val bitmapHeight = renderedBitmap?.height?.toFloat() ?: 1200f
+                    // The page fitted to the viewer is the frame the image, lots, roads and taps all share.
+                    val pageFit = renderedBitmap?.let { minOf(viewportWidth / it.width, viewportHeight / it.height) } ?: 1f
+                    val bitmapWidth = renderedBitmap?.let { it.width * pageFit } ?: 1600f
+                    val bitmapHeight = renderedBitmap?.let { it.height * pageFit } ?: 1200f
+                    val density = androidx.compose.ui.platform.LocalDensity.current
 
                     // Auto-center viewport when a single lot matches search query
                     LaunchedEffect(matchingLots, searchQuery) {
@@ -1054,7 +1057,9 @@ fun SubdivisionPlanTab(
                             Image(
                                 bitmap = renderedBitmap!!.asImageBitmap(),
                                 contentDescription = "SDP PDF",
+                                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
                                 modifier = Modifier
+                                    .requiredSize(with(density) { bitmapWidth.toDp() }, with(density) { bitmapHeight.toDp() })
                                     .graphicsLayer(
                                         scaleX = scale,
                                         scaleY = scale,
@@ -1210,11 +1215,14 @@ fun SubdivisionPlanTab(
                                             text = labelText,
                                             style = TextStyle(
                                                 color = if (isMatching) onSurfaceMap else nhaMap.neutral.copy(alpha = 0.5f),
-                                                fontSize = 9.sp,
+                                                // Same size on screen at any zoom; the layer scales everything else.
+                                                fontSize = 9.sp / scale,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         )
-                                        drawText(
+                                        // A plan of hundreds of lots: label only the lots wide enough to hold one.
+                                        val lotWidth = (parsedLot.bounds.maxX - parsedLot.bounds.minX) * bitmapWidth
+                                        if (textLayoutResult.size.width <= lotWidth * 1.2f || isSelected) drawText(
                                             textLayoutResult = textLayoutResult,
                                             topLeft = Offset(
                                                 x = centroid.x * bitmapWidth - (textLayoutResult.size.width / 2f),
