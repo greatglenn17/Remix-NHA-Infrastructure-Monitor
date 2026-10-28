@@ -287,8 +287,13 @@ fun SubdivisionPlanTab(
     onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> },
     onTraceLot: (SdpPlan, Float, Float, (List<Pair<Float, Float>>?) -> Unit) -> Unit = { _, _, _, done -> done(null) },
     onRemoveDetectedLots: (SdpPlan) -> Unit = {},
-    onRenumberLots: (renumbered: List<SdpLot>, oldBlock: String) -> Unit = { _, _ -> }
+    onRenumberLots: (renumbered: List<SdpLot>, oldBlock: String) -> Unit = { _, _ -> },
+    onSetPlanScale: (SdpPlan, Int) -> Unit = { _, _ -> },
+    onLotArea: (SdpPlan, List<Pair<Float, Float>>, (Double?) -> Unit) -> Unit = { _, _, done -> done(null) }
 ) {
+    var showScaleDialog by remember { mutableStateOf(false) }
+    // Area worked out from the plan scale for the lot being added; null until known.
+    var draftArea by remember { mutableStateOf<Double?>(null) }
     val context = LocalContext.current
 
     // Lot detection: runs by itself right after a PDF upload, or from "Find lots".
@@ -332,7 +337,10 @@ fun SubdivisionPlanTab(
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
 
     // Renumbering one block: a panel replaces the lot card and the plan shows the new numbers.
+    // renumberBlock is the block the lots came from (null: panel closed); renumberIds the lots
+    // being numbered, which taps add to or take out of (empty: pick the next block).
     var renumberBlock by remember { mutableStateOf<String?>(null) }
+    var renumberIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var renumberTo by remember { mutableStateOf("") }
     var renumberFirst by remember { mutableStateOf("1") }
     var renumberPattern by remember { mutableStateOf(BlockNumbering.Pattern.ODD_EVEN) }
@@ -340,6 +348,7 @@ fun SubdivisionPlanTab(
     var renumberOtherRow by remember { mutableStateOf(false) }
     val startRenumber = { lot: SdpLot ->
         renumberBlock = lot.blockNumber
+        renumberIds = activeLots.filter { it.blockNumber == lot.blockNumber }.map { it.id }.toSet()
         renumberTo = lot.blockNumber
         renumberFirst = "1"
         renumberPattern = BlockNumbering.Pattern.ODD_EVEN
@@ -422,9 +431,9 @@ fun SubdivisionPlanTab(
     }
 
     // New lot numbers of the block being renumbered, by lot id.
-    val renumberPreview = remember(renumberBlock, renumberFirst, renumberPattern, renumberOtherEnd, renumberOtherRow, parsedLots, renderedBitmap) {
-        val block = renumberBlock ?: return@remember emptyMap<Long, Int>()
-        val lots = parsedLots.filter { it.lot.blockNumber == block }
+    val renumberPreview = remember(renumberIds, renumberFirst, renumberPattern, renumberOtherEnd, renumberOtherRow, parsedLots, renderedBitmap) {
+        val lots = parsedLots.filter { it.lot.id in renumberIds }
+        if (lots.isEmpty()) return@remember emptyMap<Long, Int>()
         val w = (renderedBitmap?.width ?: 1600).toDouble(); val h = (renderedBitmap?.height ?: 1200).toDouble()
         val numbers = BlockNumbering.number(
             lots.map { it.centroid.x * w to it.centroid.y * h },
@@ -561,6 +570,20 @@ fun SubdivisionPlanTab(
                             },
                             style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
                         )
+                        if (activeSdpPlan != null && (canDigitize || activeSdpPlan.scaleDenominator > 0)) {
+                            Text(
+                                text = if (activeSdpPlan.scaleDenominator > 0) "Scale 1:${activeSdpPlan.scaleDenominator}" + if (canDigitize) " (change)" else ""
+                                    else "Set the plan scale to work out lot areas",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (activeSdpPlan.scaleDenominator > 0) MaterialTheme.colorScheme.onSurfaceVariant else LocalNHAColors.current.watch,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .then(if (canDigitize) Modifier.clickable { showScaleDialog = true } else Modifier)
+                                    .testTag("plan_scale")
+                            )
+                        }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1067,9 +1090,14 @@ fun SubdivisionPlanTab(
                                         val tappedNorm = Offset(normX, normY)
 
                                         if (renumberBlock != null) {
-                                            // While renumbering, a tap on a lot moves on to that lot's block.
-                                            parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }
-                                                ?.let { startRenumber(it.lot) }
+                                            // While renumbering, a tap adds a lot to the block or takes it out;
+                                            // after a save, it picks the next block.
+                                            parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }?.let { hit ->
+                                                val id = hit.lot.id
+                                                if (renumberIds.isEmpty()) startRenumber(hit.lot)
+                                                else if (id !in renumberIds) renumberIds = renumberIds + id
+                                                else if (renumberIds.size > 1) renumberIds = renumberIds - id
+                                            }
                                         } else if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
                                             interactionMode == SdpInteractionMode.DIGITIZING_ROAD) {
                                             draftPoints.add(tappedNorm)
@@ -1303,6 +1331,15 @@ fun SubdivisionPlanTab(
                                         style = Stroke(width = if (isSelected) 5f else (if (isMatching) 3f else 1.5f))
                                     )
 
+                                    // While renumbering, a dashed outline marks lots that still have the app's numbers.
+                                    if (renumberBlock != null && previewNumber == null && lot.description.startsWith("Auto-detected") && lot.blockNumber != "OS") {
+                                        drawPath(
+                                            path = path,
+                                            color = nhaMap.watch,
+                                            style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f))
+                                        )
+                                    }
+
                                     // DISTINCT THICK BILLING BORDER (IF BILLED)
                                     if (isBilled && isMatching) {
                                         drawPath(
@@ -1469,10 +1506,13 @@ fun SubdivisionPlanTab(
                 // RENUMBER BLOCK PANEL: the plan above previews the numbers as they are set.
                 if (renumberBlock != null) {
                     val block = renumberBlock!!
-                    val blockLots = activeLots.filter { it.blockNumber == block }
+                    val blockLots = activeLots.filter { it.id in renumberIds }
                     val target = renumberTo.trim()
                     val first = renumberFirst.trim().toIntOrNull()
-                    val othersInTarget = activeLots.count { it.blockNumber == target && it.blockNumber != block }
+                    val othersInTarget = activeLots.count { it.blockNumber == target && it.id !in renumberIds }
+                    // Blocks with lots nobody has renumbered yet, and numbers two lots share.
+                    val blocksToDo = activeLots.filter { it.description.startsWith("Auto-detected") && it.blockNumber != "OS" }.map { it.blockNumber }.distinct().size
+                    val duplicates = activeLots.groupBy { it.blockNumber to it.lotNumber }.filter { it.value.size > 1 }.keys.map { (b, l) -> "B$b-L$l" }
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1481,69 +1521,88 @@ fun SubdivisionPlanTab(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                "Renumber Block $block (${blockLots.size} lots)",
+                                if (blockLots.isEmpty()) "Renumber blocks" else "Renumber Block $block (${blockLots.size} lots)",
                                 style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
                             Text(
-                                "Check the numbers on the shaded lots against the plan. Tap another lot to go to its block.",
+                                if (blockLots.isEmpty()) "Saved. Tap a lot to renumber its block."
+                                else "Check the numbers on the shaded lots against the plan. Tap a lot to add it to this block or take it out.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = renumberTo,
-                                    onValueChange = { renumberTo = it.take(10) },
-                                    label = { Text("Block on plan") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f).testTag("renumber_block_field")
-                                )
-                                OutlinedTextField(
-                                    value = renumberFirst,
-                                    onValueChange = { v -> renumberFirst = v.filter { it.isDigit() }.take(4) },
-                                    label = { Text("First lot") },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f).testTag("renumber_first_field")
-                                )
-                            }
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.horizontalScroll(rememberScrollState())
-                            ) {
-                                FilterChip(
-                                    selected = renumberPattern == BlockNumbering.Pattern.ODD_EVEN,
-                                    onClick = { renumberPattern = BlockNumbering.Pattern.ODD_EVEN },
-                                    label = { Text("Odd / even rows") }
-                                )
-                                FilterChip(
-                                    selected = renumberPattern == BlockNumbering.Pattern.CONSECUTIVE,
-                                    onClick = { renumberPattern = BlockNumbering.Pattern.CONSECUTIVE },
-                                    label = { Text("Consecutive") }
-                                )
-                                FilterChip(selected = renumberOtherEnd, onClick = { renumberOtherEnd = !renumberOtherEnd }, label = { Text("Start from other end") })
-                                FilterChip(selected = renumberOtherRow, onClick = { renumberOtherRow = !renumberOtherRow }, label = { Text("Start on other row") })
-                            }
-                            if (othersInTarget > 0) {
+                            Text(
+                                if (blocksToDo == 0) "Every found block is renumbered."
+                                else "$blocksToDo ${if (blocksToDo == 1) "block still has" else "blocks still have"} the app's numbers (dashed outline).",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.testTag("renumber_blocks_to_do")
+                            )
+                            if (duplicates.isNotEmpty()) {
                                 Text(
-                                    "Block $target already has $othersInTarget other ${if (othersInTarget == 1) "lot" else "lots"}. They keep their numbers until you renumber them.",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind)
+                                    "Used twice: " + duplicates.take(4).joinToString(", ") + if (duplicates.size > 4) " and ${duplicates.size - 4} more" else "",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind),
+                                    modifier = Modifier.testTag("renumber_duplicates")
                                 )
+                            }
+                            if (blockLots.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = renumberTo,
+                                        onValueChange = { renumberTo = it.take(10) },
+                                        label = { Text("Block on plan") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f).testTag("renumber_block_field")
+                                    )
+                                    OutlinedTextField(
+                                        value = renumberFirst,
+                                        onValueChange = { v -> renumberFirst = v.filter { it.isDigit() }.take(4) },
+                                        label = { Text("First lot") },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.weight(1f).testTag("renumber_first_field")
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    FilterChip(
+                                        selected = renumberPattern == BlockNumbering.Pattern.ODD_EVEN,
+                                        onClick = { renumberPattern = BlockNumbering.Pattern.ODD_EVEN },
+                                        label = { Text("Odd / even rows") }
+                                    )
+                                    FilterChip(
+                                        selected = renumberPattern == BlockNumbering.Pattern.CONSECUTIVE,
+                                        onClick = { renumberPattern = BlockNumbering.Pattern.CONSECUTIVE },
+                                        label = { Text("Consecutive") }
+                                    )
+                                    FilterChip(selected = renumberOtherEnd, onClick = { renumberOtherEnd = !renumberOtherEnd }, label = { Text("Start from other end") })
+                                    FilterChip(selected = renumberOtherRow, onClick = { renumberOtherRow = !renumberOtherRow }, label = { Text("Start on other row") })
+                                }
+                                if (othersInTarget > 0) {
+                                    Text(
+                                        "Block $target already has $othersInTarget other ${if (othersInTarget == 1) "lot" else "lots"}. They keep their numbers until you renumber them.",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind)
+                                    )
+                                }
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton(onClick = { renumberBlock = null }) {
-                                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { renumberBlock = null; renumberIds = emptySet() }) {
+                                    Text(if (blockLots.isEmpty()) "Done" else "Close", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Button(
-                                    enabled = target.isNotEmpty() && first != null && blockLots.isNotEmpty(),
-                                    onClick = {
-                                        onRenumberLots(
-                                            blockLots.mapNotNull { lot -> renumberPreview[lot.id]?.let { lot.copy(blockNumber = target, lotNumber = it.toString()) } },
-                                            block
-                                        )
-                                        renumberBlock = null
-                                    },
-                                    modifier = Modifier.testTag("renumber_save_button")
-                                ) { Text("Save numbers") }
+                                if (blockLots.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        enabled = target.isNotEmpty() && first != null,
+                                        onClick = {
+                                            onRenumberLots(
+                                                blockLots.mapNotNull { lot -> renumberPreview[lot.id]?.let { lot.copy(blockNumber = target, lotNumber = it.toString()) } },
+                                                block
+                                            )
+                                            // Stay open so the next tap picks the next block.
+                                            renumberIds = emptySet()
+                                        },
+                                        modifier = Modifier.testTag("renumber_save_button")
+                                    ) { Text("Save numbers") }
+                                }
                             }
                         }
                     }
@@ -1872,7 +1931,12 @@ fun SubdivisionPlanTab(
 
     // 6. ADD LOT DIALOG
     if (showAddLotDialog && activeSdpPlan != null) {
+        LaunchedEffect(Unit) {
+            draftArea = null
+            onLotArea(activeSdpPlan, draftPoints.map { it.x to it.y }) { draftArea = it }
+        }
         AddLotDialog(
+            suggestedArea = draftArea,
             onDismiss = {
                 showAddLotDialog = false
                 // A traced outline is thrown away on cancel; tapped corners stay for more tapping.
@@ -1884,6 +1948,47 @@ fun SubdivisionPlanTab(
                 draftPoints.clear()
                 showAddLotDialog = false
             }
+        )
+    }
+
+    // 6b. PLAN SCALE
+    if (showScaleDialog && activeSdpPlan != null) {
+        var scaleText by remember { mutableStateOf(activeSdpPlan.scaleDenominator.takeIf { it > 0 }?.toString() ?: "") }
+        val scale = scaleText.toIntOrNull()?.takeIf { it in 10..100000 }
+        AlertDialog(
+            onDismissRequest = { showScaleDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Plan scale", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Type the scale printed on the plan, e.g. SCALE 1:1000. Lot areas are worked out from it; areas someone typed in stay.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("1 : ", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = scaleText,
+                            onValueChange = { v -> scaleText = v.filter { it.isDigit() }.take(6) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f).testTag("plan_scale_field")
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = scale != null,
+                    onClick = {
+                        onSetPlanScale(activeSdpPlan, scale!!)
+                        showScaleDialog = false
+                    },
+                    modifier = Modifier.testTag("plan_scale_save")
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { showScaleDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
@@ -1932,7 +2037,7 @@ fun SubdivisionPlanTab(
             text = {
                 Text(
                     "Lots the app found that have no progress yet are taken off the plan on every phone. " +
-                        "Lots you added yourself stay" + (if (kept > 0) ", and so do the $kept found ${if (kept == 1) "lot that already has" else "lots that already have"} progress." else ".") +
+                        "Lots you added yourself or renumbered stay" + (if (kept > 0) ", and so do the $kept found ${if (kept == 1) "lot that already has" else "lots that already have"} progress." else ".") +
                         " Find lots can add them again.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2002,8 +2107,8 @@ fun SubdivisionPlanTab(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Found $lotCount lots in $blockCount blocks" + if (largeCount > 0) ", and $largeCount larger areas (open spaces or facilities)." else ".")
                     Text(
-                        "Blocks and lots are numbered top to bottom; edit a lot to match the plan's own numbers. " +
-                            "Earlier found lots with no progress yet are replaced" +
+                        "Blocks and lots are numbered top to bottom; use Renumber block to match the plan's own numbers. " +
+                            "Earlier found lots with no progress yet are replaced; renumbered lots stay" +
                             if (updatedDetected > 0) "; the $updatedDetected with progress stay." else ".",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2489,12 +2594,15 @@ fun LotAuditHistoryDialog(
 @Composable
 fun AddLotDialog(
     onDismiss: () -> Unit,
-    onSubmit: (block: String, lot: String, unit: String, area: Double, desc: String) -> Unit
+    onSubmit: (block: String, lot: String, unit: String, area: Double, desc: String) -> Unit,
+    suggestedArea: Double? = null
 ) {
     var blockNumber by remember { mutableStateOf("") }
     var lotNumber by remember { mutableStateOf("") }
     var unitNumber by remember { mutableStateOf("") }
     var areaSqM by remember { mutableStateOf("50.0") }
+    // The worked-out area arrives a moment after the dialog opens; it replaces the default only.
+    LaunchedEffect(suggestedArea) { if (suggestedArea != null && areaSqM == "50.0") areaSqM = suggestedArea.toString() }
     var description by remember { mutableStateOf("") }
 
     AlertDialog(

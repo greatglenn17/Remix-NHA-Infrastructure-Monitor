@@ -30,8 +30,16 @@ object LotDetector {
         var touchesEdge = false
         val w get() = maxX - minX + 1
         val h get() = maxY - minY + 1
-        val fill get() = area.toFloat() / (w * h)
-        val aspect get() = max(w, h).toFloat() / min(w, h)
+        var sx = 0.0; var sy = 0.0; var sxx = 0.0; var syy = 0.0; var sxy = 0.0
+        // Measured along the region's own axes (second moments), so tilted lots count as rectangles too.
+        private val axes: Pair<Double, Double> get() {
+            val mx = sx / area; val my = sy / area
+            val a = sxx / area - mx * mx; val b = syy / area - my * my; val c = sxy / area - mx * my
+            val d = sqrt((a - b) * (a - b) / 4 + c * c)
+            return ((a + b) / 2 + d) to max((a + b) / 2 - d, 1.0 / 12)
+        }
+        val fill get() = axes.let { (l1, l2) -> (area / (12 * sqrt(l1 * l2))).toFloat() }
+        val aspect get() = axes.let { (l1, l2) -> sqrt(l1 / l2).toFloat() }
         val cx get() = (minX + maxX) / 2f
         val cy get() = (minY + maxY) / 2f
     }
@@ -117,6 +125,7 @@ object LotDetector {
             val p = stack[--sp]
             val x = p % w; val y = p / w
             r.area++
+            r.sx += x; r.sy += y; r.sxx += x.toDouble() * x; r.syy += y.toDouble() * y; r.sxy += x.toDouble() * y
             if (x < r.minX) r.minX = x; if (x > r.maxX) r.maxX = x
             if (y < r.minY) r.minY = y; if (y > r.maxY) r.maxY = y
             if (x == 0 || y == 0 || x == w - 1 || y == h - 1) r.touchesEdge = true

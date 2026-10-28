@@ -180,6 +180,9 @@ interface ProjectDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSdpPlan(sdpPlan: SdpPlan): Long
 
+    @Update
+    suspend fun updateSdpPlan(sdpPlan: SdpPlan)
+
     @Query("UPDATE sdp_plans SET isActive = 0 WHERE projectId = :projectId")
     suspend fun deactivateAllSdpPlansForProject(projectId: Long)
 

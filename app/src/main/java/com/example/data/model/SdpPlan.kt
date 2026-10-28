@@ -28,6 +28,8 @@ data class SdpPlan(
     val uploadedDate: String, // YYYY-MM-DD
     val uploadedBy: String,
     val description: String = "",
+    // The plan's printed scale 1:N (e.g. 1000); 0 when not set. Lot areas are worked out from it.
+    val scaleDenominator: Int = 0,
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,

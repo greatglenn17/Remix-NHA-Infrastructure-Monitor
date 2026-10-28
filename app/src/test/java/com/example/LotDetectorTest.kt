@@ -58,6 +58,24 @@ class LotDetectorTest {
     }
 
     @Test
+    fun findsLotsInABlockTiltedAlongADiagonalRoad() {
+        val c = Canvas(600, 600)
+        val a = Math.toRadians(50.0)
+        fun line(x0: Double, y0: Double, x1: Double, y1: Double) {
+            val p = { x: Double, y: Double -> (300 + x * Math.cos(a) - y * Math.sin(a)) to (300 + x * Math.sin(a) + y * Math.cos(a)) }
+            val (ax, ay) = p(x0, y0); val (bx, by) = p(x1, y1)
+            for (i in 0..1000) {
+                val x = (ax + (bx - ax) * i / 1000).toInt(); val y = (ay + (by - ay) * i / 1000).toInt()
+                c.dark[y * c.w + x] = true
+            }
+        }
+        // One row of 8 lots, 25 x 50 px, turned 50 degrees: their own boxes are only about half full.
+        line(-100.0, 0.0, 100.0, 0.0); line(-100.0, 50.0, 100.0, 50.0)
+        for (i in 0..8) line(-100.0 + i * 25, 0.0, -100.0 + i * 25, 50.0)
+        assertEquals(8, LotDetector.detect(c.dark, c.w, c.h).count { it.isLot })
+    }
+
+    @Test
     fun blankOrScannedPageFindsNothing() {
         assertTrue(LotDetector.detect(BooleanArray(200 * 100), 200, 100).isEmpty())
     }

@@ -181,6 +181,13 @@ class ProjectRepository(
         return projectDao.insertSdpPlan(sdpPlan)
     }
 
+    /** Saves the plan's scale and the lot areas worked out from it. */
+    suspend fun setSdpPlanScale(plan: SdpPlan, lots: List<SdpLot>, role: UserRole? = null) {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        projectDao.updateSdpPlan(plan)
+        if (lots.isNotEmpty()) projectDao.updateSdpLots(lots)
+    }
+
     suspend fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long, role: UserRole? = null) {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
         projectDao.setActiveSdpPlan(projectId, sdpPlanId)
