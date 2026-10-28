@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -275,9 +276,31 @@ fun SubdivisionPlanTab(
         billingRef: String
     ) -> Unit,
     onGetInspectionsForLot: (sdpLotId: Long) -> Flow<List<SdpLotInspection>>,
-    auditLogs: List<com.example.data.model.AuditLog> = emptyList()
+    auditLogs: List<com.example.data.model.AuditLog> = emptyList(),
+    onDetectLots: (SdpPlan, (List<com.example.util.LotDetector.Area>?) -> Unit) -> Unit = { _, done -> done(null) },
+    onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
+
+    // Lot detection: runs by itself right after a PDF upload, or from "Find lots".
+    var detectAfterUpload by remember { mutableStateOf(false) }
+    var isDetecting by remember { mutableStateOf(false) }
+    var detectedAreas by remember { mutableStateOf<List<com.example.util.LotDetector.Area>?>(null) }
+    var detectFailed by remember { mutableStateOf(false) }
+    val runDetection = { plan: SdpPlan ->
+        isDetecting = true
+        onDetectLots(plan) { areas ->
+            isDetecting = false
+            if (areas.isNullOrEmpty()) detectFailed = true else detectedAreas = areas
+        }
+    }
+    LaunchedEffect(activeSdpPlan?.id) {
+        val plan = activeSdpPlan ?: return@LaunchedEffect
+        if (detectAfterUpload && com.example.data.files.Attachments.isRef(plan.pdfFileUrl)) {
+            detectAfterUpload = false
+            runDetection(plan)
+        }
+    }
 
     // PDF Renderer States
     var renderedBitmap by remember(activeSdpPlan?.id) { mutableStateOf<Bitmap?>(null) }
@@ -405,7 +428,11 @@ fun SubdivisionPlanTab(
                 val pdfUri = Uri.parse(currentPlan.pdfFileUrl)
                 var pfd: ParcelFileDescriptor? = null
 
-                if (pdfUri.scheme == "content" || pdfUri.scheme == "file") {
+                if (com.example.data.files.Attachments.isRef(currentPlan.pdfFileUrl)) {
+                    // Downloaded the first time when another phone uploaded the plan.
+                    val local = com.example.data.files.Attachments.ensureLocal(context, currentPlan.pdfFileUrl)
+                    if (local != null) pfd = ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY)
+                } else if (pdfUri.scheme == "content" || pdfUri.scheme == "file") {
                     pfd = context.contentResolver.openFileDescriptor(pdfUri, "r")
                 } else {
                     val file = File(pdfUri.path ?: "")
@@ -421,8 +448,10 @@ fun SubdivisionPlanTab(
                     val safePage = selectedPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
                     if (renderer.pageCount > safePage) {
                         val page = renderer.openPage(safePage)
-                        val renderWidth = (page.width * 2).coerceAtMost(2400)
-                        val renderHeight = (page.height * 2).coerceAtMost(2400)
+                        // One scale for both sides, so the page keeps its shape.
+                        val pageScale = minOf(2f, 2400f / page.width, 2400f / page.height)
+                        val renderWidth = (page.width * pageScale).toInt().coerceAtLeast(1)
+                        val renderHeight = (page.height * pageScale).toInt().coerceAtLeast(1)
                         val bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
                         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                         page.close()
@@ -437,7 +466,11 @@ fun SubdivisionPlanTab(
                         pfd.close()
                     }
                 } else {
-                    pdfError = "Unable to open PDF file descriptor."
+                    pdfError = if (com.example.data.files.Attachments.isRef(currentPlan.pdfFileUrl)) {
+                        "The plan PDF is not on this phone yet. It may still be uploading from the other phone; check the internet and open Lots again."
+                    } else {
+                        "This plan was saved by an older version and its PDF can no longer be opened. Upload the plan again."
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -493,6 +526,24 @@ fun SubdivisionPlanTab(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(Icons.Default.Palette, contentDescription = "Legend", tint = LocalNHAColors.current.watch, modifier = Modifier.size(18.dp))
+                        }
+
+                        if (canManageSdp && activeSdpPlan != null && com.example.data.files.Attachments.isRef(activeSdpPlan.pdfFileUrl)) {
+                            OutlinedButton(
+                                onClick = { runDetection(activeSdpPlan) },
+                                enabled = !isDetecting,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp).testTag("find_lots_button")
+                            ) {
+                                if (isDetecting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isDetecting) "Finding…" else "Find lots", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         if (canManageSdp) {
@@ -1668,9 +1719,68 @@ fun SubdivisionPlanTab(
             currentVersion = sdpPlans.size + 1,
             onDismiss = { showUploadDialog = false },
             onSubmit = { planName: String, pdfUriString: String, desc: String ->
+                detectAfterUpload = pdfUriString.isNotBlank()
                 onUploadSdpPlan(planName, pdfUriString, desc)
                 showUploadDialog = false
             }
+        )
+    }
+
+    // 11. DETECTED LOTS REVIEW
+    detectedAreas?.let { areas ->
+        val plan = activeSdpPlan
+        val lotCount = areas.count { it.isLot }
+        val blockCount = areas.filter { it.isLot }.map { it.block }.distinct().size
+        val largeCount = areas.count { !it.isLot }
+        val updatedDetected = activeLots.count { it.description.startsWith("Auto-detected") && lotProgressMap.containsKey(it.id) }
+        AlertDialog(
+            onDismissRequest = { detectedAreas = null },
+            containerColor = MaterialTheme.colorScheme.surface,
+            icon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Lots found in the plan", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Found $lotCount lots in $blockCount blocks" + if (largeCount > 0) ", and $largeCount larger areas (open spaces or facilities)." else ".")
+                    Text(
+                        "Blocks and lots are numbered top to bottom; edit a lot to match the plan's own numbers. " +
+                            "Earlier found lots with no progress yet are replaced" +
+                            if (updatedDetected > 0) "; the $updatedDetected with progress stay." else ".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { if (plan != null) onAddDetectedLots(plan, areas.filter { it.isLot }); detectedAreas = null },
+                    modifier = Modifier.testTag("add_detected_lots")
+                ) { Text("Add lots") }
+            },
+            dismissButton = {
+                Row {
+                    if (largeCount > 0) {
+                        TextButton(onClick = { if (plan != null) onAddDetectedLots(plan, areas); detectedAreas = null }) {
+                            Text("Add lots and larger areas")
+                        }
+                    }
+                    TextButton(onClick = { detectedAreas = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+        )
+    }
+    if (detectFailed) {
+        AlertDialog(
+            onDismissRequest = { detectFailed = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("No lots found", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "The app finds lots in a plan PDF exported from CAD, where each lot is a closed outline. " +
+                        "A scanned plan or a photo has no clear outlines; add its lots by hand in Digitize mode.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = { TextButton(onClick = { detectFailed = false }) { Text("OK") } }
         )
     }
 }
@@ -2197,16 +2307,10 @@ fun AddSdpPlanDialog(
 ) {
     var planName by remember { mutableStateOf("Approved Subdivision Plan Layout") }
     var description by remember { mutableStateOf("Official Approved SDP PDF Reference Document") }
-    var selectedPdfUri by remember { mutableStateOf<Uri?>(null) }
-    var pdfFileName by remember { mutableStateOf("") }
-
-    val pdfPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            selectedPdfUri = uri
-            pdfFileName = uri.lastPathSegment ?: "Approved_SDP.pdf"
-        }
+    // The pick is copied into the app and uploaded like any attachment, so every phone can open it.
+    var pdfRef by remember { mutableStateOf<String?>(null) }
+    val pdfPicker = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        if (com.example.data.files.Attachments.isPdf(ref)) pdfRef = ref
     }
 
     AlertDialog(
@@ -2257,33 +2361,30 @@ fun AddSdpPlanDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                    border = BorderStroke(1.dp, if (pdfRef != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { pdfPickerLauncher.launch("application/pdf") }
+                        .clickable { pdfPicker.launch("application/pdf") }
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (selectedPdfUri != null) Icons.Default.CheckCircle else Icons.Default.FileUpload,
+                            imageVector = if (pdfRef != null) Icons.Default.CheckCircle else Icons.Default.FileUpload,
                             contentDescription = "PDF",
-                            tint = if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (pdfRef != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (selectedPdfUri != null) "PDF Selected" else "Select Approved SDP PDF",
+                                text = if (pdfRef != null) "PDF Selected" else "Select Approved SDP PDF",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             )
-                            if (pdfFileName.isNotBlank()) {
-                                Text(
-                                    text = pdfFileName,
-                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary),
-                                    maxLines = 1
-                                )
-                            }
+                            Text(
+                                text = "Lots are found automatically when the plan is a PDF exported from CAD.",
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
                         }
                     }
                 }
@@ -2292,12 +2393,9 @@ fun AddSdpPlanDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val finalUri = selectedPdfUri?.toString() ?: ""
-                    if (finalUri.isNotBlank()) {
-                        onSubmit(planName, finalUri, description)
-                    }
+                    pdfRef?.let { onSubmit(planName, it, description) }
                 },
-                enabled = selectedPdfUri != null,
+                enabled = pdfRef != null,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("Save SDP Plan", fontWeight = FontWeight.Bold)

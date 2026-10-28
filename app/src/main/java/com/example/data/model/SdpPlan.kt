@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "sdp_plans",
@@ -15,7 +16,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class SdpPlan(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -26,5 +27,9 @@ data class SdpPlan(
     val isActive: Boolean = true,
     val uploadedDate: String, // YYYY-MM-DD
     val uploadedBy: String,
-    val description: String = ""
+    val description: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -4,7 +4,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Database side of cross-device record sync (weekly/monthly reports, documents,
- * issues and payments).
+ * issues, payments and the subdivision plan with its lots, roads, progress and inspections).
  *
  * Each synced table has a `uuid`, `revision` and `updatedAt` column. SQLite triggers
  * queue a `record:<table>` event in sync_outbox for every local insert, update and
@@ -19,9 +19,26 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 object RecordSyncSchema {
 
-    /** Tables synced as records, in the order a fresh device should apply them. */
-    val TABLES = listOf(
+    /** The first synced tables (database 22). */
+    val REPORT_TABLES = listOf(
         "weekly_reports", "monthly_reports", "pending_documents", "project_issues", "project_payments"
+    )
+
+    /** Subdivision plan tables, synced from database 24. A plan comes before the lots that point at it. */
+    val SDP_TABLES = listOf("sdp_plans", "sdp_lots", "sdp_roads", "sdp_lot_progress", "sdp_lot_inspections")
+
+    /** Tables synced as records, in the order a fresh device should apply them. */
+    val TABLES = REPORT_TABLES + SDP_TABLES
+
+    /**
+     * Columns holding another synced row's local id: table -> (column -> the table it points at).
+     * The cloud copy carries the parent's uuid instead (see RecordSync).
+     */
+    val PARENT_REFS = mapOf(
+        "sdp_lots" to mapOf("sdpPlanId" to "sdp_plans"),
+        "sdp_roads" to mapOf("sdpPlanId" to "sdp_plans"),
+        "sdp_lot_progress" to mapOf("sdpPlanId" to "sdp_plans", "sdpLotId" to "sdp_lots"),
+        "sdp_lot_inspections" to mapOf("sdpPlanId" to "sdp_plans", "sdpLotId" to "sdp_lots")
     )
 
     const val ENTITY_PREFIX = "record:"
@@ -30,9 +47,9 @@ object RecordSyncSchema {
     private const val NEW_EVENT_ID = "lower(hex(randomblob(16)))"
     private const val LOCAL_WRITE = "(SELECT applyingRemote FROM sync_state) = 0"
 
-    /** 21 -> 22: add the sync columns, give existing rows an identity, and queue them for upload. */
-    fun migrate(db: SupportSQLiteDatabase) {
-        for (table in TABLES) {
+    /** Adds the sync columns to [tables], gives existing rows an identity, and queues them for upload (21 -> 22, 23 -> 24). */
+    fun migrate(db: SupportSQLiteDatabase, tables: List<String>) {
+        for (table in tables) {
             db.execSQL("ALTER TABLE `$table` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
             db.execSQL("ALTER TABLE `$table` ADD COLUMN `revision` INTEGER NOT NULL DEFAULT 1")
             db.execSQL("ALTER TABLE `$table` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")

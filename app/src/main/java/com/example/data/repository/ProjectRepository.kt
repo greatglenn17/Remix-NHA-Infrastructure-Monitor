@@ -205,6 +205,15 @@ class ProjectRepository(
         projectDao.deactivateSdpLot(lotId, modifiedBy, date)
     }
 
+    /** Swaps earlier auto-detected lots nobody has updated for [lots]; lots with progress stay. */
+    suspend fun replaceDetectedLots(sdpPlanId: Long, lots: List<SdpLot>, marker: String, modifiedBy: String, role: UserRole? = null) {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+        val stale = projectDao.untouchedDetectedLotIds(sdpPlanId, marker)
+        if (stale.isNotEmpty()) projectDao.deactivateSdpLots(stale, modifiedBy, date)
+        projectDao.insertSdpLots(lots)
+    }
+
     // SDP Roads
     fun getActiveRoadsForPlan(sdpPlanId: Long): Flow<List<SdpRoad>> = projectDao.getActiveRoadsForPlan(sdpPlanId)
 

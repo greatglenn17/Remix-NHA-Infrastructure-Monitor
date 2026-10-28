@@ -52,6 +52,9 @@ data class PortfolioUiState(
     }
 }
 
+/** Starts the description of lots the app found in the plan PDF, so a new run can replace them. */
+private const val DETECTED_LOT = "Auto-detected"
+
 class ProjectViewModel(application: Application) : AndroidViewModel(application) {
 
     private val projectDao: com.example.data.local.ProjectDao
@@ -965,6 +968,73 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 details = "Uploaded Approved SDP Plan Version $nextVersion: $planName",
                 oldValue = "",
                 newValue = "Plan: $planName, Version: $nextVersion, File: $pdfFileUrl"
+            )
+        }
+    }
+
+    /** Finds the lots in the plan's PDF (page 1); null when the PDF cannot be opened. */
+    fun detectSdpLots(plan: SdpPlan, onResult: (List<com.example.util.LotDetector.Area>?) -> Unit) {
+        viewModelScope.launch {
+            val areas = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl)
+                        ?: return@runCatching null
+                    android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                        android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
+                            renderer.openPage(0).use { page ->
+                                // Lot lines on a CAD sheet are thin; ~3200 px keeps a typical lot tens of pixels wide.
+                                val scale = 3200f / maxOf(page.width, page.height)
+                                val w = (page.width * scale).toInt(); val h = (page.height * scale).toInt()
+                                val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                                bitmap.eraseColor(android.graphics.Color.WHITE)
+                                page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val dark = BooleanArray(w * h)
+                                val row = IntArray(w)
+                                for (y in 0 until h) {
+                                    bitmap.getPixels(row, 0, w, 0, y, w, 1)
+                                    for (x in 0 until w) {
+                                        val c = row[x]
+                                        val lum = (299 * ((c shr 16) and 255) + 587 * ((c shr 8) and 255) + 114 * (c and 255)) / 1000
+                                        dark[y * w + x] = lum < 225
+                                    }
+                                }
+                                bitmap.recycle()
+                                com.example.util.LotDetector.detect(dark, w, h)
+                            }
+                        }
+                    }
+                }.getOrNull()
+            }
+            onResult(areas)
+        }
+    }
+
+    /** Adds detected areas as lots, replacing earlier detected lots that have no progress yet. */
+    fun addDetectedSdpLots(plan: SdpPlan, areas: List<com.example.util.LotDetector.Area>) {
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            val lots = areas.map { a ->
+                SdpLot(
+                    projectId = plan.projectId,
+                    sdpPlanId = plan.id,
+                    blockNumber = if (a.isLot) a.block.toString() else "OS",
+                    lotNumber = a.lot.toString(),
+                    polygonNormalizedJson = org.json.JSONArray(a.polygon.map { (x, y) -> org.json.JSONArray(listOf(x.toDouble(), y.toDouble())) }).toString(),
+                    description = if (a.isLot) DETECTED_LOT else "$DETECTED_LOT open space or facility",
+                    createdBy = user,
+                    createdDate = currentDate,
+                    lastModifiedBy = user,
+                    lastModifiedDate = currentDate
+                )
+            }
+            repository.replaceDetectedLots(plan.id, lots, DETECTED_LOT, user, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Lot Created",
+                details = "Added ${lots.size} lots found in SDP Plan v${plan.version}",
+                oldValue = "",
+                newValue = "${areas.count { it.isLot }} lots, ${areas.count { !it.isLot }} larger areas"
             )
         }
     }

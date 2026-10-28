@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "sdp_lot_inspections",
@@ -30,7 +31,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["projectId"]),
         Index(value = ["sdpPlanId"]),
-        Index(value = ["sdpLotId"])
+        Index(value = ["sdpLotId"]),
+        Index(value = ["uuid"])
     ]
 )
 data class SdpLotInspection(
@@ -48,5 +50,9 @@ data class SdpLotInspection(
     val remarks: String,
     val billingStatus: String = "NOT BILLED",
     val billingReference: String = "",
-    val createdDate: String
+    val createdDate: String,
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
