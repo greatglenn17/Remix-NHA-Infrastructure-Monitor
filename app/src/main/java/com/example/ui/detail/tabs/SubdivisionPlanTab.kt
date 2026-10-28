@@ -149,17 +149,17 @@ fun isLotMatchingFilter(
     return true
 }
 
-fun lotProgressFill(progress: Int, nha: NHAColors, inProgress: Color): Color = when {
-    progress == 0 -> nha.behind
-    progress in 1..40 -> nha.watch
-    progress in 41..99 -> inProgress
+/** 0-25% red, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
+fun lotProgressFill(progress: Int, nha: NHAColors): Color = when {
     progress >= 100 -> nha.onTrack
+    progress >= 76 -> nha.progressQuarter4
+    progress >= 51 -> nha.progressQuarter3
+    progress >= 26 -> nha.progressQuarter2
     else -> nha.behind
 }
 
 @Composable
-fun getLotProgressFillColor(progress: Int): Color =
-    lotProgressFill(progress, LocalNHAColors.current, MaterialTheme.colorScheme.primary)
+fun getLotProgressFillColor(progress: Int): Color = lotProgressFill(progress, LocalNHAColors.current)
 
 // --- GEOMETRY & MATH UTILITIES ---
 fun normalizedToJson(points: List<Offset>): String {
@@ -1304,7 +1304,7 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = lotProgressFill(progressValue, nhaMap, primaryMap)
+                                val baseProgressColor = lotProgressFill(progressValue, nhaMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -2865,10 +2865,11 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
-                LegendRow(color = getLotProgressFillColor(0), label = "0% / Layout / Excavation Started")
-                LegendRow(color = getLotProgressFillColor(20), label = "1 – 40% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(70), label = "41 – 99% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed")
+                LegendRow(color = getLotProgressFillColor(0), label = "0 – 25% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(26), label = "26 – 50% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed / RFO")
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text("DEVELOPER BILLING STATUS (LOT BORDER):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
