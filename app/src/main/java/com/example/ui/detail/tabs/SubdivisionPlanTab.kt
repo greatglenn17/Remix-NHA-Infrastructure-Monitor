@@ -99,6 +99,9 @@ enum class SdpInteractionMode {
     EDITING_LOT,
     EDITING_ROAD
 }
+/** Same bands as [lotProgressFill]. */
+val LOT_PROGRESS_FILTERS = listOf("ALL", "0-25%", "26-50%", "51-75%", "76-99%", "100%")
+
 fun isLotMatchingFilter(
     lot: SdpLot,
     query: String,
@@ -135,11 +138,10 @@ fun isLotMatchingFilter(
     if (progressFilter != "ALL") {
         val progVal = progress?.physicalProgress ?: 0
         val matchesProg = when (progressFilter) {
-            "0%" -> progVal == 0
-            "1-20%" -> progVal in 1..20
-            "21-50%" -> progVal in 21..50
-            "51-80%" -> progVal in 51..80
-            "81-99%" -> progVal in 81..99
+            "0-25%" -> progVal <= 25
+            "26-50%" -> progVal in 26..50
+            "51-75%" -> progVal in 51..75
+            "76-99%" -> progVal in 76..99
             "100%" -> progVal >= 100
             else -> true
         }
@@ -907,7 +909,7 @@ fun SubdivisionPlanTab(
                                         modifier = Modifier.weight(1f)
                                     )
                                     DropdownMenu(expanded = progExpanded, onDismissRequest = { progExpanded = false }) {
-                                        listOf("ALL", "0%", "1-20%", "21-40%", "41-60%", "61-80%", "81-99%", "100%").forEach { opt ->
+                                        LOT_PROGRESS_FILTERS.forEach { opt ->
                                             DropdownMenuItem(text = { Text(opt) }, onClick = { selectedProgressFilter = opt; progExpanded = false })
                                         }
                                     }
