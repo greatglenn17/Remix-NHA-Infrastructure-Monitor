@@ -31,6 +31,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 private data class FilterParams(
     val query: String,
@@ -972,40 +973,72 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** The plan PDF's first page as line pixels, kept for the last plan so taps on it are quick. */
+    private class PlanMask(val planUuid: String, val dark: BooleanArray, val width: Int, val height: Int)
+    private var planMask: PlanMask? = null
+    private val planMaskLock = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun planMask(plan: SdpPlan): PlanMask? = planMaskLock.withLock {
+        planMask?.takeIf { it.planUuid == plan.uuid }?.let { return@withLock it }
+        val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@withLock null
+        android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
+                renderer.openPage(0).use { page ->
+                    // Lot lines on a CAD sheet are thin; ~3200 px keeps a typical lot tens of pixels wide.
+                    val scale = 3200f / maxOf(page.width, page.height)
+                    val w = (page.width * scale).toInt(); val h = (page.height * scale).toInt()
+                    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    val dark = BooleanArray(w * h)
+                    val row = IntArray(w)
+                    for (y in 0 until h) {
+                        bitmap.getPixels(row, 0, w, 0, y, w, 1)
+                        for (x in 0 until w) {
+                            val c = row[x]
+                            val lum = (299 * ((c shr 16) and 255) + 587 * ((c shr 8) and 255) + 114 * (c and 255)) / 1000
+                            dark[y * w + x] = lum < 225
+                        }
+                    }
+                    bitmap.recycle()
+                    PlanMask(plan.uuid, dark, w, h).also { planMask = it }
+                }
+            }
+        }
+    }
+
     /** Finds the lots in the plan's PDF (page 1); null when the PDF cannot be opened. */
     fun detectSdpLots(plan: SdpPlan, onResult: (List<com.example.util.LotDetector.Area>?) -> Unit) {
         viewModelScope.launch {
             val areas = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                runCatching {
-                    val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl)
-                        ?: return@runCatching null
-                    android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
-                        android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
-                            renderer.openPage(0).use { page ->
-                                // Lot lines on a CAD sheet are thin; ~3200 px keeps a typical lot tens of pixels wide.
-                                val scale = 3200f / maxOf(page.width, page.height)
-                                val w = (page.width * scale).toInt(); val h = (page.height * scale).toInt()
-                                val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-                                bitmap.eraseColor(android.graphics.Color.WHITE)
-                                page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                val dark = BooleanArray(w * h)
-                                val row = IntArray(w)
-                                for (y in 0 until h) {
-                                    bitmap.getPixels(row, 0, w, 0, y, w, 1)
-                                    for (x in 0 until w) {
-                                        val c = row[x]
-                                        val lum = (299 * ((c shr 16) and 255) + 587 * ((c shr 8) and 255) + 114 * (c and 255)) / 1000
-                                        dark[y * w + x] = lum < 225
-                                    }
-                                }
-                                bitmap.recycle()
-                                com.example.util.LotDetector.detect(dark, w, h)
-                            }
-                        }
-                    }
-                }.getOrNull()
+                runCatching { planMask(plan)?.let { com.example.util.LotDetector.detect(it.dark, it.width, it.height) } }.getOrNull()
             }
             onResult(areas)
+        }
+    }
+
+    /** The outline of the lot around a tapped point (0..1) of the plan, for a lot detection missed. */
+    fun traceSdpLot(plan: SdpPlan, x: Float, y: Float, onResult: (List<Pair<Float, Float>>?) -> Unit) {
+        viewModelScope.launch {
+            val outline = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching { planMask(plan)?.let { com.example.util.LotDetector.traceAt(it.dark, it.width, it.height, x, y) } }.getOrNull()
+            }
+            onResult(outline)
+        }
+    }
+
+    /** Removes the plan's auto-detected lots that have no progress yet. */
+    fun removeDetectedSdpLots(plan: SdpPlan) {
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val removed = repository.replaceDetectedLots(plan.id, emptyList(), DETECTED_LOT, user, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Lot Deactivated",
+                details = "Removed $removed auto-detected lots from SDP Plan v${plan.version}",
+                oldValue = "Active",
+                newValue = "Deactivated"
+            )
         }
     }
 
@@ -1014,7 +1047,21 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val user = currentUserAccount.value.name
             val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
-            val lots = areas.map { a ->
+            // Lots that stay (added by hand, or with progress) must not get a found copy on top.
+            val progress = activeSdpLotProgressMap.value
+            val kept = activeSdpLots.value.filter { it.sdpPlanId == plan.id && (!it.description.startsWith(DETECTED_LOT) || it.id in progress) }
+                .mapNotNull { lot ->
+                    runCatching {
+                        val pts = org.json.JSONArray(lot.polygonNormalizedJson)
+                        val xs = (0 until pts.length()).map { pts.getJSONArray(it).getDouble(0) }
+                        val ys = (0 until pts.length()).map { pts.getJSONArray(it).getDouble(1) }
+                        doubleArrayOf(xs.min(), ys.min(), xs.max(), ys.max())
+                    }.getOrNull()
+                }
+            val lots = areas.filter { a ->
+                val cx = a.polygon.map { it.first }.average(); val cy = a.polygon.map { it.second }.average()
+                kept.none { b -> cx in b[0]..b[2] && cy in b[1]..b[3] }
+            }.map { a ->
                 SdpLot(
                     projectId = plan.projectId,
                     sdpPlanId = plan.id,
@@ -1034,7 +1081,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Lot Created",
                 details = "Added ${lots.size} lots found in SDP Plan v${plan.version}",
                 oldValue = "",
-                newValue = "${areas.count { it.isLot }} lots, ${areas.count { !it.isLot }} larger areas"
+                newValue = "${lots.count { it.blockNumber != "OS" }} lots, ${lots.count { it.blockNumber == "OS" }} larger areas"
             )
         }
     }

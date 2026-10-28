@@ -205,13 +205,14 @@ class ProjectRepository(
         projectDao.deactivateSdpLot(lotId, modifiedBy, date)
     }
 
-    /** Swaps earlier auto-detected lots nobody has updated for [lots]; lots with progress stay. */
-    suspend fun replaceDetectedLots(sdpPlanId: Long, lots: List<SdpLot>, marker: String, modifiedBy: String, role: UserRole? = null) {
+    /** Swaps earlier auto-detected lots nobody has updated for [lots]; lots with progress stay. Returns how many went. */
+    suspend fun replaceDetectedLots(sdpPlanId: Long, lots: List<SdpLot>, marker: String, modifiedBy: String, role: UserRole? = null): Int {
         validatePermission(role, Permission.EDIT_PROJECT)
         val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
         val stale = projectDao.untouchedDetectedLotIds(sdpPlanId, marker)
         if (stale.isNotEmpty()) projectDao.deactivateSdpLots(stale, modifiedBy, date)
-        projectDao.insertSdpLots(lots)
+        if (lots.isNotEmpty()) projectDao.insertSdpLots(lots)
+        return stale.size
     }
 
     // SDP Roads

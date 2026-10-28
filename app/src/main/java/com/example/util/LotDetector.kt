@@ -79,30 +79,54 @@ object LotDetector {
         return out
     }
 
+    /**
+     * The outline of the closed area around ([x], [y]), both 0..1, for a lot the user points
+     * at; null when the point is on a line, or the area is open or too big to be one lot.
+     */
+    fun traceAt(dark: BooleanArray, width: Int, height: Int, x: Float, y: Float): List<Pair<Float, Float>>? {
+        require(dark.size == width * height)
+        val wall = thicken(dark, width, height)
+        val px = (x * width).toInt().coerceIn(0, width - 1)
+        val py = (y * height).toInt().coerceIn(0, height - 1)
+        // A tap can land on the lot line itself; take the nearest open pixel within a few pixels.
+        val start = (0..6).asSequence().flatMap { d -> (-d..d).asSequence().flatMap { dy -> (-d..d).asSequence().map { dx -> px + dx to py + dy } } }
+            .firstOrNull { (cx, cy) -> cx in 0 until width && cy in 0 until height && !wall[cy * width + cx] }
+            ?: return null
+        val labels = IntArray(width * height)
+        val r = fill(start.second * width + start.first, Region(1), wall, labels, width, height, IntArray(4096))
+        if (r.touchesEdge || r.area < 50 || r.area > width.toLong() * height / 50) return null
+        return normalize(simplify(outlineOf(r, labels, width), 1.5), width, height)
+    }
+
     private fun label(wall: BooleanArray, labels: IntArray, w: Int, h: Int): List<Region> {
         val regions = mutableListOf<Region>()
         var stack = IntArray(4096)
         for (start in wall.indices) {
             if (wall[start] || labels[start] != 0) continue
-            val r = Region(regions.size + 1).also { regions += it }
-            var sp = 0
-            stack[sp++] = start
-            labels[start] = r.id
-            while (sp > 0) {
-                val p = stack[--sp]
-                val x = p % w; val y = p / w
-                r.area++
-                if (x < r.minX) r.minX = x; if (x > r.maxX) r.maxX = x
-                if (y < r.minY) r.minY = y; if (y > r.maxY) r.maxY = y
-                if (x == 0 || y == 0 || x == w - 1 || y == h - 1) r.touchesEdge = true
-                if (sp + 4 > stack.size) stack = stack.copyOf(stack.size * 2)
-                if (x > 0 && !wall[p - 1] && labels[p - 1] == 0) { labels[p - 1] = r.id; stack[sp++] = p - 1 }
-                if (x < w - 1 && !wall[p + 1] && labels[p + 1] == 0) { labels[p + 1] = r.id; stack[sp++] = p + 1 }
-                if (y > 0 && !wall[p - w] && labels[p - w] == 0) { labels[p - w] = r.id; stack[sp++] = p - w }
-                if (y < h - 1 && !wall[p + w] && labels[p + w] == 0) { labels[p + w] = r.id; stack[sp++] = p + w }
-            }
+            regions += fill(start, Region(regions.size + 1), wall, labels, w, h, stack)
         }
         return regions
+    }
+
+    private fun fill(start: Int, r: Region, wall: BooleanArray, labels: IntArray, w: Int, h: Int, initial: IntArray): Region {
+        var stack = initial
+        var sp = 0
+        stack[sp++] = start
+        labels[start] = r.id
+        while (sp > 0) {
+            val p = stack[--sp]
+            val x = p % w; val y = p / w
+            r.area++
+            if (x < r.minX) r.minX = x; if (x > r.maxX) r.maxX = x
+            if (y < r.minY) r.minY = y; if (y > r.maxY) r.maxY = y
+            if (x == 0 || y == 0 || x == w - 1 || y == h - 1) r.touchesEdge = true
+            if (sp + 4 > stack.size) stack = stack.copyOf(stack.size * 2)
+            if (x > 0 && !wall[p - 1] && labels[p - 1] == 0) { labels[p - 1] = r.id; stack[sp++] = p - 1 }
+            if (x < w - 1 && !wall[p + 1] && labels[p + 1] == 0) { labels[p + 1] = r.id; stack[sp++] = p + 1 }
+            if (y > 0 && !wall[p - w] && labels[p - w] == 0) { labels[p - w] = r.id; stack[sp++] = p - w }
+            if (y < h - 1 && !wall[p + w] && labels[p + w] == 0) { labels[p + w] = r.id; stack[sp++] = p + w }
+        }
+        return r
     }
 
     /** The most common size, counted on a log scale so lots of slightly different sizes fall together. */

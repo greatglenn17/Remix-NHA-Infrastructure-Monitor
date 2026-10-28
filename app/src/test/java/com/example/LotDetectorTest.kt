@@ -43,6 +43,21 @@ class LotDetectorTest {
     }
 
     @Test
+    fun traceAtOutlinesTheLotUnderTheTap() {
+        val c = Canvas(400, 300)
+        c.block(50, 50, cols = 3, rows = 1, lw = 40, lh = 60)
+        // Middle lot spans x 90..130, y 50..110; tap its centre, and on the inner edge of its left line.
+        for (tapX in listOf(110f, 91f)) {
+            val poly = LotDetector.traceAt(c.dark, c.w, c.h, tapX / c.w, 80f / c.h)!!
+            val xs = poly.map { it.first * c.w }; val ys = poly.map { it.second * c.h }
+            assertTrue(xs.min() in 88f..94f && xs.max() in 128f..133f)
+            assertTrue(ys.min() in 48f..54f && ys.max() in 108f..113f)
+        }
+        // Outside every outline: open to the page edge, not a lot.
+        assertEquals(null, LotDetector.traceAt(c.dark, c.w, c.h, 0.9f, 0.9f))
+    }
+
+    @Test
     fun blankOrScannedPageFindsNothing() {
         assertTrue(LotDetector.detect(BooleanArray(200 * 100), 200, 100).isEmpty())
     }

@@ -90,6 +90,8 @@ enum class SdpInteractionMode {
     MONITORING,
     DIGITIZING_LOT,
     DIGITIZING_ROAD,
+    // Tap inside a lot the detector missed; the app traces its outline from the PDF.
+    TAP_ADD_LOT,
     EDITING_LOT,
     EDITING_ROAD
 }
@@ -278,7 +280,9 @@ fun SubdivisionPlanTab(
     onGetInspectionsForLot: (sdpLotId: Long) -> Flow<List<SdpLotInspection>>,
     auditLogs: List<com.example.data.model.AuditLog> = emptyList(),
     onDetectLots: (SdpPlan, (List<com.example.util.LotDetector.Area>?) -> Unit) -> Unit = { _, done -> done(null) },
-    onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> }
+    onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> },
+    onTraceLot: (SdpPlan, Float, Float, (List<Pair<Float, Float>>?) -> Unit) -> Unit = { _, _, _, done -> done(null) },
+    onRemoveDetectedLots: (SdpPlan) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -287,6 +291,9 @@ fun SubdivisionPlanTab(
     var isDetecting by remember { mutableStateOf(false) }
     var detectedAreas by remember { mutableStateOf<List<com.example.util.LotDetector.Area>?>(null) }
     var detectFailed by remember { mutableStateOf(false) }
+    var isTracing by remember { mutableStateOf(false) }
+    var tapAddMessage by remember { mutableStateOf<String?>(null) }
+    var confirmRemoveDetected by remember { mutableStateOf(false) }
     val runDetection = { plan: SdpPlan ->
         isDetecting = true
         onDetectLots(plan) { areas ->
@@ -315,6 +322,7 @@ fun SubdivisionPlanTab(
 
     // Interaction & Selection State
     var interactionMode by remember { mutableStateOf(SdpInteractionMode.MONITORING) }
+    val isDrawMode = interactionMode != SdpInteractionMode.MONITORING && interactionMode != SdpInteractionMode.TAP_ADD_LOT
     var selectedLot by remember { mutableStateOf<SdpLot?>(null) }
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
 
@@ -671,8 +679,8 @@ fun SubdivisionPlanTab(
                                             draftPoints.clear()
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (interactionMode != SdpInteractionMode.MONITORING) LocalNHAColors.current.watch else Color.Transparent,
-                                            contentColor = if (interactionMode != SdpInteractionMode.MONITORING) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = if (isDrawMode) LocalNHAColors.current.watch else Color.Transparent,
+                                            contentColor = if (isDrawMode) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -682,6 +690,49 @@ fun SubdivisionPlanTab(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("EDIT SDP", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
+
+                                    if (com.example.data.files.Attachments.isRef(activeSdpPlan.pdfFileUrl)) {
+                                        val tapMode = interactionMode == SdpInteractionMode.TAP_ADD_LOT
+                                        Button(
+                                            onClick = {
+                                                interactionMode = SdpInteractionMode.TAP_ADD_LOT
+                                                draftPoints.clear()
+                                                tapAddMessage = null
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (tapMode) LocalNHAColors.current.watch else Color.Transparent,
+                                                contentColor = if (tapMode) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+                                            ),
+                                            shape = RoundedCornerShape(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(28.dp).testTag("tap_add_lot_mode")
+                                        ) {
+                                            Icon(Icons.Default.TouchApp, contentDescription = null, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("TAP TO ADD", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Lot tools: what a tap does now, and removing the lots the app found.
+                    if (canDigitize && interactionMode != SdpInteractionMode.MONITORING) {
+                        val removableCount = activeLots.count { it.description.startsWith("Auto-detected") && !lotProgressMap.containsKey(it.id) }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = tapAddMessage ?: if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) {
+                                    if (isTracing) "Tracing the lot…" else "Tap inside a lot the app missed to add it."
+                                } else "Tap each corner of the lot, then save it.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (tapAddMessage != null) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (removableCount > 0) {
+                                TextButton(onClick = { confirmRemoveDetected = true }, modifier = Modifier.testTag("remove_found_lots")) {
+                                    Text("Remove found lots ($removableCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LocalNHAColors.current.behind)
                                 }
                             }
                         }
@@ -969,7 +1020,7 @@ fun SubdivisionPlanTab(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(interactionMode) {
+                            .pointerInput(interactionMode, parsedLots, bitmapWidth, bitmapHeight, activeSdpPlan) {
                                 detectTapGestures(
                                     onDoubleTap = {
                                         scale = if (scale > 1.2f) 1f else 2.5f
@@ -983,6 +1034,24 @@ fun SubdivisionPlanTab(
                                         if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
                                             interactionMode == SdpInteractionMode.DIGITIZING_ROAD) {
                                             draftPoints.add(tappedNorm)
+                                        } else if (interactionMode == SdpInteractionMode.TAP_ADD_LOT && activeSdpPlan != null && !isTracing) {
+                                            val existing = parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }
+                                            if (existing != null) {
+                                                tapAddMessage = "Block ${existing.lot.blockNumber} Lot ${existing.lot.lotNumber} is already a lot. Tap a lot that is not shaded."
+                                            } else {
+                                                isTracing = true
+                                                tapAddMessage = null
+                                                onTraceLot(activeSdpPlan, normX, normY) { outline ->
+                                                    isTracing = false
+                                                    if (outline == null) {
+                                                        tapAddMessage = "No closed lot outline there. Zoom in and tap inside the lot, or use Edit SDP to tap its corners."
+                                                    } else {
+                                                        draftPoints.clear()
+                                                        draftPoints.addAll(outline.map { (x, y) -> Offset(x, y) })
+                                                        showAddLotDialog = true
+                                                    }
+                                                }
+                                            }
                                         } else if (interactionMode == SdpInteractionMode.MONITORING) {
                                             // FAST SPATIAL HIT-TESTING FOR LOTS & ROADS
                                             var hitLot: SdpLot? = null
@@ -1239,7 +1308,7 @@ fun SubdivisionPlanTab(
                                     for (i in 1 until draftPoints.size) {
                                         lineTo(draftPoints[i].x * bitmapWidth, draftPoints[i].y * bitmapHeight)
                                     }
-                                    if (interactionMode == SdpInteractionMode.DIGITIZING_LOT && draftPoints.size >= 3) {
+                                    if ((interactionMode == SdpInteractionMode.DIGITIZING_LOT || interactionMode == SdpInteractionMode.TAP_ADD_LOT) && draftPoints.size >= 3) {
                                         close()
                                     }
                                 }
@@ -1476,6 +1545,19 @@ fun SubdivisionPlanTab(
                                     ) {
                                         Text("HISTORY & DETAILS", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
+
+                                    if (canDigitize) {
+                                        Button(
+                                            onClick = { lotToDeactivate = selectedLot },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = LocalNHAColors.current.behind),
+                                            border = BorderStroke(1.dp, LocalNHAColors.current.behind),
+                                            shape = RoundedCornerShape(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier.weight(0.7f).height(32.dp).testTag("remove_lot_button")
+                                        ) {
+                                            Text("REMOVE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1656,7 +1738,11 @@ fun SubdivisionPlanTab(
     // 6. ADD LOT DIALOG
     if (showAddLotDialog && activeSdpPlan != null) {
         AddLotDialog(
-            onDismiss = { showAddLotDialog = false },
+            onDismiss = {
+                showAddLotDialog = false
+                // A traced outline is thrown away on cancel; tapped corners stay for more tapping.
+                if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) draftPoints.clear()
+            },
             onSubmit = { block: String, lot: String, unit: String, area: Double, desc: String ->
                 val json = normalizedToJson(draftPoints)
                 onAddLot(block, lot, unit, area, json, desc)
@@ -1684,8 +1770,8 @@ fun SubdivisionPlanTab(
         AlertDialog(
             onDismissRequest = { lotToDeactivate = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Deactivate Lot Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Deactivated lots will be hidden from monitoring mode but preserved in audit logs and history.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Remove Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("The lot is taken off the plan on every phone. Its progress and billing history stay in the audit log.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1694,9 +1780,40 @@ fun SubdivisionPlanTab(
                         lotToDeactivate = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface)
-                ) { Text("Deactivate") }
+                ) { Text("Remove") }
             },
             dismissButton = { TextButton(onClick = { lotToDeactivate = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        )
+    }
+
+    // 8b. REMOVE ALL FOUND LOTS CONFIRMATION
+    if (confirmRemoveDetected && activeSdpPlan != null) {
+        val removable = activeLots.count { it.description.startsWith("Auto-detected") && !lotProgressMap.containsKey(it.id) }
+        val kept = activeLots.count { it.description.startsWith("Auto-detected") && lotProgressMap.containsKey(it.id) }
+        AlertDialog(
+            onDismissRequest = { confirmRemoveDetected = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Remove $removable found ${if (removable == 1) "lot" else "lots"}?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Lots the app found that have no progress yet are taken off the plan on every phone. " +
+                        "Lots you added yourself stay" + (if (kept > 0) ", and so do the $kept found ${if (kept == 1) "lot that already has" else "lots that already have"} progress." else ".") +
+                        " Find lots can add them again.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRemoveDetectedLots(activeSdpPlan)
+                        selectedLot = null
+                        confirmRemoveDetected = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.testTag("confirm_remove_found_lots")
+                ) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemoveDetected = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
