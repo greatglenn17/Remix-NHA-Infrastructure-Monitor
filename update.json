@@ -1,8 +1,8 @@
 {
-  "versionCode": 193,
-  "versionName": "1.9.3",
-  "releaseNotes": "v1.9.3: Subdivision plans find lots automatically from a CAD plan PDF, work out lot areas from the plan scale, sync lots and progress between phones, and colour lots by progress in five bands. Viewers see the plan read-only.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.3/NHA_Monitor_v1.9.3_Build193.apk",
-  "apkSha256": "b34871457cab6cee969c17bae0874f26d85ccc4a52961e925d236915370f3f19",
+  "versionCode": 194,
+  "versionName": "1.9.4",
+  "releaseNotes": "v1.9.4: Print or save as PDF the Project Profile and the weekly and monthly Project Engineer's Reports on A4 with the NHA header. Signatories and their positions (including Officer-in-Charge) are asked before printing and remembered per project. Edit Project adds Projected Beneficiaries, Board Resolution, Notice of Award and Notice to Proceed.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.4/NHA_Monitor_v1.9.4_Build194.apk",
+  "apkSha256": "981efd7c4f6eec105df8a8956fe4ae33b87a51941a1f20ffabc15292d92b8a39",
   "isMandatory": true
 }
