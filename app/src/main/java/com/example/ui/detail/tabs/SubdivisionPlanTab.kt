@@ -786,7 +786,7 @@ fun SubdivisionPlanTab(
                     if (canDigitize && interactionMode != SdpInteractionMode.MONITORING) {
                         val removableCount = activeLots.count { it.description.startsWith("Auto-detected") && !lotProgressMap.containsKey(it.id) }
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MinHeight)) {  // fixed height: buttons appearing must not shift the plan under the finger
                             Text(
                                 text = tapAddMessage ?: if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) {
                                     if (isTracing) "Tracing the lot…" else "Tap inside a lot the app missed to add it."
@@ -798,6 +798,14 @@ fun SubdivisionPlanTab(
                             if (removableCount > 0) {
                                 TextButton(onClick = { confirmRemoveDetected = true }, modifier = Modifier.testTag("remove_found_lots")) {
                                     Text("Remove found lots ($removableCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LocalNHAColors.current.behind)
+                                }
+                            }
+                            if (interactionMode == SdpInteractionMode.DIGITIZING_LOT && draftPoints.isNotEmpty()) {
+                                TextButton(onClick = { draftPoints.clear() }) { Text("Clear", fontSize = 11.sp) }
+                                if (draftPoints.size >= 3) {
+                                    Button(onClick = { showAddLotDialog = true }, modifier = Modifier.testTag("save_drawn_lot")) {
+                                        Text("Save lot", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
@@ -3229,7 +3237,7 @@ private fun ProgressPicker(value: Float, color: Color, onChange: (Float) -> Unit
         OutlinedTextField(
             value = typed,
             onValueChange = { text ->
-                typed = text.filter(Char::isDigit).take(3)
+                typed = text.substringBefore('.').substringBefore(',').filter(Char::isDigit).take(3)  // lot progress is whole percent
                 typed.toIntOrNull()?.coerceIn(0, 100)?.let { onChange(it.toFloat()) }
             },
             suffix = { Text("%") },
@@ -3243,10 +3251,8 @@ private fun ProgressPicker(value: Float, color: Color, onChange: (Float) -> Unit
 /** Photos of a lot. Each new one is stamped "Block X Lot Y" with the date, so the picture says which lot it shows. */
 @Composable
 private fun LotPhotos(lot: SdpLot, photos: List<String>, onChange: (List<String>) -> Unit) {
-    val stamp = listOf(
-        "Block ${lot.blockNumber} Lot ${lot.lotNumber}",
-        java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", java.util.Locale.ENGLISH))
-    )
+    // Built when the photo comes in, so the time is when it was taken.
+    val stamp = { listOf("Block ${lot.blockNumber} Lot ${lot.lotNumber}", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", java.util.Locale.ENGLISH))) }
     val latest by rememberUpdatedState(photos)
     val camera = com.example.ui.components.rememberAttachmentCamera(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }
     val picker = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }

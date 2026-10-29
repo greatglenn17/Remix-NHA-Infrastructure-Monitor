@@ -1558,13 +1558,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     suspend fun weeklyReportForm(project: Project, report: WeeklyReport, signatories: com.example.util.Signatories): String {
         val context = getApplication<Application>()
         // Photos go in as data URIs so the print page needs no file access.
+        val titles = com.example.data.files.PhotoDetails.parse(report.photoDetailsJson)
         val photos = com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson)
             .filterNot { com.example.data.files.Attachments.isPdf(it) }
             .mapNotNull { ref ->
-                if (!com.example.data.files.Attachments.isRef(ref)) return@mapNotNull ref.takeIf { it.startsWith("http") }
-                com.example.data.files.Attachments.ensureLocal(context, ref)?.let { file ->
+                val src = if (!com.example.data.files.Attachments.isRef(ref)) ref.takeIf { it.startsWith("http") }
+                else com.example.data.files.Attachments.ensureLocal(context, ref)?.let { file ->
                     "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
                 }
+                src?.let { it to titles[ref]?.title.orEmpty() }
             }
         return com.example.util.BlueBookForms.weeklyReport(
             project, report,

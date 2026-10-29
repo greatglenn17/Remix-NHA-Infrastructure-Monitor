@@ -138,7 +138,7 @@ object BlueBookForms {
         issues: List<WeeklyIssue>,
         accomplishment: List<AccomplishmentItem>,
         weather: List<DailyHourlyWeather>,
-        photos: List<String>,
+        photos: List<Pair<String, String>>,  // image src to its title
         logs: ContractLogs,
         signatories: Signatories,
         banner: String = ""
@@ -205,7 +205,7 @@ object BlueBookForms {
         if (photos.isEmpty()) b.append("<tr><td colspan='2' class='empty'>No photos attached.</td></tr>")
         photos.chunked(2).forEach { pair ->
             b.append("<tr>")
-            pair.forEach { b.append("<td><img src='$it'></td>") }
+            pair.forEach { (src, title) -> b.append("<td><img src='$src'>${if (title.isBlank()) "" else "<div>${esc(title)}</div>"}</td>") }
             if (pair.size == 1) b.append("<td></td>")
             b.append("</tr>")
         }

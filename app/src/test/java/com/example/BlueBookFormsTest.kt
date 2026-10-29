@@ -102,7 +102,7 @@ class BlueBookFormsTest {
         )
         val html = BlueBookForms.weeklyReport(
             project, report, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
-            listOf(day("2026-07-20", hours(5))), emptyList(), ContractLogs.from(project, docs),
+            listOf(day("2026-07-20", hours(5))), listOf("data:image/jpeg;base64,BBBB" to "Footing, Block 3"), ContractLogs.from(project, docs),
             Signatories("Glenn C. Aprovechado", "Principal Engineer C", "Ana Cruz", "District Manager", "", "Regional Manager"),
             banner = "data:image/png;base64,AAAA"
         )
@@ -114,5 +114,6 @@ class BlueBookFormsTest {
         assertTrue(html.contains("Principal Engineer C"))
         assertTrue(html.contains("<img class='banner' src='data:image/png;base64,AAAA'>"))
         assertFalse(html.contains("FORM NO."))
+        assertTrue(html.contains("<img src='data:image/jpeg;base64,BBBB'><div>Footing, Block 3</div>"))
     }
 }

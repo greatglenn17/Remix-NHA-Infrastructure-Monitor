@@ -27,7 +27,7 @@ class AttachmentPicker(val launch: (mimeType: String) -> Unit)
 
 /** A file picker whose pick is copied into the app (see [Attachments]) and handed back as its reference. */
 @Composable
-fun rememberAttachmentPicker(kind: Attachments.Kind, stamp: List<String> = emptyList(), onAttached: (ref: String) -> Unit): AttachmentPicker {
+fun rememberAttachmentPicker(kind: Attachments.Kind, stamp: () -> List<String> = { emptyList() }, onAttached: (ref: String) -> Unit): AttachmentPicker {
     val context = LocalContext.current
     val projectUuid = LocalProjectUuid.current
     val scope = rememberCoroutineScope()
@@ -37,7 +37,7 @@ fun rememberAttachmentPicker(kind: Attachments.Kind, stamp: List<String> = empty
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             try {
-                latestOnAttached(Attachments.import(context, uri, kind, projectUuid, latestStamp))
+                latestOnAttached(Attachments.import(context, uri, kind, projectUuid, latestStamp()))
             } catch (e: Exception) {
                 Toast.makeText(context, "File not attached: ${e.message}", Toast.LENGTH_LONG).show()
             }
@@ -62,7 +62,7 @@ fun rememberAttachmentOpener(): (value: String) -> Unit {
 
 /** Takes a photo with the camera app and attaches it, e.g. a DV shot on site. Launch with no arguments. */
 @Composable
-fun rememberAttachmentCamera(kind: Attachments.Kind, stamp: List<String> = emptyList(), onAttached: (ref: String) -> Unit): () -> Unit {
+fun rememberAttachmentCamera(kind: Attachments.Kind, stamp: () -> List<String> = { emptyList() }, onAttached: (ref: String) -> Unit): () -> Unit {
     val context = LocalContext.current
     val projectUuid = LocalProjectUuid.current
     val scope = rememberCoroutineScope()
@@ -75,7 +75,7 @@ fun rememberAttachmentCamera(kind: Attachments.Kind, stamp: List<String> = empty
         if (!saved) { file.delete(); return@rememberLauncherForActivityResult }
         scope.launch {
             try {
-                latestOnAttached(Attachments.importCameraPhoto(context, file, projectUuid, kind, latestStamp))
+                latestOnAttached(Attachments.importCameraPhoto(context, file, projectUuid, kind, latestStamp()))
             } catch (e: Exception) {
                 Toast.makeText(context, "Photo not attached: ${e.message}", Toast.LENGTH_LONG).show()
             }
