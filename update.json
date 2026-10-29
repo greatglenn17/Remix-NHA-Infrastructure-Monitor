@@ -1,8 +1,8 @@
 {
-  "versionCode": 194,
-  "versionName": "1.9.4",
-  "releaseNotes": "v1.9.4: Print or save as PDF the Project Profile and the weekly and monthly Project Engineer's Reports on A4 with the NHA header. Signatories and their positions (including Officer-in-Charge) are asked before printing and remembered per project. Edit Project adds Projected Beneficiaries, Board Resolution, Notice of Award and Notice to Proceed.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.4/NHA_Monitor_v1.9.4_Build194.apk",
-  "apkSha256": "981efd7c4f6eec105df8a8956fe4ae33b87a51941a1f20ffabc15292d92b8a39",
+  "versionCode": 195,
+  "versionName": "1.9.5",
+  "releaseNotes": "v1.9.5: Field feedback. Edit the scope of works with Wt% worked out from the amounts; only approved time extensions add contract days; two-decimal percentages; +/- buttons for manpower and equipment; activities over a range of days; separate weekly signatories; scan or photograph the DV; weekly photo albums with geo-tag and titles; lots take a typed %, several lots can get the same progress at once, and lot photos are stamped with block and lot; developer requests are tracked until packaged; issues get a target date and show on that week's print.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.5/NHA_Monitor_v1.9.5_Build195.apk",
+  "apkSha256": "f3dd4fd02ba5358be493482b21c3425fe25245beb304e9fa799adcc90f71cf66",
   "isMandatory": true
 }
