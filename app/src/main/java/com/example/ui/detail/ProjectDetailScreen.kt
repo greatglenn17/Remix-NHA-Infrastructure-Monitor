@@ -90,6 +90,15 @@ fun ProjectDetailScreen(
     fun printForm(jobName: String, build: suspend () -> String?) {
         printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
     }
+    // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
+    var printWithSignatories by remember { mutableStateOf<((com.example.util.Signatories) -> Unit)?>(null) }
+    printWithSignatories?.let { print ->
+        com.example.ui.dialogs.SignatoriesDialog(
+            initial = viewModel.signatoriesFor(currentProject),
+            onDismiss = { printWithSignatories = null },
+            onPrint = { s -> printWithSignatories = null; viewModel.saveSignatories(currentProject, s); print(s) }
+        )
+    }
 
     LaunchedEffect(currentProject.id) {
         viewModel.selectProject(currentProject.id)
@@ -208,7 +217,7 @@ fun ProjectDetailScreen(
                                     onAddWeeklyReportClick = onAddWeeklyReportClick,
                                     onEditWeeklyReportClick = { viewModel.weeklyReportToEdit.value = it; onAddWeeklyReportClick() },
                                     onDeleteWeeklyReportClick = { viewModel.deleteWeeklyReport(it) },
-                                    onPrintWeeklyReportClick = { report -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report) } }
+                                    onPrintWeeklyReportClick = { report -> printWithSignatories = { s -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report, s) } } }
                                 )
                                 "Monthly" -> MonthlyReportsTab(project = currentProject,
                                     monthlyReports = monthlyReports,
@@ -220,7 +229,7 @@ fun ProjectDetailScreen(
                                     onSignOffClick = { report, roleType, status, notes ->
                                         viewModel.updateMonthlySignoff(report, roleType, status, notes)
                                     },
-                                    onPrintMonthClick = { month, weeks -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks) } }
+                                    onPrintMonthClick = { month, weeks -> printWithSignatories = { s -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks, s) } } }
                                 )
                             "Lots" -> SubdivisionPlanTab(
                                 project = currentProject,

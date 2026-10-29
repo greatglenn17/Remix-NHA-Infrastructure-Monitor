@@ -40,6 +40,13 @@ data class Project(
     val boardResolution: String = "",
     val noticeOfAward: String = "",
     val noticeToProceed: String = "",
+    // Signatories printed on the weekly and monthly Blue Book reports.
+    val preparedByName: String = "",
+    val preparedByPosition: String = "",
+    val checkedByName: String = "",
+    val checkedByPosition: String = "",
+    val notedByName: String = "",
+    val notedByPosition: String = "",
     val contractCostOriginal: Double,
     val contractCostRevised: Double,
     val contractDurationDays: Int,

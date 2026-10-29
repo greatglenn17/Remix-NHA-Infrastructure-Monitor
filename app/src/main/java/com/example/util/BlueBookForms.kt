@@ -29,6 +29,13 @@ import kotlin.math.sin
 /** The person printing the form, for the "Prepared by" block. */
 data class Preparer(val name: String, val title: String, val office: String)
 
+/** The Prepared by / Checked by / Noted by block of the weekly and monthly reports. */
+data class Signatories(
+    val preparedName: String, val preparedPosition: String,
+    val checkedName: String, val checkedPosition: String,
+    val notedName: String, val notedPosition: String
+)
+
 data class Extension(val no: String, val days: Int, val reason: String, val status: String)
 
 /**
@@ -84,7 +91,7 @@ data class ContractLogs(
  */
 object BlueBookForms {
 
-    fun projectProfile(project: Project, logs: ContractLogs, preparer: Preparer, asOf: LocalDate): String {
+    fun projectProfile(project: Project, logs: ContractLogs, preparer: Preparer, asOf: LocalDate, banner: String = ""): String {
         val rows = StringBuilder()
         fun row(label: String, value: String) { rows.append("<tr><td class='pl'>${esc(label)}</td><td class='pc'>:</td><td>$value</td></tr>") }
         fun sub(label: String, value: String) { rows.append("<tr><td class='pl ps'>${esc(label)}</td><td class='pc'>:</td><td>${esc(value)}</td></tr>") }
@@ -120,7 +127,8 @@ object BlueBookForms {
             <h1 class='title'>PROJECT PROFILE</h1>
             <table class='profile'>$rows</table>
             <div class='sig1'>Prepared By:<br><br><br><b>${esc(preparer.name.uppercase())}</b><br>${esc(preparer.title)}<br>${esc(preparer.office)}</div>
-            """
+            """,
+            banner
         )
     }
 
@@ -134,7 +142,9 @@ object BlueBookForms {
         accomplishment: List<AccomplishmentItem>,
         weather: List<DailyHourlyWeather>,
         photos: List<String>,
-        logs: ContractLogs
+        logs: ContractLogs,
+        signatories: Signatories,
+        banner: String = ""
     ): String {
         val b = StringBuilder()
         b.append(header("For the Week of ${esc(report.reportingWeek.replace(Regex("^Week \\d+: "), ""))}"))
@@ -203,8 +213,8 @@ object BlueBookForms {
         b.append("</table>")
 
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>")
-        b.append(signatures(report.submittedByStaff, "", ""))
-        return page("Weekly Project Engineer's Report", b.toString())
+        b.append(signatures(signatories))
+        return page("Weekly Project Engineer's Report", b.toString(), banner)
     }
 
     /**
@@ -222,7 +232,9 @@ object BlueBookForms {
         logs: ContractLogs,
         documents: List<PendingDocument>,
         weather: List<DailyHourlyWeather>,
-        saved: MonthlyReport?
+        saved: MonthlyReport?,
+        signatories: Signatories,
+        banner: String = ""
     ): String {
         val b = StringBuilder()
         b.append(header("For the Month of ${esc(month.format(MONTH))}"))
@@ -279,8 +291,8 @@ object BlueBookForms {
 
         b.append("<table><tr><th class='sec'>III. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on or before end of each month.</p>")
-        b.append(signatures(saved?.preparedByName ?: "", saved?.checkedByName ?: "", saved?.notedByName ?: ""))
-        return page("Monthly Project Engineer's Report", b.toString())
+        b.append(signatures(signatories))
+        return page("Monthly Project Engineer's Report", b.toString(), banner)
     }
 
     private fun header(period: String) = """
@@ -311,11 +323,11 @@ object BlueBookForms {
         """
     }
 
-    private fun signatures(prepared: String, checked: String, noted: String) = """
+    private fun signatures(s: Signatories) = """
         <table class='sig'><tr>
-          <td>Prepared by:<br><br><br><b>${esc(prepared)}</b><div class='line'></div>Site Engineer</td>
-          <td>Checked by:<br><br><br><b>${esc(checked)}</b><div class='line'></div>District Manager</td>
-          <td>Noted by:<br><br><br><b>${esc(noted)}</b><div class='line'></div>Regional Manager</td>
+          <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}</td>
+          <td>Checked by:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}</td>
+          <td>Noted by:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}</td>
         </tr></table>
     """
 
@@ -405,7 +417,8 @@ object BlueBookForms {
     private val WEEK_DAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
     // Print ink, not app colours: black text on white A4 paper.
-    private fun page(title: String, body: String) = """
+    // [banner] is the NHA header image as a data URI; blank leaves it out.
+    private fun page(title: String, body: String, banner: String) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
         @page { size: A4; margin: 12mm; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
@@ -441,10 +454,11 @@ object BlueBookForms {
         td.ps { font-weight: normal; padding-left: 10mm; }
         td.pc { width: 3%; }
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
+        img.banner { display: block; width: 100%; margin-bottom: 3mm; }
         table.sig { margin-top: 6mm; }
         table.sig td { border: none; width: 33%; }
         .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
         .note { font-size: 8pt; font-style: italic; }
-        </style></head><body>$body</body></html>
+        </style></head><body>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }

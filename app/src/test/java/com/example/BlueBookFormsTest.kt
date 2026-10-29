@@ -7,6 +7,7 @@ import com.example.data.model.WeeklyReport
 import com.example.util.BlueBookForms
 import com.example.util.ContractLogs
 import com.example.util.Preparer
+import com.example.util.Signatories
 import java.time.LocalDate
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
@@ -80,11 +81,16 @@ class BlueBookFormsTest {
         )
         val html = BlueBookForms.weeklyReport(
             project, report, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
-            listOf(day("2026-07-20", hours(5))), emptyList(), ContractLogs.from(project, docs)
+            listOf(day("2026-07-20", hours(5))), emptyList(), ContractLogs.from(project, docs),
+            Signatories("Glenn C. Aprovechado", "Principal Engineer C", "Ana Cruz", "District Manager", "", "Regional Manager"),
+            banner = "data:image/png;base64,AAAA"
         )
         assertEquals(7, Regex("<svg").findAll(html).count())
         // 24 hour slices per clock; days with no log are drawn empty.
         assertEquals(7 * 24, Regex("<path").findAll(html).count())
         assertTrue(html.contains("July 20, 2026"))
+        assertTrue(html.contains("GLENN C. APROVECHADO"))
+        assertTrue(html.contains("Principal Engineer C"))
+        assertTrue(html.contains("<img class='banner' src='data:image/png;base64,AAAA'>"))
     }
 }

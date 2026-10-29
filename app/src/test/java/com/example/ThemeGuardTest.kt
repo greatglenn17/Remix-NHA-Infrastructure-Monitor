@@ -49,6 +49,7 @@ class ThemeGuardTest {
             "ui/dialogs/GoogleDriveSyncDialog.kt",
             "ui/dialogs/ManageUsersDialog.kt",
             "ui/dialogs/NotificationsDialog.kt",
+            "ui/dialogs/SignatoriesDialog.kt",
             "ui/dialogs/UpdateAvailableDialog.kt",
             "ui/dialogs/WeekRange.kt",
             "ui/dialogs/WeeklyReportSteps.kt",
