@@ -75,6 +75,8 @@ class ProjectScheduleTest {
     fun revisedDuration_noneWhenSameOrBlank() {
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "-"))
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-01"))
+        // Revised date left equal to the original: an approved suspension alone must not show a duration.
+        assertNull(ProjectSchedule.revisedDurationDays("2026-04-13", 360, 0, "2027-04-07", "2027-04-07"))
     }
 
     @Test

@@ -36,10 +36,12 @@ object ProjectSchedule {
 
     /**
      * Contract duration plus approved order days, else the span from the start to the stored revised date.
-     * Null when neither applies, the dates are unparseable, or the span equals the contract duration.
+     * Null when neither applies, the dates are unparseable, the span equals the contract duration,
+     * or the stored revised date is just the original completion (nothing was revised).
      */
-    fun revisedDurationDays(dateStarted: String, contractDurationDays: Int, addedDays: Int, completionDateRevised: String): Int? {
+    fun revisedDurationDays(dateStarted: String, contractDurationDays: Int, addedDays: Int, completionDateRevised: String, completionDateOriginal: String = ""): Int? {
         if (addedDays > 0) return contractDurationDays + addedDays
+        if (completionDateRevised.trim() == completionDateOriginal.trim()) return null
         val start = parse(dateStarted) ?: return null
         val end = parse(completionDateRevised) ?: return null
         return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it > 0 && it != contractDurationDays }
