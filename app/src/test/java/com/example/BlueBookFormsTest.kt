@@ -92,5 +92,6 @@ class BlueBookFormsTest {
         assertTrue(html.contains("GLENN C. APROVECHADO"))
         assertTrue(html.contains("Principal Engineer C"))
         assertTrue(html.contains("<img class='banner' src='data:image/png;base64,AAAA'>"))
+        assertFalse(html.contains("FORM NO."))
     }
 }

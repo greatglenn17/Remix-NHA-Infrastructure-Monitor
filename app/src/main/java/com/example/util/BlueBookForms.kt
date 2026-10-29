@@ -296,10 +296,6 @@ object BlueBookForms {
     }
 
     private fun header(period: String) = """
-        <table class='head'><tr>
-          <td class='agency'>OFFICE OF THE PRESIDENT<br><b>NATIONAL HOUSING AUTHORITY</b><br>Elliptical Road, Diliman, Quezon City</td>
-          <td class='formno'>FORM NO._____</td>
-        </tr></table>
         <h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>$period</div>
     """
 
@@ -435,9 +431,6 @@ object BlueBookForms {
         td.rec { height: 30mm; }
         td.empty { text-align: center; color: #555; }
         tr.tot td { font-weight: bold; }
-        table.head td { border: none; padding: 0; }
-        td.agency { font-size: 9pt; }
-        td.formno { text-align: right; vertical-align: top; }
         h1 { font-size: 13pt; text-align: center; margin: 3mm 0 0; }
         h1.title { font-size: 14pt; margin: 4mm 0 6mm; text-decoration: underline; }
         .period { text-align: center; margin-bottom: 3mm; font-weight: bold; }
