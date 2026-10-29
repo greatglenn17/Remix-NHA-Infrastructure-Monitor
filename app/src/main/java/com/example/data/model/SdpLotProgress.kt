@@ -53,6 +53,8 @@ data class SdpLotProgress(
     val billedBy: String = "",
     val billingReference: String = "",
     val billingRemarks: String = "",
+    // Site photos of this lot (attachment refs, JSON array); each is stamped with its block and lot.
+    val photosJson: String = "[]",
     // Audit fields
     val createdBy: String = "",
     val createdDate: String = "",

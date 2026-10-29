@@ -265,7 +265,9 @@ fun SubdivisionPlanTab(
         startDate: String,
         targetDate: String,
         contractor: String,
-        remarks: String
+        remarks: String,
+        // Null keeps the lot's photos.
+        photos: List<String>?
     ) -> Unit,
     onUpdateLotBillingStatus: (
         sdpLotId: Long,
@@ -337,6 +339,9 @@ fun SubdivisionPlanTab(
     val isDrawMode = interactionMode != SdpInteractionMode.MONITORING && interactionMode != SdpInteractionMode.TAP_ADD_LOT
     var selectedLot by remember { mutableStateOf<SdpLot?>(null) }
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
+    // Group select: lots that get the same progress in one save (null: off).
+    var groupIds by remember { mutableStateOf<Set<Long>?>(null) }
+    var showGroupProgress by remember { mutableStateOf(false) }
 
     // Renumbering one block: a panel replaces the lot card and the plan shows the new numbers.
     // renumberBlock is the block the lots came from (null: panel closed); renumberIds the lots
@@ -1134,10 +1139,16 @@ fun SubdivisionPlanTab(
                                             }
 
                                             if (hitLot != null) {
-                                                selectedLot = hitLot
-                                                selectedRoad = null
-                                                // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL (viewers only see the lot card)
-                                                if (canDigitize) showProgressDialogLot = hitLot
+                                                val group = groupIds
+                                                if (group != null) {
+                                                    val id = hitLot.id
+                                                    groupIds = if (id in group) group - id else group + id
+                                                } else {
+                                                    selectedLot = hitLot
+                                                    selectedRoad = null
+                                                    // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL (viewers only see the lot card)
+                                                    if (canDigitize) showProgressDialogLot = hitLot
+                                                }
                                             } else {
                                                 // Test roads
                                                 var hitRoad: SdpRoad? = null
@@ -1300,7 +1311,7 @@ fun SubdivisionPlanTab(
                                     close()
                                 }
                                 val previewNumber = renumberPreview[lot.id]
-                                val isSelected = selectedLot?.id == lot.id || previewNumber != null
+                                val isSelected = selectedLot?.id == lot.id || previewNumber != null || groupIds?.contains(lot.id) == true
                                 val progressRecord = lotProgressMap[lot.id]
                                 val progressValue = progressRecord?.physicalProgress ?: 0
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
@@ -1610,8 +1621,34 @@ fun SubdivisionPlanTab(
                     }
                 }
 
+                groupIds?.let { group ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                "${group.size} lot${if (group.size == 1) "" else "s"} selected",
+                                style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                            )
+                            Text("Tap lots on the plan to add or remove them.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { groupIds = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    enabled = group.isNotEmpty(),
+                                    onClick = { showGroupProgress = true },
+                                    modifier = Modifier.testTag("group_update_button")
+                                ) { Text("Update progress") }
+                            }
+                        }
+                    }
+                }
+
                 // BOTTOM SELECTION INFO CARD (WITH PHASE 7 RECORD INSPECTION & HISTORY ACTIONS)
-                if (renumberBlock == null && (selectedLot != null || selectedRoad != null)) {
+                if (renumberBlock == null && groupIds == null && (selectedLot != null || selectedRoad != null)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1754,6 +1791,15 @@ fun SubdivisionPlanTab(
                                     ) {
                                         Text("RENUMBER BLOCK ${selectedLot!!.blockNumber}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    OutlinedButton(
+                                        onClick = { groupIds = setOf(selectedLot!!.id); selectedLot = null },
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().height(32.dp).testTag("group_select_button")
+                                    ) {
+                                        Text("SELECT MORE LOTS (SAME PROGRESS)", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
@@ -1806,7 +1852,7 @@ fun SubdivisionPlanTab(
             defaultContractor = project.contractor,
             canManageBilling = canDigitize,
             onDismiss = { showProgressDialogLot = null },
-            onSubmitProgress = { progressVal: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String ->
+            onSubmitProgress = { progressVal: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String> ->
                 onUpdateLotProgress(
                     targetLot.id,
                     progressVal,
@@ -1815,12 +1861,35 @@ fun SubdivisionPlanTab(
                     startDate,
                     targetDate,
                     contractor,
-                    remarks
+                    remarks,
+                    photos
                 )
                 showProgressDialogLot = null
             },
             onToggleBillingRequested = { shouldBeBilled: Boolean ->
                 lotToToggleBilling = Pair(targetLot, shouldBeBilled)
+            }
+        )
+    }
+
+    if (showGroupProgress) {
+        val group = groupIds.orEmpty()
+        GroupProgressDialog(
+            count = group.size,
+            onDismiss = { showGroupProgress = false },
+            onSubmit = { progressVal, status, activity, remarks ->
+                // Each lot keeps its own dates, contractor and photos.
+                group.forEach { id ->
+                    val existing = lotProgressMap[id]
+                    onUpdateLotProgress(
+                        id, progressVal, status, activity,
+                        existing?.startDate ?: "", existing?.targetCompletionDate ?: "",
+                        existing?.contractor?.ifBlank { project.contractor } ?: project.contractor,
+                        remarks, null
+                    )
+                }
+                showGroupProgress = false
+                groupIds = null
             }
         )
     }
@@ -2232,21 +2301,10 @@ fun RecordInspectionSnapshotDialog(
                     }
                 }
 
-                Slider(
-                    value = progressSlider,
-                    onValueChange = {
-                        progressSlider = it
-                        constructionStatus = when (it.toInt()) {
-                            0 -> "Not Started"
-                            in 1..20 -> "Layout / Excavation Started"
-                            in 21..80 -> "Under Construction"
-                            in 81..99 -> "Substantially Completed"
-                            else -> "Completed"
-                        }
-                    },
-                    valueRange = 0f..100f,
-                    colors = SliderDefaults.colors(thumbColor = derivedColor, activeTrackColor = derivedColor, inactiveTrackColor = cs.onSurfaceVariant.copy(alpha = 0.3f))
-                )
+                ProgressPicker(progressSlider, derivedColor) {
+                    progressSlider = it
+                    constructionStatus = statusForProgress(it.toInt())
+                }
             }
         }
 
@@ -2910,7 +2968,8 @@ fun UpdateLotProgressDialog(
         startDate: String,
         targetDate: String,
         contractor: String,
-        remarks: String
+        remarks: String,
+        photos: List<String>
     ) -> Unit,
     onToggleBillingRequested: (shouldBeBilled: Boolean) -> Unit
 ) {
@@ -2921,6 +2980,7 @@ fun UpdateLotProgressDialog(
     var targetCompletionDate by remember { mutableStateOf(currentProgress?.targetCompletionDate ?: "") }
     var contractor by remember { mutableStateOf(currentProgress?.contractor?.ifBlank { defaultContractor } ?: defaultContractor) }
     var remarks by remember { mutableStateOf(currentProgress?.remarks ?: "") }
+    var photos by remember { mutableStateOf(com.example.data.files.Attachments.parseList(currentProgress?.photosJson ?: "[]")) }
 
     val intProgress = progressSlider.toInt().coerceIn(0, 100)
     val derivedColor = getLotProgressFillColor(intProgress)
@@ -2972,25 +3032,10 @@ fun UpdateLotProgressDialog(
                             }
                         }
 
-                        Slider(
-                            value = progressSlider,
-                            onValueChange = {
-                                progressSlider = it
-                                constructionStatus = when (it.toInt()) {
-                                    0 -> "Not Started"
-                                    in 1..20 -> "Layout / Excavation Started"
-                                    in 21..80 -> "Under Construction"
-                                    in 81..99 -> "Substantially Completed"
-                                    else -> "Completed"
-                                }
-                            },
-                            valueRange = 0f..100f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = derivedColor,
-                                activeTrackColor = derivedColor,
-                                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            )
-                        )
+                        ProgressPicker(progressSlider, derivedColor) {
+                            progressSlider = it
+                            constructionStatus = statusForProgress(it.toInt())
+                        }
                     }
                 }
 
@@ -3036,6 +3081,8 @@ fun UpdateLotProgressDialog(
                     label = { Text("Remarks") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                LotPhotos(lot, photos) { photos = it }
 
                 // DEVELOPER BILLING CONTROL SECTION
                 Surface(
@@ -3107,7 +3154,8 @@ fun UpdateLotProgressDialog(
                         startDate,
                         targetCompletionDate,
                         contractor,
-                        remarks
+                        remarks,
+                        photos
                     )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = derivedColor, contentColor = MaterialTheme.colorScheme.surface)
@@ -3121,4 +3169,113 @@ fun UpdateLotProgressDialog(
             }
         }
     )
+}
+
+/** One progress update saved to every lot picked with group select. */
+@Composable
+private fun GroupProgressDialog(count: Int, onDismiss: () -> Unit, onSubmit: (progress: Int, status: String, activity: String, remarks: String) -> Unit) {
+    var progress by remember { mutableFloatStateOf(0f) }
+    var status by remember { mutableStateOf(statusForProgress(0)) }
+    var activity by remember { mutableStateOf("") }
+    var remarks by remember { mutableStateOf("") }
+    val intProgress = progress.toInt().coerceIn(0, 100)
+    val color = getLotProgressFillColor(intProgress)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Update $count lots", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Physical Progress: $intProgress%", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                ProgressPicker(progress, color) { progress = it; status = statusForProgress(it.toInt()) }
+                OutlinedTextField(value = status, onValueChange = { status = it }, label = { Text("Construction Status") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = activity, onValueChange = { activity = it }, label = { Text("Current Activity") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(intProgress, status, activity, remarks) }, modifier = Modifier.testTag("group_save_button")) {
+                Text("SAVE TO $count LOTS", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+    )
+}
+
+/** Construction status that goes with a progress %, as the progress slider sets it. */
+fun statusForProgress(progress: Int): String = when (progress) {
+    0 -> "Not Started"
+    in 1..20 -> "Layout / Excavation Started"
+    in 21..80 -> "Under Construction"
+    in 81..99 -> "Substantially Completed"
+    else -> "Completed"
+}
+
+/** Progress slider with a box to type the exact %. */
+@Composable
+private fun ProgressPicker(value: Float, color: Color, onChange: (Float) -> Unit) {
+    var typed by remember { mutableStateOf(value.toInt().toString()) }
+    // Keep the box in step when the slider moves.
+    LaunchedEffect(value) { if (typed.toIntOrNull() != value.toInt()) typed = value.toInt().toString() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = 0f..100f,
+            colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color, inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(8.dp))
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { text ->
+                typed = text.filter(Char::isDigit).take(3)
+                typed.toIntOrNull()?.coerceIn(0, 100)?.let { onChange(it.toFloat()) }
+            },
+            suffix = { Text("%") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.width(92.dp).testTag("lot_progress_input")
+        )
+    }
+}
+
+/** Photos of a lot. Each new one is stamped "Block X Lot Y" with the date, so the picture says which lot it shows. */
+@Composable
+private fun LotPhotos(lot: SdpLot, photos: List<String>, onChange: (List<String>) -> Unit) {
+    val stamp = listOf(
+        "Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+        java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", java.util.Locale.ENGLISH))
+    )
+    val latest by rememberUpdatedState(photos)
+    val camera = com.example.ui.components.rememberAttachmentCamera(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }
+    val picker = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }
+    val open = com.example.ui.components.rememberAttachmentOpener()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Lot photos (${photos.size})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (photos.isNotEmpty()) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                photos.forEach { ref ->
+                    Box {
+                        coil.compose.AsyncImage(
+                            model = ref, contentDescription = "Photo of Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)).clickable { open(ref) }
+                        )
+                        IconButton(onClick = { onChange(photos - ref) }, modifier = Modifier.align(Alignment.TopEnd).size(32.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove photo", tint = MaterialTheme.colorScheme.surface)
+                        }
+                    }
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = camera, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Take photo")
+            }
+            OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Gallery")
+            }
+        }
+    }
 }

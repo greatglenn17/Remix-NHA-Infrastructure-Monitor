@@ -10,13 +10,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.data.files.Attachments
 import com.example.data.model.PendingDocument
 import com.example.data.model.ProjectPayment
 import com.example.data.model.Permission
 import com.example.data.model.UserRole
 import com.example.data.model.hasPermission
-import com.example.ui.components.rememberAttachmentPicker
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.detail.tabs.ViewDvScanDialog
@@ -46,7 +44,7 @@ fun MoneySection(
     val canManagePayments = currentUserRole.hasPermission(Permission.MANAGE_PAYMENTS)
 
     // Uploads a scanned copy straight to an existing payment
-    val singleScanLauncher = rememberAttachmentPicker(Attachments.Kind.SCAN) { ref ->
+    val attachToPayment = com.example.ui.detail.tabs.rememberDvAttacher { ref ->
         paymentToAttachScan?.let { payment ->
             val updated = payment.copy(fileUrl = ref)
             onUpdatePayment(updated)
@@ -70,10 +68,8 @@ fun MoneySection(
                             PaymentCard(
                                 payment = payment,
                                 onViewScan = { viewingDvPayment = payment },
-                                onAttachScan = {
-                                    paymentToAttachScan = payment
-                                    singleScanLauncher.launch("image/*")
-                                },
+                                // The DV dialog offers Scan, Take photo and Upload.
+                                onAttachScan = { viewingDvPayment = payment },
                                 onDelete = { onDeletePayment(payment) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 canEdit = canManagePayments
@@ -113,9 +109,9 @@ fun MoneySection(
             payment = viewingDvPayment!!,
             onDismiss = { viewingDvPayment = null },
             onReplaceScan = if (canManagePayments) {
-                {
+                { source ->
                     paymentToAttachScan = viewingDvPayment
-                    singleScanLauncher.launch("image/*")
+                    attachToPayment(source)
                 }
             } else null
         )
@@ -146,7 +142,7 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
             )
             ProgressLine(
                 label = "Work done",
-                value = "%.1f%%".format(actualPercent),
+                value = "%.2f%%".format(actualPercent),
                 fraction = (actualPercent / 100).toFloat(),
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)

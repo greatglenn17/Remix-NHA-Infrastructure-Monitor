@@ -122,3 +122,31 @@ data class PendingDocument(
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** A developer's request for an order, tracked from the day NHA receives it until it is packaged. */
+@Entity(
+    tableName = "developer_requests",
+    foreignKeys = [
+        ForeignKey(
+            entity = Project::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
+)
+data class DeveloperRequest(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val requestType: String,
+    val details: String = "",
+    val dateRequested: String = "",
+    val dateReceived: String = "",
+    // Blank until NHA has packaged the request.
+    val datePackaged: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
+)

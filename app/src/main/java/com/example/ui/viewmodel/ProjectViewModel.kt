@@ -626,10 +626,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private val portfolioItems: Flow<List<PortfolioItem>> = combine(
-        userScopedProjects, allPendingDocuments, billedTotalsByProject, reportDao.getLatestWeeklyReportTimes()
-    ) { projects, docs, billed, latest ->
+        userScopedProjects, allPendingDocuments, billedTotalsByProject, reportDao.getLatestWeeklyReportTimes(), projectDao.getAllDeveloperRequests()
+    ) { projects, docs, billed, latest, requests ->
         val today = LocalDate.now()
         val docsByProject = docs.groupBy { it.projectId }
+        val requestsByProject = requests.groupBy { it.projectId }
         val latestByProject = latest.associate {
             it.projectId to Instant.ofEpochMilli(it.latestAt).atZone(ZoneId.systemDefault()).toLocalDate()
         }
@@ -640,7 +641,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val lastUpdate = latestByProject[project.id]
             PortfolioItem(
                 project = project,
-                flags = ProjectAttention.flags(project, projectDocs, billedTotal, lastUpdate, today),
+                flags = ProjectAttention.flags(project, projectDocs, billedTotal, lastUpdate, today, requestsByProject[project.id].orEmpty()),
                 billedFraction = BillingProgress.billedFraction(billedTotal, cost),
                 billedTotal = billedTotal,
                 contractCost = cost,
@@ -663,6 +664,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             totalProjects = items.size
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PortfolioUiState.EMPTY)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val developerRequests: StateFlow<List<com.example.data.model.DeveloperRequest>> = _selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else projectDao.getDeveloperRequestsForProject(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val pendingDocuments: StateFlow<List<PendingDocument>> = _selectedProjectId.flatMapLatest { id ->
@@ -741,7 +747,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         startDate: String,
         targetCompletionDate: String,
         contractor: String,
-        remarks: String
+        remarks: String,
+        // Null keeps the lot's photos as they are.
+        photos: List<String>? = null
     ) {
         val safeProgress = physicalProgress.coerceIn(0, 100)
         viewModelScope.launch {
@@ -766,6 +774,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedBy = existing?.billedBy ?: "",
                 billingReference = existing?.billingReference ?: "",
                 billingRemarks = existing?.billingRemarks ?: "",
+                photosJson = photos?.let(com.example.data.files.Attachments::toJson) ?: existing?.photosJson ?: "[]",
                 createdBy = existing?.createdBy?.ifBlank { user } ?: user,
                 createdDate = existing?.createdDate?.ifBlank { currentDate } ?: currentDate,
                 lastModifiedBy = user,
@@ -816,6 +825,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedBy = if (isBilled) user else "",
                 billingReference = if (isBilled) billingReference else "",
                 billingRemarks = if (isBilled) billingRemarks else "",
+                photosJson = existing?.photosJson ?: "[]",
                 createdBy = existing?.createdBy?.ifBlank { user } ?: user,
                 createdDate = existing?.createdDate?.ifBlank { currentDate } ?: currentDate,
                 lastModifiedBy = user,
@@ -1501,12 +1511,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         "data:image/png;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
     }
 
-    /** The project's saved signatories; blanks fall back to the signed-in user and the form's usual positions. */
-    fun signatoriesFor(project: Project): com.example.util.Signatories {
+    /**
+     * The project's saved signatories for the weekly or the monthly report; blanks fall back to the
+     * signed-in user and the form's usual positions. Prepared by is the same on both.
+     */
+    fun signatoriesFor(project: Project, weekly: Boolean): com.example.util.Signatories {
         val user = currentUserAccount.value
-        return com.example.util.Signatories(
-            preparedName = project.preparedByName.ifBlank { user.name },
-            preparedPosition = project.preparedByPosition.ifBlank { user.title.ifBlank { "Site Engineer" } },
+        val preparedName = project.preparedByName.ifBlank { user.name }
+        val preparedPosition = project.preparedByPosition.ifBlank { user.title.ifBlank { "Site Engineer" } }
+        return if (weekly) com.example.util.Signatories(
+            preparedName, preparedPosition,
+            checkedName = project.weeklyCheckedByName,
+            checkedPosition = project.weeklyCheckedByPosition.ifBlank { "Principal Engineer A" },
+            notedName = project.weeklyNotedByName,
+            notedPosition = project.weeklyNotedByPosition.ifBlank { "District Manager" }
+        ) else com.example.util.Signatories(
+            preparedName, preparedPosition,
             checkedName = project.checkedByName,
             checkedPosition = project.checkedByPosition.ifBlank { "District Manager" },
             notedName = project.notedByName,
@@ -1515,10 +1535,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** Remembers the signatories on the project for the next printout; only roles that can edit the project save. */
-    fun saveSignatories(project: Project, s: com.example.util.Signatories) {
+    fun saveSignatories(project: Project, s: com.example.util.Signatories, weekly: Boolean) {
         if (!currentUserAccount.value.role.hasPermission(Permission.EDIT_PROJECT)) return
-        val updated = project.copy(
-            preparedByName = s.preparedName, preparedByPosition = s.preparedPosition,
+        val prepared = project.copy(preparedByName = s.preparedName, preparedByPosition = s.preparedPosition)
+        val updated = if (weekly) prepared.copy(
+            weeklyCheckedByName = s.checkedName, weeklyCheckedByPosition = s.checkedPosition,
+            weeklyNotedByName = s.notedName, weeklyNotedByPosition = s.notedPosition
+        ) else prepared.copy(
             checkedByName = s.checkedName, checkedByPosition = s.checkedPosition,
             notedByName = s.notedName, notedByPosition = s.notedPosition
         )
@@ -1548,7 +1571,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             com.example.ui.detail.tabs.parseManpowerList(report.manpowerJson),
             com.example.ui.detail.tabs.parseEquipmentList(report.equipmentJson),
             com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson),
-            com.example.ui.detail.tabs.parseIssuesList(report.issuesJson),
+            com.example.util.BlueBookForms.weekIssues(report, com.example.ui.detail.tabs.parseIssuesList(report.issuesJson), repository.getProjectIssues(project.id).first()),
             com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson),
             repository.getDailyWeather(project.id).first().filter { it.weeklyReportId == report.id },
             photos,
@@ -1960,6 +1983,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         accomplishmentItemsJson: String,
         documentsIssuedReceivedJson: String,
         attachedPhotoUrl: String,
+        photoDetailsJson: String,
         weatherDrafts: List<DailyHourlyWeather>
     ) {
         viewModelScope.launch(missingProjectGuard) {
@@ -1981,6 +2005,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     accomplishmentItemsJson = accomplishmentItemsJson,
                     documentsIssuedReceivedJson = documentsIssuedReceivedJson,
                     attachedPhotoUrlsJson = photoList,
+                    photoDetailsJson = photoDetailsJson,
                     submittedByStaff = currentUserAccount.value.name
                 )
                 weeklyReportWeatherWriter.create(report, weatherDrafts)
@@ -2212,6 +2237,32 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Issue Deletion",
                 details = "Deleted issue: ${issue.description.take(30)}...",
                 oldValue = "Issue ID: ${issue.id}",
+                newValue = ""
+            )
+        }
+    }
+
+    fun saveDeveloperRequest(request: com.example.data.model.DeveloperRequest) {
+        viewModelScope.launch(missingProjectGuard) {
+            if (request.id == 0L) projectDao.insertDeveloperRequest(request) else projectDao.updateDeveloperRequest(request)
+            logAuditAction(
+                projectId = request.projectId,
+                actionType = "Developer Request",
+                details = "${request.requestType} request received ${request.dateReceived}" + if (request.datePackaged.isNotBlank()) ", packaged ${request.datePackaged}" else "",
+                oldValue = "",
+                newValue = request.details
+            )
+        }
+    }
+
+    fun deleteDeveloperRequest(request: com.example.data.model.DeveloperRequest) {
+        viewModelScope.launch(missingProjectGuard) {
+            projectDao.deleteDeveloperRequest(request.id)
+            logAuditAction(
+                projectId = request.projectId,
+                actionType = "Developer Request",
+                details = "Deleted ${request.requestType} request received ${request.dateReceived}",
+                oldValue = request.details,
                 newValue = ""
             )
         }

@@ -54,6 +54,17 @@ class ProjectAttentionTest {
     private fun List<com.example.util.AttentionFlag>.of(kind: AttentionKind) = filter { it.kind == kind }
     private fun List<com.example.util.AttentionFlag>.level(kind: AttentionKind): AttentionLevel? = of(kind).singleOrNull()?.level
 
+    @Test fun developerRequestsNotPackaged_areFlaggedWithOldestAge() {
+        val requests = listOf(
+            com.example.data.model.DeveloperRequest(projectId = 1, requestType = "Time Extension", dateReceived = "2026-10-21"),
+            com.example.data.model.DeveloperRequest(projectId = 1, requestType = "Variation Order", dateReceived = "2026-10-24"),
+            com.example.data.model.DeveloperRequest(projectId = 1, requestType = "Work Resumption Order", dateReceived = "2026-10-01", datePackaged = "2026-10-03")
+        )
+        val flag = ProjectAttention.flags(project(), emptyList(), 0.0, recent, today, requests)
+            .of(AttentionKind.REQUEST_NOT_PACKAGED).single()
+        assertEquals("2 developer requests not yet packaged (oldest received 5 days ago)", flag.message)
+    }
+
     @Test fun slippageJustAboveWarning_notFlagged() {
         assertEquals(emptyList<Any>(), flags(project(50.0, 40.1)).of(BEHIND))
     }
@@ -74,7 +85,7 @@ class ProjectAttentionTest {
     @Test fun slippageAtFifteen_isCritical() {
         val f = flags(project(50.0, 35.0)).of(BEHIND).single()
         assertEquals(CRITICAL, f.level)
-        assertEquals("15.0% behind schedule", f.message)
+        assertEquals("15.00% behind schedule", f.message)
     }
 
     @Test fun behindScheduleStatus_isWarningEvenWithSmallSlippage() {
@@ -88,7 +99,7 @@ class ProjectAttentionTest {
     @Test fun billingGapAboveTen_isWarning() {
         val f = flags(project(40.0, 40.0), billed = 501_000.0).of(BILLING_AHEAD).single()
         assertEquals(WARNING, f.level)
-        assertEquals("Billed 50.1%, work done 40.0%", f.message)
+        assertEquals("Billed 50.10%, work done 40.00%", f.message)
     }
 
     @Test fun zeroContractCost_noBillingFlag() {

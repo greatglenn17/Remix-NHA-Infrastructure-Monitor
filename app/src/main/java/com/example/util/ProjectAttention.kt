@@ -1,5 +1,6 @@
 package com.example.util
 
+import com.example.data.model.DeveloperRequest
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
@@ -9,7 +10,7 @@ import java.time.temporal.ChronoUnit
 /** Red, amber, grey; declaration order is the rank. */
 enum class AttentionLevel { CRITICAL, WARNING, STALE }
 
-enum class AttentionKind { BEHIND, BILLING_AHEAD, WAITING_APPROVAL, DUE_SOON, OVERDUE, NO_RECENT_UPDATE }
+enum class AttentionKind { BEHIND, BILLING_AHEAD, WAITING_APPROVAL, REQUEST_NOT_PACKAGED, DUE_SOON, OVERDUE, NO_RECENT_UPDATE }
 
 data class AttentionFlag(val kind: AttentionKind, val level: AttentionLevel, val message: String)
 
@@ -21,6 +22,9 @@ object ProjectAttention {
     const val DUE_SOON_DAYS = 30
     const val STALE_DAYS = 14
     val ORDER_TYPES = listOf("Variation Order", "Time Extension", "Work Suspension", "Work Resumption")
+    val REQUEST_TYPES = listOf(
+        "Work Suspension Order", "Continuance of Work Suspension Order", "Work Resumption Order", "Variation Order", "Time Extension"
+    )
 
     /** Time extensions, suspensions, resumptions and variation orders not yet Approved. */
     fun waitingApproval(documents: List<PendingDocument>): Int = documents.count { doc ->
@@ -33,7 +37,8 @@ object ProjectAttention {
         documents: List<PendingDocument>,
         billedTotal: Double,
         latestReportAt: LocalDate?,
-        today: LocalDate
+        today: LocalDate,
+        requests: List<DeveloperRequest> = emptyList()
     ): List<AttentionFlag> {
         val flags = mutableListOf<AttentionFlag>()
         val finished = project.actualAccomplishment >= 100.0
@@ -42,7 +47,7 @@ object ProjectAttention {
         val markedBehind = project.status == ProjectStatus.BEHIND_SCHEDULE.label
         if (slip <= WARNING_SLIPPAGE || markedBehind) {
             val level = if (slip <= CRITICAL_SLIPPAGE) AttentionLevel.CRITICAL else AttentionLevel.WARNING
-            val message = if (slip < 0) "%.1f%% behind schedule".format(-slip) else "Marked behind schedule"
+            val message = if (slip < 0) "%.2f%% behind schedule".format(-slip) else "Marked behind schedule"
             flags += AttentionFlag(AttentionKind.BEHIND, level, message)
         }
 
@@ -52,7 +57,7 @@ object ProjectAttention {
             if (billedPercent - project.actualAccomplishment > BILLING_GAP_POINTS) {
                 flags += AttentionFlag(
                     AttentionKind.BILLING_AHEAD, AttentionLevel.WARNING,
-                    "Billed %.1f%%, work done %.1f%%".format(billedPercent, project.actualAccomplishment)
+                    "Billed %.2f%%, work done %.2f%%".format(billedPercent, project.actualAccomplishment)
                 )
             }
         }
@@ -61,6 +66,14 @@ object ProjectAttention {
         if (waiting > 0) {
             val noun = if (waiting == 1) "order" else "orders"
             flags += AttentionFlag(AttentionKind.WAITING_APPROVAL, AttentionLevel.WARNING, "$waiting $noun waiting approval")
+        }
+
+        val unpackaged = requests.filter { it.datePackaged.isBlank() }
+        if (unpackaged.isNotEmpty()) {
+            val noun = if (unpackaged.size == 1) "developer request" else "developer requests"
+            val oldest = unpackaged.mapNotNull { parse(it.dateReceived) }.minOrNull()
+            val age = oldest?.let { " (oldest received ${days(ChronoUnit.DAYS.between(it, today).coerceAtLeast(0))} ago)" }.orEmpty()
+            flags += AttentionFlag(AttentionKind.REQUEST_NOT_PACKAGED, AttentionLevel.WARNING, "${unpackaged.size} $noun not yet packaged$age")
         }
 
         if (!finished) {

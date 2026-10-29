@@ -77,7 +77,7 @@ fun ProjectHeader(
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         ProgressLine(
                             label = "Work done",
-                            value = "%.1f%%".format(project.actualAccomplishment),
+                            value = "%.2f%%".format(project.actualAccomplishment),
                             fraction = (project.actualAccomplishment / 100).toFloat(),
                             color = varianceColor,
                             modifier = Modifier.weight(1f)

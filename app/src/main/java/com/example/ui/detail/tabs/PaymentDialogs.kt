@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,9 +44,7 @@ fun AddPaymentDialog(
     var amountStr by remember { mutableStateOf("") }
     var fileUrl by remember { mutableStateOf("") }
 
-    val filePickerLauncher = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
-        fileUrl = ref
-    }
+    val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
 
     val nha = LocalNHAColors.current
     val amountErr = FormValidation.amountError(amountStr, true)
@@ -138,16 +138,7 @@ fun AddPaymentDialog(
                             )
                         }
                     } else {
-                        Button(
-                            onClick = { filePickerLauncher.launch("image/*") },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Upload Scanned DV (Image / File)", style = MaterialTheme.typography.labelSmall)
-                        }
+                        DvSourceButtons(attachDv)
                     }
                 }
             }
@@ -175,7 +166,7 @@ fun ViewDvScanDialog(
     payment: ProjectPayment,
     onDismiss: () -> Unit,
     // Null for roles that cannot manage payments.
-    onReplaceScan: (() -> Unit)?
+    onReplaceScan: ((DvSource) -> Unit)?
 ) {
     val phpFormat = remember { java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "PH")) }
     val cs = MaterialTheme.colorScheme
@@ -250,29 +241,13 @@ fun ViewDvScanDialog(
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            if (onReplaceScan != null) {
-                Button(
-                    onClick = onReplaceScan,
-                    shape = RoundedCornerShape(50.dp)
-                ) {
-                    Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(if (payment.fileUrl.isNotBlank()) "Change Scan" else "Upload Scan", fontWeight = FontWeight.Bold)
-                }
-            } else {
-                TextButton(onClick = onDismiss) { Text("Close") }
-            }
-        },
-        dismissButton = if (onReplaceScan != null) {
-            {
-                TextButton(onClick = onDismiss) {
-                    Text("Close")
+                onReplaceScan?.let { replace ->
+                    Text(if (payment.fileUrl.isNotBlank()) "Change the DV copy" else "Attach the DV copy", style = MaterialTheme.typography.labelMedium, color = cs.primary)
+                    DvSourceButtons(replace)
                 }
             }
-        } else null
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }
 
@@ -280,4 +255,44 @@ fun ViewDvScanDialog(
 private fun currentMonthPeriod(today: java.time.LocalDate): String {
     val month = today.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
     return "$month 1 - ${today.lengthOfMonth()}, ${today.year}"
+}
+
+/** Where a DV copy comes from: Google's document scanner, a camera photo, or a file already on the phone. */
+enum class DvSource { SCAN, PHOTO, FILE }
+
+/** One launcher for the three [DvSource]s; each hands back the attached file's reference. */
+@Composable
+fun rememberDvAttacher(onAttached: (ref: String) -> Unit): (DvSource) -> Unit {
+    val scan = com.example.ui.components.rememberDocumentScanner(onAttached)
+    val photo = com.example.ui.components.rememberAttachmentCamera(com.example.data.files.Attachments.Kind.SCAN, onAttached = onAttached)
+    val file = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN, onAttached = onAttached)
+    return { source ->
+        when (source) {
+            DvSource.SCAN -> scan()
+            DvSource.PHOTO -> photo()
+            DvSource.FILE -> file.launch("image/*")
+        }
+    }
+}
+
+@Composable
+fun DvSourceButtons(onPick: (DvSource) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(
+            Triple(DvSource.SCAN, "Scan DV", Icons.Default.DocumentScanner),
+            Triple(DvSource.PHOTO, "Take photo", Icons.Default.CameraAlt),
+            Triple(DvSource.FILE, "Upload", Icons.Default.UploadFile)
+        ).forEach { (source, label, icon) ->
+            OutlinedButton(
+                onClick = { onPick(source) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            }
+        }
+    }
 }

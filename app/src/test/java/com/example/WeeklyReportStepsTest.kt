@@ -69,7 +69,7 @@ class WeeklyReportStepsTest {
         rule.setContent {
             NHATheme(themeMode = AppThemeMode.LIGHT) {
                 AddWeeklyReportDialog(project = project, projectId = 1, existingReport = report, onDismiss = {},
-                    onSubmit = { week, target, actual, activities, photos, weather, dates, manpower, equipment, issues, accItems ->
+                    onSubmit = { week, target, actual, activities, photos, weather, dates, manpower, equipment, issues, accItems, _ ->
                         got = listOf(week, target, actual, activities, photos, weather.keys, dates.values.toList(), manpower, equipment, issues, accItems)
                     })
             }

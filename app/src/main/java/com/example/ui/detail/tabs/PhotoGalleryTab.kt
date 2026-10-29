@@ -3,6 +3,7 @@ package com.example.ui.detail.tabs
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,24 +27,30 @@ import com.example.ui.theme.*
 data class PhotoItem(
     val url: String,
     val weekDate: String,
-    val submittedBy: String
+    val submittedBy: String,
+    val detail: com.example.data.files.PhotoDetail = com.example.data.files.PhotoDetail()
 )
 
 @Composable
 fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
     var selectedPhoto by remember { mutableStateOf<PhotoItem?>(null) }
 
-    val photos = remember(weeklyReports) {
-        weeklyReports.flatMap { report ->
-            com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson).map { url ->
+    // One album per reporting week, in report order.
+    val albums = remember(weeklyReports) {
+        weeklyReports.map { report ->
+            val details = com.example.data.files.PhotoDetails.parse(report.photoDetailsJson)
+            report.reportingWeek to com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson).map { url ->
                 PhotoItem(
                     url = url,
                     weekDate = report.reportingWeek,
-                    submittedBy = report.submittedByStaff
+                    submittedBy = report.submittedByStaff,
+                    detail = details[url] ?: com.example.data.files.PhotoDetail()
                 )
             }
-        }
+        }.filter { it.second.isNotEmpty() }
     }
+    val photos = albums.flatMap { it.second }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (photos.isEmpty()) {
@@ -86,7 +93,15 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(photos) { photo ->
+                    albums.forEach { (week, weekPhotos) ->
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            "$week  ·  ${weekPhotos.size} photo${if (weekPhotos.size == 1) "" else "s"}",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                    items(weekPhotos) { photo ->
                         Card(
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(2.dp),
@@ -103,7 +118,8 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                                     contentScale = ContentScale.Crop
                                 )
 
-                                Surface(
+                                val label = photo.detail.title.ifBlank { photo.detail.takenAt }
+                                if (label.isNotBlank()) Surface(
                                     color = Color.Black.copy(alpha = 0.6f),
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
@@ -111,13 +127,15 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                                 ) {
                                     Column(modifier = Modifier.padding(6.dp)) {
                                         Text(
-                                            text = photo.weekDate,
+                                            text = label,
+                                            maxLines = 2,
                                             style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
                                         )
                                     }
                                 }
                             }
                         }
+                    }
                     }
                 }
             }
@@ -164,6 +182,16 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        val d = photo.detail
+                        if (d.title.isNotBlank()) Text(d.title, style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                        if (d.takenAt.isNotBlank()) Text("Taken: ${d.takenAt}", style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray))
+                        if (d.location.isNotBlank()) {
+                            Text("Location: ${d.location}", style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray))
+                            TextButton(onClick = {
+                                val uri = android.net.Uri.parse("geo:${d.lat},${d.lng}?q=${d.lat},${d.lng}")
+                                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+                            }) { Text("Open in Maps") }
+                        }
                         Text(
                             text = "Submitted by: ${photo.submittedBy}",
                             style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray)

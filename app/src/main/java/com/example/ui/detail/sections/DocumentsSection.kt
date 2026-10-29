@@ -54,6 +54,7 @@ fun OrderStatusDialog(
     currentUserRole: UserRole,
     onUpdateStatus: (PendingDocument, String, String) -> Unit,
     onDeleteDocument: (Long) -> Unit,
+    onAddContinuance: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var remarks by remember(doc.id) { mutableStateOf(doc.remarks) }
@@ -79,6 +80,11 @@ fun OrderStatusDialog(
                 }
                 if (!canApprove) Text("Only an Engineer Admin can approve.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, enabled = canEdit, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+                onAddContinuance?.let { add ->
+                    OutlinedButton(onClick = { onDismiss(); add() }, modifier = Modifier.fillMaxWidth().testTag("add_continuance_button")) {
+                        Text("Add Continuance of Work Suspension")
+                    }
+                }
             }
         },
         confirmButton = {

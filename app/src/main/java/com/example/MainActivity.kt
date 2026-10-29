@@ -165,7 +165,7 @@ class MainActivity : ComponentActivity() {
                                     showAddWeeklyReportDialog = false
                                     viewModel.weeklyReportToEdit.value = null
                                 },
-                                onSubmit = { week, target, actual, activities, photoUrl, dailyWeatherMap, dailyWeatherDates, manpowerJson, equipmentJson, issuesJson, accItemsJson ->
+                                onSubmit = { week, target, actual, activities, photoUrl, dailyWeatherMap, dailyWeatherDates, manpowerJson, equipmentJson, issuesJson, accItemsJson, photoDetailsJson ->
                                     val (daysElapsed, remainingDays) = if (selectedProject != null) {
                                         ProjectSchedule.elapsedAndRemaining(
                                             dateStarted = selectedProject.dateStarted,
@@ -185,6 +185,7 @@ class MainActivity : ComponentActivity() {
                                             actualAccomplishmentPct = actual,
                                             activitiesJson = activities,
                                             attachedPhotoUrlsJson = com.example.data.files.Attachments.toJson(com.example.data.files.Attachments.parseList(photoUrl)),
+                                            photoDetailsJson = photoDetailsJson,
                                             manpowerJson = manpowerJson,
                                             equipmentJson = equipmentJson,
                                             issuesJson = issuesJson,
@@ -219,6 +220,7 @@ class MainActivity : ComponentActivity() {
                                             accomplishmentItemsJson = accItemsJson,
                                             documentsIssuedReceivedJson = "[]",
                                             attachedPhotoUrl = photoUrl,
+                                            photoDetailsJson = photoDetailsJson,
                                             weatherDrafts = dailyWeatherDates.map { (dayOfWeek, dateStr) ->
                                                 val rawValue = dailyWeatherMap[dayOfWeek] ?: "FAIR"
                                                 val conditions = if (rawValue.contains(",")) rawValue else List(24) { rawValue }.joinToString(",")
@@ -347,11 +349,11 @@ class MainActivity : ComponentActivity() {
                                     showAddIssueDialog = false
                                     viewModel.projectIssueToEdit.value = null
                                 },
-                                onSubmit = { date, description, actionTaken, status, isCritical ->
+                                onSubmit = { date, description, actionTaken, status, isCritical, targetDate ->
                                     if (issueToEdit != null) {
-                                        viewModel.updateProjectIssue(issueToEdit.copy(date = date, description = description, actionTaken = actionTaken, status = status, isCritical = isCritical))
+                                        viewModel.updateProjectIssue(issueToEdit.copy(date = date, description = description, actionTaken = actionTaken, status = status, isCritical = isCritical, targetDate = targetDate))
                                     } else {
-                                        viewModel.addProjectIssue(com.example.data.model.ProjectIssue(projectId = pId, date = date, description = description, actionTaken = actionTaken, remarks = "", loggedBy = "", status = status, isCritical = isCritical))
+                                        viewModel.addProjectIssue(com.example.data.model.ProjectIssue(projectId = pId, date = date, description = description, actionTaken = actionTaken, remarks = "", loggedBy = "", status = status, isCritical = isCritical, targetDate = targetDate))
                                     }
                                     showAddIssueDialog = false
                                     viewModel.projectIssueToEdit.value = null

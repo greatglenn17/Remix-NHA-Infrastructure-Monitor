@@ -47,6 +47,11 @@ data class Project(
     val checkedByPosition: String = "",
     val notedByName: String = "",
     val notedByPosition: String = "",
+    // The weekly report has its own checker and noter; Prepared by is shared with the monthly.
+    val weeklyCheckedByName: String = "",
+    val weeklyCheckedByPosition: String = "",
+    val weeklyNotedByName: String = "",
+    val weeklyNotedByPosition: String = "",
     val contractCostOriginal: Double,
     val contractCostRevised: Double,
     val contractDurationDays: Int,

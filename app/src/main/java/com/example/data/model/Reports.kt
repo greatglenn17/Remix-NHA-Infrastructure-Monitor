@@ -33,6 +33,8 @@ data class WeeklyReport(
     val accomplishmentItemsJson: String, // JSON array of AccomplishmentItem
     val documentsIssuedReceivedJson: String, // JSON array of DocumentActionItem
     val attachedPhotoUrlsJson: String, // JSON array of image URLs
+    // Photo ref -> title, time taken and location; see PhotoDetails.
+    val photoDetailsJson: String = "{}",
     val submittedByStaff: String,
     val createdAtTimestamp: Long = System.currentTimeMillis(),
     // Cross-device sync identity and version; see RecordSyncSchema.

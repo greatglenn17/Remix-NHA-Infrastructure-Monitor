@@ -25,8 +25,7 @@ object ProjectSchedule {
     }
 
     /**
-     * Start date plus the contract duration plus the days of approved time extensions
-     * (" - N Days" in the name) and approved work suspensions ("Duration: N Days" in the remarks).
+     * Start date plus the contract duration plus the days of approved time extensions (" - N Days" in the name).
      * Null when nothing approved adds days or the start date is unparseable.
      */
     fun revisedCompletion(dateStarted: String, contractDurationDays: Int, documents: List<PendingDocument>): String? {
@@ -46,17 +45,39 @@ object ProjectSchedule {
         return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it > 0 && it != contractDurationDays }
     }
 
-    /** Days added to the contract by approved Time Extensions (" - N Days") and Work Suspensions ("Duration: N Days"). */
+    /**
+     * Days added to the contract by approved Time Extensions (" - N Days"). A suspension stops the
+     * clock but adds no days by itself: the days come with the time extension approved for it.
+     */
     fun addedDays(documents: List<PendingDocument>): Int {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
-        val extensionDays = approved.filter { it.documentName.contains("Time Extension", ignoreCase = true) }.sumOf {
+        return approved.filter { it.documentName.contains("Time Extension", ignoreCase = true) }.sumOf {
             Regex(".* - (\\d+) Days", RegexOption.IGNORE_CASE).find(it.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: 0
         }
-        val suspensionDays = approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.sumOf {
-            Regex("Duration: (\\d+) Days", RegexOption.IGNORE_CASE).find(it.remarks)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-        }
-        return extensionDays + suspensionDays
     }
+
+    fun isSuspension(doc: PendingDocument) = doc.documentName.startsWith("Work Suspension No.", ignoreCase = true)
+
+    /**
+     * Name of the next Continuance of [suspension], e.g. "Continuance No. 2 of Work Suspension No. 1 (Full)",
+     * and the day it starts: the latest End of the suspension and its continuances so far.
+     */
+    fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>): Pair<String, String> {
+        val base = suspension.documentName.trim()
+        val chain = documents.filter { it.documentName.trim().endsWith("of $base", ignoreCase = true) }
+        val no = chain.size + 1
+        val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
+        return "Continuance No. $no of $base" to (lastEnd?.toString() ?: "")
+    }
+
+    /** Remarks in the same "Duration | Effectivity | End" form as a suspension, so the schedule and forms read it. */
+    fun suspensionRemarks(days: Int, effectivity: String): String {
+        val end = parse(effectivity)?.plusDays(days.toLong())
+        return "Duration: $days Days | Effectivity: $effectivity" + (end?.let { " | End: $it" } ?: "")
+    }
+
+    private fun endOf(remarks: String): LocalDate? =
+        Regex("End: (\\d{4}-\\d{2}-\\d{2})").find(remarks)?.groupValues?.get(1)?.let(::parse)
 
     private fun parse(date: String): LocalDate? = try {
         LocalDate.parse(date.trim())
