@@ -31,7 +31,8 @@ fun WeeklyReportsTab(
     currentUserRole: UserRole,
     onAddWeeklyReportClick: () -> Unit,
     onEditWeeklyReportClick: (WeeklyReport) -> Unit,
-    onDeleteWeeklyReportClick: (WeeklyReport) -> Unit
+    onDeleteWeeklyReportClick: (WeeklyReport) -> Unit,
+    onPrintWeeklyReportClick: (WeeklyReport) -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (weeklyReports.isEmpty()) {
@@ -87,7 +88,7 @@ fun WeeklyReportsTab(
                 }
 
                 items(weeklyReports, key = { it.id }) { report ->
-                    WeeklyReportCard(report = report, currentUserRole = currentUserRole, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) })
+                    WeeklyReportCard(report = report, currentUserRole = currentUserRole, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) }, onPrintClick = { onPrintWeeklyReportClick(report) })
                 }
             }
             if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
@@ -107,7 +108,8 @@ private fun WeeklyReportCard(
     report: WeeklyReport,
     currentUserRole: UserRole,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onPrintClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -146,6 +148,9 @@ private fun WeeklyReportCard(
                             )
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onPrintClick, modifier = Modifier.size(48.dp).testTag("print_weekly_report_button")) {
+                                Icon(Icons.Default.Print, contentDescription = "Print", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                            }
                             if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) {
                                 IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
                                     Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
@@ -636,7 +641,7 @@ internal fun parseActivitiesList(jsonStr: String): List<DailyActivity> {
 }
 
 
-private fun parseAccomplishmentItemsList(jsonStr: String): List<AccomplishmentItem> {
+internal fun parseAccomplishmentItemsList(jsonStr: String): List<AccomplishmentItem> {
     if (jsonStr.isBlank()) return emptyList()
     val list = mutableListOf<AccomplishmentItem>()
     try {

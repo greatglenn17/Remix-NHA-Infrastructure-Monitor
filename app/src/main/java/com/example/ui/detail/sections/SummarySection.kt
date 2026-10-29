@@ -43,6 +43,7 @@ fun SummarySection(
     onAddOrder: () -> Unit,
     onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
     onDeleteOrder: (Long) -> Unit,
+    onPrintProfile: () -> Unit = {},
     today: LocalDate = LocalDate.now()
 ) {
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
@@ -53,7 +54,7 @@ fun SummarySection(
     val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> AttentionCard(flags, m) },
-        { m -> ProfileCard(project, canEditProject, onEditProject, m) },
+        { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
         { m ->
             KeyDatesCard(
                 project, revisedCompletion, addedDays, today, documents,
@@ -167,19 +168,22 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, modifier: M
 }
 
 @Composable
-private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject: () -> Unit, modifier: Modifier) {
+private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject: () -> Unit, onPrintProfile: () -> Unit, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     SectionCard(
         "Project profile",
         Icons.Default.Info,
         modifier,
-        action = if (canEditProject) {
-            {
-                IconButton(onClick = onEditProject, modifier = Modifier.testTag("edit_project_button")) {
+        action = {
+            Row {
+                IconButton(onClick = onPrintProfile, modifier = Modifier.testTag("print_profile_button")) {
+                    Icon(Icons.Default.Print, contentDescription = "Print Project Profile", tint = scheme.onSurfaceVariant)
+                }
+                if (canEditProject) IconButton(onClick = onEditProject, modifier = Modifier.testTag("edit_project_button")) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit Project", tint = scheme.onSurfaceVariant)
                 }
             }
-        } else null
+        }
     ) {
         val hasPhoto = project.latestUpdatePhotoUrl.isNotBlank()
         SitePhoto(

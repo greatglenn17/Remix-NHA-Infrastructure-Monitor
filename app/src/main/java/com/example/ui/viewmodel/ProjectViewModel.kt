@@ -1490,6 +1490,92 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Blue Book forms (A4 print / Save as PDF), filled from this project's records.
+
+    private suspend fun contractLogs(project: Project) =
+        com.example.util.ContractLogs.from(project, repository.getPendingDocuments(project.id).first())
+
+    /** The NHA header banner from assets, as a data URI for the print page. */
+    private val blueBookBanner: String by lazy {
+        val bytes = getApplication<Application>().assets.open("blue_book_header.png").use { it.readBytes() }
+        "data:image/png;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    }
+
+    /** The project's saved signatories; blanks fall back to the signed-in user and the form's usual positions. */
+    fun signatoriesFor(project: Project): com.example.util.Signatories {
+        val user = currentUserAccount.value
+        return com.example.util.Signatories(
+            preparedName = project.preparedByName.ifBlank { user.name },
+            preparedPosition = project.preparedByPosition.ifBlank { user.title.ifBlank { "Site Engineer" } },
+            checkedName = project.checkedByName,
+            checkedPosition = project.checkedByPosition.ifBlank { "District Manager" },
+            notedName = project.notedByName,
+            notedPosition = project.notedByPosition.ifBlank { "Regional Manager" }
+        )
+    }
+
+    /** Remembers the signatories on the project for the next printout; only roles that can edit the project save. */
+    fun saveSignatories(project: Project, s: com.example.util.Signatories) {
+        if (!currentUserAccount.value.role.hasPermission(Permission.EDIT_PROJECT)) return
+        val updated = project.copy(
+            preparedByName = s.preparedName, preparedByPosition = s.preparedPosition,
+            checkedByName = s.checkedName, checkedByPosition = s.checkedPosition,
+            notedByName = s.notedName, notedByPosition = s.notedPosition
+        )
+        if (updated != project) updateProjectMaster(updated)
+    }
+
+    suspend fun projectProfileForm(project: Project): String {
+        val user = currentUserAccount.value
+        return com.example.util.BlueBookForms.projectProfile(
+            project, contractLogs(project), com.example.util.Preparer(user.name, user.title, user.office), LocalDate.now(), blueBookBanner
+        )
+    }
+
+    suspend fun weeklyReportForm(project: Project, report: WeeklyReport, signatories: com.example.util.Signatories): String {
+        val context = getApplication<Application>()
+        // Photos go in as data URIs so the print page needs no file access.
+        val photos = com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson)
+            .filterNot { com.example.data.files.Attachments.isPdf(it) }
+            .mapNotNull { ref ->
+                if (!com.example.data.files.Attachments.isRef(ref)) return@mapNotNull ref.takeIf { it.startsWith("http") }
+                com.example.data.files.Attachments.ensureLocal(context, ref)?.let { file ->
+                    "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                }
+            }
+        return com.example.util.BlueBookForms.weeklyReport(
+            project, report,
+            com.example.ui.detail.tabs.parseManpowerList(report.manpowerJson),
+            com.example.ui.detail.tabs.parseEquipmentList(report.equipmentJson),
+            com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson),
+            com.example.ui.detail.tabs.parseIssuesList(report.issuesJson),
+            com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson),
+            repository.getDailyWeather(project.id).first().filter { it.weeklyReportId == report.id },
+            photos,
+            contractLogs(project),
+            signatories,
+            blueBookBanner
+        )
+    }
+
+    /** [month] is the Monthly tab's selection, e.g. "July 2026"; null when it can't be read. */
+    suspend fun monthlyReportForm(project: Project, month: String, monthWeeklyReports: List<WeeklyReport>, signatories: com.example.util.Signatories): String? {
+        val ym = com.example.util.BlueBookForms.parseMonth(month) ?: return null
+        val lastWeekly = monthWeeklyReports.maxByOrNull { it.id }
+        return com.example.util.BlueBookForms.monthlyReport(
+            project, ym, lastWeekly,
+            lastWeekly?.let { com.example.ui.detail.tabs.parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty(),
+            repository.getProjectPaymentsForProject(project.id).first(),
+            repository.getProjectIssues(project.id).first(),
+            contractLogs(project),
+            repository.getPendingDocuments(project.id).first(),
+            repository.getDailyWeather(project.id).first(),
+            repository.getMonthlyReports(project.id).first().firstOrNull { it.reportingMonth.trim().equals(month.trim(), ignoreCase = true) },
+            signatories,
+            blueBookBanner
+        )
+    }
+
     fun updateProjectStatus(projectId: Long, newStatus: String) {
         viewModelScope.launch(missingProjectGuard) {
             selectedProject.value?.let { current ->

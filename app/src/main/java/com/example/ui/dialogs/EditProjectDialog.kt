@@ -49,10 +49,18 @@ fun EditProjectDialog(
         dateStarted: String,
         completionDateOriginal: String,
         assignedStaff: String,
-        assignedUsers: List<com.example.data.model.RegisteredUser>?
+        assignedUsers: List<com.example.data.model.RegisteredUser>?,
+        projectedBeneficiaries: String,
+        boardResolution: String,
+        noticeOfAward: String,
+        noticeToProceed: String
     ) -> Unit
 ) {
     var name by remember { mutableStateOf(project.name) }
+    var projectedBeneficiaries by remember { mutableStateOf(project.projectedBeneficiaries) }
+    var boardResolution by remember { mutableStateOf(project.boardResolution) }
+    var noticeOfAward by remember { mutableStateOf(project.noticeOfAward) }
+    var noticeToProceed by remember { mutableStateOf(project.noticeToProceed) }
     var location by remember { mutableStateOf(project.location) }
     val assignedStaff = project.assignedStaff
     // A blank list means this phone has never received the assignment: editing it would send "[]" and clear it for everyone.
@@ -122,7 +130,8 @@ fun EditProjectDialog(
     fun snapshot() = listOf(
         name, location, selectedUids.toList(), implementingOffice, contractor, scopeItems.toList(),
         currentScopeItem, currentScopeAmount, currentScopeWeight, projectType, landAreaValue,
-        landAreaUnit, numberOfUnits, durationText, dateStarted
+        landAreaUnit, numberOfUnits, durationText, dateStarted,
+        projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed
     )
     val initial = remember { snapshot() }
     val dirty = snapshot() != initial
@@ -154,7 +163,11 @@ fun EditProjectDialog(
                 assignedStaff,
                 if (canEditAssignment) {
                     selectedUids.map { uid -> registeredUsers.firstOrNull { it.uid == uid } ?: com.example.data.model.RegisteredUser(uid, uid) }
-                } else null
+                } else null,
+                projectedBeneficiaries.trim(),
+                boardResolution.trim(),
+                noticeOfAward.trim(),
+                noticeToProceed.trim()
             )
         }
     ) {
@@ -419,6 +432,35 @@ fun EditProjectDialog(
                 singleLine = true
             )
         }
+
+        // Printed on the Project Profile sheet; left blank when unknown.
+        OutlinedTextField(
+            value = projectedBeneficiaries,
+            onValueChange = { projectedBeneficiaries = it },
+            label = { Text("Projected Beneficiaries") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = boardResolution,
+            onValueChange = { boardResolution = it },
+            label = { Text("Board Resolution / Date") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        OutlinedTextField(
+            value = noticeOfAward,
+            onValueChange = { noticeOfAward = it },
+            label = { Text("Notice of Award") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        OutlinedTextField(
+            value = noticeToProceed,
+            onValueChange = { noticeToProceed = it },
+            label = { Text("Notice to Proceed") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
 
         // Auto-computed Original Contract Cost from Scope of Work amounts
         val autoComputedCost = scopeItems.sumOf { it.amount }
