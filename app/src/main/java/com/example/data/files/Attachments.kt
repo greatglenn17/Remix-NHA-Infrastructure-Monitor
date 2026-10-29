@@ -129,8 +129,8 @@ object Attachments {
     fun toJson(list: List<String>): String = JSONArray(list).toString()
 
     /** Copies a picked file into the app, shrinking images, and queues it for upload. Returns its reference. */
-    suspend fun import(context: Context, uri: Uri, kind: Kind, projectUuid: String): String =
-        copyIn(context, uri, kind, requireProject(projectUuid))
+    suspend fun import(context: Context, uri: Uri, kind: Kind, projectUuid: String, stamp: List<String> = emptyList()): String =
+        copyIn(context, uri, kind, requireProject(projectUuid), stamp)
 
     private fun requireProject(projectUuid: String): String {
         if (projectUuid.isBlank()) throw IllegalStateException("No project selected")
@@ -139,7 +139,7 @@ object Attachments {
     }
 
     /** A null [projectUuid] makes a legacy reference; only the one-time migration of old uris does that. */
-    private suspend fun copyIn(context: Context, uri: Uri, kind: Kind, projectUuid: String?): String = withContext(Dispatchers.IO) {
+    private suspend fun copyIn(context: Context, uri: Uri, kind: Kind, projectUuid: String?, stamp: List<String> = emptyList()): String = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val bytes = resolver.openInputStream(uri)?.use { input ->
             val buffer = java.io.ByteArrayOutputStream()
@@ -154,10 +154,11 @@ object Attachments {
             }
             buffer.toByteArray()
         } ?: throw UnsupportedFileException()
-        store(context, bytes, kind, projectUuid)
+        store(context, bytes, kind, projectUuid, stamp)
     }
 
-    private suspend fun store(context: Context, bytes: ByteArray, kind: Kind, projectUuid: String?): String {
+    /** [stamp] lines are printed on the bottom of a photo, e.g. its block and lot; PDFs are kept as they are. */
+    private suspend fun store(context: Context, bytes: ByteArray, kind: Kind, projectUuid: String?, stamp: List<String> = emptyList()): String {
         val isPdf = bytes.size > 4 && String(bytes, 0, 4, Charsets.US_ASCII) == "%PDF"
         val id = UUID.randomUUID().toString()
         val name: String
@@ -166,7 +167,7 @@ object Attachments {
             name = "$id.pdf"
             File(dir(context), name).writeBytes(bytes)
         } else {
-            val bitmap = decodeScaled(bytes, kind.maxEdge) ?: throw UnsupportedFileException()
+            val bitmap = decodeScaled(bytes, kind.maxEdge)?.let { if (stamp.isEmpty()) it else PhotoStamp.draw(it, stamp) } ?: throw UnsupportedFileException()
             name = "$id.jpg"
             File(dir(context), name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             bitmap.recycle()
@@ -217,7 +218,7 @@ object Attachments {
      * attaches the shrunk copy. Older Android versions need a storage permission for the
      * Gallery copy, so there only the attachment is kept.
      */
-    suspend fun importCameraPhoto(context: Context, file: File, projectUuid: String): String = withContext(Dispatchers.IO) {
+    suspend fun importCameraPhoto(context: Context, file: File, projectUuid: String, kind: Kind = Kind.PHOTO, stamp: List<String> = emptyList()): String = withContext(Dispatchers.IO) {
         requireProject(projectUuid)
         try {
             val bytes = file.readBytes()
@@ -233,7 +234,7 @@ object Attachments {
                     }
                 }.onFailure { Log.w(TAG, "Could not save the original photo to the Gallery", it) }
             }
-            store(context, bytes, Kind.PHOTO, projectUuid)
+            store(context, bytes, kind, projectUuid, stamp)
         } finally {
             file.delete()
         }

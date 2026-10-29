@@ -51,6 +51,7 @@ import com.example.ui.theme.WeatherFairGreen
 import com.example.ui.theme.WeatherRainShowersCyan
 import com.example.ui.theme.WeatherRainyBlue
 import com.example.ui.theme.WeatherStormyRed
+import com.example.util.ActivityDays
 import com.example.util.FormValidation
 import org.json.JSONArray
 import org.json.JSONObject
@@ -73,7 +74,8 @@ fun AddWeeklyReportDialog(
         manpowerJson: String,
         equipmentJson: String,
         issuesJson: String,
-        accomplishmentItemsJson: String
+        accomplishmentItemsJson: String,
+        photoDetailsJson: String
     ) -> Unit,
     today: java.time.LocalDate = java.time.LocalDate.now()
 ) {
@@ -178,6 +180,14 @@ fun AddWeeklyReportDialog(
         }
     } }
 
+    val photoDetails = remember {
+        mutableStateMapOf<String, com.example.data.files.PhotoDetail>().apply {
+            putAll(com.example.data.files.PhotoDetails.parse(existingReport?.photoDetailsJson ?: "{}"))
+        }
+    }
+    // Geo-tag: new photos get the time and GPS position printed on them and kept with the report.
+    var geoTag by remember { mutableStateOf(false) }
+    var captionFor by remember { mutableStateOf<String?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var showDateRangePicker by remember { mutableStateOf(false) }
 
@@ -194,7 +204,10 @@ fun AddWeeklyReportDialog(
         photoScope.launch {
             for (uri in uris) {
                 try {
-                    photoUrls.add(Attachments.import(context, uri, Attachments.Kind.PHOTO, projectUuid))
+                    val detail = com.example.data.files.PhotoDetails.fromExif(context, uri)
+                    val ref = Attachments.import(context, uri, Attachments.Kind.PHOTO, projectUuid, if (geoTag) detail.stamp else emptyList())
+                    photoUrls.add(ref)
+                    photoDetails[ref] = detail
                 } catch (e: Exception) {
                     attachFailed(e)
                 }
@@ -214,11 +227,21 @@ fun AddWeeklyReportDialog(
         }
         photoScope.launch {
             try {
-                photoUrls.add(Attachments.importCameraPhoto(context, file, projectUuid))
+                val fix = if (geoTag) com.example.data.files.PhotoDetails.currentLocation(context) else null
+                if (geoTag && fix == null) android.widget.Toast.makeText(context, "No GPS fix yet: photo saved without location", android.widget.Toast.LENGTH_LONG).show()
+                val detail = com.example.data.files.PhotoDetail(takenAt = com.example.data.files.PhotoDetails.now(), lat = fix?.latitude, lng = fix?.longitude)
+                val ref = Attachments.importCameraPhoto(context, file, projectUuid, stamp = if (geoTag) detail.stamp else emptyList())
+                photoUrls.add(ref)
+                photoDetails[ref] = detail
             } catch (e: Exception) {
                 attachFailed(e)
             }
         }
+    }
+
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        geoTag = granted.values.any { it }
+        if (!geoTag) android.widget.Toast.makeText(context, "Location permission is needed to geo-tag photos", android.widget.Toast.LENGTH_LONG).show()
     }
 
     // Daily Weather State for 7 Days of the Week (24 Hours per Day)
@@ -267,7 +290,7 @@ fun AddWeeklyReportDialog(
     var step by remember { mutableStateOf(WeeklyStep.WEEK) }
     val errors = weeklyErrors(accomplishmentMap, scopeItems.map { it.name })
     fun snapshot() = listOf(
-        reportingWeek, accomplishmentMap.toMap(), activityItems, photoUrls.toList(),
+        reportingWeek, accomplishmentMap.toMap(), activityItems, photoUrls.toList(), photoDetails.toMap(),
         dailyHourlyWeather.mapValues { it.value.toList() }, manpowerItems, equipmentItems, issuesItems
     )
     val initial = remember { snapshot() }
@@ -324,7 +347,8 @@ fun AddWeeklyReportDialog(
                 manpowerJson,
                 equipmentJson,
                 issuesJson,
-                accItemsJson
+                accItemsJson,
+                com.example.data.files.PhotoDetails.toJson(photoDetails.filterKeys { it in photoUrls })
             )
         }
     ) {
@@ -951,6 +975,22 @@ fun AddWeeklyReportDialog(
                             Text("Add Photos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Geo-tag new photos", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                Text("Prints the date, time and GPS location on each photo", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            }
+                            Switch(
+                                checked = geoTag,
+                                onCheckedChange = { on ->
+                                    if (on && !com.example.data.files.PhotoDetails.hasLocationPermission(context)) {
+                                        locationPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                                    } else geoTag = on
+                                },
+                                modifier = Modifier.testTag("geotag_switch")
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         if (photoUrls.isNotEmpty()) {
@@ -964,6 +1004,7 @@ fun AddWeeklyReportDialog(
                                             .size(120.dp)
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(MaterialTheme.colorScheme.surface)
+                                            .clickable { captionFor = url }
                                     ) {
                                         AsyncImage(
                                             model = url,
@@ -971,9 +1012,15 @@ fun AddWeeklyReportDialog(
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
                                         )
+                                        Text(
+                                            photoDetails[url]?.title?.ifBlank { null } ?: "Tap to add title",
+                                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White),
+                                            maxLines = 2,
+                                            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(4.dp)
+                                        )
 
                                         IconButton(
-                                            onClick = { photoUrls.remove(url) },
+                                            onClick = { photoUrls.remove(url); photoDetails.remove(url) },
                                             modifier = Modifier
                                                 .align(Alignment.TopEnd)
                                                 .padding(6.dp)
@@ -1044,6 +1091,30 @@ fun AddWeeklyReportDialog(
                 }
             }
         }
+    }
+
+    captionFor?.let { ref ->
+        val detail = photoDetails[ref] ?: com.example.data.files.PhotoDetail()
+        var title by remember(ref) { mutableStateOf(detail.title) }
+        AlertDialog(
+            onDismissRequest = { captionFor = null },
+            title = { Text("Photo title") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = title, onValueChange = { title = it },
+                        label = { Text("What the photo shows") },
+                        modifier = Modifier.fillMaxWidth().testTag("photo_title_input")
+                    )
+                    if (detail.takenAt.isNotBlank()) Text("Taken: ${detail.takenAt}", style = MaterialTheme.typography.bodySmall)
+                    if (detail.location.isNotBlank()) Text("Location: ${detail.location}", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { photoDetails[ref] = detail.copy(title = title.trim()); captionFor = null }, modifier = Modifier.testTag("photo_title_save")) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { captionFor = null }) { Text("Cancel") } }
+        )
     }
 
     if (showPhotoSourceDialog) {
@@ -1150,16 +1221,7 @@ private fun ManpowerInputRow(
             singleLine = true
         )
 
-        OutlinedTextField(
-            value = item.count.toString(),
-            onValueChange = { newCountText ->
-                val cnt = newCountText.toIntOrNull() ?: 0
-                onUpdate(item.copy(count = cnt))
-            },
-            label = { Text("No.") },
-            modifier = Modifier.weight(1f),
-            singleLine = true
-        )
+        CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
         IconButton(onClick = onDelete) {
             Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
@@ -1193,16 +1255,7 @@ private fun EquipmentInputRow(
                 singleLine = true
             )
 
-            OutlinedTextField(
-                value = item.count.toString(),
-                onValueChange = { newCntText ->
-                    val cnt = newCntText.toIntOrNull() ?: 0
-                    onUpdate(item.copy(count = cnt))
-                },
-                label = { Text("No.") },
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
+            CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
@@ -1346,37 +1399,11 @@ private fun ActivityInputRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-            var expanded by remember { mutableStateOf(false) }
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded },
-                modifier = Modifier.weight(1f)
-            ) {
-                OutlinedTextField(
-                    value = activity.day,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Day of Week") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    singleLine = true
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    days.forEach { day ->
-                        DropdownMenuItem(
-                            text = { Text(day) },
-                            onClick = {
-                                onUpdate(activity.copy(day = day))
-                                expanded = false
-                            }
-                        )
-                    }
-                }
+            val (from, to) = ActivityDays.split(activity.day)
+            DayDropdown("From", from, ActivityDays.DAYS, Modifier.weight(1f)) { onUpdate(activity.copy(day = ActivityDays.label(it, to))) }
+            Spacer(Modifier.width(6.dp))
+            DayDropdown("To (optional)", to ?: SAME_DAY, listOf(SAME_DAY) + ActivityDays.DAYS, Modifier.weight(1f)) {
+                onUpdate(activity.copy(day = ActivityDays.label(from, it.takeUnless { it == SAME_DAY })))
             }
 
             IconButton(onClick = onDelete) {
@@ -1406,3 +1433,49 @@ private fun ActivityInputRow(
     }
 }
 
+
+private const val SAME_DAY = "Same day"
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DayDropdown(label: String, value: String, options: List<String>, modifier: Modifier, onPick: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }, modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            singleLine = true
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { day ->
+                DropdownMenuItem(text = { Text(day) }, onClick = { onPick(day); expanded = false })
+            }
+        }
+    }
+}
+
+/** − / + buttons around the number, which can still be typed for large crews. */
+@Composable
+private fun CountStepper(count: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        FilledTonalIconButton(onClick = { onChange((count - 1).coerceAtLeast(0)) }, enabled = count > 0, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Remove, contentDescription = "One less")
+        }
+        OutlinedTextField(
+            value = count.toString(),
+            onValueChange = { text -> onChange(text.filter(Char::isDigit).take(4).toIntOrNull() ?: 0) },
+            label = { Text("No.") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center),
+            modifier = Modifier.width(72.dp).padding(horizontal = 4.dp),
+            singleLine = true
+        )
+        FilledTonalIconButton(onClick = { onChange(count + 1) }, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Add, contentDescription = "One more")
+        }
+    }
+}

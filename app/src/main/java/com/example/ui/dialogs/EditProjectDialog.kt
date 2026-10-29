@@ -82,9 +82,6 @@ fun EditProjectDialog(
             }
         }
     } }
-    var currentScopeItem by remember { mutableStateOf("") }
-    var currentScopeAmount by remember { mutableStateOf("") }
-    var currentScopeWeight by remember { mutableStateOf("") }
     
     var projectType by remember { mutableStateOf(project.projectType) }
     // Parse land area into value and unit
@@ -125,11 +122,10 @@ fun EditProjectDialog(
     val nha = LocalNHAColors.current
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
-    val scopeAmountError = FormValidation.amountError(currentScopeAmount, required = false)
     val durationError = daysError(durationText)
     fun snapshot() = listOf(
         name, location, selectedUids.toList(), implementingOffice, contractor, scopeItems.toList(),
-        currentScopeItem, currentScopeAmount, currentScopeWeight, projectType, landAreaValue,
+        projectType, landAreaValue,
         landAreaUnit, numberOfUnits, durationText, dateStarted,
         projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed
     )
@@ -139,14 +135,14 @@ fun EditProjectDialog(
     LongForm(
         title = "Edit project",
         dirty = dirty,
-        saveEnabled = nameError == null && contractorError == null && scopeAmountError == null && durationError == null,
+        saveEnabled = nameError == null && contractorError == null && durationError == null,
         saveTag = "submit_edit_project",
         onDismiss = onDismiss,
         onSave = {
             val cost = scopeItems.sumOf { it.amount }
             val duration = durationText.trim().toIntOrNull() ?: 365
             val landArea = if (landAreaValue.isBlank()) "" else "${landAreaValue.trim()} $landAreaUnit"
-            val scopeOfWorkJson = JSONArray(scopeItems.map { JSONObject().put("name", it.name).put("amount", it.amount).put("weightPct", it.weightPct) }).toString()
+            val scopeOfWorkJson = JSONArray(withAutoWeights(scopeItems).map { JSONObject().put("name", it.name).put("amount", it.amount).put("weightPct", it.weightPct) }).toString()
             onEdit(
                 name,
                 location,
@@ -203,138 +199,7 @@ fun EditProjectDialog(
             supportingText = contractorError?.let { { Text(it) } },
             singleLine = true
         )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Scope of Works",
-                style = MaterialTheme.typography.titleSmall.copy(color = cs.primary, fontWeight = FontWeight.Bold)
-            )
-            Button(
-                onClick = {
-                    val amount = FormValidation.parseAmount(currentScopeAmount) ?: 0.0
-                    val weight = currentScopeWeight.toDoubleOrNull() ?: 0.0
-                    if (currentScopeItem.isNotBlank() && weight > 0 && scopeAmountError == null) {
-                        scopeItems.add(com.example.data.model.ScopeItem(currentScopeItem, amount, weight))
-                        currentScopeItem = ""
-                        currentScopeAmount = ""
-                        currentScopeWeight = ""
-                    }
-                },
-                modifier = Modifier.height(36.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = cs.primary, contentColor = cs.onPrimary),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-            ) {
-                Text("Add Scope of Works", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = currentScopeItem,
-                onValueChange = { currentScopeItem = it },
-                label = { Text("Item", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-                modifier = Modifier.weight(1.8f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = currentScopeAmount,
-                onValueChange = { currentScopeAmount = it },
-                label = { Text("Amt", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    isError = scopeAmountError != null,
-                modifier = Modifier.weight(1.1f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = currentScopeWeight,
-                onValueChange = { currentScopeWeight = it },
-                label = { Text("Wt(%)", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1.1f),
-                singleLine = true
-            )
-        }
-        if (scopeItems.isNotEmpty()) {
-            Surface(
-                color = cs.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    scopeItems.forEachIndexed { index, item ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "- ${item.name}",
-                                color = cs.onSurface,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1.8f)
-                            )
-                            Text(
-                                com.example.utils.CurrencyFormatter.formatPhp(item.amount),
-                                color = cs.primary,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1.1f)
-                            )
-                            Text(
-                                "${item.weightPct}%",
-                                color = cs.onSurface,
-                                style = MaterialTheme.typography.bodySmall,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.weight(1.1f)
-                            )
-                        }
-                    }
-                    HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
-                    val totalWeight = scopeItems.sumOf { it.weightPct }
-                    val totalAmount = scopeItems.sumOf { it.amount }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Total",
-                            color = cs.onSurface,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1.8f)
-                        )
-                        Text(
-                            com.example.utils.CurrencyFormatter.formatPhp(totalAmount),
-                            color = cs.primary,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1.1f)
-                        )
-                        Text(
-                            "$totalWeight%",
-                            color = if (totalWeight == 100.0) nha.onTrack else nha.behind,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.weight(1.1f)
-                        )
-                    }
-                    TextButton(onClick = { scopeItems.clear() }) {
-                        Text("Clear All", color = nha.behind)
-                    }
-                }
-            }
-        }
+        ScopeOfWorksEditor(scopeItems)
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
                 onClick = { showProjectTypeDropdown = true },

@@ -24,6 +24,7 @@ import com.example.data.model.Permission
 import com.example.data.model.ProjectIssue
 import com.example.data.model.UserRole
 import com.example.data.model.hasPermission
+import com.example.data.model.isOverdue
 import com.example.ui.theme.*
 
 @Composable
@@ -47,6 +48,7 @@ fun IssuesTab(
 
             val matchesFilter = when (selectedFilter) {
                 "Critical" -> issue.isCritical
+                "Overdue" -> issue.isOverdue()
                 "Resolved" -> issue.status.contains("Resolved", ignoreCase = true) || issue.status.contains("Closed", ignoreCase = true)
                 "Pending" -> issue.status.contains("Pending", ignoreCase = true) || issue.status.contains("Open", ignoreCase = true)
                 else -> true
@@ -98,7 +100,7 @@ fun IssuesTab(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf("All", "Critical", "Pending", "Resolved").forEach { filter ->
+                listOf("All", "Critical", "Pending", "Overdue", "Resolved").forEach { filter ->
                     FilterChip(
                         selected = selectedFilter == filter,
                         onClick = { selectedFilter = filter },
@@ -215,6 +217,18 @@ fun IssueCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (issue.targetDate.isNotBlank()) {
+                        val overdue = issue.isOverdue()
+                        Text(
+                            text = "  ·  Target ${issue.targetDate}" + if (overdue) " (OVERDUE)" else "",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (overdue) FontWeight.Bold else FontWeight.Normal,
+                                color = if (overdue) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 Row(

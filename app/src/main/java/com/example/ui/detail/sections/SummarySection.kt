@@ -44,6 +44,10 @@ fun SummarySection(
     onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
     onDeleteOrder: (Long) -> Unit,
     onPrintProfile: () -> Unit = {},
+    onAddContinuance: (name: String, remarks: String) -> Unit = { _, _ -> },
+    requests: List<com.example.data.model.DeveloperRequest> = emptyList(),
+    onSaveRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
+    onDeleteRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
     today: LocalDate = LocalDate.now()
 ) {
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
@@ -52,6 +56,8 @@ fun SummarySection(
     val addedDays = remember(documents) { ProjectSchedule.addedDays(documents) }
     var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
     val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
+    var showRequestDialog by remember { mutableStateOf(false) }
+    var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
         { m -> AttentionCard(flags, m) },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
@@ -61,11 +67,38 @@ fun SummarySection(
                 onAddOrder.takeIf { canUpdateOrders }, if (canUpdateOrders) { order: PendingDocument -> openOrder = order } else null, m
             )
         },
+        { m ->
+            DeveloperRequestsCard(
+                requests, today, { editRequest = null; showRequestDialog = true }.takeIf { canUpdateOrders },
+                if (canUpdateOrders) { r: com.example.data.model.DeveloperRequest -> editRequest = r; showRequestDialog = true } else null, m
+            )
+        },
         { m -> CostCard(project, documents, m) },
         { m -> LatestReportCard(latestReport, openIssues, m) }
     )
     CardColumns(cards)
-    openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateOrderStatus, onDeleteOrder) { openOrder = null } }
+    if (showRequestDialog) {
+        DeveloperRequestDialog(
+            projectId = project.id, existing = editRequest,
+            onDismiss = { showRequestDialog = false },
+            onSave = { onSaveRequest(it); showRequestDialog = false },
+            onDelete = { onDeleteRequest(it); showRequestDialog = false }
+        )
+    }
+    var continueFrom by remember { mutableStateOf<PendingDocument?>(null) }
+    openOrder?.let { order ->
+        OrderStatusDialog(
+            order, currentUserRole, onUpdateOrderStatus, onDeleteOrder,
+            onAddContinuance = { continueFrom = order }.takeIf { ProjectSchedule.isSuspension(order) }
+        ) { openOrder = null }
+    }
+    continueFrom?.let { ws ->
+        val (name, startsOn) = remember(ws, documents) { ProjectSchedule.nextContinuance(ws, documents) }
+        ContinuanceDialog(name, startsOn, onDismiss = { continueFrom = null }) { days, effectivity ->
+            onAddContinuance(name, ProjectSchedule.suspensionRemarks(days, effectivity))
+            continueFrom = null
+        }
+    }
 }
 
 private val SCHEDULE_ORDER_TYPES = listOf("Time Extension", "Work Suspension", "Work Resumption")
@@ -119,7 +152,7 @@ private fun KeyDatesCard(
         // Same date Days left counts down to: approved orders first, else the stored revised date.
         Field("Revised completion", revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-")
         Field("Contract duration", "${CurrencyFormatter.formatNumber(project.contractDurationDays)} days")
-        Field("Revised duration", ProjectSchedule.revisedDurationDays(project.dateStarted, project.contractDurationDays, addedDays, project.completionDateRevised)?.let { "${CurrencyFormatter.formatNumber(it)} days" } ?: "-")
+        Field("Revised duration", ProjectSchedule.revisedDurationDays(project.dateStarted, project.contractDurationDays, addedDays, project.completionDateRevised, project.completionDateOriginal)?.let { "${CurrencyFormatter.formatNumber(it)} days" } ?: "-")
         Field(
             "Days left",
             when {
@@ -159,8 +192,8 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, modifier: M
             EmptyLine("No weekly reports yet")
         } else {
             Text(report.reportingWeek, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            Field("Target", "%.1f%%".format(report.targetAccomplishmentPct))
-            Field("Actual", "%.1f%%".format(report.actualAccomplishmentPct))
+            Field("Target", "%.2f%%".format(report.targetAccomplishmentPct))
+            Field("Actual", "%.2f%%".format(report.actualAccomplishmentPct))
             Field("Submitted by", report.submittedByStaff.ifBlank { "-" })
         }
         Field("Open issues", openIssues.toString())
@@ -223,3 +256,34 @@ private fun scopeItems(json: String): List<Triple<String, Double, Double>> = try
 } catch (e: Exception) {
     listOf(Triple(json, 0.0, 100.0))
 }.filter { it.first.isNotBlank() }
+
+/** A Continuance of Work Suspension Order: more days on a logged suspension, starting where it ends. */
+@Composable
+private fun ContinuanceDialog(name: String, startsOn: String, onDismiss: () -> Unit, onSave: (days: Int, effectivity: String) -> Unit) {
+    var days by remember { mutableStateOf("") }
+    var effectivity by remember { mutableStateOf(startsOn) }
+    val dayCount = days.trim().toIntOrNull()?.takeIf { it > 0 }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Continuance of Work Suspension") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = days, onValueChange = { days = it.filter(Char::isDigit) }, label = { Text("No. of Days") }, singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                com.example.ui.components.DateField(label = "Effectivity Date", value = effectivity, onValueChange = { effectivity = it })
+                Text(
+                    "Saved as Pending. Like the suspension, it adds no days to the contract; an approved Time Extension does.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { dayCount?.let { onSave(it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}

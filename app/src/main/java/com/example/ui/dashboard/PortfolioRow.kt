@@ -100,7 +100,7 @@ fun PortfolioRow(
             val workDone: @Composable (Modifier) -> Unit = { m ->
                 ProgressLine(
                     label = "Work done",
-                    value = "%.1f%%".format(project.actualAccomplishment),
+                    value = "%.2f%%".format(project.actualAccomplishment),
                     fraction = (project.actualAccomplishment / 100).toFloat(),
                     color = varianceColor,
                     modifier = m
@@ -110,7 +110,7 @@ fun PortfolioRow(
                 val fraction = item.billedFraction ?: 0f
                 ProgressLine(
                     label = "Billed",
-                    value = if (noBillings) "No billings yet" else "%.1f%% · %s".format(fraction * 100, peso(item.billedTotal)),
+                    value = if (noBillings) "No billings yet" else "%.2f%% · %s".format(fraction * 100, peso(item.billedTotal)),
                     fraction = if (noBillings) 0f else fraction,
                     color = scheme.primary,
                     modifier = m
@@ -276,6 +276,6 @@ internal fun containerOf(color: Color, colors: NHAColors) = when (color) {
     else -> colors.neutralContainer
 }
 
-internal fun formatVariance(v: Double) = if (v >= 0) "+%.1f%%".format(v) else "−%.1f%%".format(-v)
+internal fun formatVariance(v: Double) = if (v >= 0) "+%.2f%%".format(v) else "−%.2f%%".format(-v)
 
 internal fun peso(amount: Double): String = NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(amount)

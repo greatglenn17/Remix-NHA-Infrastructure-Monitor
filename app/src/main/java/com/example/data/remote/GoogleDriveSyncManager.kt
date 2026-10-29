@@ -182,6 +182,7 @@ class GoogleDriveSyncManager(
                     put("accomplishmentItemsJson", w.accomplishmentItemsJson)
                     put("documentsIssuedReceivedJson", w.documentsIssuedReceivedJson)
                     put("attachedPhotoUrlsJson", w.attachedPhotoUrlsJson)
+                    put("photoDetailsJson", w.photoDetailsJson)
                     put("submittedByStaff", w.submittedByStaff)
                     put("createdAtTimestamp", w.createdAtTimestamp)
                 })
@@ -334,6 +335,7 @@ class GoogleDriveSyncManager(
                     put("timestamp", iss.timestamp)
                     put("status", iss.status)
                     put("isCritical", iss.isCritical)
+                    put("targetDate", iss.targetDate)
                 })
             }
 
@@ -735,6 +737,7 @@ class GoogleDriveSyncManager(
                     accomplishmentItemsJson = w.optString("accomplishmentItemsJson", "[]"),
                     documentsIssuedReceivedJson = w.optString("documentsIssuedReceivedJson", "[]"),
                     attachedPhotoUrlsJson = w.optString("attachedPhotoUrlsJson", "[]"),
+                    photoDetailsJson = w.optString("photoDetailsJson", "{}"),
                     submittedByStaff = w.optString("submittedByStaff", "Engr. Field"),
                     createdAtTimestamp = w.optLong("createdAtTimestamp", System.currentTimeMillis())
                 )
@@ -896,7 +899,8 @@ class GoogleDriveSyncManager(
                     loggedBy = iss.optString("loggedBy", iss.optString("reportedBy", "Engr. Field")),
                     timestamp = iss.optLong("timestamp", System.currentTimeMillis()),
                     status = iss.optString("status", "Pending"),
-                    isCritical = iss.optBoolean("isCritical", false)
+                    isCritical = iss.optBoolean("isCritical", false),
+                    targetDate = iss.optString("targetDate", "")
                 )
                 projectDao.insertProjectIssue(issue)
             }

@@ -52,6 +52,7 @@ fun ProjectDetailScreen(
     val isSyncing by viewModel.isSyncing.collectAsState()
     val project by viewModel.selectedProject.collectAsState()
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
+    val developerRequests by viewModel.developerRequests.collectAsState()
     val weeklyReports by viewModel.weeklyReports.collectAsState()
     val monthlyReports by viewModel.monthlyReports.collectAsState()
     val projectIssues by viewModel.projectIssues.collectAsState()
@@ -91,12 +92,14 @@ fun ProjectDetailScreen(
         printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
     }
     // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
-    var printWithSignatories by remember { mutableStateOf<((com.example.util.Signatories) -> Unit)?>(null) }
-    printWithSignatories?.let { print ->
+    // (weekly?, print): the weekly and monthly reports keep separate checkers and noters.
+    var printWithSignatories by remember { mutableStateOf<Pair<Boolean, (com.example.util.Signatories) -> Unit>?>(null) }
+    printWithSignatories?.let { (weekly, print) ->
         com.example.ui.dialogs.SignatoriesDialog(
-            initial = viewModel.signatoriesFor(currentProject),
+            initial = viewModel.signatoriesFor(currentProject, weekly),
+            weekly = weekly,
             onDismiss = { printWithSignatories = null },
-            onPrint = { s -> printWithSignatories = null; viewModel.saveSignatories(currentProject, s); print(s) }
+            onPrint = { s -> printWithSignatories = null; viewModel.saveSignatories(currentProject, s, weekly); print(s) }
         )
     }
 
@@ -186,7 +189,8 @@ fun ProjectDetailScreen(
                             flags = ProjectAttention.flags(
                                 currentProject, pendingDocuments, billedTotal,
                                 latestReport?.let { Instant.ofEpochMilli(it.createdAtTimestamp).atZone(ZoneId.systemDefault()).toLocalDate() },
-                                today
+                                today,
+                                developerRequests
                             ),
                             documents = pendingDocuments,
                             latestReport = latestReport,
@@ -200,6 +204,10 @@ fun ProjectDetailScreen(
                             onAddOrder = onAddDocumentClick,
                             onUpdateOrderStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
                             onDeleteOrder = { viewModel.deletePendingDocument(it) },
+                            onAddContinuance = { name, remarks -> viewModel.addPendingDocument(currentProject.id, name, remarks) },
+                            requests = developerRequests,
+                            onSaveRequest = viewModel::saveDeveloperRequest,
+                            onDeleteRequest = viewModel::deleteDeveloperRequest,
                             onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
                             today = today
                         )
@@ -217,7 +225,7 @@ fun ProjectDetailScreen(
                                     onAddWeeklyReportClick = onAddWeeklyReportClick,
                                     onEditWeeklyReportClick = { viewModel.weeklyReportToEdit.value = it; onAddWeeklyReportClick() },
                                     onDeleteWeeklyReportClick = { viewModel.deleteWeeklyReport(it) },
-                                    onPrintWeeklyReportClick = { report -> printWithSignatories = { s -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report, s) } } }
+                                    onPrintWeeklyReportClick = { report -> printWithSignatories = true to { s: com.example.util.Signatories -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report, s) } } }
                                 )
                                 "Monthly" -> MonthlyReportsTab(project = currentProject,
                                     monthlyReports = monthlyReports,
@@ -229,7 +237,7 @@ fun ProjectDetailScreen(
                                     onSignOffClick = { report, roleType, status, notes ->
                                         viewModel.updateMonthlySignoff(report, roleType, status, notes)
                                     },
-                                    onPrintMonthClick = { month, weeks -> printWithSignatories = { s -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks, s) } } }
+                                    onPrintMonthClick = { month, weeks -> printWithSignatories = false to { s: com.example.util.Signatories -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks, s) } } }
                                 )
                             "Lots" -> SubdivisionPlanTab(
                                 project = currentProject,
@@ -274,7 +282,7 @@ fun ProjectDetailScreen(
                                 onDeactivateRoad = { road: com.example.data.model.SdpRoad ->
                                     viewModel.deactivateSdpRoad(road)
                                 },
-                                onUpdateLotProgress = { lotId: Long, progress: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String ->
+                                onUpdateLotProgress = { lotId: Long, progress: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String>? ->
                                     activeSdpPlan?.let { plan ->
                                         viewModel.updateLotProgress(
                                             projectId = currentProject.id,
@@ -286,7 +294,8 @@ fun ProjectDetailScreen(
                                             startDate = startDate,
                                             targetCompletionDate = targetDate,
                                             contractor = contractor,
-                                            remarks = remarks
+                                            remarks = remarks,
+                                            photos = photos
                                         )
                                     }
                                 },

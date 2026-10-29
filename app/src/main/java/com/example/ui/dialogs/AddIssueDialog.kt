@@ -26,17 +26,18 @@ import java.util.Locale
 fun AddIssueDialog(
     existingIssue: ProjectIssue? = null,
     onDismiss: () -> Unit,
-    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean) -> Unit
+    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean, targetDate: String) -> Unit
 ) {
     var date by remember { mutableStateOf(existingIssue?.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var description by remember { mutableStateOf(existingIssue?.description ?: "") }
     var actionTaken by remember { mutableStateOf(existingIssue?.actionTaken ?: "") }
     var isCritical by remember { mutableStateOf(existingIssue?.isCritical ?: false) }
+    var targetDate by remember { mutableStateOf(existingIssue?.targetDate ?: "") }
     var status by remember { mutableStateOf(existingIssue?.status ?: "Pending") }
     var showStatusDropdown by remember { mutableStateOf(false) }
 
     var tried by remember { mutableStateOf(false) }
-    val snapshot = { listOf(date, description, actionTaken, isCritical, status) }
+    val snapshot = { listOf(date, description, actionTaken, isCritical, status, targetDate) }
     val initial = remember { snapshot() }
     val close = com.example.ui.components.rememberDiscardGuard(snapshot() != initial, onDismiss)
     val descError = if (tried) FormValidation.requiredError(description) else null
@@ -70,6 +71,7 @@ fun AddIssueDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
+                DateField(label = "Target date (optional)", value = targetDate, onValueChange = { targetDate = it }, clearable = true)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = isCritical,
@@ -110,7 +112,7 @@ fun AddIssueDialog(
                 onClick = {
                     tried = true
                     if (date.isNotBlank() && description.isNotBlank() && actionTaken.isNotBlank()) {
-                        onSubmit(date, description, actionTaken, status, isCritical)
+                        onSubmit(date, description, actionTaken, status, isCritical, targetDate)
                     }
                 }
             ) {

@@ -29,11 +29,18 @@ data class ProjectIssue(
     val timestamp: Long = System.currentTimeMillis(),
     val status: String = "Pending",
     val isCritical: Boolean = false,
+    // When the issue must be settled by; blank when there is no deadline.
+    val targetDate: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** Still pending after its target date. */
+fun ProjectIssue.isOverdue(today: java.time.LocalDate = java.time.LocalDate.now()): Boolean =
+    status.contains("Pending", ignoreCase = true) &&
+        runCatching { java.time.LocalDate.parse(targetDate.trim()) }.getOrNull()?.isBefore(today) == true
 
 @Entity(
     tableName = "audit_logs",

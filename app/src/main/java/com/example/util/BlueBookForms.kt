@@ -46,8 +46,6 @@ data class ContractLogs(
     val originalCost: Double,
     val revisedCost: Double,
     val revisedCompletion: String,
-    /** Days added by approved Work Suspensions, which push completion back without changing the duration. */
-    val suspensionDays: Int,
     /** Label to value, e.g. "Work Suspension No. 1 (Full)" to "2019-01-03 – 2019-05-29". */
     val suspensions: List<Pair<String, String>>,
     val resumptions: List<Pair<String, String>>,
@@ -65,9 +63,8 @@ data class ContractLogs(
                 revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents) ?: original,
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
-                suspensionDays = named("Work Suspension").filter { it.status.equals("Approved", ignoreCase = true) }
-                    .sumOf { field(it.remarks, "Duration").substringBefore(" ").toIntOrNull() ?: 0 },
-                suspensions = named("Work Suspension").map { d ->
+                // Continuances ("Continuance No. 1 of Work Suspension No. 1 …") are listed with their suspension.
+                suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
                     val from = field(d.remarks, "Effectivity")
                     val to = field(d.remarks, "End")
                     d.documentName to (if (to.isEmpty()) BlueBookForms.date(from) else "${BlueBookForms.date(from)} – ${BlueBookForms.date(to)}") + mark(d)
@@ -141,7 +138,7 @@ object BlueBookForms {
         issues: List<WeeklyIssue>,
         accomplishment: List<AccomplishmentItem>,
         weather: List<DailyHourlyWeather>,
-        photos: List<String>,
+        photos: List<Pair<String, String>>,  // image src to its title
         logs: ContractLogs,
         signatories: Signatories,
         banner: String = ""
@@ -177,10 +174,12 @@ object BlueBookForms {
         b.append("<tr class='tot'><td>TOTAL (Weekly)</td><td class='n'>${manpower.sumOf { it.count }}</td><td>TOTAL (Weekly)</td><td class='n'>${equipment.sumOf { it.count }}</td><td colspan='4'></td></tr></table>")
 
         b.append("<table><tr><th colspan='3' class='sec'>V. ACTIVITIES OF THE WEEK</th></tr><tr><th>DAY OF THE WEEK</th><th>DESCRIPTION</th><th>REMARKS</th></tr>")
-        val days = (WEEK_DAYS.take(5) + activities.map { it.day }).distinct()
-        days.forEach { day ->
-            val list = activities.filter { it.day.equals(day, ignoreCase = true) }
-            if (list.isEmpty() && day !in WEEK_DAYS.take(5)) return@forEach
+        // One row per day or day range, in week order; weekdays no activity covers stay as blank rows.
+        val labels = activities.map { it.day.trim() }.distinctBy { it.lowercase() }
+        val covered = labels.flatMap { ActivityDays.covered(it) }.toSet()
+        val blank = WEEK_DAYS.take(5).filterIndexed { i, _ -> i !in covered }
+        (labels + blank).sortedBy { ActivityDays.start(it) }.forEach { day ->
+            val list = activities.filter { it.day.trim().equals(day, ignoreCase = true) }
             b.append("<tr><td class='day'>${esc(day.uppercase())}</td><td>${lines(list.map { it.description })}</td><td>${lines(list.map { it.remarks })}</td></tr>")
         }
         b.append("</table>")
@@ -206,14 +205,14 @@ object BlueBookForms {
         if (photos.isEmpty()) b.append("<tr><td colspan='2' class='empty'>No photos attached.</td></tr>")
         photos.chunked(2).forEach { pair ->
             b.append("<tr>")
-            pair.forEach { b.append("<td><img src='$it'></td>") }
+            pair.forEach { (src, title) -> b.append("<td><img src='$src'>${if (title.isBlank()) "" else "<div>${esc(title)}</div>"}</td>") }
             if (pair.size == 1) b.append("<td></td>")
             b.append("</tr>")
         }
         b.append("</table>")
 
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>")
-        b.append(signatures(signatories))
+        b.append(signatures(signatories, "Checked and Reviewed by"))
         return page("Weekly Project Engineer's Report", b.toString(), banner)
     }
 
@@ -258,14 +257,13 @@ object BlueBookForms {
         b.append("</table>")
 
         b.append("<table><tr><th colspan='7' class='sub'>CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>")
-        // Each extension adds its days to the running duration; the completion date also counts
-        // approved suspension days, as the Key Dates card does.
+        // Each extension adds its days to the running duration, as the Key Dates card does.
         var duration = project.contractDurationDays
         val start = parseDate(project.dateStarted)
         repeat(maxOf(4, logs.extensions.size)) { i ->
             val t = logs.extensions.getOrNull(i)
             if (t != null) duration += t.days
-            val end = if (t != null) start?.plusDays((duration + logs.suspensionDays).toLong())?.format(LONG_DATE).orEmpty() else ""
+            val end = if (t != null) start?.plusDays(duration.toLong())?.format(LONG_DATE).orEmpty() else ""
             b.append("<tr><td class='c'>${esc(t?.no ?: "${i + 1}")}</td><td class='n'>${t?.days ?: ""}</td><td class='n'>${if (t != null) "$duration c.d." else ""}</td><td></td><td>${esc(t?.reason ?: "")}</td><td>$end</td><td>${esc(t?.status ?: "")}</td></tr>")
         }
         b.append("</table>")
@@ -319,10 +317,10 @@ object BlueBookForms {
         """
     }
 
-    private fun signatures(s: Signatories) = """
+    private fun signatures(s: Signatories, checkedTitle: String = "Checked by") = """
         <table class='sig'><tr>
           <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}</td>
-          <td>Checked by:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}</td>
+          <td>$checkedTitle:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}</td>
           <td>Noted by:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}</td>
         </tr></table>
     """
@@ -398,6 +396,28 @@ object BlueBookForms {
 
     fun parseMonth(month: String): YearMonth? = runCatching { YearMonth.parse(month.trim(), MONTH) }.getOrNull()
 
+    /** Monday of a reporting week: "Oct 26, 2026 - Nov 1, 2026", or the older "Week 30: July 20 - July 26, 2026". */
+    fun weekStart(reportingWeek: String): LocalDate? {
+        val parts = reportingWeek.replace(Regex("^Week \\d+: "), "").split(" - ").map { it.trim() }
+        if (parts.size != 2) return null
+        fun parse(text: String) = WEEK_FORMATS.firstNotNullOfOrNull { runCatching { LocalDate.parse(text, it) }.getOrNull() }
+        val end = parse(parts[1]) ?: return null
+        return parse(parts[0]) ?: parse("${parts[0]}, ${end.year}")
+    }
+
+    /** The report's own issues, then the Issues tab entries dated within its week. */
+    fun weekIssues(report: WeeklyReport, reportIssues: List<WeeklyIssue>, logged: List<ProjectIssue>): List<WeeklyIssue> {
+        val start = weekStart(report.reportingWeek) ?: return reportIssues
+        val inWeek = logged
+            .filter { issue -> parseDate(issue.date)?.let { !it.isBefore(start) && !it.isAfter(start.plusDays(6)) } == true }
+            .sortedBy { it.date }
+            .map { issue ->
+                val target = issue.targetDate.takeIf { it.isNotBlank() }?.let { "Target: ${date(it)}" }
+                WeeklyIssue(issue.description, issue.actionTaken, listOfNotNull(issue.remarks.ifBlank { null }, target).joinToString("; "))
+            }
+        return reportIssues + inWeek.filterNot { w -> reportIssues.any { it.description.trim().equals(w.description.trim(), ignoreCase = true) } }
+    }
+
     private fun parseDate(value: String): LocalDate? = runCatching { LocalDate.parse(value.trim()) }.getOrNull()
 
     internal fun date(value: String): String = parseDate(value)?.format(LONG_DATE) ?: value
@@ -410,6 +430,7 @@ object BlueBookForms {
 
     private val LONG_DATE = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH)
     private val MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+    private val WEEK_FORMATS = listOf("MMM d, yyyy", "MMMM d, yyyy").map { DateTimeFormatter.ofPattern(it, Locale.ENGLISH) }
     private val WEEK_DAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
     // Print ink, not app colours: black text on white A4 paper.

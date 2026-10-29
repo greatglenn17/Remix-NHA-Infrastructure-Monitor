@@ -17,12 +17,15 @@ private val PREPARED_POSITIONS = listOf(
 )
 private val CHECKED_POSITIONS = listOf("District Manager", "Officer-in-Charge")
 private val NOTED_POSITIONS = listOf("Regional Manager", "Officer-in-Charge")
+private val WEEKLY_CHECKED_POSITIONS = listOf("Principal Engineer A", "Principal Architect A")
+private val WEEKLY_NOTED_POSITIONS = CHECKED_POSITIONS
 
 /** Asks who signs a weekly or monthly Blue Book report before it is printed. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignatoriesDialog(
     initial: Signatories,
+    weekly: Boolean,
     onDismiss: () -> Unit,
     onPrint: (Signatories) -> Unit
 ) {
@@ -60,12 +63,12 @@ fun SignatoriesDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
-        title = { Text("Signatories") },
+        title = { Text(if (weekly) "Weekly report signatories" else "Monthly report signatories") },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Signer("Prepared by", preparedName, { preparedName = it }, preparedPosition, { preparedPosition = it }, PREPARED_POSITIONS)
-                Signer("Checked by", checkedName, { checkedName = it }, checkedPosition, { checkedPosition = it }, CHECKED_POSITIONS)
-                Signer("Noted by", notedName, { notedName = it }, notedPosition, { notedPosition = it }, NOTED_POSITIONS)
+                Signer(if (weekly) "Checked and Reviewed by" else "Checked by", checkedName, { checkedName = it }, checkedPosition, { checkedPosition = it }, if (weekly) WEEKLY_CHECKED_POSITIONS else CHECKED_POSITIONS)
+                Signer("Noted by", notedName, { notedName = it }, notedPosition, { notedPosition = it }, if (weekly) WEEKLY_NOTED_POSITIONS else NOTED_POSITIONS)
             }
         },
         confirmButton = {

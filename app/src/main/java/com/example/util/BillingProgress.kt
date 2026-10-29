@@ -11,6 +11,6 @@ object BillingProgress {
     fun label(totalBilled: Double, contractCost: Double): String = when {
         totalBilled <= 0 -> "No billings yet"
         contractCost <= 0 -> "No contract cost"
-        else -> "%.1f%%".format(totalBilled / contractCost * 100)
+        else -> "%.2f%%".format(totalBilled / contractCost * 100)
     }
 }

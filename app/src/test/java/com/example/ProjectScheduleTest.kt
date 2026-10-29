@@ -3,6 +3,8 @@ package com.example
 import com.example.data.model.PendingDocument
 import com.example.util.ProjectSchedule
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -40,12 +42,13 @@ class ProjectScheduleTest {
         PendingDocument(projectId = 1, documentName = name, status = status, remarks = remarks)
 
     @Test
-    fun revisedCompletion_addsApprovedExtensionAndSuspensionDays() {
+    fun revisedCompletion_addsApprovedExtensionDaysOnly() {
         val docs = listOf(
             doc("Time Extension No. 1 - 30 Days", "Approved"),
             doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
         )
-        assertEquals("2026-05-21", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+        // The approved suspension stops the clock but adds no days; only the time extension does.
+        assertEquals("2026-05-11", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
     }
 
     @Test
@@ -72,6 +75,8 @@ class ProjectScheduleTest {
     fun revisedDuration_noneWhenSameOrBlank() {
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "-"))
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-01"))
+        // Revised date left equal to the original: an approved suspension alone must not show a duration.
+        assertNull(ProjectSchedule.revisedDurationDays("2026-04-13", 360, 0, "2027-04-07", "2027-04-07"))
     }
 
     @Test
@@ -86,13 +91,24 @@ class ProjectScheduleTest {
     }
 
     @Test
-    fun addedDays_sumsApprovedOrdersOnly() {
+    fun addedDays_sumsApprovedTimeExtensionsOnly() {
         val docs = listOf(
             doc("Time Extension No. 1 - 30 Days", "Approved"),
             doc("Time Extension No. 2 - 15 Days", "Pending"),
             doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
         )
-        assertEquals(40, ProjectSchedule.addedDays(docs))
+        assertEquals(30, ProjectSchedule.addedDays(docs))
         assertEquals(0, ProjectSchedule.addedDays(emptyList()))
+    }
+
+    @Test
+    fun continuance_numbersAndStartsWhereTheChainEnds() {
+        val ws = doc("Work Suspension No. 1 (Full)", "Approved", "Duration: 30 Days | Effectivity: 2026-01-01 | End: 2026-01-31")
+        assertEquals("Continuance No. 1 of Work Suspension No. 1 (Full)" to "2026-01-31", ProjectSchedule.nextContinuance(ws, listOf(ws)))
+        val c1 = doc("Continuance No. 1 of Work Suspension No. 1 (Full)", "Approved", ProjectSchedule.suspensionRemarks(15, "2026-01-31"))
+        assertEquals("Duration: 15 Days | Effectivity: 2026-01-31 | End: 2026-02-15", c1.remarks)
+        assertEquals("Continuance No. 2 of Work Suspension No. 1 (Full)" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1)))
+        assertTrue(ProjectSchedule.isSuspension(ws))
+        assertFalse(ProjectSchedule.isSuspension(c1))
     }
 }

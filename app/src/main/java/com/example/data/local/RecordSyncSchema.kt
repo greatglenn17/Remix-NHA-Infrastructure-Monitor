@@ -27,8 +27,11 @@ object RecordSyncSchema {
     /** Subdivision plan tables, synced from database 24. A plan comes before the lots that point at it. */
     val SDP_TABLES = listOf("sdp_plans", "sdp_lots", "sdp_roads", "sdp_lot_progress", "sdp_lot_inspections")
 
+    /** Developer requests, synced from database 28; the table is created with its sync columns. */
+    val REQUEST_TABLES = listOf("developer_requests")
+
     /** Tables synced as records, in the order a fresh device should apply them. */
-    val TABLES = REPORT_TABLES + SDP_TABLES
+    val TABLES = REPORT_TABLES + SDP_TABLES + REQUEST_TABLES
 
     /**
      * Columns holding another synced row's local id: table -> (column -> the table it points at).

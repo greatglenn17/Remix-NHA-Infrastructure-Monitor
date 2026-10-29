@@ -37,9 +37,10 @@ import androidx.security.crypto.MasterKey
         SdpRoad::class,
         SdpLotProgress::class,
         SdpLotInspection::class,
+        DeveloperRequest::class,
         SyncOutboxEvent::class
     ],
-    version = 27,
+    version = 28,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -315,7 +316,27 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_27_28 = object : Migration(27, 28) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE project_issues ADD COLUMN targetDate TEXT NOT NULL DEFAULT ''")
+                for (column in WEEKLY_SIGNATORY_COLUMNS) {
+                    db.execSQL("ALTER TABLE projects ADD COLUMN $column TEXT NOT NULL DEFAULT ''")
+                }
+                db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN photosJson TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE weekly_reports ADD COLUMN photoDetailsJson TEXT NOT NULL DEFAULT '{}'")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `developer_requests` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `projectId` INTEGER NOT NULL, " +
+                        "`requestType` TEXT NOT NULL, `details` TEXT NOT NULL, `dateRequested` TEXT NOT NULL, `dateReceived` TEXT NOT NULL, " +
+                        "`datePackaged` TEXT NOT NULL, `uuid` TEXT NOT NULL, `revision` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`projectId`) REFERENCES `projects`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_developer_requests_projectId` ON `developer_requests` (`projectId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_developer_requests_uuid` ON `developer_requests` (`uuid`)")
+            }
+        }
+
         val SIGNATORY_COLUMNS = listOf("preparedByName", "preparedByPosition", "checkedByName", "checkedByPosition", "notedByName", "notedByPosition")
+        val WEEKLY_SIGNATORY_COLUMNS = listOf("weeklyCheckedByName", "weeklyCheckedByPosition", "weeklyNotedByName", "weeklyNotedByPosition")
 
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -326,7 +347,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance
