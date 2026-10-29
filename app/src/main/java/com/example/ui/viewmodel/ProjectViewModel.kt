@@ -1490,6 +1490,58 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Blue Book forms (A4 print / Save as PDF), filled from this project's records.
+
+    private suspend fun contractLogs(project: Project) =
+        com.example.util.ContractLogs.from(project, repository.getPendingDocuments(project.id).first())
+
+    suspend fun projectProfileForm(project: Project): String {
+        val user = currentUserAccount.value
+        return com.example.util.BlueBookForms.projectProfile(
+            project, contractLogs(project), com.example.util.Preparer(user.name, user.title, user.office), LocalDate.now()
+        )
+    }
+
+    suspend fun weeklyReportForm(project: Project, report: WeeklyReport): String {
+        val context = getApplication<Application>()
+        // Photos go in as data URIs so the print page needs no file access.
+        val photos = com.example.data.files.Attachments.parseList(report.attachedPhotoUrlsJson)
+            .filterNot { com.example.data.files.Attachments.isPdf(it) }
+            .mapNotNull { ref ->
+                if (!com.example.data.files.Attachments.isRef(ref)) return@mapNotNull ref.takeIf { it.startsWith("http") }
+                com.example.data.files.Attachments.ensureLocal(context, ref)?.let { file ->
+                    "data:image/jpeg;base64," + android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+                }
+            }
+        return com.example.util.BlueBookForms.weeklyReport(
+            project, report,
+            com.example.ui.detail.tabs.parseManpowerList(report.manpowerJson),
+            com.example.ui.detail.tabs.parseEquipmentList(report.equipmentJson),
+            com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson),
+            com.example.ui.detail.tabs.parseIssuesList(report.issuesJson),
+            com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson),
+            repository.getDailyWeather(project.id).first().filter { it.weeklyReportId == report.id },
+            photos,
+            contractLogs(project)
+        )
+    }
+
+    /** [month] is the Monthly tab's selection, e.g. "July 2026"; null when it can't be read. */
+    suspend fun monthlyReportForm(project: Project, month: String, monthWeeklyReports: List<WeeklyReport>): String? {
+        val ym = com.example.util.BlueBookForms.parseMonth(month) ?: return null
+        val lastWeekly = monthWeeklyReports.maxByOrNull { it.id }
+        return com.example.util.BlueBookForms.monthlyReport(
+            project, ym, lastWeekly,
+            lastWeekly?.let { com.example.ui.detail.tabs.parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty(),
+            repository.getProjectPaymentsForProject(project.id).first(),
+            repository.getProjectIssues(project.id).first(),
+            contractLogs(project),
+            repository.getPendingDocuments(project.id).first(),
+            repository.getDailyWeather(project.id).first(),
+            repository.getMonthlyReports(project.id).first().firstOrNull { it.reportingMonth.trim().equals(month.trim(), ignoreCase = true) }
+        )
+    }
+
     fun updateProjectStatus(projectId: Long, newStatus: String) {
         viewModelScope.launch(missingProjectGuard) {
             selectedProject.value?.let { current ->

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +28,8 @@ fun MonthlyReportsTab(
     onAddMonthlyReportClick: () -> Unit,
     onEditMonthlyReportClick: (MonthlyReport) -> Unit,
     onDeleteMonthlyReportClick: (MonthlyReport) -> Unit,
-    onSignOffClick: (MonthlyReport, String, String, String) -> Unit
+    onSignOffClick: (MonthlyReport, String, String, String) -> Unit,
+    onPrintMonthClick: (String, List<WeeklyReport>) -> Unit = { _, _ -> }
 ) {
     // With no reports yet, start on the current month rather than a fixed one.
     val currentMonth = remember {
@@ -125,6 +127,12 @@ fun MonthlyReportsTab(
                             )
                         }
                     }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = { onPrintMonthClick(selectedMonth, monthWeeklyReports) }, modifier = Modifier.testTag("print_monthly_report_button")) {
+                    Icon(Icons.Default.Print, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Print Blue Book form")
                 }
             }
         }

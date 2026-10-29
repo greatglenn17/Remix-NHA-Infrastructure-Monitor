@@ -204,7 +204,7 @@ fun DashboardScreen(
             registeredUsers = registeredUsers,
             registeredUsersLoaded = registeredUsersLoaded,
             onDismiss = { projectToEdit = null },
-            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers ->
+            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers, projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed ->
                 val updated = projectToEdit!!.copy(
                     name = name,
                     location = location,
@@ -214,6 +214,10 @@ fun DashboardScreen(
                     projectType = projectType,
                     landArea = landArea,
                     numberOfUnits = numberOfUnits,
+                    projectedBeneficiaries = projectedBeneficiaries,
+                    boardResolution = boardResolution,
+                    noticeOfAward = noticeOfAward,
+                    noticeToProceed = noticeToProceed,
                     contractCostOriginal = cost,
                     contractDurationDays = duration,
                     dateStarted = dateStarted,

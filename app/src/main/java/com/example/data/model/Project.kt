@@ -35,6 +35,11 @@ data class Project(
     val projectType: String = ProjectType.HOUSING_PROJECT.label,
     val landArea: String = "",
     val numberOfUnits: String = "",
+    // Project Profile fields, free text as written on the NHA profile sheet.
+    val projectedBeneficiaries: String = "",
+    val boardResolution: String = "",
+    val noticeOfAward: String = "",
+    val noticeToProceed: String = "",
     val contractCostOriginal: Double,
     val contractCostRevised: Double,
     val contractDurationDays: Int,

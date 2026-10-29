@@ -16,6 +16,7 @@ import com.example.data.model.Permission
 import com.example.data.model.Project
 import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
+import kotlinx.coroutines.launch
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.ProjectHeader
 import com.example.ui.detail.sections.RelatedFilesList
@@ -82,6 +83,13 @@ fun ProjectDetailScreen(
     }
 
     val currentProject = project!!
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val printScope = rememberCoroutineScope()
+    // Blue Book forms open in the system print screen (A4), where "Save as PDF" is one of the printers.
+    fun printForm(jobName: String, build: suspend () -> String?) {
+        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
+    }
 
     LaunchedEffect(currentProject.id) {
         viewModel.selectProject(currentProject.id)
@@ -183,6 +191,7 @@ fun ProjectDetailScreen(
                             onAddOrder = onAddDocumentClick,
                             onUpdateOrderStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
                             onDeleteOrder = { viewModel.deletePendingDocument(it) },
+                            onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
                             today = today
                         )
                     }
@@ -198,7 +207,8 @@ fun ProjectDetailScreen(
                                     currentUserRole = currentUser.role,
                                     onAddWeeklyReportClick = onAddWeeklyReportClick,
                                     onEditWeeklyReportClick = { viewModel.weeklyReportToEdit.value = it; onAddWeeklyReportClick() },
-                                    onDeleteWeeklyReportClick = { viewModel.deleteWeeklyReport(it) }
+                                    onDeleteWeeklyReportClick = { viewModel.deleteWeeklyReport(it) },
+                                    onPrintWeeklyReportClick = { report -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report) } }
                                 )
                                 "Monthly" -> MonthlyReportsTab(project = currentProject,
                                     monthlyReports = monthlyReports,
@@ -209,7 +219,8 @@ fun ProjectDetailScreen(
                                     onDeleteMonthlyReportClick = { viewModel.deleteMonthlyReport(it) },
                                     onSignOffClick = { report, roleType, status, notes ->
                                         viewModel.updateMonthlySignoff(report, roleType, status, notes)
-                                    }
+                                    },
+                                    onPrintMonthClick = { month, weeks -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks) } }
                                 )
                             "Lots" -> SubdivisionPlanTab(
                                 project = currentProject,
@@ -377,7 +388,7 @@ fun ProjectDetailScreen(
             registeredUsers = registeredUsers,
             registeredUsersLoaded = registeredUsersLoaded,
             onDismiss = { projectToEdit = null },
-            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers ->
+            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers, projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed ->
                 val updated = projectToEdit!!.copy(
                     name = name,
                     location = location,
@@ -387,6 +398,10 @@ fun ProjectDetailScreen(
                     projectType = projectType,
                     landArea = landArea,
                     numberOfUnits = numberOfUnits,
+                    projectedBeneficiaries = projectedBeneficiaries,
+                    boardResolution = boardResolution,
+                    noticeOfAward = noticeOfAward,
+                    noticeToProceed = noticeToProceed,
                     contractCostOriginal = cost,
                     contractDurationDays = duration,
                     dateStarted = dateStarted,
