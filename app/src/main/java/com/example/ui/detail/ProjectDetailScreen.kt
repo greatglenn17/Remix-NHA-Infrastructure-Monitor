@@ -222,6 +222,13 @@ fun ProjectDetailScreen(
                                 onUploadSdpPlan = { planName: String, pdfUrl: String, desc: String ->
                                     viewModel.addSdpPlan(currentProject.id, planName, pdfUrl, desc)
                                 },
+                                onDetectLots = viewModel::detectSdpLots,
+                                onAddDetectedLots = viewModel::addDetectedSdpLots,
+                                onTraceLot = viewModel::traceSdpLot,
+                                onRemoveDetectedLots = viewModel::removeDetectedSdpLots,
+                                onRenumberLots = viewModel::renumberSdpLots,
+                                onSetPlanScale = viewModel::setSdpPlanScale,
+                                onLotArea = viewModel::sdpLotArea,
                                 onSelectActiveVersion = { planId: Long ->
                                     viewModel.setActiveSdpPlan(currentProject.id, planId)
                                 },

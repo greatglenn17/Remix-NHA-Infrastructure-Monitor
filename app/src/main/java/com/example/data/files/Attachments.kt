@@ -318,7 +318,8 @@ object Attachments {
         "weekly_reports" to "attachedPhotoUrlsJson",
         "pending_documents" to "fileUrl",
         "project_payments" to "fileUrl",
-        "projects" to "latestUpdatePhotoUrl"
+        "projects" to "latestUpdatePhotoUrl",
+        "sdp_plans" to "pdfFileUrl"
     )
 
     /**

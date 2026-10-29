@@ -181,6 +181,13 @@ class ProjectRepository(
         return projectDao.insertSdpPlan(sdpPlan)
     }
 
+    /** Saves the plan's scale and the lot areas worked out from it. */
+    suspend fun setSdpPlanScale(plan: SdpPlan, lots: List<SdpLot>, role: UserRole? = null) {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        projectDao.updateSdpPlan(plan)
+        if (lots.isNotEmpty()) projectDao.updateSdpLots(lots)
+    }
+
     suspend fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long, role: UserRole? = null) {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
         projectDao.setActiveSdpPlan(projectId, sdpPlanId)
@@ -199,10 +206,25 @@ class ProjectRepository(
         projectDao.updateSdpLot(lot)
     }
 
+    suspend fun updateSdpLots(lots: List<SdpLot>, role: UserRole? = null) {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        projectDao.updateSdpLots(lots)
+    }
+
     suspend fun deactivateSdpLot(lotId: Long, modifiedBy: String, role: UserRole? = null) {
         validatePermission(role, Permission.EDIT_PROJECT)
         val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
         projectDao.deactivateSdpLot(lotId, modifiedBy, date)
+    }
+
+    /** Swaps earlier auto-detected lots nobody has updated for [lots]; lots with progress stay. Returns how many went. */
+    suspend fun replaceDetectedLots(sdpPlanId: Long, lots: List<SdpLot>, marker: String, modifiedBy: String, role: UserRole? = null): Int {
+        validatePermission(role, Permission.EDIT_PROJECT)
+        val date = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+        val stale = projectDao.untouchedDetectedLotIds(sdpPlanId, marker)
+        if (stale.isNotEmpty()) projectDao.deactivateSdpLots(stale, modifiedBy, date)
+        if (lots.isNotEmpty()) projectDao.insertSdpLots(lots)
+        return stale.size
     }
 
     // SDP Roads

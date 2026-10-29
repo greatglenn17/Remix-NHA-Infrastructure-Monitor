@@ -180,6 +180,9 @@ interface ProjectDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSdpPlan(sdpPlan: SdpPlan): Long
 
+    @Update
+    suspend fun updateSdpPlan(sdpPlan: SdpPlan)
+
     @Query("UPDATE sdp_plans SET isActive = 0 WHERE projectId = :projectId")
     suspend fun deactivateAllSdpPlansForProject(projectId: Long)
 
@@ -195,6 +198,9 @@ interface ProjectDao {
 
     @Update
     suspend fun updateSdpLot(lot: SdpLot)
+
+    @Update
+    suspend fun updateSdpLots(lots: List<SdpLot>)
 
     @Query("UPDATE sdp_lots SET isActive = 0, lastModifiedBy = :modifiedBy, lastModifiedDate = :modifiedDate WHERE id = :lotId")
     suspend fun deactivateSdpLot(lotId: Long, modifiedBy: String, modifiedDate: String)
@@ -219,8 +225,19 @@ interface ProjectDao {
     @Query("SELECT * FROM sdp_lot_progress WHERE sdpLotId = :sdpLotId LIMIT 1")
     suspend fun getLotProgressByLotId(sdpLotId: Long): SdpLotProgress?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // Upsert, not REPLACE: REPLACE deletes the row first, which the sync would send as a delete.
+    @Upsert
     suspend fun insertOrUpdateLotProgress(progress: SdpLotProgress): Long
+
+    /** Detected lots in one transaction, so the plan never shows half of them. */
+    @Insert
+    suspend fun insertSdpLots(lots: List<SdpLot>): List<Long>
+
+    @Query("SELECT id FROM sdp_lots WHERE sdpPlanId = :sdpPlanId AND isActive = 1 AND description LIKE :marker || '%' AND id NOT IN (SELECT sdpLotId FROM sdp_lot_progress)")
+    suspend fun untouchedDetectedLotIds(sdpPlanId: Long, marker: String): List<Long>
+
+    @Query("UPDATE sdp_lots SET isActive = 0, lastModifiedBy = :modifiedBy, lastModifiedDate = :modifiedDate WHERE id IN (:lotIds)")
+    suspend fun deactivateSdpLots(lotIds: List<Long>, modifiedBy: String, modifiedDate: String)
 
     // SDP Lot Inspection History
     @Query("SELECT * FROM sdp_lot_inspections WHERE sdpLotId = :sdpLotId ORDER BY inspectionTimestamp DESC")

@@ -31,6 +31,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 
 private data class FilterParams(
     val query: String,
@@ -51,6 +52,11 @@ data class PortfolioUiState(
         val EMPTY = PortfolioUiState(PortfolioSummary(0, 0, 0, 0), emptyList(), emptyList(), null, 0)
     }
 }
+
+/** Starts the description of lots the app found in the plan PDF, so a new run can replace them. */
+private const val DETECTED_LOT = "Auto-detected"
+// A found lot someone has checked against the plan; Find lots and Remove found lots leave it alone.
+private const val RENUMBERED_LOT = "Renumbered to the plan"
 
 class ProjectViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -969,6 +975,173 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** The plan PDF's first page as line pixels, kept for the last plan so taps on it are quick. */
+    private class PlanMask(val planUuid: String, val dark: BooleanArray, val width: Int, val height: Int)
+    private var planMask: PlanMask? = null
+    private val planMaskLock = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun planMask(plan: SdpPlan): PlanMask? = planMaskLock.withLock {
+        planMask?.takeIf { it.planUuid == plan.uuid }?.let { return@withLock it }
+        val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@withLock null
+        android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
+                renderer.openPage(0).use { page ->
+                    // Lot lines on a CAD sheet are thin; ~3200 px keeps a typical lot tens of pixels wide.
+                    val scale = 3200f / maxOf(page.width, page.height)
+                    val w = (page.width * scale).toInt(); val h = (page.height * scale).toInt()
+                    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    val dark = BooleanArray(w * h)
+                    val row = IntArray(w)
+                    for (y in 0 until h) {
+                        bitmap.getPixels(row, 0, w, 0, y, w, 1)
+                        for (x in 0 until w) {
+                            val c = row[x]
+                            val lum = (299 * ((c shr 16) and 255) + 587 * ((c shr 8) and 255) + 114 * (c and 255)) / 1000
+                            dark[y * w + x] = lum < 225
+                        }
+                    }
+                    bitmap.recycle()
+                    PlanMask(plan.uuid, dark, w, h).also { planMask = it }
+                }
+            }
+        }
+    }
+
+    /** Finds the lots in the plan's PDF (page 1); null when the PDF cannot be opened. */
+    fun detectSdpLots(plan: SdpPlan, onResult: (List<com.example.util.LotDetector.Area>?) -> Unit) {
+        viewModelScope.launch {
+            val areas = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching { planMask(plan)?.let { com.example.util.LotDetector.detect(it.dark, it.width, it.height) } }.getOrNull()
+            }
+            onResult(areas)
+        }
+    }
+
+    /** The outline of the lot around a tapped point (0..1) of the plan, for a lot detection missed. */
+    fun traceSdpLot(plan: SdpPlan, x: Float, y: Float, onResult: (List<Pair<Float, Float>>?) -> Unit) {
+        viewModelScope.launch {
+            val outline = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching { planMask(plan)?.let { com.example.util.LotDetector.traceAt(it.dark, it.width, it.height, x, y) } }.getOrNull()
+            }
+            onResult(outline)
+        }
+    }
+
+    private val pageSizes = java.util.concurrent.ConcurrentHashMap<String, Pair<Double, Double>>()
+
+    /** Page 1 of the plan's PDF in points (1/72 inch); null when the PDF cannot be opened. */
+    private suspend fun planPageSize(plan: SdpPlan): Pair<Double, Double>? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        pageSizes[plan.uuid] ?: runCatching {
+            val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@runCatching null
+            android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                android.graphics.pdf.PdfRenderer(pfd).use { r -> r.openPage(0).use { p -> p.width.toDouble() to p.height.toDouble() } }
+            }
+        }.getOrNull()?.also { pageSizes[plan.uuid] = it }
+    }
+
+    private fun polygonOf(json: String): List<Pair<Double, Double>> = runCatching {
+        val pts = org.json.JSONArray(json)
+        (0 until pts.length()).map { pts.getJSONArray(it).let { p -> p.getDouble(0) to p.getDouble(1) } }
+    }.getOrDefault(emptyList())
+
+    /** Square metres of [polygon] at the plan's scale; null when the plan has no scale or no readable PDF. */
+    private suspend fun areaOn(plan: SdpPlan, polygon: List<Pair<Double, Double>>, scale: Int = plan.scaleDenominator): Double? {
+        if (scale <= 0) return null
+        val (w, h) = planPageSize(plan) ?: return null
+        return com.example.util.LotArea.squareMetres(polygon, w, h, scale)
+    }
+
+    /** The area to suggest for a lot being added, from the plan's scale. */
+    fun sdpLotArea(plan: SdpPlan, polygon: List<Pair<Float, Float>>, onResult: (Double?) -> Unit) {
+        viewModelScope.launch { onResult(areaOn(plan, polygon.map { (x, y) -> x.toDouble() to y.toDouble() })) }
+    }
+
+    /** Sets the plan's printed scale and works out the areas of its lots that nobody typed in. */
+    fun setSdpPlanScale(plan: SdpPlan, scale: Int) {
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            val lots = activeSdpLots.value.filter { it.sdpPlanId == plan.id }.mapNotNull { lot ->
+                val polygon = polygonOf(lot.polygonNormalizedJson)
+                val area = areaOn(plan, polygon, scale) ?: return@mapNotNull null
+                val oldWorkedOut = areaOn(plan, polygon)
+                // Typed areas stay: only blank ones, the add dialog's 50 default, or the last worked-out value change.
+                val untyped = lot.lotAreaSqM == 0.0 || lot.lotAreaSqM == 50.0 || (oldWorkedOut != null && kotlin.math.abs(lot.lotAreaSqM - oldWorkedOut) < 0.01)
+                if (untyped && area != lot.lotAreaSqM) lot.copy(lotAreaSqM = area, lastModifiedBy = user, lastModifiedDate = currentDate) else null
+            }
+            repository.setSdpPlanScale(plan.copy(scaleDenominator = scale), lots, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Project Edit",
+                details = "Set SDP Plan v${plan.version} scale to 1:$scale and worked out ${lots.size} lot areas",
+                oldValue = if (plan.scaleDenominator > 0) "1:${plan.scaleDenominator}" else "No scale",
+                newValue = "1:$scale"
+            )
+        }
+    }
+
+    /** Removes the plan's auto-detected lots that have no progress yet. */
+    fun removeDetectedSdpLots(plan: SdpPlan) {
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val removed = repository.replaceDetectedLots(plan.id, emptyList(), DETECTED_LOT, user, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Lot Deactivated",
+                details = "Removed $removed auto-detected lots from SDP Plan v${plan.version}",
+                oldValue = "Active",
+                newValue = "Deactivated"
+            )
+        }
+    }
+
+    /** Adds detected areas as lots, replacing earlier detected lots that have no progress yet. */
+    fun addDetectedSdpLots(plan: SdpPlan, areas: List<com.example.util.LotDetector.Area>) {
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            // Lots that stay (added by hand, or with progress) must not get a found copy on top.
+            val progress = activeSdpLotProgressMap.value
+            val kept = activeSdpLots.value.filter { it.sdpPlanId == plan.id && (!it.description.startsWith(DETECTED_LOT) || it.id in progress) }
+                .mapNotNull { lot ->
+                    runCatching {
+                        val pts = org.json.JSONArray(lot.polygonNormalizedJson)
+                        val xs = (0 until pts.length()).map { pts.getJSONArray(it).getDouble(0) }
+                        val ys = (0 until pts.length()).map { pts.getJSONArray(it).getDouble(1) }
+                        doubleArrayOf(xs.min(), ys.min(), xs.max(), ys.max())
+                    }.getOrNull()
+                }
+            val lots = areas.filter { a ->
+                val cx = a.polygon.map { it.first }.average(); val cy = a.polygon.map { it.second }.average()
+                kept.none { b -> cx in b[0]..b[2] && cy in b[1]..b[3] }
+            }.map { a ->
+                SdpLot(
+                    projectId = plan.projectId,
+                    sdpPlanId = plan.id,
+                    blockNumber = if (a.isLot) a.block.toString() else "OS",
+                    lotNumber = a.lot.toString(),
+                    lotAreaSqM = areaOn(plan, a.polygon.map { (x, y) -> x.toDouble() to y.toDouble() }) ?: 0.0,
+                    polygonNormalizedJson = org.json.JSONArray(a.polygon.map { (x, y) -> org.json.JSONArray(listOf(x.toDouble(), y.toDouble())) }).toString(),
+                    description = if (a.isLot) DETECTED_LOT else "$DETECTED_LOT open space or facility",
+                    createdBy = user,
+                    createdDate = currentDate,
+                    lastModifiedBy = user,
+                    lastModifiedDate = currentDate
+                )
+            }
+            repository.replaceDetectedLots(plan.id, lots, DETECTED_LOT, user, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Lot Created",
+                details = "Added ${lots.size} lots found in SDP Plan v${plan.version}",
+                oldValue = "",
+                newValue = "${lots.count { it.blockNumber != "OS" }} lots, ${lots.count { it.blockNumber == "OS" }} larger areas"
+            )
+        }
+    }
+
     fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long) {
         viewModelScope.launch {
             repository.setActiveSdpPlan(projectId, sdpPlanId, currentUserAccount.value.role)
@@ -1033,6 +1206,30 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 details = "Updated Lot B${lot.blockNumber}-L${lot.lotNumber} (ID: ${lot.id})",
                 oldValue = "",
                 newValue = "Updated boundary/info for Lot ID ${lot.id}"
+            )
+        }
+    }
+
+    /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */
+    fun renumberSdpLots(renumbered: List<SdpLot>, oldBlock: String) {
+        if (renumbered.isEmpty()) return
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            repository.updateSdpLots(renumbered.map {
+                it.copy(
+                    description = if (it.description.startsWith(DETECTED_LOT)) RENUMBERED_LOT else it.description,
+                    lastModifiedBy = user,
+                    lastModifiedDate = currentDate
+                )
+            }, currentUserAccount.value.role)
+            val numbers = renumbered.map { it.lotNumber.toIntOrNull() ?: 0 }
+            logAuditAction(
+                projectId = renumbered.first().projectId,
+                actionType = "Lot Geometry Changed",
+                details = "Renumbered ${renumbered.size} lots of Block $oldBlock",
+                oldValue = "Block $oldBlock",
+                newValue = "Block ${renumbered.first().blockNumber}, Lots ${numbers.min()}-${numbers.max()}"
             )
         }
     }

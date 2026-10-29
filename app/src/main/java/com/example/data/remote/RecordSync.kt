@@ -17,7 +17,8 @@ import org.json.JSONObject
  *
  * `data` is the row as a JSON string without its local ids, so the format follows
  * the table's columns without per-type code. A weekly report also carries its
- * weather rows under `_weather`.
+ * weather rows under `_weather`. A column pointing at another synced row (a lot's plan,
+ * see [RecordSyncSchema.PARENT_REFS]) travels as that row's uuid under `_ref_<column>`.
  */
 class RecordSync(private val db: AppDatabase) {
 
@@ -36,8 +37,13 @@ class RecordSync(private val db: AppDatabase) {
             if (c.moveToFirst()) c.toJson() else null
         } ?: return null
         val (projectUuid, assignedUids) = projectFor(row.optLong("projectId")) ?: return null
+        val refs = RecordSyncSchema.PARENT_REFS[table].orEmpty()
         val data = JSONObject()
-        row.keys().forEach { key -> if (key !in localOnly) data.put(key, row.get(key)) }
+        row.keys().forEach { key -> if (key !in localOnly && key !in refs) data.put(key, row.get(key)) }
+        for ((column, parent) in refs) {
+            // A parent deleted meanwhile takes this row with it (cascade), so there is nothing to send.
+            data.put("_ref_$column", uuidOf(parent, row.optLong(column)) ?: return null)
+        }
         if (table == "weekly_reports") {
             val weather = JSONArray()
             sql.query(
@@ -101,14 +107,22 @@ class RecordSync(private val db: AppDatabase) {
         val isDeleted = doc["isDeleted"] == true
 
         val remoteUpdatedAt = (doc["updatedAt"] as? Number)?.toLong() ?: 0L
-        val local = sql.query("SELECT id, revision, updatedAt FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c ->
+        val byUuid = sql.query("SELECT id, revision, updatedAt FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c ->
             if (c.moveToFirst()) Triple(c.getLong(0), c.getLong(1), c.getLong(2)) else null
         }
 
         if (isDeleted) {
-            if (local != null) writeRemote { it.delete("`$table`", "id = ?", arrayOf(local.first)) }
+            if (byUuid != null) writeRemote { it.delete("`$table`", "id = ?", arrayOf(byUuid.first)) }
             return true
         }
+
+        val data = JSONObject(doc["data"] as? String ?: "{}")
+        val parentIds = mutableMapOf<String, Long>()
+        for ((column, parent) in RecordSyncSchema.PARENT_REFS[table].orEmpty()) {
+            // Waits, like a record whose project hasn't arrived, until the parent row is here.
+            parentIds[column] = idOf(parent, data.optString("_ref_$column")) ?: return false
+        }
+        val local = byUuid ?: sameLotProgress(table, parentIds)
         // A cached snapshot from before this phone's own delete must not bring the record back.
         if (local == null && deletedHereAt(uuid) >= revision) return true
         if (local != null && !RemoteVersion.isNewer(local.second, local.third, revision, remoteUpdatedAt)) return true
@@ -117,8 +131,8 @@ class RecordSync(private val db: AppDatabase) {
             "SELECT id FROM projects WHERE projectUuid = ? LIMIT 1", arrayOf(doc["projectUuid"] as? String ?: "")
         ).use { c -> if (c.moveToFirst()) c.getLong(0) else null } ?: return false
 
-        val data = JSONObject(doc["data"] as? String ?: "{}")
         val values = data.toContentValues(columnsOf(table)).apply {
+            parentIds.forEach { (column, id) -> put(column, id) }
             put("projectId", projectId)
             put("uuid", uuid)
             put("revision", revision)
@@ -145,6 +159,24 @@ class RecordSync(private val db: AppDatabase) {
             }
         }
         return true
+    }
+
+    private fun uuidOf(table: String, id: Long): String? =
+        sql.query("SELECT uuid FROM `$table` WHERE id = ? LIMIT 1", arrayOf(id)).use { c -> if (c.moveToFirst()) c.getString(0) else null }
+
+    private fun idOf(table: String, uuid: String): Long? =
+        sql.query("SELECT id FROM `$table` WHERE uuid = ? LIMIT 1", arrayOf(uuid)).use { c -> if (c.moveToFirst()) c.getLong(0) else null }
+
+    /**
+     * A lot has one progress row (unique sdpLotId). When two phones each started one for the
+     * same lot, the cloud's copy is applied onto this phone's row and takes over its uuid.
+     */
+    private fun sameLotProgress(table: String, parentIds: Map<String, Long>): Triple<Long, Long, Long>? {
+        if (table != "sdp_lot_progress") return null
+        val lotId = parentIds["sdpLotId"] ?: return null
+        return sql.query("SELECT id, revision, updatedAt FROM sdp_lot_progress WHERE sdpLotId = ? LIMIT 1", arrayOf(lotId)).use { c ->
+            if (c.moveToFirst()) Triple(c.getLong(0), c.getLong(1), c.getLong(2)) else null
+        }
     }
 
     /** Revision of this phone's latest delete of [uuid] (the outbox keeps sent events), or 0. */

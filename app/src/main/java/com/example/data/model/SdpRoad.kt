@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "sdp_roads",
@@ -21,7 +22,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"]), Index(value = ["sdpPlanId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["sdpPlanId"]), Index(value = ["uuid"])]
 )
 data class SdpRoad(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -34,5 +35,9 @@ data class SdpRoad(
     val createdBy: String = "",
     val createdDate: String = "",
     val lastModifiedBy: String = "",
-    val lastModifiedDate: String = ""
+    val lastModifiedDate: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )

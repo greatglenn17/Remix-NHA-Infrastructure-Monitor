@@ -21,6 +21,10 @@ data class NHAColors(
     val watchContainer: Color,
     val behindContainer: Color,
     val neutralContainer: Color,
+    // Lot progress bands between behind (0-25%) and onTrack (100%).
+    val progressQuarter2: Color,
+    val progressQuarter3: Color,
+    val progressQuarter4: Color,
     val isDark: Boolean
 )
 
@@ -40,6 +44,9 @@ val DarkNHAColors = NHAColors(
     watchContainer = Color(0xFF331D08),
     behindContainer = Color(0xFF371215),
     neutralContainer = Color(0xFF1E293B),
+    progressQuarter2 = Color(0xFFFB923C),
+    progressQuarter3 = Color(0xFFFACC15),
+    progressQuarter4 = Color(0xFF60A5FA),
     isDark = true
 )
 
@@ -59,6 +66,9 @@ val LightNHAColors = NHAColors(
     watchContainer = Color(0xFFFEF3C7),
     behindContainer = Color(0xFFFEE2E2),
     neutralContainer = Color(0xFFF1F5F9),
+    progressQuarter2 = Color(0xFFEA580C),
+    progressQuarter3 = Color(0xFFCA8A04),
+    progressQuarter4 = Color(0xFF2563EB),
     isDark = false
 )
 

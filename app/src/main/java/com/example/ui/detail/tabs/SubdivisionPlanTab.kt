@@ -18,12 +18,17 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.util.BlockNumbering
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,9 +94,14 @@ enum class SdpInteractionMode {
     MONITORING,
     DIGITIZING_LOT,
     DIGITIZING_ROAD,
+    // Tap inside a lot the detector missed; the app traces its outline from the PDF.
+    TAP_ADD_LOT,
     EDITING_LOT,
     EDITING_ROAD
 }
+/** Same bands as [lotProgressFill]. */
+val LOT_PROGRESS_FILTERS = listOf("ALL", "0-25%", "26-50%", "51-75%", "76-99%", "100%")
+
 fun isLotMatchingFilter(
     lot: SdpLot,
     query: String,
@@ -128,11 +138,10 @@ fun isLotMatchingFilter(
     if (progressFilter != "ALL") {
         val progVal = progress?.physicalProgress ?: 0
         val matchesProg = when (progressFilter) {
-            "0%" -> progVal == 0
-            "1-20%" -> progVal in 1..20
-            "21-50%" -> progVal in 21..50
-            "51-80%" -> progVal in 51..80
-            "81-99%" -> progVal in 81..99
+            "0-25%" -> progVal <= 25
+            "26-50%" -> progVal in 26..50
+            "51-75%" -> progVal in 51..75
+            "76-99%" -> progVal in 76..99
             "100%" -> progVal >= 100
             else -> true
         }
@@ -142,17 +151,17 @@ fun isLotMatchingFilter(
     return true
 }
 
-fun lotProgressFill(progress: Int, nha: NHAColors, inProgress: Color): Color = when {
-    progress == 0 -> nha.behind
-    progress in 1..40 -> nha.watch
-    progress in 41..99 -> inProgress
+/** 0-25% red, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
+fun lotProgressFill(progress: Int, nha: NHAColors): Color = when {
     progress >= 100 -> nha.onTrack
+    progress >= 76 -> nha.progressQuarter4
+    progress >= 51 -> nha.progressQuarter3
+    progress >= 26 -> nha.progressQuarter2
     else -> nha.behind
 }
 
 @Composable
-fun getLotProgressFillColor(progress: Int): Color =
-    lotProgressFill(progress, LocalNHAColors.current, MaterialTheme.colorScheme.primary)
+fun getLotProgressFillColor(progress: Int): Color = lotProgressFill(progress, LocalNHAColors.current)
 
 // --- GEOMETRY & MATH UTILITIES ---
 fun normalizedToJson(points: List<Offset>): String {
@@ -275,9 +284,42 @@ fun SubdivisionPlanTab(
         billingRef: String
     ) -> Unit,
     onGetInspectionsForLot: (sdpLotId: Long) -> Flow<List<SdpLotInspection>>,
-    auditLogs: List<com.example.data.model.AuditLog> = emptyList()
+    auditLogs: List<com.example.data.model.AuditLog> = emptyList(),
+    onDetectLots: (SdpPlan, (List<com.example.util.LotDetector.Area>?) -> Unit) -> Unit = { _, done -> done(null) },
+    onAddDetectedLots: (SdpPlan, List<com.example.util.LotDetector.Area>) -> Unit = { _, _ -> },
+    onTraceLot: (SdpPlan, Float, Float, (List<Pair<Float, Float>>?) -> Unit) -> Unit = { _, _, _, done -> done(null) },
+    onRemoveDetectedLots: (SdpPlan) -> Unit = {},
+    onRenumberLots: (renumbered: List<SdpLot>, oldBlock: String) -> Unit = { _, _ -> },
+    onSetPlanScale: (SdpPlan, Int) -> Unit = { _, _ -> },
+    onLotArea: (SdpPlan, List<Pair<Float, Float>>, (Double?) -> Unit) -> Unit = { _, _, done -> done(null) }
 ) {
+    var showScaleDialog by remember { mutableStateOf(false) }
+    // Area worked out from the plan scale for the lot being added; null until known.
+    var draftArea by remember { mutableStateOf<Double?>(null) }
     val context = LocalContext.current
+
+    // Lot detection: runs by itself right after a PDF upload, or from "Find lots".
+    var detectAfterUpload by remember { mutableStateOf(false) }
+    var isDetecting by remember { mutableStateOf(false) }
+    var detectedAreas by remember { mutableStateOf<List<com.example.util.LotDetector.Area>?>(null) }
+    var detectFailed by remember { mutableStateOf(false) }
+    var isTracing by remember { mutableStateOf(false) }
+    var tapAddMessage by remember { mutableStateOf<String?>(null) }
+    var confirmRemoveDetected by remember { mutableStateOf(false) }
+    val runDetection = { plan: SdpPlan ->
+        isDetecting = true
+        onDetectLots(plan) { areas ->
+            isDetecting = false
+            if (areas.isNullOrEmpty()) detectFailed = true else detectedAreas = areas
+        }
+    }
+    LaunchedEffect(activeSdpPlan?.id) {
+        val plan = activeSdpPlan ?: return@LaunchedEffect
+        if (detectAfterUpload && com.example.data.files.Attachments.isRef(plan.pdfFileUrl)) {
+            detectAfterUpload = false
+            runDetection(plan)
+        }
+    }
 
     // PDF Renderer States
     var renderedBitmap by remember(activeSdpPlan?.id) { mutableStateOf<Bitmap?>(null) }
@@ -292,8 +334,31 @@ fun SubdivisionPlanTab(
 
     // Interaction & Selection State
     var interactionMode by remember { mutableStateOf(SdpInteractionMode.MONITORING) }
+    val isDrawMode = interactionMode != SdpInteractionMode.MONITORING && interactionMode != SdpInteractionMode.TAP_ADD_LOT
     var selectedLot by remember { mutableStateOf<SdpLot?>(null) }
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
+
+    // Renumbering one block: a panel replaces the lot card and the plan shows the new numbers.
+    // renumberBlock is the block the lots came from (null: panel closed); renumberIds the lots
+    // being numbered, which taps add to or take out of (empty: pick the next block).
+    var renumberBlock by remember { mutableStateOf<String?>(null) }
+    var renumberIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var renumberTo by remember { mutableStateOf("") }
+    var renumberFirst by remember { mutableStateOf("1") }
+    var renumberPattern by remember { mutableStateOf(BlockNumbering.Pattern.ODD_EVEN) }
+    var renumberOtherEnd by remember { mutableStateOf(false) }
+    var renumberOtherRow by remember { mutableStateOf(false) }
+    val startRenumber = { lot: SdpLot ->
+        renumberBlock = lot.blockNumber
+        renumberIds = activeLots.filter { it.blockNumber == lot.blockNumber }.map { it.id }.toSet()
+        renumberTo = lot.blockNumber
+        renumberFirst = "1"
+        renumberPattern = BlockNumbering.Pattern.ODD_EVEN
+        renumberOtherEnd = false
+        renumberOtherRow = false
+        selectedLot = null
+        selectedRoad = null
+    }
 
     // Draft Geometry Points (Normalized 0.0 to 1.0)
     val draftPoints = remember { mutableStateListOf<Offset>() }
@@ -367,6 +432,18 @@ fun SubdivisionPlanTab(
         }
     }
 
+    // New lot numbers of the block being renumbered, by lot id.
+    val renumberPreview = remember(renumberIds, renumberFirst, renumberPattern, renumberOtherEnd, renumberOtherRow, parsedLots, renderedBitmap) {
+        val lots = parsedLots.filter { it.lot.id in renumberIds }
+        if (lots.isEmpty()) return@remember emptyMap<Long, Int>()
+        val w = (renderedBitmap?.width ?: 1600).toDouble(); val h = (renderedBitmap?.height ?: 1200).toDouble()
+        val numbers = BlockNumbering.number(
+            lots.map { it.centroid.x * w to it.centroid.y * h },
+            renumberFirst.toIntOrNull() ?: 1, renumberPattern, renumberOtherEnd, renumberOtherRow
+        )
+        lots.zip(numbers).associate { (p, n) -> p.lot.id to n }
+    }
+
     val parsedRoads = remember(activeRoads) {
         activeRoads.mapNotNull { road ->
             val polyline = jsonToNormalized(road.polylineNormalizedJson)
@@ -405,7 +482,11 @@ fun SubdivisionPlanTab(
                 val pdfUri = Uri.parse(currentPlan.pdfFileUrl)
                 var pfd: ParcelFileDescriptor? = null
 
-                if (pdfUri.scheme == "content" || pdfUri.scheme == "file") {
+                if (com.example.data.files.Attachments.isRef(currentPlan.pdfFileUrl)) {
+                    // Downloaded the first time when another phone uploaded the plan.
+                    val local = com.example.data.files.Attachments.ensureLocal(context, currentPlan.pdfFileUrl)
+                    if (local != null) pfd = ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY)
+                } else if (pdfUri.scheme == "content" || pdfUri.scheme == "file") {
                     pfd = context.contentResolver.openFileDescriptor(pdfUri, "r")
                 } else {
                     val file = File(pdfUri.path ?: "")
@@ -421,8 +502,10 @@ fun SubdivisionPlanTab(
                     val safePage = selectedPage.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
                     if (renderer.pageCount > safePage) {
                         val page = renderer.openPage(safePage)
-                        val renderWidth = (page.width * 2).coerceAtMost(2400)
-                        val renderHeight = (page.height * 2).coerceAtMost(2400)
+                        // One scale for both sides, so the page keeps its shape.
+                        val pageScale = minOf(2f, 2400f / page.width, 2400f / page.height)
+                        val renderWidth = (page.width * pageScale).toInt().coerceAtLeast(1)
+                        val renderHeight = (page.height * pageScale).toInt().coerceAtLeast(1)
                         val bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
                         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                         page.close()
@@ -437,7 +520,11 @@ fun SubdivisionPlanTab(
                         pfd.close()
                     }
                 } else {
-                    pdfError = "Unable to open PDF file descriptor."
+                    pdfError = if (com.example.data.files.Attachments.isRef(currentPlan.pdfFileUrl)) {
+                        "The plan PDF is not on this phone yet. It may still be uploading from the other phone; check the internet and open Lots again."
+                    } else {
+                        "This plan was saved by an older version and its PDF can no longer be opened. Upload the plan again."
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -485,6 +572,20 @@ fun SubdivisionPlanTab(
                             },
                             style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
                         )
+                        if (activeSdpPlan != null && (canDigitize || activeSdpPlan.scaleDenominator > 0)) {
+                            Text(
+                                text = if (activeSdpPlan.scaleDenominator > 0) "Scale 1:${activeSdpPlan.scaleDenominator}" + if (canDigitize) " (change)" else ""
+                                    else "Set the plan scale to work out lot areas",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = if (activeSdpPlan.scaleDenominator > 0) MaterialTheme.colorScheme.onSurfaceVariant else LocalNHAColors.current.watch,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .then(if (canDigitize) Modifier.clickable { showScaleDialog = true } else Modifier)
+                                    .testTag("plan_scale")
+                            )
+                        }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -493,6 +594,24 @@ fun SubdivisionPlanTab(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(Icons.Default.Palette, contentDescription = "Legend", tint = LocalNHAColors.current.watch, modifier = Modifier.size(18.dp))
+                        }
+
+                        if (canManageSdp && activeSdpPlan != null && com.example.data.files.Attachments.isRef(activeSdpPlan.pdfFileUrl)) {
+                            OutlinedButton(
+                                onClick = { runDetection(activeSdpPlan) },
+                                enabled = !isDetecting,
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp).testTag("find_lots_button")
+                            ) {
+                                if (isDetecting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (isDetecting) "Finding…" else "Find lots", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         if (canManageSdp) {
@@ -620,8 +739,8 @@ fun SubdivisionPlanTab(
                                             draftPoints.clear()
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (interactionMode != SdpInteractionMode.MONITORING) LocalNHAColors.current.watch else Color.Transparent,
-                                            contentColor = if (interactionMode != SdpInteractionMode.MONITORING) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = if (isDrawMode) LocalNHAColors.current.watch else Color.Transparent,
+                                            contentColor = if (isDrawMode) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -631,6 +750,49 @@ fun SubdivisionPlanTab(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text("EDIT SDP", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
+
+                                    if (com.example.data.files.Attachments.isRef(activeSdpPlan.pdfFileUrl)) {
+                                        val tapMode = interactionMode == SdpInteractionMode.TAP_ADD_LOT
+                                        Button(
+                                            onClick = {
+                                                interactionMode = SdpInteractionMode.TAP_ADD_LOT
+                                                draftPoints.clear()
+                                                tapAddMessage = null
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (tapMode) LocalNHAColors.current.watch else Color.Transparent,
+                                                contentColor = if (tapMode) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+                                            ),
+                                            shape = RoundedCornerShape(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(28.dp).testTag("tap_add_lot_mode")
+                                        ) {
+                                            Icon(Icons.Default.TouchApp, contentDescription = null, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("TAP TO ADD", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Lot tools: what a tap does now, and removing the lots the app found.
+                    if (canDigitize && interactionMode != SdpInteractionMode.MONITORING) {
+                        val removableCount = activeLots.count { it.description.startsWith("Auto-detected") && !lotProgressMap.containsKey(it.id) }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = tapAddMessage ?: if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) {
+                                    if (isTracing) "Tracing the lot…" else "Tap inside a lot the app missed to add it."
+                                } else "Tap each corner of the lot, then save it.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (tapAddMessage != null) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (removableCount > 0) {
+                                TextButton(onClick = { confirmRemoveDetected = true }, modifier = Modifier.testTag("remove_found_lots")) {
+                                    Text("Remove found lots ($removableCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LocalNHAColors.current.behind)
                                 }
                             }
                         }
@@ -747,7 +909,7 @@ fun SubdivisionPlanTab(
                                         modifier = Modifier.weight(1f)
                                     )
                                     DropdownMenu(expanded = progExpanded, onDismissRequest = { progExpanded = false }) {
-                                        listOf("ALL", "0%", "1-20%", "21-40%", "41-60%", "61-80%", "81-99%", "100%").forEach { opt ->
+                                        LOT_PROGRESS_FILTERS.forEach { opt ->
                                             DropdownMenuItem(text = { Text(opt) }, onClick = { selectedProgressFilter = opt; progExpanded = false })
                                         }
                                     }
@@ -889,8 +1051,11 @@ fun SubdivisionPlanTab(
                         Text(pdfError!!, color = LocalNHAColors.current.behind)
                     }
                 } else {
-                    val bitmapWidth = renderedBitmap?.width?.toFloat() ?: 1600f
-                    val bitmapHeight = renderedBitmap?.height?.toFloat() ?: 1200f
+                    // The page fitted to the viewer is the frame the image, lots, roads and taps all share.
+                    val pageFit = renderedBitmap?.let { minOf(viewportWidth / it.width, viewportHeight / it.height) } ?: 1f
+                    val bitmapWidth = renderedBitmap?.let { it.width * pageFit } ?: 1600f
+                    val bitmapHeight = renderedBitmap?.let { it.height * pageFit } ?: 1200f
+                    val density = androidx.compose.ui.platform.LocalDensity.current
 
                     // Auto-center viewport when a single lot matches search query
                     LaunchedEffect(matchingLots, searchQuery) {
@@ -915,7 +1080,7 @@ fun SubdivisionPlanTab(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(interactionMode) {
+                            .pointerInput(interactionMode, parsedLots, bitmapWidth, bitmapHeight, activeSdpPlan) {
                                 detectTapGestures(
                                     onDoubleTap = {
                                         scale = if (scale > 1.2f) 1f else 2.5f
@@ -926,9 +1091,36 @@ fun SubdivisionPlanTab(
                                         val normY = ((tapOffset.y - offset.y) / (bitmapHeight * scale)).coerceIn(0f, 1f)
                                         val tappedNorm = Offset(normX, normY)
 
-                                        if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
+                                        if (renumberBlock != null) {
+                                            // While renumbering, a tap adds a lot to the block or takes it out;
+                                            // after a save, it picks the next block.
+                                            parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }?.let { hit ->
+                                                val id = hit.lot.id
+                                                if (renumberIds.isEmpty()) startRenumber(hit.lot)
+                                                else if (id !in renumberIds) renumberIds = renumberIds + id
+                                                else if (renumberIds.size > 1) renumberIds = renumberIds - id
+                                            }
+                                        } else if (interactionMode == SdpInteractionMode.DIGITIZING_LOT ||
                                             interactionMode == SdpInteractionMode.DIGITIZING_ROAD) {
                                             draftPoints.add(tappedNorm)
+                                        } else if (interactionMode == SdpInteractionMode.TAP_ADD_LOT && activeSdpPlan != null && !isTracing) {
+                                            val existing = parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }
+                                            if (existing != null) {
+                                                tapAddMessage = "Block ${existing.lot.blockNumber} Lot ${existing.lot.lotNumber} is already a lot. Tap a lot that is not shaded."
+                                            } else {
+                                                isTracing = true
+                                                tapAddMessage = null
+                                                onTraceLot(activeSdpPlan, normX, normY) { outline ->
+                                                    isTracing = false
+                                                    if (outline == null) {
+                                                        tapAddMessage = "No closed lot outline there. Zoom in and tap inside the lot, or use Edit SDP to tap its corners."
+                                                    } else {
+                                                        draftPoints.clear()
+                                                        draftPoints.addAll(outline.map { (x, y) -> Offset(x, y) })
+                                                        showAddLotDialog = true
+                                                    }
+                                                }
+                                            }
                                         } else if (interactionMode == SdpInteractionMode.MONITORING) {
                                             // FAST SPATIAL HIT-TESTING FOR LOTS & ROADS
                                             var hitLot: SdpLot? = null
@@ -944,8 +1136,8 @@ fun SubdivisionPlanTab(
                                             if (hitLot != null) {
                                                 selectedLot = hitLot
                                                 selectedRoad = null
-                                                // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL
-                                                showProgressDialogLot = hitLot
+                                                // NORMAL TAP -> OPEN CONSTRUCTION PROGRESS MODAL (viewers only see the lot card)
+                                                if (canDigitize) showProgressDialogLot = hitLot
                                             } else {
                                                 // Test roads
                                                 var hitRoad: SdpRoad? = null
@@ -963,7 +1155,7 @@ fun SubdivisionPlanTab(
                                         }
                                     },
                                     onLongPress = { tapOffset ->
-                                        if (interactionMode == SdpInteractionMode.MONITORING) {
+                                        if (interactionMode == SdpInteractionMode.MONITORING && renumberBlock == null) {
                                             val normX = ((tapOffset.x - offset.x) / (bitmapWidth * scale)).coerceIn(0f, 1f)
                                             val normY = ((tapOffset.y - offset.y) / (bitmapHeight * scale)).coerceIn(0f, 1f)
                                             val tappedNorm = Offset(normX, normY)
@@ -1003,7 +1195,9 @@ fun SubdivisionPlanTab(
                             Image(
                                 bitmap = renderedBitmap!!.asImageBitmap(),
                                 contentDescription = "SDP PDF",
+                                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
                                 modifier = Modifier
+                                    .requiredSize(with(density) { bitmapWidth.toDp() }, with(density) { bitmapHeight.toDp() })
                                     .graphicsLayer(
                                         scaleX = scale,
                                         scaleY = scale,
@@ -1105,13 +1299,14 @@ fun SubdivisionPlanTab(
                                     }
                                     close()
                                 }
-                                val isSelected = selectedLot?.id == lot.id
+                                val previewNumber = renumberPreview[lot.id]
+                                val isSelected = selectedLot?.id == lot.id || previewNumber != null
                                 val progressRecord = lotProgressMap[lot.id]
                                 val progressValue = progressRecord?.physicalProgress ?: 0
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = lotProgressFill(progressValue, nhaMap, primaryMap)
+                                val baseProgressColor = lotProgressFill(progressValue, nhaMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -1138,6 +1333,15 @@ fun SubdivisionPlanTab(
                                         style = Stroke(width = if (isSelected) 5f else (if (isMatching) 3f else 1.5f))
                                     )
 
+                                    // While renumbering, a dashed outline marks lots that still have the app's numbers.
+                                    if (renumberBlock != null && previewNumber == null && lot.description.startsWith("Auto-detected") && lot.blockNumber != "OS") {
+                                        drawPath(
+                                            path = path,
+                                            color = nhaMap.watch,
+                                            style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f))
+                                        )
+                                    }
+
                                     // DISTINCT THICK BILLING BORDER (IF BILLED)
                                     if (isBilled && isMatching) {
                                         drawPath(
@@ -1154,16 +1358,20 @@ fun SubdivisionPlanTab(
                                     if (isMatching || scale > 1.8f) {
                                         val centroid = parsedLot.centroid
                                         val billedTag = if (isBilled) " • BILLED" else ""
-                                        val labelText = "B${lot.blockNumber}-L${lot.lotNumber}\n${progressValue}%$billedTag"
+                                        // The preview shows just the lot number so a row of narrow lots stays readable.
+                                        val labelText = if (previewNumber != null) "$previewNumber" else "B${lot.blockNumber}-L${lot.lotNumber}\n${progressValue}%$billedTag"
                                         val textLayoutResult = textMeasurer.measure(
                                             text = labelText,
                                             style = TextStyle(
                                                 color = if (isMatching) onSurfaceMap else nhaMap.neutral.copy(alpha = 0.5f),
-                                                fontSize = 9.sp,
+                                                // Same size on screen at any zoom; the layer scales everything else.
+                                                fontSize = 9.sp / scale,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         )
-                                        drawText(
+                                        // A plan of hundreds of lots: label only the lots wide enough to hold one.
+                                        val lotWidth = (parsedLot.bounds.maxX - parsedLot.bounds.minX) * bitmapWidth
+                                        if (textLayoutResult.size.width <= lotWidth * 1.2f || isSelected) drawText(
                                             textLayoutResult = textLayoutResult,
                                             topLeft = Offset(
                                                 x = centroid.x * bitmapWidth - (textLayoutResult.size.width / 2f),
@@ -1180,7 +1388,7 @@ fun SubdivisionPlanTab(
                                     for (i in 1 until draftPoints.size) {
                                         lineTo(draftPoints[i].x * bitmapWidth, draftPoints[i].y * bitmapHeight)
                                     }
-                                    if (interactionMode == SdpInteractionMode.DIGITIZING_LOT && draftPoints.size >= 3) {
+                                    if ((interactionMode == SdpInteractionMode.DIGITIZING_LOT || interactionMode == SdpInteractionMode.TAP_ADD_LOT) && draftPoints.size >= 3) {
                                         close()
                                     }
                                 }
@@ -1297,8 +1505,113 @@ fun SubdivisionPlanTab(
                             }
                         }
 
+                // RENUMBER BLOCK PANEL: the plan above previews the numbers as they are set.
+                if (renumberBlock != null) {
+                    val block = renumberBlock!!
+                    val blockLots = activeLots.filter { it.id in renumberIds }
+                    val target = renumberTo.trim()
+                    val first = renumberFirst.trim().toIntOrNull()
+                    val othersInTarget = activeLots.count { it.blockNumber == target && it.id !in renumberIds }
+                    // Blocks with lots nobody has renumbered yet, and numbers two lots share.
+                    val blocksToDo = activeLots.filter { it.description.startsWith("Auto-detected") && it.blockNumber != "OS" }.map { it.blockNumber }.distinct().size
+                    val duplicates = activeLots.groupBy { it.blockNumber to it.lotNumber }.filter { it.value.size > 1 }.keys.map { (b, l) -> "B$b-L$l" }
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                if (blockLots.isEmpty()) "Renumber blocks" else "Renumber Block $block (${blockLots.size} lots)",
+                                style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                if (blockLots.isEmpty()) "Saved. Tap a lot to renumber its block."
+                                else "Check the numbers on the shaded lots against the plan. Tap a lot to add it to this block or take it out.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                            Text(
+                                if (blocksToDo == 0) "Every found block is renumbered."
+                                else "$blocksToDo ${if (blocksToDo == 1) "block still has" else "blocks still have"} the app's numbers (dashed outline).",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.testTag("renumber_blocks_to_do")
+                            )
+                            if (duplicates.isNotEmpty()) {
+                                Text(
+                                    "Used twice: " + duplicates.take(4).joinToString(", ") + if (duplicates.size > 4) " and ${duplicates.size - 4} more" else "",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind),
+                                    modifier = Modifier.testTag("renumber_duplicates")
+                                )
+                            }
+                            if (blockLots.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = renumberTo,
+                                        onValueChange = { renumberTo = it.take(10) },
+                                        label = { Text("Block on plan") },
+                                        singleLine = true,
+                                        modifier = Modifier.weight(1f).testTag("renumber_block_field")
+                                    )
+                                    OutlinedTextField(
+                                        value = renumberFirst,
+                                        onValueChange = { v -> renumberFirst = v.filter { it.isDigit() }.take(4) },
+                                        label = { Text("First lot") },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.weight(1f).testTag("renumber_first_field")
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                                ) {
+                                    FilterChip(
+                                        selected = renumberPattern == BlockNumbering.Pattern.ODD_EVEN,
+                                        onClick = { renumberPattern = BlockNumbering.Pattern.ODD_EVEN },
+                                        label = { Text("Odd / even rows") }
+                                    )
+                                    FilterChip(
+                                        selected = renumberPattern == BlockNumbering.Pattern.CONSECUTIVE,
+                                        onClick = { renumberPattern = BlockNumbering.Pattern.CONSECUTIVE },
+                                        label = { Text("Consecutive") }
+                                    )
+                                    FilterChip(selected = renumberOtherEnd, onClick = { renumberOtherEnd = !renumberOtherEnd }, label = { Text("Start from other end") })
+                                    FilterChip(selected = renumberOtherRow, onClick = { renumberOtherRow = !renumberOtherRow }, label = { Text("Start on other row") })
+                                }
+                                if (othersInTarget > 0) {
+                                    Text(
+                                        "Block $target already has $othersInTarget other ${if (othersInTarget == 1) "lot" else "lots"}. They keep their numbers until you renumber them.",
+                                        style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind)
+                                    )
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { renumberBlock = null; renumberIds = emptySet() }) {
+                                    Text(if (blockLots.isEmpty()) "Done" else "Close", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (blockLots.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Button(
+                                        enabled = target.isNotEmpty() && first != null,
+                                        onClick = {
+                                            onRenumberLots(
+                                                blockLots.mapNotNull { lot -> renumberPreview[lot.id]?.let { lot.copy(blockNumber = target, lotNumber = it.toString()) } },
+                                                block
+                                            )
+                                            // Stay open so the next tap picks the next block.
+                                            renumberIds = emptySet()
+                                        },
+                                        modifier = Modifier.testTag("renumber_save_button")
+                                    ) { Text("Save numbers") }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // BOTTOM SELECTION INFO CARD (WITH PHASE 7 RECORD INSPECTION & HISTORY ACTIONS)
-                if (selectedLot != null || selectedRoad != null) {
+                if (renumberBlock == null && (selectedLot != null || selectedRoad != null)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1385,7 +1698,7 @@ fun SubdivisionPlanTab(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Button(
+                                    if (canDigitize) Button(
                                         onClick = { showProgressDialogLot = selectedLot },
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                                         shape = RoundedCornerShape(6.dp),
@@ -1395,7 +1708,7 @@ fun SubdivisionPlanTab(
                                         Text("UPDATE PROGRESS", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
 
-                                    Button(
+                                    if (canDigitize) Button(
                                         onClick = { showRecordInspectionDialogLot = selectedLot },
                                         colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.onTrack, contentColor = MaterialTheme.colorScheme.surface),
                                         shape = RoundedCornerShape(6.dp),
@@ -1416,6 +1729,30 @@ fun SubdivisionPlanTab(
                                         modifier = Modifier.weight(1f).height(32.dp)
                                     ) {
                                         Text("HISTORY & DETAILS", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    if (canDigitize) {
+                                        Button(
+                                            onClick = { lotToDeactivate = selectedLot },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = LocalNHAColors.current.behind),
+                                            border = BorderStroke(1.dp, LocalNHAColors.current.behind),
+                                            shape = RoundedCornerShape(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier.weight(0.7f).height(32.dp).testTag("remove_lot_button")
+                                        ) {
+                                            Text("REMOVE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                if (canDigitize && selectedLot != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    OutlinedButton(
+                                        onClick = { startRenumber(selectedLot!!) },
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().height(32.dp).testTag("renumber_block_button")
+                                    ) {
+                                        Text("RENUMBER BLOCK ${selectedLot!!.blockNumber}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1596,14 +1933,64 @@ fun SubdivisionPlanTab(
 
     // 6. ADD LOT DIALOG
     if (showAddLotDialog && activeSdpPlan != null) {
+        LaunchedEffect(Unit) {
+            draftArea = null
+            onLotArea(activeSdpPlan, draftPoints.map { it.x to it.y }) { draftArea = it }
+        }
         AddLotDialog(
-            onDismiss = { showAddLotDialog = false },
+            suggestedArea = draftArea,
+            onDismiss = {
+                showAddLotDialog = false
+                // A traced outline is thrown away on cancel; tapped corners stay for more tapping.
+                if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) draftPoints.clear()
+            },
             onSubmit = { block: String, lot: String, unit: String, area: Double, desc: String ->
                 val json = normalizedToJson(draftPoints)
                 onAddLot(block, lot, unit, area, json, desc)
                 draftPoints.clear()
                 showAddLotDialog = false
             }
+        )
+    }
+
+    // 6b. PLAN SCALE
+    if (showScaleDialog && activeSdpPlan != null) {
+        var scaleText by remember { mutableStateOf(activeSdpPlan.scaleDenominator.takeIf { it > 0 }?.toString() ?: "") }
+        val scale = scaleText.toIntOrNull()?.takeIf { it in 10..100000 }
+        AlertDialog(
+            onDismissRequest = { showScaleDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Plan scale", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Type the scale printed on the plan, e.g. SCALE 1:1000. Lot areas are worked out from it; areas someone typed in stay.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("1 : ", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = scaleText,
+                            onValueChange = { v -> scaleText = v.filter { it.isDigit() }.take(6) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f).testTag("plan_scale_field")
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = scale != null,
+                    onClick = {
+                        onSetPlanScale(activeSdpPlan, scale!!)
+                        showScaleDialog = false
+                    },
+                    modifier = Modifier.testTag("plan_scale_save")
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { showScaleDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
@@ -1625,8 +2012,8 @@ fun SubdivisionPlanTab(
         AlertDialog(
             onDismissRequest = { lotToDeactivate = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Deactivate Lot Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Deactivated lots will be hidden from monitoring mode but preserved in audit logs and history.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Remove Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("The lot is taken off the plan on every phone. Its progress and billing history stay in the audit log.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1635,9 +2022,40 @@ fun SubdivisionPlanTab(
                         lotToDeactivate = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface)
-                ) { Text("Deactivate") }
+                ) { Text("Remove") }
             },
             dismissButton = { TextButton(onClick = { lotToDeactivate = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        )
+    }
+
+    // 8b. REMOVE ALL FOUND LOTS CONFIRMATION
+    if (confirmRemoveDetected && activeSdpPlan != null) {
+        val removable = activeLots.count { it.description.startsWith("Auto-detected") && !lotProgressMap.containsKey(it.id) }
+        val kept = activeLots.count { it.description.startsWith("Auto-detected") && lotProgressMap.containsKey(it.id) }
+        AlertDialog(
+            onDismissRequest = { confirmRemoveDetected = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Remove $removable found ${if (removable == 1) "lot" else "lots"}?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Lots the app found that have no progress yet are taken off the plan on every phone. " +
+                        "Lots you added yourself or renumbered stay" + (if (kept > 0) ", and so do the $kept found ${if (kept == 1) "lot that already has" else "lots that already have"} progress." else ".") +
+                        " Find lots can add them again.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRemoveDetectedLots(activeSdpPlan)
+                        selectedLot = null
+                        confirmRemoveDetected = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.testTag("confirm_remove_found_lots")
+                ) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemoveDetected = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 
@@ -1668,9 +2086,68 @@ fun SubdivisionPlanTab(
             currentVersion = sdpPlans.size + 1,
             onDismiss = { showUploadDialog = false },
             onSubmit = { planName: String, pdfUriString: String, desc: String ->
+                detectAfterUpload = pdfUriString.isNotBlank()
                 onUploadSdpPlan(planName, pdfUriString, desc)
                 showUploadDialog = false
             }
+        )
+    }
+
+    // 11. DETECTED LOTS REVIEW
+    detectedAreas?.let { areas ->
+        val plan = activeSdpPlan
+        val lotCount = areas.count { it.isLot }
+        val blockCount = areas.filter { it.isLot }.map { it.block }.distinct().size
+        val largeCount = areas.count { !it.isLot }
+        val updatedDetected = activeLots.count { it.description.startsWith("Auto-detected") && lotProgressMap.containsKey(it.id) }
+        AlertDialog(
+            onDismissRequest = { detectedAreas = null },
+            containerColor = MaterialTheme.colorScheme.surface,
+            icon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Lots found in the plan", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Found $lotCount lots in $blockCount blocks" + if (largeCount > 0) ", and $largeCount larger areas (open spaces or facilities)." else ".")
+                    Text(
+                        "Blocks and lots are numbered top to bottom; use Renumber block to match the plan's own numbers. " +
+                            "Earlier found lots with no progress yet are replaced; renumbered lots stay" +
+                            if (updatedDetected > 0) "; the $updatedDetected with progress stay." else ".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { if (plan != null) onAddDetectedLots(plan, areas.filter { it.isLot }); detectedAreas = null },
+                    modifier = Modifier.testTag("add_detected_lots")
+                ) { Text("Add lots") }
+            },
+            dismissButton = {
+                Row {
+                    if (largeCount > 0) {
+                        TextButton(onClick = { if (plan != null) onAddDetectedLots(plan, areas); detectedAreas = null }) {
+                            Text("Add lots and larger areas")
+                        }
+                    }
+                    TextButton(onClick = { detectedAreas = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+        )
+    }
+    if (detectFailed) {
+        AlertDialog(
+            onDismissRequest = { detectFailed = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("No lots found", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "The app finds lots in a plan PDF exported from CAD, where each lot is a closed outline. " +
+                        "A scanned plan or a photo has no clear outlines; add its lots by hand in Digitize mode.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = { TextButton(onClick = { detectFailed = false }) { Text("OK") } }
         )
     }
 }
@@ -2119,12 +2596,15 @@ fun LotAuditHistoryDialog(
 @Composable
 fun AddLotDialog(
     onDismiss: () -> Unit,
-    onSubmit: (block: String, lot: String, unit: String, area: Double, desc: String) -> Unit
+    onSubmit: (block: String, lot: String, unit: String, area: Double, desc: String) -> Unit,
+    suggestedArea: Double? = null
 ) {
     var blockNumber by remember { mutableStateOf("") }
     var lotNumber by remember { mutableStateOf("") }
     var unitNumber by remember { mutableStateOf("") }
     var areaSqM by remember { mutableStateOf("50.0") }
+    // The worked-out area arrives a moment after the dialog opens; it replaces the default only.
+    LaunchedEffect(suggestedArea) { if (suggestedArea != null && areaSqM == "50.0") areaSqM = suggestedArea.toString() }
     var description by remember { mutableStateOf("") }
 
     AlertDialog(
@@ -2197,16 +2677,10 @@ fun AddSdpPlanDialog(
 ) {
     var planName by remember { mutableStateOf("Approved Subdivision Plan Layout") }
     var description by remember { mutableStateOf("Official Approved SDP PDF Reference Document") }
-    var selectedPdfUri by remember { mutableStateOf<Uri?>(null) }
-    var pdfFileName by remember { mutableStateOf("") }
-
-    val pdfPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            selectedPdfUri = uri
-            pdfFileName = uri.lastPathSegment ?: "Approved_SDP.pdf"
-        }
+    // The pick is copied into the app and uploaded like any attachment, so every phone can open it.
+    var pdfRef by remember { mutableStateOf<String?>(null) }
+    val pdfPicker = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.SCAN) { ref ->
+        if (com.example.data.files.Attachments.isPdf(ref)) pdfRef = ref
     }
 
     AlertDialog(
@@ -2257,33 +2731,30 @@ fun AddSdpPlanDialog(
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                    border = BorderStroke(1.dp, if (pdfRef != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { pdfPickerLauncher.launch("application/pdf") }
+                        .clickable { pdfPicker.launch("application/pdf") }
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (selectedPdfUri != null) Icons.Default.CheckCircle else Icons.Default.FileUpload,
+                            imageVector = if (pdfRef != null) Icons.Default.CheckCircle else Icons.Default.FileUpload,
                             contentDescription = "PDF",
-                            tint = if (selectedPdfUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (pdfRef != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (selectedPdfUri != null) "PDF Selected" else "Select Approved SDP PDF",
+                                text = if (pdfRef != null) "PDF Selected" else "Select Approved SDP PDF",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             )
-                            if (pdfFileName.isNotBlank()) {
-                                Text(
-                                    text = pdfFileName,
-                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary),
-                                    maxLines = 1
-                                )
-                            }
+                            Text(
+                                text = "Lots are found automatically when the plan is a PDF exported from CAD.",
+                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
                         }
                     }
                 }
@@ -2292,12 +2763,9 @@ fun AddSdpPlanDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val finalUri = selectedPdfUri?.toString() ?: ""
-                    if (finalUri.isNotBlank()) {
-                        onSubmit(planName, finalUri, description)
-                    }
+                    pdfRef?.let { onSubmit(planName, it, description) }
                 },
-                enabled = selectedPdfUri != null,
+                enabled = pdfRef != null,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("Save SDP Plan", fontWeight = FontWeight.Bold)
@@ -2399,10 +2867,11 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
-                LegendRow(color = getLotProgressFillColor(0), label = "0% / Layout / Excavation Started")
-                LegendRow(color = getLotProgressFillColor(20), label = "1 – 40% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(70), label = "41 – 99% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed")
+                LegendRow(color = getLotProgressFillColor(0), label = "0 – 25% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(26), label = "26 – 50% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed / RFO")
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text("DEVELOPER BILLING STATUS (LOT BORDER):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
