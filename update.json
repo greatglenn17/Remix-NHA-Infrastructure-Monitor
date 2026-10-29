@@ -1,8 +1,8 @@
 {
-  "versionCode": 192,
-  "versionName": "1.9.2",
-  "releaseNotes": "v1.9.2: The Super Admin now gives roles in the app (Manage users & roles). Sign-in no longer asks for a role, the admin PIN and instant password reset are gone, and Viewers no longer see billing or weekly-report add buttons.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.2/NHA_Monitor_v1.9.2_Build192.apk",
-  "apkSha256": "30438206272d64f4737e721a03ce68c89e15d8c511da35d180622282e78e4c74",
+  "versionCode": 193,
+  "versionName": "1.9.3",
+  "releaseNotes": "v1.9.3: Subdivision plans find lots automatically from a CAD plan PDF, work out lot areas from the plan scale, sync lots and progress between phones, and colour lots by progress in five bands. Viewers see the plan read-only.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.3/NHA_Monitor_v1.9.3_Build193.apk",
+  "apkSha256": "b34871457cab6cee969c17bae0874f26d85ccc4a52961e925d236915370f3f19",
   "isMandatory": true
 }
