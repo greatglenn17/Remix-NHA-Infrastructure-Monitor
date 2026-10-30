@@ -1419,14 +1419,11 @@ fun SubdivisionPlanTab(
                                         )
                                     }
 
-                                    // Render Label (Centroid)
-                                    if (isMatching || scale > 1.8f) {
+                                    // The fill colour already shows progress, so only the renumber preview labels lots (with the new number).
+                                    if (previewNumber != null) {
                                         val centroid = parsedLot.centroid
-                                        val billedTag = if (isBilled) " • BILLED" else ""
-                                        // The preview shows just the lot number so a row of narrow lots stays readable.
-                                        val labelText = if (previewNumber != null) "$previewNumber" else "B${lot.blockNumber}-L${lot.lotNumber}\n${progressValue}%$billedTag"
                                         val textLayoutResult = textMeasurer.measure(
-                                            text = labelText,
+                                            text = "$previewNumber",
                                             style = TextStyle(
                                                 color = if (isMatching) onSurfaceMap else nhaMap.neutral.copy(alpha = 0.5f),
                                                 // Same size on screen at any zoom; the layer scales everything else.
@@ -1798,7 +1795,8 @@ fun SubdivisionPlanTab(
                                             }
                                         }
                                         Text(
-                                            text = "Progress: ${progressVal}% (${progressRecord?.constructionStatus ?: "Not Started"}) • Area: ${selectedLot!!.lotAreaSqM} sq.m • Unit: ${selectedLot!!.housingUnitNumber.ifBlank { "N/A" }}",
+                                            text = (if (selectedLot!!.isRoadLot) "Road: ${if (progressVal >= 100) "Completed" else "Not completed"} • Drainage: ${if ((progressRecord?.drainageProgress ?: 0) >= 100) "Completed" else "Not completed"}"
+                                                else "Progress: ${progressVal}% (${progressRecord?.constructionStatus ?: "Not Started"})") + " • Area: ${selectedLot!!.lotAreaSqM} sq.m • Unit: ${selectedLot!!.housingUnitNumber.ifBlank { "N/A" }}",
                                             style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         )
                                         if (progressRecord?.lastModifiedBy?.isNotBlank() == true) {
@@ -3129,8 +3127,26 @@ fun UpdateLotProgressDialog(
                     }
                 }
 
-                // Physical Progress Slider & Visual Color Preview
-                Surface(
+                if (isRoad) {
+                    // Road lots are tagged done instead of tracked by %; done is saved as 100%.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = intProgress == 100,
+                            onClick = {
+                                progressSlider = if (intProgress == 100) 0f else 100f
+                                constructionStatus = statusForProgress(progressSlider.toInt())
+                            },
+                            label = { Text("Road completed") },
+                            modifier = Modifier.testTag("road_done")
+                        )
+                        FilterChip(
+                            selected = drainageSlider >= 100f,
+                            onClick = { drainageSlider = if (drainageSlider >= 100f) 0f else 100f },
+                            label = { Text("Drainage completed") },
+                            modifier = Modifier.testTag("drainage_done")
+                        )
+                    }
+                } else Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, derivedColor),
@@ -3142,7 +3158,7 @@ fun UpdateLotProgressDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(if (isRoad) "Road works %" else "Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            Text("Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Surface(
                                 color = derivedColor,
                                 shape = RoundedCornerShape(4.dp)
@@ -3158,35 +3174,6 @@ fun UpdateLotProgressDialog(
                         ProgressPicker(progressSlider, derivedColor) {
                             progressSlider = it
                             constructionStatus = statusForProgress(it.toInt())
-                        }
-                    }
-                }
-
-                if (isRoad) {
-                    val drainage = drainageSlider.toInt().coerceIn(0, 100)
-                    val drainageColor = getLotProgressFillColor(drainage)
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, drainageColor),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Drainage %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                                Surface(color = drainageColor, shape = RoundedCornerShape(4.dp)) {
-                                    Text(
-                                        text = "$drainage%",
-                                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            ProgressPicker(drainageSlider, drainageColor) { drainageSlider = it }
                         }
                     }
                 }

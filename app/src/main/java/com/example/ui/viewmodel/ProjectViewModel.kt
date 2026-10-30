@@ -1303,20 +1303,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                             val out = java.io.ByteArrayOutputStream()
                             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
                             bitmap.recycle()
-                            "data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+                            ("data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)) to w.toDouble() / h
                         }
                     }
                 }
             }.getOrNull()
         } ?: return null
         val summary = com.example.util.SdpSummary.of(
-            lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0, progress[it.id]?.drainageProgress ?: 0) },
-            LOT_USES
+            lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0) }
         )
         val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
             "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, colors).toArgb() and 0xFFFFFF)
         }
-        return com.example.util.BlueBookForms.sdpPlan(project, summary, image, bandHex, "#%06X".format(colors.neutral.toArgb() and 0xFFFFFF), LocalDate.now(), blueBookBanner)
+        return com.example.util.BlueBookForms.sdpPlan(project, summary, image.first, image.second, bandHex, LocalDate.now(), blueBookBanner)
     }
 
     /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */

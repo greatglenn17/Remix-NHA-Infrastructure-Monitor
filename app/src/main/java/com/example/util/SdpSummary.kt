@@ -2,7 +2,7 @@ package com.example.util
 
 import java.util.Locale
 
-/** The side table of the SDP print: saleable lots by progress band, road lots, other non-saleable areas. */
+/** The legend of the SDP print: saleable lots by progress band. */
 object SdpSummary {
     /** Same bands as the lot colours on the plan. */
     val BANDS = listOf("0–25%", "26–50%", "51–75%", "76–99%", "100% / RFO")
@@ -15,46 +15,23 @@ object SdpSummary {
         else -> 0
     }
 
-    /** One lot: its use (see LOT_USES), area and progress; [drainage] counts on road lots only. */
-    data class Item(val use: String, val areaSqM: Double, val progress: Int, val drainage: Int = 0)
+    /** One lot: its use (see LOT_USES), area and progress. */
+    data class Item(val use: String, val areaSqM: Double, val progress: Int)
 
     data class Totals(val count: Int, val areaSqM: Double)
 
     data class Summary(
         /** Saleable lots per band of [BANDS]. */
         val saleableBands: List<Int>,
-        val saleable: Totals,
-        val roads: Totals,
-        val roadProgress: Double,
-        val drainageProgress: Double,
-        /** Each non-saleable use that has lots (road lots too), in the order given. */
-        val nonSaleable: List<Pair<String, Totals>>
+        val saleable: Totals
     )
 
-    fun of(items: List<Item>, uses: List<String>): Summary {
+    fun of(items: List<Item>): Summary {
         val saleable = items.filter { it.use == "Saleable" }
-        val roads = items.filter { it.use == "Road Lot" }
-        val nonSaleable = uses.filter { it != "Saleable" }
-            .map { use -> use to totals(items.filter { it.use == use }) }
-            .filter { it.second.count > 0 }
         return Summary(
             saleableBands = BANDS.indices.map { b -> saleable.count { band(it.progress) == b } },
-            saleable = totals(saleable),
-            roads = totals(roads),
-            roadProgress = weighted(roads) { it.progress },
-            drainageProgress = weighted(roads) { it.drainage },
-            nonSaleable = nonSaleable
+            saleable = Totals(saleable.size, saleable.sumOf { it.areaSqM })
         )
-    }
-
-    private fun totals(items: List<Item>) = Totals(items.size, items.sumOf { it.areaSqM })
-
-    /** Weighted by area, so a long road counts more than a short one; a plain average while areas are unknown. */
-    private fun weighted(items: List<Item>, value: (Item) -> Int): Double {
-        if (items.isEmpty()) return 0.0
-        val area = items.sumOf { it.areaSqM }
-        return if (items.all { it.areaSqM > 0 }) items.sumOf { value(it) * it.areaSqM } / area
-        else items.sumOf { value(it) }.toDouble() / items.size
     }
 
     /** The box around all [polygons] (points 0..1) plus [margin], kept on the page; null with no points. */

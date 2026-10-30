@@ -1,6 +1,5 @@
 package com.example
 
-import com.example.data.model.LOT_USES
 import com.example.data.model.Project
 import com.example.data.model.SdpLot
 import com.example.data.model.use
@@ -16,28 +15,15 @@ import org.junit.Test
 class SdpSummaryTest {
 
     @Test
-    fun saleableLotsCountByBand_roadsWeightByArea_otherUsesListed() {
+    fun onlySaleableLotsCountByBand() {
         val items = listOf(
             Item("Saleable", 40.0, 0), Item("Saleable", 40.0, 25), Item("Saleable", 40.0, 26),
             Item("Saleable", 40.0, 75), Item("Saleable", 40.0, 76), Item("Saleable", 40.0, 100),
-            Item("Road Lot", 300.0, 100, drainage = 50), Item("Road Lot", 100.0, 0, drainage = 10),
-            Item("Open Space", 500.0, 0), Item("Easement", 80.0, 0)
+            Item("Road Lot", 300.0, 100), Item("Open Space", 500.0, 0), Item("Easement", 80.0, 0)
         )
-        val s = SdpSummary.of(items, LOT_USES)
+        val s = SdpSummary.of(items)
         assertEquals(listOf(2, 1, 1, 1, 1), s.saleableBands)
         assertEquals(SdpSummary.Totals(6, 240.0), s.saleable)
-        assertEquals(SdpSummary.Totals(2, 400.0), s.roads)
-        // (100 x 300 + 0 x 100) / 400 and (50 x 300 + 10 x 100) / 400
-        assertEquals(75.0, s.roadProgress, 0.001)
-        assertEquals(40.0, s.drainageProgress, 0.001)
-        assertEquals(listOf("Open Space", "Road Lot", "Easement"), s.nonSaleable.map { it.first })
-    }
-
-    @Test
-    fun roadProgressIsAPlainAverageWhileAreasAreUnknown() {
-        val s = SdpSummary.of(listOf(Item("Road Lot", 0.0, 80, 20), Item("Road Lot", 120.0, 20, 0)), LOT_USES)
-        assertEquals(50.0, s.roadProgress, 0.001)
-        assertEquals(10.0, s.drainageProgress, 0.001)
     }
 
     @Test
@@ -63,26 +49,25 @@ class SdpSummaryTest {
     }
 
     @Test
-    fun printShowsTheBandsNonSaleableTotalsAndRoadWorks() {
+    fun printShowsTheLegendBesideATallPlanAndUnderAWideOne() {
         val project = Project(
             name = "San Ildefonso <Heights>", location = "Bulacan", implementingOffice = "", contractor = "", scopeOfWork = "",
             contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 360,
             dateStarted = "2026-04-13", completionDateOriginal = "2027-04-07", completionDateRevised = ""
         )
-        val s = SdpSummary.of(
-            listOf(Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Road Lot", 200.0, 60, 30), Item("Open Space", 100.0, 0)),
-            LOT_USES
-        )
-        val html = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", listOf("#111111", "#222222", "#333333", "#444444", "#555555"), "#999999", LocalDate.of(2026, 10, 30))
-        assertTrue(html.contains("size: A4;"))
-        assertTrue(html.contains("background:#999999'></i>NON-SALEABLE AREAS"))
-        assertTrue(html.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of"))
-        assertTrue(html.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
-        assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
-        assertTrue(html.contains("<td>Road Lot</td><td class='n'>1</td><td class='n'>200.00</td>"))
-        assertTrue(html.contains("<td>Total</td><td class='n'>2</td><td class='n'>300.00</td>"))
-        assertTrue(html.contains("<td>Road works</td><td class='n'>60.00%</td>"))
-        assertTrue(html.contains("<td>Drainage</td><td class='n'>30.00%</td>"))
-        assertTrue(html.contains("as of October 30, 2026"))
+        val s = SdpSummary.of(listOf(Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Road Lot", 200.0, 60), Item("Open Space", 100.0, 0)))
+        val bands = listOf("#111111", "#222222", "#333333", "#444444", "#555555")
+        val tall = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", 0.6, bands, LocalDate.of(2026, 10, 30))
+        assertTrue(tall.contains("size: A4; margin: 6mm;"))
+        assertTrue(tall.contains("<h1>STATUS OF CONSTRUCTION</h1>"))
+        assertTrue(tall.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of October 30, 2026"))
+        assertTrue(tall.contains("<td class='side'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
+        assertTrue(tall.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
+        assertTrue(tall.contains("<td>Total units</td><td class='n'>2</td>"))
+        assertTrue(tall.contains("<td>Area (sq.m.)</td><td class='n'>80.00</td>"))
+        for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage")) assertTrue(gone, !tall.contains(gone))
+        val wide = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", 1.4, bands, LocalDate.of(2026, 10, 30))
+        assertTrue(wide.contains("<div class='plan'><img src='data:image/png;base64,AA'></div><table class='lg'><tr><th class='sec' rowspan='2'>LEGEND</th>"))
+        assertTrue(wide.contains("<td class='c'>1</td><td class='c'>1</td><td class='c'>0</td>"))
     }
 }

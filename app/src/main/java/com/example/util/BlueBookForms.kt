@@ -306,42 +306,36 @@ object BlueBookForms {
     }
 
     /**
-     * The subdivision plan coloured by lot progress on portrait A4, with the summary under it as a legend.
-     * [planImage] is the framed plan as a data URI; [bandHex] the colour of each band of [SdpSummary.BANDS].
+     * The subdivision plan coloured by lot progress, filling a portrait A4 page, with a legend of saleable
+     * units per band. [planImage] is the framed plan as a data URI and [planAspect] its width over height;
+     * [bandHex] the colour of each band of [SdpSummary.BANDS].
      */
-    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, neutralHex: String, asOf: LocalDate, banner: String = ""): String {
-        fun area(a: Double) = if (a > 0) "%,.2f".format(Locale.US, a) else "&#8212;"
-        val b = StringBuilder()
-        b.append("<td class='s1'><table><tr><th class='sec' colspan='2'>SALEABLE LOTS</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
-        SdpSummary.BANDS.forEachIndexed { i, band ->
-            b.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
+    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, planAspect: Double, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
+        val area = summary.saleable.areaSqM.let { if (it > 0) "%,.2f".format(Locale.US, it) else "&#8212;" }
+        fun swatch(i: Int) = "<i class='sw' style='background:${bandHex[i]}'></i>${esc(SdpSummary.BANDS[i])}"
+        // A tall plan is biggest with the legend beside it, a wide one with the legend in a strip under it.
+        val plan = if (planAspect < 0.75) {
+            val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
+            SdpSummary.BANDS.indices.forEach { legend.append("<tr><td>${swatch(it)}</td><td class='n'>${summary.saleableBands[it]}</td></tr>") }
+            legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
+            legend.append("<tr><td>Area (sq.m.)</td><td class='n'>$area</td></tr></table>")
+            "<table class='sdp'><tr><td class='plan'><img src='$planImage'></td><td class='side'>$legend</td></tr></table>"
+        } else {
+            "<div class='plan'><img src='$planImage'></div><table class='lg'><tr><th class='sec' rowspan='2'>LEGEND</th>" +
+                SdpSummary.BANDS.indices.joinToString("") { "<th class='sub'>${swatch(it)}</th>" } +
+                "<th class='sub'>Total units</th><th class='sub'>Area (sq.m.)</th></tr><tr>" +
+                summary.saleableBands.joinToString("") { "<td class='c'>$it</td>" } +
+                "<td class='c'><b>${summary.saleable.count}</b></td><td class='c'>$area</td></tr></table>"
         }
-        b.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
-        b.append("<tr><td>Area (sq.m.)</td><td class='n'>${area(summary.saleable.areaSqM)}</td></tr></table></td>")
-        b.append("<td class='s2'><table><tr><th class='sec' colspan='3'><i class='sw' style='background:$neutralHex'></i>NON-SALEABLE AREAS</th></tr><tr><th class='sub'>Use</th><th class='sub'>Lots</th><th class='sub'>Area (sq.m.)</th></tr>")
-        if (summary.nonSaleable.isEmpty()) b.append("<tr><td class='empty' colspan='3'>None marked</td></tr>")
-        summary.nonSaleable.forEach { (use, t) -> b.append("<tr><td>${esc(use)}</td><td class='n'>${t.count}</td><td class='n'>${area(t.areaSqM)}</td></tr>") }
-        if (summary.nonSaleable.isNotEmpty()) {
-            b.append("<tr class='tot'><td>Total</td><td class='n'>${summary.nonSaleable.sumOf { it.second.count }}</td><td class='n'>${area(summary.nonSaleable.sumOf { it.second.areaSqM })}</td></tr>")
-        }
-        b.append("</table></td>")
-        b.append("<td class='s3'><table><tr><th class='sec' colspan='2'>ROAD LOTS</th></tr>")
-        if (summary.roads.count == 0) b.append("<tr><td class='empty' colspan='2'>No road lots marked</td></tr>")
-        else {
-            b.append("<tr><td>Road works</td><td class='n'>${pct(summary.roadProgress)}</td></tr>")
-            b.append("<tr><td>Drainage</td><td class='n'>${pct(summary.drainageProgress)}</td></tr>")
-        }
-        b.append("</table></td>")
         return page(
             "Subdivision Plan Progress",
             """
-            <h1>SUBDIVISION PLAN &#8212; STATUS OF CONSTRUCTION</h1>
+            <h1>STATUS OF CONSTRUCTION</h1>
             <div class='period'>${esc(listOf(project.name, project.location).filter { it.isNotBlank() }.joinToString(", "))} &#183; as of ${asOf.format(LONG_DATE)}</div>
-            <div class='plan'><img src='$planImage'></div>
-            <table class='sdp'><tr>$b</tr></table>
+            $plan
             """,
             banner,
-            smallBanner = true
+            fullPage = true
         )
     }
 
@@ -487,9 +481,9 @@ object BlueBookForms {
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
-    private fun page(title: String, body: String, banner: String, smallBanner: Boolean = false) = """
+    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4; margin: ${if (fullPage) "6mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
@@ -530,16 +524,20 @@ object BlueBookForms {
         .note { font-size: 8pt; font-style: italic; }
         /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
         .keep { break-inside: avoid; }
-        /* SDP print: the plan fills the page and the summary sits under it as a small legend, all on one page. */
-        img.banner.small { width: auto; max-height: 16mm; margin: 0 auto 1mm; }
-        div.plan { text-align: center; margin: 1mm 0 2mm; }
-        div.plan img { max-width: 100%; max-height: 188mm; border: 0.6pt solid #000; }
-        table.sdp { break-inside: avoid; margin: 0; }
-        table.sdp > tbody > tr > td { border: none; padding: 0 1mm; vertical-align: top; height: auto; }
-        td.s1 { width: 33%; } td.s2 { width: 40%; } td.s3 { width: 27%; }
-        table.sdp table { font-size: 7.5pt; margin: 0; }
-        table.sdp table th, table.sdp table td { padding: 0.5mm 1.2mm; height: auto; }
-        i.sw { display: inline-block; width: 2.5mm; height: 2.5mm; border: 0.4pt solid #000; margin-right: 1.2mm; vertical-align: middle; }
-        </style></head><body>${if (banner.isEmpty()) "" else "<img class='banner${if (smallBanner) " small" else ""}' src='$banner'>"}$body</body></html>
+        /* SDP print: narrow margins and the plan as big as one page allows, with the legend beside or under it. */
+        body.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
+        body.full h1 { font-size: 16pt; margin: 1mm 0 0; }
+        body.full .period { font-size: 10pt; margin-bottom: 2mm; }
+        table.sdp { margin: 0; }
+        table.sdp > tbody > tr > td { border: none; padding: 0; height: auto; }
+        td.plan { text-align: center; vertical-align: middle; }
+        td.plan img { max-width: 100%; max-height: 240mm; border: 0.6pt solid #000; }
+        td.side { width: 38mm; vertical-align: bottom; padding-left: 2mm !important; }
+        div.plan { text-align: center; margin-bottom: 2mm; }
+        div.plan img { max-width: 100%; max-height: 222mm; border: 0.6pt solid #000; }
+        table.lg { font-size: 8pt; margin: 0; break-inside: avoid; }
+        table.lg th, table.lg td { padding: 0.6mm 1.2mm; height: auto; white-space: nowrap; }
+        i.sw { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1.2mm; vertical-align: middle; }
+        </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }
