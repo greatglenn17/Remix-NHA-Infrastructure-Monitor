@@ -1316,7 +1316,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
             "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, colors).toArgb() and 0xFFFFFF)
         }
-        return com.example.util.BlueBookForms.sdpPlan(project, summary, image, bandHex, LocalDate.now(), blueBookBanner)
+        return com.example.util.BlueBookForms.sdpPlan(project, summary, image, bandHex, "#%06X".format(colors.neutral.toArgb() and 0xFFFFFF), LocalDate.now(), blueBookBanner)
     }
 
     /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */

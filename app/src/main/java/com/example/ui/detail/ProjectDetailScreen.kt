@@ -88,8 +88,8 @@ fun ProjectDetailScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val printScope = rememberCoroutineScope()
     // Blue Book forms open in the system print screen (A4), where "Save as PDF" is one of the printers.
-    fun printForm(jobName: String, landscape: Boolean = false, build: suspend () -> String?) {
-        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it, landscape) } }
+    fun printForm(jobName: String, build: suspend () -> String?) {
+        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
     }
     // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
     // (weekly?, print): the weekly and monthly reports keep separate checkers and noters.
@@ -261,7 +261,7 @@ fun ProjectDetailScreen(
                                 onSetPlanFrame = viewModel::setSdpPlanFrame,
                                 onPrintPlan = {
                                     activeSdpPlan?.let { plan ->
-                                        printForm("SDP Progress - ${currentProject.name}", landscape = true) {
+                                        printForm("SDP Progress - ${currentProject.name}") {
                                             viewModel.sdpPlanForm(currentProject, plan, activeSdpLots, activeSdpLotProgressMap)
                                         }
                                     }

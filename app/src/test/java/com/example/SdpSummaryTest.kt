@@ -73,8 +73,9 @@ class SdpSummaryTest {
             listOf(Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Road Lot", 200.0, 60, 30), Item("Open Space", 100.0, 0)),
             LOT_USES
         )
-        val html = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", listOf("#111111", "#222222", "#333333", "#444444", "#555555"), LocalDate.of(2026, 10, 30))
-        assertTrue(html.contains("size: A4 landscape"))
+        val html = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", listOf("#111111", "#222222", "#333333", "#444444", "#555555"), "#999999", LocalDate.of(2026, 10, 30))
+        assertTrue(html.contains("size: A4;"))
+        assertTrue(html.contains("background:#999999'></i>NON-SALEABLE AREAS"))
         assertTrue(html.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of"))
         assertTrue(html.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
