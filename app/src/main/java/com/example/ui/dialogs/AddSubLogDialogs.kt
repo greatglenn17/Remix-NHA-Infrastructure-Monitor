@@ -327,8 +327,8 @@ fun AddCustomDocumentDialog(
                     "Custom Document" -> docName.ifBlank { "New Document" }
                     "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
                     "Variation Order" -> voDocumentName(voNo, voType, voAmount)
-                    "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
-                    "Work Resumption Order" -> "Work Resumption No. $wrNo ($wrType)"
+                    "Work Suspension Order" -> com.example.util.ProjectSchedule.orderName("Suspension", wsNo, wsType)
+                    "Work Resumption Order" -> com.example.util.ProjectSchedule.orderName("Resumption", wrNo, wrType)
                     else -> "New Document"
                 }
                 val finalRemarks = when (selectedType) {

@@ -169,7 +169,7 @@ private fun KeyDatesCard(
         Text("Time extensions & suspensions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         if (orders.isEmpty()) EmptyLine("No time extension or suspension orders.")
         orders.forEach { doc ->
-            LogEntry(doc.documentName, MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpenOrder?.let { open -> { open(doc) } })
+            LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpenOrder?.let { open -> { open(doc) } })
         }
     }
 }

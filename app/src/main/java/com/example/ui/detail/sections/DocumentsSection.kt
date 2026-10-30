@@ -66,7 +66,7 @@ fun OrderStatusDialog(
         title = { Text("Update status") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(doc.documentName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(com.example.util.ProjectSchedule.orderLabel(doc.documentName), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("Pending", "Submitted", "Signed", "Notarized", "Approved").forEach { status ->
                         FilterChip(

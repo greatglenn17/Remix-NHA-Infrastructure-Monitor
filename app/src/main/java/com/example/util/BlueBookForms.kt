@@ -48,7 +48,7 @@ data class ContractLogs(
     val originalCost: Double,
     val revisedCost: Double,
     val revisedCompletion: String,
-    /** Label to value, e.g. "Work Suspension No. 1 (Full)" to "2019-01-03 – 2019-05-29". */
+    /** Label to value, e.g. "Work Suspension Order No. 1" to "146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)". */
     val suspensions: List<Pair<String, String>>,
     val resumptions: List<Pair<String, String>>,
     val extensions: List<Extension>,
@@ -59,26 +59,29 @@ data class ContractLogs(
             fun field(remarks: String, key: String) = Regex("$key: ([^|]*)").find(remarks)?.groupValues?.get(1)?.trim().orEmpty()
             fun mark(d: PendingDocument) = if (d.status.equals("Approved", ignoreCase = true)) "" else " (for approval)"
             fun named(prefix: String) = documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) }
-            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else "; Reason: $it" }
+            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else " ($it)" }
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
                 revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents) ?: original,
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
-                // Continuances ("Continuance No. 1 of Work Suspension No. 1 …") are listed with their suspension.
+                // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension.
                 suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
-                    val from = field(d.remarks, "Effectivity")
+                    val days = field(d.remarks, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it C.D. – " }.orEmpty()
+                    val from = BlueBookForms.date(field(d.remarks, "Effectivity"))
                     val to = field(d.remarks, "End")
-                    d.documentName to (if (to.isEmpty()) BlueBookForms.date(from) else "${BlueBookForms.date(from)} – ${BlueBookForms.date(to)}") + mark(d) + reason(d)
+                    ProjectSchedule.orderLabel(d.documentName) to days + (if (to.isEmpty()) from else "$from to ${BlueBookForms.date(to)}") + reason(d) + mark(d)
                 },
-                resumptions = named("Work Resumption").map { d -> d.documentName to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d) },
+                resumptions = documents.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }.map { d ->
+                    ProjectSchedule.orderLabel(d.documentName) to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d)
+                },
                 extensions = named("Time Extension").map { d ->
                     val m = Regex("Time Extension No\\. ?(\\S*) - (\\d+) Days", RegexOption.IGNORE_CASE).find(d.documentName)
                     Extension(m?.groupValues?.get(1).orEmpty(), m?.groupValues?.get(2)?.toIntOrNull() ?: 0, field(d.remarks, "Reason"), mark(d).trim())
                 },
                 variations = named("Variation Order").map { d ->
-                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + mark(d) + reason(d)
+                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + reason(d) + mark(d)
                 }
             )
         }
@@ -113,7 +116,9 @@ object BlueBookForms {
         row("Contract Resumption", if (logs.resumptions.isEmpty()) "None" else "")
         logs.resumptions.forEach { (label, value) -> sub(label, value) }
         row("Contract Time Extensions", if (logs.extensions.isEmpty()) "None" else "")
-        logs.extensions.forEach { sub("No. ${it.no}", "${it.days} calendar days (c.d.)" + if (it.status.isEmpty()) "" else " ${it.status}") }
+        logs.extensions.forEach {
+            sub("Time Extension No. ${it.no}", "${it.days} C.D." + (if (it.reason.isEmpty()) "" else " (${it.reason})") + if (it.status.isEmpty()) "" else " ${it.status}")
+        }
         logs.variations.forEach { (label, value) -> row(label, esc(value)) }
         row("Revised Contract Cost", esc(peso(logs.revisedCost)))
         row("Revised Completion Date", esc(date(logs.revisedCompletion)))

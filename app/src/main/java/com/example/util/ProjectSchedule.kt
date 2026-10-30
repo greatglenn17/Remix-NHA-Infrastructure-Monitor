@@ -58,22 +58,55 @@ object ProjectSchedule {
         }
     }
 
-    fun isSuspension(doc: PendingDocument) = doc.documentName.startsWith("Work Suspension No.", ignoreCase = true)
+    // "Partial Work Suspension Order No. 1", or the older "Work Suspension No. 1 (Partial)".
+    private val ORDER = Regex("^(Partial )?Work (Suspension|Resumption) (?:Order )?No\\. ?(\\S+?)(?: \\((Full|Partial)\\))?$", RegexOption.IGNORE_CASE)
+    // "2nd Partial Continuance of …", or the older "Continuance No. 2 (Partial) of …".
+    private val CONTINUANCE = Regex("^(?:Continuance No\\. ?(\\d+)(?: \\((Full|Partial)\\))?|\\d+\\w\\w( Partial)? Continuance) of (.+)$", RegexOption.IGNORE_CASE)
 
-    /**
-     * Name of the next Continuance of [suspension], e.g. "Continuance No. 2 (Partial) of Work Suspension No. 1 (Full)"
-     * with [type] given, and the day it starts: the latest End of the suspension and its continuances so far.
-     */
-    fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>, type: String? = null): Pair<String, String> {
-        val base = suspension.documentName.trim()
-        val chain = documents.filter { it.documentName.trim().endsWith("of $base", ignoreCase = true) }
-        val no = chain.size + 1
-        val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
-        return "Continuance No. $no${type?.let { " ($it)" } ?: ""} of $base" to (lastEnd?.toString() ?: "")
-    }
+    private fun isPartial(order: MatchResult) = order.groupValues[1].isNotEmpty() || order.groupValues[4].equals("Partial", ignoreCase = true)
+
+    fun isSuspension(doc: PendingDocument) = ORDER.find(doc.documentName.trim())?.groupValues?.get(2).equals("Suspension", ignoreCase = true)
 
     /** "Partial" when the suspension's name says so, else "Full". */
-    fun suspensionType(suspension: PendingDocument) = if (suspension.documentName.contains("(Partial)", ignoreCase = true)) "Partial" else "Full"
+    fun suspensionType(suspension: PendingDocument) = if (ORDER.find(suspension.documentName.trim())?.let(::isPartial) == true) "Partial" else "Full"
+
+    /** Name of a new suspension or resumption ([kind]) order: a Partial one says so in front, a Full one says nothing. */
+    fun orderName(kind: String, no: String, type: String) = (if (type == "Partial") "Partial " else "") + "Work $kind Order No. ${no.trim()}"
+
+    /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st. */
+    fun ordinal(n: Int) = "$n" + if (n % 100 in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
+
+    /**
+     * Name of the next continuance of [suspension] of [type], e.g. "2nd Partial Continuance of Work Suspension Order No. 1",
+     * and the day it starts: the latest End of the suspension and its continuances so far.
+     */
+    fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>, type: String = suspensionType(suspension)): Pair<String, String> {
+        val chain = documents.filter { continuanceOf(it.documentName) == baseOf(suspension.documentName) }
+        val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
+        return "${ordinal(chain.size + 1)}${if (type == "Partial") " Partial" else ""} Continuance of ${baseOf(suspension.documentName)}" to (lastEnd?.toString() ?: "")
+    }
+
+    /**
+     * An order's name as the cards and forms show it. Older names read in the same form as new ones:
+     * "Work Suspension No. 1 (Partial)" as "Partial Work Suspension Order No. 1", "Continuance No. 2 of …" as "2nd … Continuance of …".
+     */
+    fun orderLabel(name: String): String {
+        val n = name.trim()
+        CONTINUANCE.find(n)?.let { m ->
+            val (no, type, _, base) = m.destructured
+            if (no.isEmpty()) return n
+            // An older continuance without a type took its suspension's.
+            val partial = if (type.isEmpty()) ORDER.find(base)?.let(::isPartial) == true else type.equals("Partial", ignoreCase = true)
+            return "${ordinal(no.toInt())}${if (partial) " Partial" else ""} Continuance of ${baseOf(base)}"
+        }
+        return ORDER.find(n)?.let { m -> orderName(m.groupValues[2].replaceFirstChar { it.uppercase() }, m.groupValues[3], if (isPartial(m)) "Partial" else "Full") } ?: n
+    }
+
+    /** "Work Suspension Order No. 1", the suspension a continuance names, whatever the suspension's type. */
+    private fun baseOf(suspensionName: String) = ORDER.find(suspensionName.trim())?.let { "Work Suspension Order No. ${it.groupValues[3]}" } ?: suspensionName.trim()
+
+    /** The suspension ([baseOf]) that [name] continues, or null when it is not a continuance. */
+    private fun continuanceOf(name: String) = CONTINUANCE.find(name.trim())?.groupValues?.get(4)?.let(::baseOf)
 
     /** Remarks in the same "Duration | Effectivity | End" form as a suspension, so the schedule and forms read it. */
     fun suspensionRemarks(days: Int, effectivity: String): String {
