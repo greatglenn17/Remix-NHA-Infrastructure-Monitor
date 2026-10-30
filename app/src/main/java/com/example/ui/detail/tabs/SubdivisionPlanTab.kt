@@ -1304,6 +1304,8 @@ fun SubdivisionPlanTab(
                             }
 
                             // B. RENDER LOTS WITH SPATIAL VIEWPORT CULLING
+                            // This layer is zoomed, so outline widths are divided by the zoom to stay thin on screen.
+                            val px = 1f / scale
                             for (parsedLot in parsedLots) {
                                 // Spatial Viewport Culling: Skip lots completely outside visible viewport
                                 if (!viewportBounds.intersects(parsedLot.bounds)) continue
@@ -1349,7 +1351,7 @@ fun SubdivisionPlanTab(
                                     drawPath(
                                         path = path,
                                         color = strokeColor,
-                                        style = Stroke(width = if (isSelected) 5f else (if (isMatching) 3f else 1.5f))
+                                        style = Stroke(width = (if (isSelected) 3f else (if (isMatching) 1.5f else 0.75f)) * px)
                                     )
 
                                     // While renumbering, a dashed outline marks lots that still have the app's numbers.
@@ -1357,7 +1359,7 @@ fun SubdivisionPlanTab(
                                         drawPath(
                                             path = path,
                                             color = nhaMap.watch,
-                                            style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f))
+                                            style = Stroke(width = 2f * px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f * px, 6f * px), 0f))
                                         )
                                     }
 
@@ -1367,8 +1369,8 @@ fun SubdivisionPlanTab(
                                             path = path,
                                             color = primaryMap,
                                             style = Stroke(
-                                                width = 7.5f,
-                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 8f), 0f)
+                                                width = 3.5f * px,
+                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f * px, 7f * px), 0f)
                                             )
                                         )
                                     }
