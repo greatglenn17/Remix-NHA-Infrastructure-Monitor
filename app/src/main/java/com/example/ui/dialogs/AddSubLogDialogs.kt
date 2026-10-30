@@ -191,6 +191,7 @@ fun AddCustomDocumentDialog(
     var wsExpanded by remember { mutableStateOf(false) }
     var wsDays by remember { mutableStateOf("") }
     var wsEffectivity by remember { mutableStateOf("") }
+    var wsReason by remember { mutableStateOf("") }
 
     // Work Resumption
     var wrNo by remember { mutableStateOf("") }
@@ -198,7 +199,7 @@ fun AddCustomDocumentDialog(
     var wrRemarks by remember { mutableStateOf("") }
 
     val voAmountError = FormValidation.amountError(voAmount, false)
-    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wrNo, wrEffectivity, wrRemarks) }
+    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason, wrNo, wrEffectivity, wrRemarks) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -331,6 +332,7 @@ fun AddCustomDocumentDialog(
                         }
                         OutlinedTextField(value = wsDays, onValueChange = { wsDays = it }, label = { Text("No. of Days") }, isError = daysError(wsDays) != null, supportingText = daysError(wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                         DateField(label = "Effectivity Date", value = wsEffectivity, onValueChange = { wsEffectivity = it }, clearable = true)
+                        OutlinedTextField(value = wsReason, onValueChange = { wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
                     }
                     "Work Resumption Order" -> {
                         OutlinedTextField(value = wrNo, onValueChange = { wrNo = it }, label = { Text("Resumption No.") }, modifier = Modifier.fillMaxWidth())
@@ -373,7 +375,9 @@ fun AddCustomDocumentDialog(
                                 }
                             }
                         } catch (e: Exception) { }
-                        "Duration: ${wsDays.trim()} Days | Effectivity: $wsEffectivity" + if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
+                        val end = if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
+                        val reason = if (wsReason.isNotBlank()) " | Reason: ${wsReason.trim()}" else ""
+                        "Duration: ${wsDays.trim()} Days | Effectivity: $wsEffectivity$end$reason"
                     }
                     "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
                     else -> remarks

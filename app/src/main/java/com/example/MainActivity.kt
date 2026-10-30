@@ -349,11 +349,11 @@ class MainActivity : ComponentActivity() {
                                     showAddIssueDialog = false
                                     viewModel.projectIssueToEdit.value = null
                                 },
-                                onSubmit = { date, description, actionTaken, status, isCritical, targetDate ->
+                                onSubmit = { date, description, actionTaken, status, isCritical, targetDate, actionBy ->
                                     if (issueToEdit != null) {
-                                        viewModel.updateProjectIssue(issueToEdit.copy(date = date, description = description, actionTaken = actionTaken, status = status, isCritical = isCritical, targetDate = targetDate))
+                                        viewModel.updateProjectIssue(issueToEdit.copy(date = date, description = description, actionTaken = actionTaken, status = status, isCritical = isCritical, targetDate = targetDate, actionBy = actionBy))
                                     } else {
-                                        viewModel.addProjectIssue(com.example.data.model.ProjectIssue(projectId = pId, date = date, description = description, actionTaken = actionTaken, remarks = "", loggedBy = "", status = status, isCritical = isCritical, targetDate = targetDate))
+                                        viewModel.addProjectIssue(com.example.data.model.ProjectIssue(projectId = pId, date = date, description = description, actionTaken = actionTaken, remarks = "", loggedBy = "", status = status, isCritical = isCritical, targetDate = targetDate, actionBy = actionBy))
                                     }
                                     showAddIssueDialog = false
                                     viewModel.projectIssueToEdit.value = null

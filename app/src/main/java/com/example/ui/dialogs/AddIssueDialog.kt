@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import com.example.data.model.ISSUE_ACTION_BY
 import com.example.data.model.ProjectIssue
 import com.example.ui.components.DateField
 import com.example.util.FormValidation
@@ -26,18 +27,19 @@ import java.util.Locale
 fun AddIssueDialog(
     existingIssue: ProjectIssue? = null,
     onDismiss: () -> Unit,
-    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean, targetDate: String) -> Unit
+    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean, targetDate: String, actionBy: String) -> Unit
 ) {
     var date by remember { mutableStateOf(existingIssue?.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
     var description by remember { mutableStateOf(existingIssue?.description ?: "") }
     var actionTaken by remember { mutableStateOf(existingIssue?.actionTaken ?: "") }
     var isCritical by remember { mutableStateOf(existingIssue?.isCritical ?: false) }
     var targetDate by remember { mutableStateOf(existingIssue?.targetDate ?: "") }
+    var actionBy by remember { mutableStateOf(existingIssue?.actionBy ?: "") }
     var status by remember { mutableStateOf(existingIssue?.status ?: "Pending") }
     var showStatusDropdown by remember { mutableStateOf(false) }
 
     var tried by remember { mutableStateOf(false) }
-    val snapshot = { listOf(date, description, actionTaken, isCritical, status, targetDate) }
+    val snapshot = { listOf(date, description, actionTaken, actionBy, isCritical, status, targetDate) }
     val initial = remember { snapshot() }
     val close = com.example.ui.components.rememberDiscardGuard(snapshot() != initial, onDismiss)
     val descError = if (tried) FormValidation.requiredError(description) else null
@@ -71,6 +73,12 @@ fun AddIssueDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2
                 )
+                Text("Action taken by", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ISSUE_ACTION_BY.forEach { who ->
+                        FilterChip(selected = actionBy == who, onClick = { actionBy = if (actionBy == who) "" else who }, label = { Text(who) })
+                    }
+                }
                 DateField(label = "Target date (optional)", value = targetDate, onValueChange = { targetDate = it }, clearable = true)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
@@ -112,7 +120,7 @@ fun AddIssueDialog(
                 onClick = {
                     tried = true
                     if (date.isNotBlank() && description.isNotBlank() && actionTaken.isNotBlank()) {
-                        onSubmit(date, description, actionTaken, status, isCritical, targetDate)
+                        onSubmit(date, description, actionTaken, status, isCritical, targetDate, actionBy)
                     }
                 }
             ) {

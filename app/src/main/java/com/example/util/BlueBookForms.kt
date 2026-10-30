@@ -5,6 +5,7 @@ import com.example.data.model.AccomplishmentItem
 import com.example.data.model.DailyActivity
 import com.example.data.model.DailyHourlyWeather
 import com.example.data.model.EquipmentItem
+import com.example.data.model.ISSUE_ACTION_BY
 import com.example.data.model.ManpowerItem
 import com.example.data.model.MonthlyReport
 import com.example.data.model.PendingDocument
@@ -22,6 +23,7 @@ import com.example.ui.theme.WeatherStormyRed
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
@@ -57,6 +59,7 @@ data class ContractLogs(
             fun field(remarks: String, key: String) = Regex("$key: ([^|]*)").find(remarks)?.groupValues?.get(1)?.trim().orEmpty()
             fun mark(d: PendingDocument) = if (d.status.equals("Approved", ignoreCase = true)) "" else " (for approval)"
             fun named(prefix: String) = documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) }
+            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else "; Reason: $it" }
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
@@ -67,7 +70,7 @@ data class ContractLogs(
                 suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
                     val from = field(d.remarks, "Effectivity")
                     val to = field(d.remarks, "End")
-                    d.documentName to (if (to.isEmpty()) BlueBookForms.date(from) else "${BlueBookForms.date(from)} – ${BlueBookForms.date(to)}") + mark(d)
+                    d.documentName to (if (to.isEmpty()) BlueBookForms.date(from) else "${BlueBookForms.date(from)} – ${BlueBookForms.date(to)}") + mark(d) + reason(d)
                 },
                 resumptions = named("Work Resumption").map { d -> d.documentName to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d) },
                 extensions = named("Time Extension").map { d ->
@@ -75,7 +78,7 @@ data class ContractLogs(
                     Extension(m?.groupValues?.get(1).orEmpty(), m?.groupValues?.get(2)?.toIntOrNull() ?: 0, field(d.remarks, "Reason"), mark(d).trim())
                 },
                 variations = named("Variation Order").map { d ->
-                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + mark(d)
+                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + mark(d) + reason(d)
                 }
             )
         }
@@ -269,13 +272,15 @@ object BlueBookForms {
         b.append("</table>")
 
         b.append("<table><tr><th colspan='4' class='sub'>SUMMARY OF UNWORKABLE DAYS DUE TO WEATHER CONDITION</th></tr><tr><th>MONTH NO.</th><th>PERIOD COVERED</th><th>NO. OF WORKABLE DAYS</th><th>NO. OF UNWORKABLE DAYS</th></tr>")
-        val counts = workableDays(weather)
-        generateSequence(start?.let { YearMonth.from(it) } ?: month) { it.plusMonths(1) }.takeWhile { it <= month }.forEachIndexed { i, m ->
-            // Blank, not 0, for a month with no weather logged.
-            val (good, bad) = counts[m]?.let { (g, u) -> "$g" to "$u" } ?: ("" to "")
-            b.append("<tr><td class='c'>${i + 1}</td><td>${esc(m.format(MONTH))}</td><td class='n'>$good</td><td class='n'>$bad</td></tr>")
+        // Only months with weather logged, numbered by contract month when the start date is known.
+        val logged = workableDays(weather).filterKeys { it <= month }.toSortedMap()
+        val first = start?.let { YearMonth.from(it) }
+        if (logged.isEmpty()) b.append("<tr><td colspan='4' class='empty'>No weather logged yet.</td></tr>")
+        logged.entries.forEachIndexed { i, (m, days) ->
+            val no = first?.let { (ChronoUnit.MONTHS.between(it, m) + 1).toInt() } ?: (i + 1)
+            b.append("<tr><td class='c'>$no</td><td>${esc(m.format(MONTH))}</td><td class='n'>${days.first}</td><td class='n'>${days.second}</td></tr>")
         }
-        b.append("</table>")
+        b.append("<tr class='tot'><td colspan='2'>GRAND TOTAL</td><td class='n'>${logged.values.sumOf { it.first }}</td><td class='n'>${logged.values.sumOf { it.second }}</td></tr></table>")
 
         b.append("<table><tr><th colspan='3' class='sub'>STATUS OF SUBMISSION OF DOCUMENTARY REQUIREMENTS</th></tr><tr><th>DOCUMENT</th><th>STATUS</th><th>REMARKS</th></tr>")
         numbered(maxOf(5, documents.size)) { i -> documents.getOrNull(i).let { listOf(it?.documentName, it?.status, it?.remarks) } }.let(b::append)
@@ -284,7 +289,14 @@ object BlueBookForms {
         b.append("<table><tr><th colspan='4' class='sub'>ISSUES / CONCERNS / SITE INSTRUCTIONS</th></tr>")
         b.append("<tr><th rowspan='2'>ISSUES/CONCERNS/OBSERVATIONS (INCLUDING COMPLIANCE WITH CPES REQUIREMENTS, ETC.)</th><th colspan='3'>ACTION TAKEN</th></tr><tr><th>DATE</th><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th></tr>")
         val monthIssues = issues.filter { parseDate(it.date)?.let { d -> YearMonth.from(d) == month } ?: false }
-        numbered(maxOf(5, monthIssues.size)) { i -> monthIssues.getOrNull(i).let { listOf(it?.description, it?.date?.let(::date), it?.actionTaken, it?.remarks) } }.let(b::append)
+        numbered(maxOf(5, monthIssues.size)) { i ->
+            monthIssues.getOrNull(i).let { issue ->
+                val action = issue?.let { listOf(it.actionTaken, it.remarks).filter(String::isNotBlank).joinToString("; ") }
+                // An issue logged before "action taken by" existed keeps its action under the Implementing Office.
+                val byContractor = issue?.actionBy == ISSUE_ACTION_BY[1]
+                listOf(issue?.description, issue?.date?.let(::date), action?.takeUnless { byContractor }, action?.takeIf { byContractor })
+            }
+        }.let(b::append)
         b.append("</table>")
 
         b.append("<table><tr><th class='sec'>III. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
