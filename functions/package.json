@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "NHA Monitor Cloud Functions for Custom Claims and FCM",
   "main": "index.js",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-nha \"node --test purge.test.js\""
+  },
   "engines": {
     "node": "22"
   },
