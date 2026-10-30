@@ -1,8 +1,8 @@
 {
-  "versionCode": 195,
-  "versionName": "1.9.5",
-  "releaseNotes": "v1.9.5: Field feedback. Edit the scope of works with Wt% worked out from the amounts; only approved time extensions add contract days; two-decimal percentages; +/- buttons for manpower and equipment; activities over a range of days; separate weekly signatories; scan or photograph the DV; weekly photo albums with geo-tag and titles; lots take a typed %, several lots can get the same progress at once, and lot photos are stamped with block and lot; developer requests are tracked until packaged; issues get a target date and show on that week's print.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.5/NHA_Monitor_v1.9.5_Build195.apk",
-  "apkSha256": "f3dd4fd02ba5358be493482b21c3425fe25245beb304e9fa799adcc90f71cf66",
+  "versionCode": 196,
+  "versionName": "1.9.6",
+  "releaseNotes": "v1.9.6: Monthly report fixes. Unworkable days list only the logged months with a grand total; issues record whether the Implementing Office or the Contractor/Developer took the action; variation orders, suspensions and time extensions have a reason; monthly sections are numbered III to VIII; table titles no longer print alone at the bottom of a page.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.6/NHA_Monitor_v1.9.6_Build196.apk",
+  "apkSha256": "f528e81c9b926bd6a519b87e82de8fb8c1366bac19c922a4f1cc3d1d7c14b0ad",
   "isMandatory": true
 }
