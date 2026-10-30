@@ -531,10 +531,10 @@ object BlueBookForms {
         table.sdp { margin: 0; }
         table.sdp > tbody > tr > td { border: none; padding: 0; height: auto; }
         td.plan { text-align: center; vertical-align: middle; }
-        td.plan img { max-width: 100%; max-height: 240mm; border: 0.6pt solid #000; }
+        td.plan img { max-width: 100%; max-height: 240mm; }
         td.side { width: 38mm; vertical-align: bottom; padding-left: 2mm !important; }
         div.plan { text-align: center; margin-bottom: 2mm; }
-        div.plan img { max-width: 100%; max-height: 222mm; border: 0.6pt solid #000; }
+        div.plan img { max-width: 100%; max-height: 222mm; }
         table.lg { font-size: 8pt; margin: 0; break-inside: avoid; }
         table.lg th, table.lg td { padding: 0.6mm 1.2mm; height: auto; white-space: nowrap; }
         i.sw { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1.2mm; vertical-align: middle; }
