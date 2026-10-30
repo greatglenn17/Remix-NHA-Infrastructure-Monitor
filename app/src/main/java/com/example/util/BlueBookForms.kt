@@ -48,7 +48,7 @@ data class ContractLogs(
     val originalCost: Double,
     val revisedCost: Double,
     val revisedCompletion: String,
-    /** Label to value, e.g. "Work Suspension No. 1 (Full)" to "2019-01-03 – 2019-05-29". */
+    /** Label to value, e.g. "Work Suspension Order No. 1" to "146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)". */
     val suspensions: List<Pair<String, String>>,
     val resumptions: List<Pair<String, String>>,
     val extensions: List<Extension>,
@@ -59,26 +59,31 @@ data class ContractLogs(
             fun field(remarks: String, key: String) = Regex("$key: ([^|]*)").find(remarks)?.groupValues?.get(1)?.trim().orEmpty()
             fun mark(d: PendingDocument) = if (d.status.equals("Approved", ignoreCase = true)) "" else " (for approval)"
             fun named(prefix: String) = documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) }
-            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else "; Reason: $it" }
+            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else " ($it)" }
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
                 revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents) ?: original,
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
-                // Continuances ("Continuance No. 1 of Work Suspension No. 1 …") are listed with their suspension.
+                // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension.
                 suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
-                    val from = field(d.remarks, "Effectivity")
+                    val days = field(d.remarks, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it C.D. – " }.orEmpty()
+                    val from = BlueBookForms.date(field(d.remarks, "Effectivity"))
                     val to = field(d.remarks, "End")
-                    d.documentName to (if (to.isEmpty()) BlueBookForms.date(from) else "${BlueBookForms.date(from)} – ${BlueBookForms.date(to)}") + mark(d) + reason(d)
+                    ProjectSchedule.orderLabel(d.documentName) to days + (if (to.isEmpty()) from else "$from to ${BlueBookForms.date(to)}") + reason(d) + mark(d)
                 },
-                resumptions = named("Work Resumption").map { d -> d.documentName to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d) },
+                resumptions = documents.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }.map { d ->
+                    ProjectSchedule.orderLabel(d.documentName) to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d)
+                },
                 extensions = named("Time Extension").map { d ->
                     val m = Regex("Time Extension No\\. ?(\\S*) - (\\d+) Days", RegexOption.IGNORE_CASE).find(d.documentName)
                     Extension(m?.groupValues?.get(1).orEmpty(), m?.groupValues?.get(2)?.toIntOrNull() ?: 0, field(d.remarks, "Reason"), mark(d).trim())
                 },
                 variations = named("Variation Order").map { d ->
-                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + mark(d) + reason(d)
+                    val amount = d.documentName.substringAfter(" - ", "")
+                    d.documentName.substringBefore(" - ").substringBefore(" (") to
+                        (amount.removePrefix("PHP").replace(",", "").toDoubleOrNull()?.let(BlueBookForms::peso) ?: amount.replace("PHP", "Php")) + reason(d) + mark(d)
                 }
             )
         }
@@ -113,7 +118,9 @@ object BlueBookForms {
         row("Contract Resumption", if (logs.resumptions.isEmpty()) "None" else "")
         logs.resumptions.forEach { (label, value) -> sub(label, value) }
         row("Contract Time Extensions", if (logs.extensions.isEmpty()) "None" else "")
-        logs.extensions.forEach { sub("No. ${it.no}", "${it.days} calendar days (c.d.)" + if (it.status.isEmpty()) "" else " ${it.status}") }
+        logs.extensions.forEach {
+            sub("Time Extension No. ${it.no}", "${it.days} C.D." + (if (it.reason.isEmpty()) "" else " (${it.reason})") + if (it.status.isEmpty()) "" else " ${it.status}")
+        }
         logs.variations.forEach { (label, value) -> row(label, esc(value)) }
         row("Revised Contract Cost", esc(peso(logs.revisedCost)))
         row("Revised Completion Date", esc(date(logs.revisedCompletion)))
@@ -305,6 +312,32 @@ object BlueBookForms {
         return page("Monthly Project Engineer's Report", b.toString(), banner)
     }
 
+    /**
+     * The subdivision plan coloured by lot progress, filling a portrait A4 page, with a legend of saleable
+     * units per band over its bottom-left corner. [planImage] is the framed plan as a data URI;
+     * [bandHex] the colour of each band of [SdpSummary.BANDS].
+     */
+    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
+        val area = summary.saleable.areaSqM.let { if (it > 0) "%,.2f".format(Locale.US, it) else "&#8212;" }
+        val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
+        SdpSummary.BANDS.forEachIndexed { i, band ->
+            legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
+        }
+        legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
+        legend.append("<tr><td>Area (sq.m.)</td><td class='n'>$area</td></tr></table>")
+        val plan = "<div class='plan'><img src='$planImage'>$legend</div>"
+        return page(
+            "Subdivision Plan Progress",
+            """
+            <h1>STATUS OF CONSTRUCTION</h1>
+            <div class='period'>${esc(listOf(project.name, project.location).filter { it.isNotBlank() }.joinToString(", "))} &#183; as of ${asOf.format(LONG_DATE)}</div>
+            $plan
+            """,
+            banner,
+            fullPage = true
+        )
+    }
+
     private fun header(period: String) = """
         <h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>$period</div>
     """
@@ -434,7 +467,7 @@ object BlueBookForms {
 
     internal fun date(value: String): String = parseDate(value)?.format(LONG_DATE) ?: value
 
-    private fun peso(amount: Double) = "Php " + "%,.2f".format(Locale.US, amount)
+    internal fun peso(amount: Double) = "Php " + "%,.2f".format(Locale.US, amount)
 
     private fun pct(value: Double) = "%.2f%%".format(Locale.US, value)
 
@@ -447,9 +480,9 @@ object BlueBookForms {
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
-    private fun page(title: String, body: String, banner: String) = """
+    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4; margin: ${if (fullPage) "6mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
@@ -490,6 +523,15 @@ object BlueBookForms {
         .note { font-size: 8pt; font-style: italic; }
         /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
         .keep { break-inside: avoid; }
-        </style></head><body>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
+        /* SDP print: narrow margins, the plan as big as one page allows and the legend over its bottom-left corner. */
+        body.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
+        body.full h1 { font-size: 16pt; margin: 1mm 0 0; }
+        body.full .period { font-size: 10pt; margin-bottom: 2mm; }
+        div.plan { position: relative; text-align: center; }
+        div.plan img { max-width: 100%; max-height: 244mm; }
+        table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 10pt; margin: 0; }
+        table.lg th, table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
+        i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
+        </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }

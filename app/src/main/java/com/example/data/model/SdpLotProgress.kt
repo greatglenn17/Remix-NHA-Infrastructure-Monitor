@@ -41,6 +41,7 @@ data class SdpLotProgress(
     val sdpPlanId: Long,
     val sdpLotId: Long,
     val physicalProgress: Int = 0, // 0 to 100
+    val drainageProgress: Int = 0, // 0 to 100; road lots only
     val constructionStatus: String = "Not Started", // "Not Started", "Layout / Excavation Started", "Under Construction", "Substantially Completed", "Completed"
     val currentActivity: String = "",
     val startDate: String = "",

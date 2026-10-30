@@ -1,8 +1,8 @@
 {
-  "versionCode": 196,
-  "versionName": "1.9.6",
-  "releaseNotes": "v1.9.6: Monthly report fixes. Unworkable days list only the logged months with a grand total; issues record whether the Implementing Office or the Contractor/Developer took the action; variation orders, suspensions and time extensions have a reason; monthly sections are numbered III to VIII; table titles no longer print alone at the bottom of a page.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.6/NHA_Monitor_v1.9.6_Build196.apk",
-  "apkSha256": "f528e81c9b926bd6a519b87e82de8fb8c1366bac19c922a4f1cc3d1d7c14b0ad",
+  "versionCode": 197,
+  "versionName": "1.9.7",
+  "releaseNotes": "v1.9.7: Subdivision plan print and Full / Partial orders. Crop the plan to its frame; mark lots Saleable, Non-saleable, Road or Open Space; road lots are tagged Road completed and Drainage completed; Status of Construction prints on a full A4 page with a legend; continuances and resumptions can be Full or Partial, named \"Partial Work Suspension Order No. 1\" and \"1st Continuance of ...\"; the Project Profile lists orders with days, dates, amount and reason.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.7/NHA_Monitor_v1.9.7_Build197.apk",
+  "apkSha256": "c2a9a1fd904acdbaa078cebf35fade19b36500fa200e16d64b7d0de0f747eb86",
   "isMandatory": true
 }

@@ -33,7 +33,7 @@ class BlueBookFormsTest {
         doc("Work Resumption No. 1", "Approved", "Effectivity: 2019-05-30 | Remarks: "),
         doc("Time Extension No. 1 - 146 Days", "Approved", "Reason: Right of way"),
         doc("Time Extension No. 2 - 130 Days", "Pending", "Reason: Rain"),
-        doc("Variation Order No. 1 (Additive) - PHP 0", "Approved", "Reason: Realignment")
+        doc("Variation Order No. 1 (Additive) - PHP 1,250000", "Approved", "Reason: Realignment")
     )
 
     private fun day(date: String, csv: String) =
@@ -44,12 +44,13 @@ class BlueBookFormsTest {
     @Test
     fun orders_becomeTheProfileLists() {
         val logs = ContractLogs.from(project, docs)
-        assertEquals(listOf("Work Suspension No. 1 (Full)" to "January 3, 2019 – May 29, 2019; Reason: Road widening"), logs.suspensions)
-        assertEquals(listOf("Work Resumption No. 1" to "May 30, 2019"), logs.resumptions)
+        // Older names read in the new form; Full is left out.
+        assertEquals(listOf("Work Suspension Order No. 1" to "146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)"), logs.suspensions)
+        assertEquals(listOf("Work Resumption Order No. 1" to "May 30, 2019"), logs.resumptions)
         assertEquals(listOf("1" to 146, "2" to 130), logs.extensions.map { it.no to it.days })
         assertEquals("(for approval)", logs.extensions[1].status)
         assertEquals("Right of way", logs.extensions[0].reason)
-        assertEquals(listOf("Variation Order No. 1" to "Php 0; Reason: Realignment"), logs.variations)
+        assertEquals(listOf("Variation Order No. 1" to "Php 1,250,000.00 (Realignment)"), logs.variations)
     }
 
     @Test
@@ -69,6 +70,7 @@ class BlueBookFormsTest {
         assertFalse(html.contains("<Phase 1>"))
         assertTrue(html.contains("September 24, 2018"))
         assertTrue(html.contains("GLENN C. APROVECHADO"))
+        assertTrue(html.contains("Time Extension No. 2</td><td class='pc'>:</td><td>130 C.D. (Rain) (for approval)</td>"))
     }
 
     @Test
@@ -113,8 +115,8 @@ class BlueBookFormsTest {
         assertTrue(html.contains("1. Office</td><td>March 10, 2019</td><td>Act on Office</td><td></td>"))
         assertTrue(html.contains("2. Contractor</td><td>March 10, 2019</td><td></td><td>Act on Contractor</td>"))
         assertTrue(html.contains("3. Old</td><td>March 10, 2019</td><td>Act on Old</td><td></td>"))
-        assertTrue(html.contains("Variation Order No. 1: Php 0; Reason: Realignment"))
-        assertTrue(html.contains("Reason: Road widening"))
+        assertTrue(html.contains("Variation Order No. 1: Php 1,250,000.00 (Realignment)"))
+        assertTrue(html.contains("Work Suspension Order No. 1: 146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)"))
         assertTrue(html.contains("Right of way"))
         // Every section after II. Project Status is numbered, through VIII. Recommendations.
         listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",

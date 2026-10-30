@@ -30,6 +30,8 @@ data class SdpPlan(
     val description: String = "",
     // The plan's printed scale 1:N (e.g. 1000); 0 when not set. Lot areas are worked out from it.
     val scaleDenominator: Int = 0,
+    // The plan area of the page as "minX,minY,maxX,maxY" (0..1); blank: the whole page.
+    val frame: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,

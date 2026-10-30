@@ -103,12 +103,36 @@ class ProjectScheduleTest {
 
     @Test
     fun continuance_numbersAndStartsWhereTheChainEnds() {
-        val ws = doc("Work Suspension No. 1 (Full)", "Approved", "Duration: 30 Days | Effectivity: 2026-01-01 | End: 2026-01-31")
-        assertEquals("Continuance No. 1 of Work Suspension No. 1 (Full)" to "2026-01-31", ProjectSchedule.nextContinuance(ws, listOf(ws)))
-        val c1 = doc("Continuance No. 1 of Work Suspension No. 1 (Full)", "Approved", ProjectSchedule.suspensionRemarks(15, "2026-01-31"))
+        val ws = doc(ProjectSchedule.orderName("Suspension", "1", "Full"), "Approved", "Duration: 30 Days | Effectivity: 2026-01-01 | End: 2026-01-31")
+        assertEquals("Work Suspension Order No. 1", ws.documentName)
+        assertEquals("1st Continuance of Work Suspension Order No. 1" to "2026-01-31", ProjectSchedule.nextContinuance(ws, listOf(ws)))
+        val c1 = doc("1st Continuance of Work Suspension Order No. 1", "Approved", ProjectSchedule.suspensionRemarks(15, "2026-01-31"))
         assertEquals("Duration: 15 Days | Effectivity: 2026-01-31 | End: 2026-02-15", c1.remarks)
-        assertEquals("Continuance No. 2 of Work Suspension No. 1 (Full)" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1)))
+        assertEquals("2nd Partial Continuance of Work Suspension Order No. 1" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1), "Partial"))
         assertTrue(ProjectSchedule.isSuspension(ws))
         assertFalse(ProjectSchedule.isSuspension(c1))
+        assertEquals("Full", ProjectSchedule.suspensionType(ws))
+        assertEquals(listOf("1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"), listOf(1, 2, 3, 4, 11, 12, 13, 21, 22).map(ProjectSchedule::ordinal))
+    }
+
+    @Test
+    fun partialOrders_sayPartialInFront_andOlderNamesReadTheSame() {
+        val ws = doc("Partial Work Suspension Order No. 2", "Approved", "Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24")
+        assertTrue(ProjectSchedule.isSuspension(ws))
+        assertEquals("Partial", ProjectSchedule.suspensionType(ws))
+        assertEquals("Partial Work Resumption Order No. 1", ProjectSchedule.orderName("Resumption", " 1 ", "Partial"))
+        // A suspension saved before the new names: still a suspension, and its continuances still count.
+        val old = doc("Work Suspension No. 1 (Partial)", "Approved", "Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24")
+        assertTrue(ProjectSchedule.isSuspension(old))
+        assertEquals("Partial", ProjectSchedule.suspensionType(old))
+        val oldC1 = doc("Continuance No. 1 of Work Suspension No. 1 (Partial)", "Approved", ProjectSchedule.suspensionRemarks(10, "2026-08-24"))
+        val oldC2 = doc("Continuance No. 2 (Full) of Work Suspension No. 1 (Partial)", "Pending", ProjectSchedule.suspensionRemarks(5, "2026-09-03"))
+        assertEquals("3rd Partial Continuance of Work Suspension Order No. 1" to "2026-09-08", ProjectSchedule.nextContinuance(old, listOf(old, oldC1, oldC2)))
+        assertEquals("Partial Work Suspension Order No. 1", ProjectSchedule.orderLabel(old.documentName))
+        assertEquals("1st Partial Continuance of Work Suspension Order No. 1", ProjectSchedule.orderLabel(oldC1.documentName))
+        assertEquals("2nd Continuance of Work Suspension Order No. 1", ProjectSchedule.orderLabel(oldC2.documentName))
+        assertEquals("Work Resumption Order No. 3", ProjectSchedule.orderLabel("Work Resumption No. 3"))
+        for (same in listOf("Time Extension No. 1 - 30 Days", "2nd Partial Continuance of Work Suspension Order No. 1", "Partial Work Suspension Order No. 2"))
+            assertEquals(same, ProjectSchedule.orderLabel(same))
     }
 }
