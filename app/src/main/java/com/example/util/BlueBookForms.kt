@@ -81,7 +81,9 @@ data class ContractLogs(
                     Extension(m?.groupValues?.get(1).orEmpty(), m?.groupValues?.get(2)?.toIntOrNull() ?: 0, field(d.remarks, "Reason"), mark(d).trim())
                 },
                 variations = named("Variation Order").map { d ->
-                    d.documentName.substringBefore(" - ").substringBefore(" (") to d.documentName.substringAfter(" - ", "").replace("PHP", "Php") + reason(d) + mark(d)
+                    val amount = d.documentName.substringAfter(" - ", "")
+                    d.documentName.substringBefore(" - ").substringBefore(" (") to
+                        (amount.removePrefix("PHP").replace(",", "").toDoubleOrNull()?.let(BlueBookForms::peso) ?: amount.replace("PHP", "Php")) + reason(d) + mark(d)
                 }
             )
         }
@@ -465,7 +467,7 @@ object BlueBookForms {
 
     internal fun date(value: String): String = parseDate(value)?.format(LONG_DATE) ?: value
 
-    private fun peso(amount: Double) = "Php " + "%,.2f".format(Locale.US, amount)
+    internal fun peso(amount: Double) = "Php " + "%,.2f".format(Locale.US, amount)
 
     private fun pct(value: Double) = "%.2f%%".format(Locale.US, value)
 
