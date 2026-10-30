@@ -307,26 +307,18 @@ object BlueBookForms {
 
     /**
      * The subdivision plan coloured by lot progress, filling a portrait A4 page, with a legend of saleable
-     * units per band. [planImage] is the framed plan as a data URI and [planAspect] its width over height;
+     * units per band over its bottom-left corner. [planImage] is the framed plan as a data URI;
      * [bandHex] the colour of each band of [SdpSummary.BANDS].
      */
-    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, planAspect: Double, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
+    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
         val area = summary.saleable.areaSqM.let { if (it > 0) "%,.2f".format(Locale.US, it) else "&#8212;" }
-        fun swatch(i: Int) = "<i class='sw' style='background:${bandHex[i]}'></i>${esc(SdpSummary.BANDS[i])}"
-        // A tall plan is biggest with the legend beside it, a wide one with the legend in a strip under it.
-        val plan = if (planAspect < 0.75) {
-            val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
-            SdpSummary.BANDS.indices.forEach { legend.append("<tr><td>${swatch(it)}</td><td class='n'>${summary.saleableBands[it]}</td></tr>") }
-            legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
-            legend.append("<tr><td>Area (sq.m.)</td><td class='n'>$area</td></tr></table>")
-            "<table class='sdp'><tr><td class='plan'><img src='$planImage'></td><td class='side'>$legend</td></tr></table>"
-        } else {
-            "<div class='plan'><img src='$planImage'></div><table class='lg'><tr><th class='sec' rowspan='2'>LEGEND</th>" +
-                SdpSummary.BANDS.indices.joinToString("") { "<th class='sub'>${swatch(it)}</th>" } +
-                "<th class='sub'>Total units</th><th class='sub'>Area (sq.m.)</th></tr><tr>" +
-                summary.saleableBands.joinToString("") { "<td class='c'>$it</td>" } +
-                "<td class='c'><b>${summary.saleable.count}</b></td><td class='c'>$area</td></tr></table>"
+        val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
+        SdpSummary.BANDS.forEachIndexed { i, band ->
+            legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
         }
+        legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
+        legend.append("<tr><td>Area (sq.m.)</td><td class='n'>$area</td></tr></table>")
+        val plan = "<div class='plan'><img src='$planImage'>$legend</div>"
         return page(
             "Subdivision Plan Progress",
             """
@@ -524,18 +516,13 @@ object BlueBookForms {
         .note { font-size: 8pt; font-style: italic; }
         /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
         .keep { break-inside: avoid; }
-        /* SDP print: narrow margins and the plan as big as one page allows, with the legend beside or under it. */
+        /* SDP print: narrow margins, the plan as big as one page allows and the legend over its bottom-left corner. */
         body.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
         body.full h1 { font-size: 16pt; margin: 1mm 0 0; }
         body.full .period { font-size: 10pt; margin-bottom: 2mm; }
-        table.sdp { margin: 0; }
-        table.sdp > tbody > tr > td { border: none; padding: 0; height: auto; }
-        td.plan { text-align: center; vertical-align: middle; }
-        td.plan img { max-width: 100%; max-height: 240mm; }
-        td.side { width: 38mm; vertical-align: bottom; padding-left: 2mm !important; }
-        div.plan { text-align: center; margin-bottom: 2mm; }
-        div.plan img { max-width: 100%; max-height: 222mm; }
-        table.lg { font-size: 8pt; margin: 0; break-inside: avoid; }
+        div.plan { position: relative; text-align: center; }
+        div.plan img { max-width: 100%; max-height: 244mm; }
+        table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 8pt; margin: 0; }
         table.lg th, table.lg td { padding: 0.6mm 1.2mm; height: auto; white-space: nowrap; }
         i.sw { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1.2mm; vertical-align: middle; }
         </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>

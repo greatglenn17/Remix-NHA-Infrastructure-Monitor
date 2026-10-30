@@ -49,7 +49,7 @@ class SdpSummaryTest {
     }
 
     @Test
-    fun printShowsTheLegendBesideATallPlanAndUnderAWideOne() {
+    fun printShowsOnlyTheLegendOverThePlan() {
         val project = Project(
             name = "San Ildefonso <Heights>", location = "Bulacan", implementingOffice = "", contractor = "", scopeOfWork = "",
             contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 360,
@@ -57,17 +57,14 @@ class SdpSummaryTest {
         )
         val s = SdpSummary.of(listOf(Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Road Lot", 200.0, 60), Item("Open Space", 100.0, 0)))
         val bands = listOf("#111111", "#222222", "#333333", "#444444", "#555555")
-        val tall = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", 0.6, bands, LocalDate.of(2026, 10, 30))
-        assertTrue(tall.contains("size: A4; margin: 6mm;"))
-        assertTrue(tall.contains("<h1>STATUS OF CONSTRUCTION</h1>"))
-        assertTrue(tall.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of October 30, 2026"))
-        assertTrue(tall.contains("<td class='side'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
-        assertTrue(tall.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
-        assertTrue(tall.contains("<td>Total units</td><td class='n'>2</td>"))
-        assertTrue(tall.contains("<td>Area (sq.m.)</td><td class='n'>80.00</td>"))
-        for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage")) assertTrue(gone, !tall.contains(gone))
-        val wide = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", 1.4, bands, LocalDate.of(2026, 10, 30))
-        assertTrue(wide.contains("<div class='plan'><img src='data:image/png;base64,AA'></div><table class='lg'><tr><th class='sec' rowspan='2'>LEGEND</th>"))
-        assertTrue(wide.contains("<td class='c'>1</td><td class='c'>1</td><td class='c'>0</td>"))
+        val html = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", bands, LocalDate.of(2026, 10, 30))
+        assertTrue(html.contains("size: A4; margin: 6mm;"))
+        assertTrue(html.contains("<h1>STATUS OF CONSTRUCTION</h1>"))
+        assertTrue(html.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of October 30, 2026"))
+        assertTrue(html.contains("<div class='plan'><img src='data:image/png;base64,AA'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
+        assertTrue(html.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
+        assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
+        assertTrue(html.contains("<td>Area (sq.m.)</td><td class='n'>80.00</td>"))
+        for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage")) assertTrue(gone, !html.contains(gone))
     }
 }
