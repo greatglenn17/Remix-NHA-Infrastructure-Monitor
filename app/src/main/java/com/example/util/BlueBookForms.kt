@@ -214,8 +214,8 @@ object BlueBookForms {
         }
         b.append("</table>")
 
-        b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>")
-        b.append(signatures(signatories, "Checked and Reviewed by"))
+        b.append("<div class='keep'><p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>")
+        b.append(signatures(signatories, "Checked and Reviewed by")).append("</div>")
         return page("Weekly Project Engineer's Report", b.toString(), banner)
     }
 
@@ -299,9 +299,9 @@ object BlueBookForms {
         }.let(b::append)
         b.append("</table>")
 
-        b.append("<table><tr><th class='sec'>III. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
+        b.append("<div class='keep'><table><tr><th class='sec'>III. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on or before end of each month.</p>")
-        b.append(signatures(signatories))
+        b.append(signatures(signatories)).append("</div>")
         return page("Monthly Project Engineer's Report", b.toString(), banner)
     }
 
@@ -453,6 +453,8 @@ object BlueBookForms {
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
+        /* A title or column-header row never ends a page: it moves on with the rows below it. */
+        tr:has(> th) { break-after: avoid; }
         th, td { border: 0.6pt solid #000; padding: 1.2mm 1.5mm; vertical-align: top; text-align: left; height: 4mm; }
         th { font-weight: bold; text-align: center; vertical-align: middle; }
         th.sec { text-align: left; background: #d9d9d9; }
@@ -463,6 +465,7 @@ object BlueBookForms {
         td.day { font-weight: bold; width: 18%; }
         td.rec { height: 30mm; }
         td.empty { text-align: center; color: #555; }
+        tr.tot { break-before: avoid; }
         tr.tot td { font-weight: bold; }
         h1 { font-size: 13pt; text-align: center; margin: 3mm 0 0; }
         h1.title { font-size: 14pt; margin: 4mm 0 6mm; text-decoration: underline; }
@@ -485,6 +488,8 @@ object BlueBookForms {
         table.sig td { border: none; width: 33%; }
         .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
         .note { font-size: 8pt; font-style: italic; }
+        /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
+        .keep { break-inside: avoid; }
         </style></head><body>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }
