@@ -212,6 +212,31 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION)
     return null;
   });
 
+// A deleted record stays as a tombstone so offline phones learn of the delete; every
+// phone listening to it reads it again on each app open, so it is removed after this long.
+const RECORD_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Daily: hard-deletes record tombstones older than RECORD_TOMBSTONE_TTL_MS. Project
+ * tombstones are kept: a phone that missed the delete would re-upload a project that is
+ * missing from the cloud, while records are only uploaded when edited. A phone offline
+ * longer than the TTL keeps its local copy of a record deleted meanwhile.
+ */
+exports.purgeOldRecordTombstones = functions.region(REGION).pubsub
+  .schedule("every 24 hours")
+  .onRun(async () => {
+    const db = getFirestore();
+    const cutoff = Date.now() - RECORD_TOMBSTONE_TTL_MS;
+    // Filtered here, not in the query: isDeleted plus an updatedAt range would need a composite index.
+    const snap = await db.collection("records").where("isDeleted", "==", true).select("updatedAt").get();
+    const old = snap.docs.filter((doc) => (doc.get("updatedAt") || 0) < cutoff);
+    const writer = db.bulkWriter();
+    old.forEach((doc) => writer.delete(doc.ref));
+    await writer.close();
+    console.log(`Purged ${old.length} of ${snap.size} record tombstones older than 30 days`);
+    return null;
+  });
+
 /**
  * Send FCM notification to all Super Admin devices when a new subordinate registers.
  */
