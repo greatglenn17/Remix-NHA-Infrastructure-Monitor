@@ -383,6 +383,7 @@ class GoogleDriveSyncManager(
                     put("polygonNormalizedJson", sl.polygonNormalizedJson)
                     put("isActive", sl.isActive)
                     put("description", sl.description)
+                    put("lotUse", sl.lotUse)
                     put("createdBy", sl.createdBy)
                     put("createdDate", sl.createdDate)
                     put("lastModifiedBy", sl.lastModifiedBy)
@@ -415,6 +416,7 @@ class GoogleDriveSyncManager(
                     put("sdpPlanId", slp.sdpPlanId)
                     put("sdpLotId", slp.sdpLotId)
                     put("physicalProgress", slp.physicalProgress)
+                    put("drainageProgress", slp.drainageProgress)
                     put("constructionStatus", slp.constructionStatus)
                     put("currentActivity", slp.currentActivity)
                     put("startDate", slp.startDate)
@@ -951,6 +953,7 @@ class GoogleDriveSyncManager(
                     polygonNormalizedJson = sl.optString("polygonNormalizedJson", sl.optString("boundaryJson", "")),
                     isActive = sl.optBoolean("isActive", true),
                     description = sl.optString("description", ""),
+                    lotUse = sl.optString("lotUse", ""),
                     createdBy = sl.optString("createdBy", ""),
                     createdDate = sl.optString("createdDate", ""),
                     lastModifiedBy = sl.optString("lastModifiedBy", ""),
@@ -985,6 +988,7 @@ class GoogleDriveSyncManager(
                     sdpPlanId = slp.getLong("sdpPlanId"),
                     sdpLotId = slp.getLong("sdpLotId"),
                     physicalProgress = slp.optInt("physicalProgress", slp.optDouble("progressPercent", 0.0).toInt()),
+                    drainageProgress = slp.optInt("drainageProgress", 0),
                     constructionStatus = slp.optString("constructionStatus", slp.optString("status", "Not Started")),
                     currentActivity = slp.optString("currentActivity", ""),
                     startDate = slp.optString("startDate", ""),

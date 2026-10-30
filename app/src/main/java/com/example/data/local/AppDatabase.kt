@@ -40,7 +40,7 @@ import androidx.security.crypto.MasterKey
         DeveloperRequest::class,
         SyncOutboxEvent::class
     ],
-    version = 29,
+    version = 30,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -341,6 +341,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_29_30 = object : Migration(29, 30) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sdp_lots ADD COLUMN lotUse TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN drainageProgress INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE sdp_plans ADD COLUMN frame TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         val SIGNATORY_COLUMNS = listOf("preparedByName", "preparedByPosition", "checkedByName", "checkedByPosition", "notedByName", "notedByPosition")
         val WEEKLY_SIGNATORY_COLUMNS = listOf("weeklyCheckedByName", "weeklyCheckedByPosition", "weeklyNotedByName", "weeklyNotedByPosition")
 
@@ -353,7 +361,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance

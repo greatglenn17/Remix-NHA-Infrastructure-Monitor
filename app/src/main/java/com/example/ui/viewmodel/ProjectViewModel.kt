@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.LocalDate
@@ -749,7 +750,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         contractor: String,
         remarks: String,
         // Null keeps the lot's photos as they are.
-        photos: List<String>? = null
+        photos: List<String>? = null,
+        // Road lots only; null keeps the saved value.
+        drainageProgress: Int? = null
     ) {
         val safeProgress = physicalProgress.coerceIn(0, 100)
         viewModelScope.launch {
@@ -763,6 +766,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 sdpPlanId = sdpPlanId,
                 sdpLotId = sdpLotId,
                 physicalProgress = safeProgress,
+                drainageProgress = (drainageProgress ?: existing?.drainageProgress ?: 0).coerceIn(0, 100),
                 constructionStatus = constructionStatus,
                 currentActivity = currentActivity,
                 startDate = startDate,
@@ -814,6 +818,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 sdpPlanId = sdpPlanId,
                 sdpLotId = sdpLotId,
                 physicalProgress = existing?.physicalProgress ?: 0,
+                drainageProgress = existing?.drainageProgress ?: 0,
                 constructionStatus = existing?.constructionStatus ?: "Not Started",
                 currentActivity = existing?.currentActivity ?: "",
                 startDate = existing?.startDate ?: "",
@@ -1218,6 +1223,100 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 newValue = "Updated boundary/info for Lot ID ${lot.id}"
             )
         }
+    }
+
+    /** Marks [lots] as one of LOT_USES (saleable, road lot, open space, ...). */
+    fun setSdpLotUse(lots: List<SdpLot>, use: String) {
+        if (lots.isEmpty()) return
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            repository.updateSdpLots(lots.map { it.copy(lotUse = use, lastModifiedBy = user, lastModifiedDate = currentDate) }, currentUserAccount.value.role)
+            logAuditAction(
+                projectId = lots.first().projectId,
+                actionType = "Lot Use Changed",
+                details = "Marked ${lots.size} lot(s) as $use: " + lots.take(20).joinToString { "B${it.blockNumber}-L${it.lotNumber}" },
+                oldValue = lots.map { it.use }.distinct().joinToString(),
+                newValue = use
+            )
+        }
+    }
+
+    /** Saves the plan area of the page used for the print; null goes back to the whole page. */
+    fun setSdpPlanFrame(plan: SdpPlan, frame: List<Float>?) {
+        viewModelScope.launch {
+            repository.setSdpPlanScale(plan.copy(frame = frame?.let(com.example.util.SdpSummary::formatFrame) ?: ""), emptyList(), currentUserAccount.value.role)
+        }
+    }
+
+    /**
+     * The SDP print: the plan's frame (saved, or around all lots) with each lot coloured by
+     * progress and the summary beside it. Null when the plan PDF cannot be opened.
+     */
+    suspend fun sdpPlanForm(project: Project, plan: SdpPlan, lots: List<SdpLot>, progress: Map<Long, SdpLotProgress>): String? {
+        val polygons = lots.associate { it.id to polygonOf(it.polygonNormalizedJson).map { (x, y) -> x.toFloat() to y.toFloat() } }
+        val frame = com.example.util.SdpSummary.parseFrame(plan.frame)
+            ?: com.example.util.SdpSummary.frameAround(polygons.values.toList())
+            ?: listOf(0f, 0f, 1f, 1f)
+        val colors = com.example.ui.theme.LightNHAColors
+        fun fill(lot: SdpLot) = if (lot.isSaleable || lot.isRoadLot)
+            com.example.ui.detail.tabs.lotProgressFill(progress[lot.id]?.physicalProgress ?: 0, colors) else colors.neutral
+        val image = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@withContext null
+            runCatching {
+                android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                    android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
+                        renderer.openPage(0).use { page ->
+                            val fw = (frame[2] - frame[0]) * page.width
+                            val fh = (frame[3] - frame[1]) * page.height
+                            // About 300 dpi across a landscape A4 page.
+                            val s = 2800f / maxOf(fw, fh)
+                            val w = (fw * s).toInt().coerceAtLeast(1)
+                            val h = (fh * s).toInt().coerceAtLeast(1)
+                            val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                            bitmap.eraseColor(android.graphics.Color.WHITE)
+                            val m = android.graphics.Matrix().apply {
+                                setScale(s, s)
+                                postTranslate(-frame[0] * page.width * s, -frame[1] * page.height * s)
+                            }
+                            page.render(bitmap, null, m, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                            val canvas = android.graphics.Canvas(bitmap)
+                            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                            for (lot in lots) {
+                                val pts = polygons[lot.id].orEmpty().takeIf { it.size >= 3 } ?: continue
+                                val path = android.graphics.Path()
+                                pts.forEachIndexed { i, (x, y) ->
+                                    val px = (x - frame[0]) / (frame[2] - frame[0]) * w
+                                    val py = (y - frame[1]) / (frame[3] - frame[1]) * h
+                                    if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                                }
+                                path.close()
+                                paint.color = fill(lot).toArgb()
+                                paint.style = android.graphics.Paint.Style.FILL
+                                paint.alpha = 115
+                                canvas.drawPath(path, paint)
+                                paint.style = android.graphics.Paint.Style.STROKE
+                                paint.strokeWidth = 2f
+                                paint.alpha = 255
+                                canvas.drawPath(path, paint)
+                            }
+                            val out = java.io.ByteArrayOutputStream()
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            bitmap.recycle()
+                            "data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+                        }
+                    }
+                }
+            }.getOrNull()
+        } ?: return null
+        val summary = com.example.util.SdpSummary.of(
+            lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0, progress[it.id]?.drainageProgress ?: 0) },
+            LOT_USES
+        )
+        val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
+            "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, colors).toArgb() and 0xFFFFFF)
+        }
+        return com.example.util.BlueBookForms.sdpPlan(project, summary, image, bandHex, LocalDate.now(), blueBookBanner)
     }
 
     /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */

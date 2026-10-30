@@ -35,6 +35,8 @@ data class SdpLot(
     val polygonNormalizedJson: String, // Array of normalized points [[x, y], ...]
     val isActive: Boolean = true,
     val description: String = "",
+    // One of LOT_USES; blank on lots saved before uses were kept (see [use]).
+    val lotUse: String = "",
     val createdBy: String = "",
     val createdDate: String = "",
     val lastModifiedBy: String = "",
@@ -44,3 +46,12 @@ data class SdpLot(
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** What a lot of the plan is for. Only saleable lots are housing units. */
+val LOT_USES = listOf("Saleable", "Open Space", "Road Lot", "Breaker / Buffer", "Easement", "Facility")
+
+/** Block "OS" areas were the open spaces before lot uses were kept. */
+val SdpLot.use: String get() = lotUse.ifBlank { if (blockNumber == "OS") "Open Space" else "Saleable" }
+val SdpLot.isSaleable: Boolean get() = use == "Saleable"
+/** Road lots carry a drainage progress besides the road's own. */
+val SdpLot.isRoadLot: Boolean get() = use == "Road Lot"

@@ -88,8 +88,8 @@ fun ProjectDetailScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val printScope = rememberCoroutineScope()
     // Blue Book forms open in the system print screen (A4), where "Save as PDF" is one of the printers.
-    fun printForm(jobName: String, build: suspend () -> String?) {
-        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
+    fun printForm(jobName: String, landscape: Boolean = false, build: suspend () -> String?) {
+        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it, landscape) } }
     }
     // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
     // (weekly?, print): the weekly and monthly reports keep separate checkers and noters.
@@ -257,6 +257,15 @@ fun ProjectDetailScreen(
                                 onRenumberLots = viewModel::renumberSdpLots,
                                 onSetPlanScale = viewModel::setSdpPlanScale,
                                 onLotArea = viewModel::sdpLotArea,
+                                onSetLotUse = viewModel::setSdpLotUse,
+                                onSetPlanFrame = viewModel::setSdpPlanFrame,
+                                onPrintPlan = {
+                                    activeSdpPlan?.let { plan ->
+                                        printForm("SDP Progress - ${currentProject.name}", landscape = true) {
+                                            viewModel.sdpPlanForm(currentProject, plan, activeSdpLots, activeSdpLotProgressMap)
+                                        }
+                                    }
+                                },
                                 onSelectActiveVersion = { planId: Long ->
                                     viewModel.setActiveSdpPlan(currentProject.id, planId)
                                 },
@@ -282,7 +291,7 @@ fun ProjectDetailScreen(
                                 onDeactivateRoad = { road: com.example.data.model.SdpRoad ->
                                     viewModel.deactivateSdpRoad(road)
                                 },
-                                onUpdateLotProgress = { lotId: Long, progress: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String>? ->
+                                onUpdateLotProgress = { lotId: Long, progress: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String>?, drainage: Int? ->
                                     activeSdpPlan?.let { plan ->
                                         viewModel.updateLotProgress(
                                             projectId = currentProject.id,
@@ -295,7 +304,8 @@ fun ProjectDetailScreen(
                                             targetCompletionDate = targetDate,
                                             contractor = contractor,
                                             remarks = remarks,
-                                            photos = photos
+                                            photos = photos,
+                                            drainageProgress = drainage
                                         )
                                     }
                                 },

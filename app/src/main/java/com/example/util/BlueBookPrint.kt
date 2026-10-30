@@ -14,7 +14,7 @@ object BlueBookPrint {
     // The print job reads from the WebView after this call returns, so it must outlive it.
     private var pending: WebView? = null
 
-    fun print(context: Context, jobName: String, html: String) {
+    fun print(context: Context, jobName: String, html: String, landscape: Boolean = false) {
         val webView = WebView(context)
         pending = webView
         webView.webViewClient = object : WebViewClient() {
@@ -23,7 +23,7 @@ object BlueBookPrint {
                 printManager.print(
                     jobName,
                     view.createPrintDocumentAdapter(jobName),
-                    PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build()
+                    PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4.let { if (landscape) it.asLandscape() else it }).build()
                 )
             }
         }

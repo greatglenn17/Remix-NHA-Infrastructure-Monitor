@@ -52,6 +52,10 @@ import com.example.data.model.SdpLotProgress
 import com.example.data.model.SdpPlan
 import com.example.data.model.SdpRoad
 import com.example.data.model.UserRole
+import com.example.data.model.LOT_USES
+import com.example.data.model.isRoadLot
+import com.example.data.model.isSaleable
+import com.example.data.model.use
 import com.example.data.model.hasPermission
 import com.example.ui.components.LongForm
 import com.example.ui.theme.*
@@ -267,7 +271,9 @@ fun SubdivisionPlanTab(
         contractor: String,
         remarks: String,
         // Null keeps the lot's photos.
-        photos: List<String>?
+        photos: List<String>?,
+        // Road lots only; null keeps the saved value.
+        drainage: Int?
     ) -> Unit,
     onUpdateLotBillingStatus: (
         sdpLotId: Long,
@@ -293,7 +299,11 @@ fun SubdivisionPlanTab(
     onRemoveDetectedLots: (SdpPlan) -> Unit = {},
     onRenumberLots: (renumbered: List<SdpLot>, oldBlock: String) -> Unit = { _, _ -> },
     onSetPlanScale: (SdpPlan, Int) -> Unit = { _, _ -> },
-    onLotArea: (SdpPlan, List<Pair<Float, Float>>, (Double?) -> Unit) -> Unit = { _, _, done -> done(null) }
+    onLotArea: (SdpPlan, List<Pair<Float, Float>>, (Double?) -> Unit) -> Unit = { _, _, done -> done(null) },
+    onSetLotUse: (List<SdpLot>, String) -> Unit = { _, _ -> },
+    // Null: the whole page.
+    onSetPlanFrame: (SdpPlan, List<Float>?) -> Unit = { _, _ -> },
+    onPrintPlan: () -> Unit = {}
 ) {
     var showScaleDialog by remember { mutableStateOf(false) }
     // Area worked out from the plan scale for the lot being added; null until known.
@@ -342,6 +352,10 @@ fun SubdivisionPlanTab(
     // Group select: lots that get the same progress in one save (null: off).
     var groupIds by remember { mutableStateOf<Set<Long>?>(null) }
     var showGroupProgress by remember { mutableStateOf(false) }
+    var showGroupUse by remember { mutableStateOf(false) }
+    // Setting the plan frame: two taps mark opposite corners of the plan area.
+    var framing by remember { mutableStateOf(false) }
+    var frameCorner by remember { mutableStateOf<Offset?>(null) }
 
     // Renumbering one block: a panel replaces the lot card and the plan shows the new numbers.
     // renumberBlock is the block the lots came from (null: panel closed); renumberIds the lots
@@ -394,14 +408,19 @@ fun SubdivisionPlanTab(
     val textMeasurer = rememberTextMeasurer()
 
     // --- REACTIVE KPI COMPUTATIONS ---
-    val totalLots = activeLots.size
-    val lotsWithProgressCount = activeLots.count { lotProgressMap.containsKey(it.id) }
-    val billedLotsCount = activeLots.count { lotProgressMap[it.id]?.billingStatus == "BILLED" }
+    // Counted over saleable lots: open spaces, road lots and the like are not housing units.
+    val saleableLots = activeLots.filter { it.isSaleable }
+    val totalLots = saleableLots.size
+    val billedLotsCount = saleableLots.count { lotProgressMap[it.id]?.billingStatus == "BILLED" }
     val notBilledLotsCount = totalLots - billedLotsCount
-    val completedLotsCount = activeLots.count { (lotProgressMap[it.id]?.physicalProgress ?: 0) >= 100 }
+    val completedLotsCount = saleableLots.count { (lotProgressMap[it.id]?.physicalProgress ?: 0) >= 100 }
     val avgPhysicalProgress = if (totalLots > 0) {
-        activeLots.sumOf { lotProgressMap[it.id]?.physicalProgress ?: 0 }.toDouble() / totalLots
+        saleableLots.sumOf { lotProgressMap[it.id]?.physicalProgress ?: 0 }.toDouble() / totalLots
     } else 0.0
+    val planFrame = remember(activeSdpPlan?.frame, activeLots) {
+        com.example.util.SdpSummary.parseFrame(activeSdpPlan?.frame ?: "")
+            ?: com.example.util.SdpSummary.frameAround(activeLots.map { l -> jsonToNormalized(l.polygonNormalizedJson).map { it.x to it.y } })
+    }
 
     // Filter active check & matching lot calculation
     val isFilterActive = searchQuery.isNotBlank() ||
@@ -601,6 +620,23 @@ fun SubdivisionPlanTab(
                             Icon(Icons.Default.Palette, contentDescription = "Legend", tint = LocalNHAColors.current.watch, modifier = Modifier.size(18.dp))
                         }
 
+                        if (activeSdpPlan != null && renderedBitmap != null && canDigitize) {
+                            IconButton(
+                                onClick = { framing = true; frameCorner = null; selectedLot = null; selectedRoad = null; groupIds = null },
+                                modifier = Modifier.size(32.dp).testTag("plan_frame_button")
+                            ) {
+                                Icon(Icons.Default.Crop, contentDescription = "Plan area for printing", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        if (activeSdpPlan != null && renderedBitmap != null && activeLots.isNotEmpty()) {
+                            IconButton(
+                                onClick = onPrintPlan,
+                                modifier = Modifier.size(32.dp).testTag("print_plan_button")
+                            ) {
+                                Icon(Icons.Default.Print, contentDescription = "Print plan with progress", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+
                         if (canManageSdp && activeSdpPlan != null && com.example.data.files.Attachments.isRef(activeSdpPlan.pdfFileUrl)) {
                             OutlinedButton(
                                 onClick = { runDetection(activeSdpPlan) },
@@ -649,7 +685,7 @@ fun SubdivisionPlanTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        KpiChip(label = "TOTAL LOTS", value = "$totalLots", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        KpiChip(label = "SALEABLE LOTS", value = "$totalLots", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                         KpiChip(label = "BILLED", value = "$billedLotsCount", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                         KpiChip(label = "NOT BILLED", value = "$notBilledLotsCount", color = LocalNHAColors.current.neutral, modifier = Modifier.weight(1f))
                         KpiChip(label = "COMPLETED", value = "$completedLotsCount", color = LocalNHAColors.current.onTrack, modifier = Modifier.weight(1f))
@@ -1104,7 +1140,15 @@ fun SubdivisionPlanTab(
                                         val normY = ((tapOffset.y - offset.y) / (bitmapHeight * scale)).coerceIn(0f, 1f)
                                         val tappedNorm = Offset(normX, normY)
 
-                                        if (renumberBlock != null) {
+                                        if (framing && activeSdpPlan != null) {
+                                            val a = frameCorner
+                                            if (a == null) frameCorner = tappedNorm
+                                            else {
+                                                onSetPlanFrame(activeSdpPlan, listOf(minOf(a.x, normX), minOf(a.y, normY), maxOf(a.x, normX), maxOf(a.y, normY)))
+                                                frameCorner = null
+                                                framing = false
+                                            }
+                                        } else if (renumberBlock != null) {
                                             // While renumbering, a tap adds a lot to the block or takes it out;
                                             // after a save, it picks the next block.
                                             parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }?.let { hit ->
@@ -1327,7 +1371,7 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord?.billingStatus == "BILLED"
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = lotProgressFill(progressValue, nhaMap)
+                                val baseProgressColor = if (lot.isSaleable || lot.isRoadLot) lotProgressFill(progressValue, nhaMap) else nhaMap.neutral
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -1401,6 +1445,19 @@ fun SubdivisionPlanTab(
                                         )
                                     }
                                 }
+
+                            // The plan area that prints, and the first corner once tapped.
+                            if (framing) {
+                                planFrame?.let { f ->
+                                    drawRect(
+                                        color = nhaMap.watch,
+                                        topLeft = Offset(f[0] * bitmapWidth, f[1] * bitmapHeight),
+                                        size = androidx.compose.ui.geometry.Size((f[2] - f[0]) * bitmapWidth, (f[3] - f[1]) * bitmapHeight),
+                                        style = Stroke(width = 2f * px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f * px, 6f * px), 0f))
+                                    )
+                                }
+                                frameCorner?.let { drawCircle(color = nhaMap.watch, radius = 6f * px, center = Offset(it.x * bitmapWidth, it.y * bitmapHeight)) }
+                            }
 
                             // C. RENDER DRAFT DIGITIZATION POINTS & LINES
                             if (draftPoints.isNotEmpty()) {
@@ -1631,6 +1688,32 @@ fun SubdivisionPlanTab(
                     }
                 }
 
+                if (framing && activeSdpPlan != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text("Plan area for printing", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold))
+                            Text(
+                                if (frameCorner == null) "The dashed box is what prints. Tap one corner of the plan area, then the opposite corner."
+                                else "Now tap the opposite corner.",
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { framing = false; frameCorner = null }) { Text("Close", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                TextButton(onClick = { onSetPlanFrame(activeSdpPlan, listOf(0f, 0f, 1f, 1f)); framing = false; frameCorner = null }) { Text("Whole page") }
+                                TextButton(
+                                    onClick = { onSetPlanFrame(activeSdpPlan, null); framing = false; frameCorner = null },
+                                    modifier = Modifier.testTag("frame_fit_lots")
+                                ) { Text("Fit to lots") }
+                            }
+                        }
+                    }
+                }
+
                 groupIds?.let { group ->
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
@@ -1646,6 +1729,18 @@ fun SubdivisionPlanTab(
                             Text("Tap lots on the plan to add or remove them.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = { groupIds = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                Box {
+                                    TextButton(enabled = group.isNotEmpty(), onClick = { showGroupUse = true }, modifier = Modifier.testTag("group_use_button")) { Text("Set use") }
+                                    DropdownMenu(expanded = showGroupUse, onDismissRequest = { showGroupUse = false }) {
+                                        LOT_USES.forEach { use ->
+                                            DropdownMenuItem(text = { Text(use) }, onClick = {
+                                                onSetLotUse(activeLots.filter { it.id in group }, use)
+                                                showGroupUse = false
+                                                groupIds = null
+                                            })
+                                        }
+                                    }
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(
                                     enabled = group.isNotEmpty(),
@@ -1862,7 +1957,8 @@ fun SubdivisionPlanTab(
             defaultContractor = project.contractor,
             canManageBilling = canDigitize,
             onDismiss = { showProgressDialogLot = null },
-            onSubmitProgress = { progressVal: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String> ->
+            onSubmitProgress = { progressVal: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String>, use: String, drainage: Int? ->
+                if (use != targetLot.use) onSetLotUse(listOf(targetLot), use)
                 onUpdateLotProgress(
                     targetLot.id,
                     progressVal,
@@ -1872,7 +1968,8 @@ fun SubdivisionPlanTab(
                     targetDate,
                     contractor,
                     remarks,
-                    photos
+                    photos,
+                    drainage
                 )
                 showProgressDialogLot = null
             },
@@ -1895,7 +1992,7 @@ fun SubdivisionPlanTab(
                         id, progressVal, status, activity,
                         existing?.startDate ?: "", existing?.targetCompletionDate ?: "",
                         existing?.contractor?.ifBlank { project.contractor } ?: project.contractor,
-                        remarks, null
+                        remarks, null, null
                     )
                 }
                 showGroupProgress = false
@@ -2940,6 +3037,7 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
                 LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(100), label = "100% Completed / RFO")
+                LegendRow(color = LocalNHAColors.current.neutral, label = "Non-saleable (open space, breaker, easement, facility)")
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text("DEVELOPER BILLING STATUS (LOT BORDER):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
@@ -2979,10 +3077,16 @@ fun UpdateLotProgressDialog(
         targetDate: String,
         contractor: String,
         remarks: String,
-        photos: List<String>
+        photos: List<String>,
+        use: String,
+        // Road lots only.
+        drainage: Int?
     ) -> Unit,
     onToggleBillingRequested: (shouldBeBilled: Boolean) -> Unit
 ) {
+    var lotUse by remember { mutableStateOf(lot.use) }
+    var drainageSlider by remember { mutableFloatStateOf(currentProgress?.drainageProgress?.toFloat() ?: 0f) }
+    val isRoad = lotUse == "Road Lot"
     var progressSlider by remember { mutableFloatStateOf(currentProgress?.physicalProgress?.toFloat() ?: 0f) }
     var constructionStatus by remember { mutableStateOf(currentProgress?.constructionStatus ?: "Not Started") }
     var currentActivity by remember { mutableStateOf(currentProgress?.currentActivity ?: "") }
@@ -3016,6 +3120,15 @@ fun UpdateLotProgressDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (canManageBilling) {
+                    Text("Lot use", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        LOT_USES.forEach { use ->
+                            FilterChip(selected = lotUse == use, onClick = { lotUse = use }, label = { Text(use) }, modifier = Modifier.testTag("lot_use_$use"))
+                        }
+                    }
+                }
+
                 // Physical Progress Slider & Visual Color Preview
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -3029,7 +3142,7 @@ fun UpdateLotProgressDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            Text(if (isRoad) "Road works %" else "Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Surface(
                                 color = derivedColor,
                                 shape = RoundedCornerShape(4.dp)
@@ -3045,6 +3158,35 @@ fun UpdateLotProgressDialog(
                         ProgressPicker(progressSlider, derivedColor) {
                             progressSlider = it
                             constructionStatus = statusForProgress(it.toInt())
+                        }
+                    }
+                }
+
+                if (isRoad) {
+                    val drainage = drainageSlider.toInt().coerceIn(0, 100)
+                    val drainageColor = getLotProgressFillColor(drainage)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, drainageColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Drainage %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                                Surface(color = drainageColor, shape = RoundedCornerShape(4.dp)) {
+                                    Text(
+                                        text = "$drainage%",
+                                        style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            ProgressPicker(drainageSlider, drainageColor) { drainageSlider = it }
                         }
                     }
                 }
@@ -3165,7 +3307,9 @@ fun UpdateLotProgressDialog(
                         targetCompletionDate,
                         contractor,
                         remarks,
-                        photos
+                        photos,
+                        lotUse,
+                        if (isRoad) drainageSlider.toInt().coerceIn(0, 100) else null
                     )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = derivedColor, contentColor = MaterialTheme.colorScheme.surface)

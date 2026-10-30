@@ -305,6 +305,45 @@ object BlueBookForms {
         return page("Monthly Project Engineer's Report", b.toString(), banner)
     }
 
+    /**
+     * The subdivision plan coloured by lot progress, on landscape A4, with the summary beside it.
+     * [planImage] is the framed plan as a data URI; [bandHex] the colour of each band of [SdpSummary.BANDS].
+     */
+    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
+        fun area(a: Double) = if (a > 0) "%,.2f".format(Locale.US, a) else "&#8212;"
+        val b = StringBuilder()
+        b.append("<table><tr><th class='sec' colspan='2'>SALEABLE LOTS</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
+        SdpSummary.BANDS.forEachIndexed { i, band ->
+            b.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
+        }
+        b.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
+        b.append("<tr><td>Area (sq.m.)</td><td class='n'>${area(summary.saleable.areaSqM)}</td></tr></table>")
+        b.append("<table><tr><th class='sec' colspan='3'>NON-SALEABLE AREAS</th></tr><tr><th class='sub'>Use</th><th class='sub'>Lots</th><th class='sub'>Area (sq.m.)</th></tr>")
+        if (summary.nonSaleable.isEmpty()) b.append("<tr><td class='empty' colspan='3'>None marked</td></tr>")
+        summary.nonSaleable.forEach { (use, t) -> b.append("<tr><td>${esc(use)}</td><td class='n'>${t.count}</td><td class='n'>${area(t.areaSqM)}</td></tr>") }
+        if (summary.nonSaleable.isNotEmpty()) {
+            b.append("<tr class='tot'><td>Total</td><td class='n'>${summary.nonSaleable.sumOf { it.second.count }}</td><td class='n'>${area(summary.nonSaleable.sumOf { it.second.areaSqM })}</td></tr>")
+        }
+        b.append("</table>")
+        b.append("<table><tr><th class='sec' colspan='2'>ROAD LOTS</th></tr>")
+        if (summary.roads.count == 0) b.append("<tr><td class='empty' colspan='2'>No road lots marked</td></tr>")
+        else {
+            b.append("<tr><td>Road works</td><td class='n'>${pct(summary.roadProgress)}</td></tr>")
+            b.append("<tr><td>Drainage</td><td class='n'>${pct(summary.drainageProgress)}</td></tr>")
+        }
+        b.append("</table>")
+        return page(
+            "Subdivision Plan Progress",
+            """
+            <h1>SUBDIVISION PLAN &#8212; STATUS OF CONSTRUCTION</h1>
+            <div class='period'>${esc(listOf(project.name, project.location).filter { it.isNotBlank() }.joinToString(", "))} &#183; as of ${asOf.format(LONG_DATE)}</div>
+            <table class='sdp'><tr><td class='plan'><img src='$planImage'></td><td class='side'>$b</td></tr></table>
+            """,
+            banner,
+            landscape = true
+        )
+    }
+
     private fun header(period: String) = """
         <h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>$period</div>
     """
@@ -447,9 +486,9 @@ object BlueBookForms {
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
-    private fun page(title: String, body: String, banner: String) = """
+    private fun page(title: String, body: String, banner: String, landscape: Boolean = false) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4${if (landscape) " landscape" else ""}; margin: ${if (landscape) "8mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
@@ -490,6 +529,14 @@ object BlueBookForms {
         .note { font-size: 8pt; font-style: italic; }
         /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
         .keep { break-inside: avoid; }
-        </style></head><body>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
+        /* SDP print: plan on the left, summary on the right, all on one landscape page. */
+        body.land img.banner { width: auto; max-height: 18mm; margin: 0 auto 1mm; }
+        table.sdp > tbody > tr > td { border: none; padding: 0; }
+        td.plan { width: 74%; text-align: center; vertical-align: middle; }
+        td.plan img { max-width: 100%; max-height: 158mm; border: 0.6pt solid #000; }
+        td.side { padding-left: 3mm !important; }
+        td.side table { font-size: 8pt; }
+        i.sw { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
+        </style></head><body${if (landscape) " class='land'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }
