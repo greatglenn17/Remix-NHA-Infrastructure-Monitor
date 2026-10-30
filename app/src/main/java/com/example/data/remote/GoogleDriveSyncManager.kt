@@ -336,6 +336,7 @@ class GoogleDriveSyncManager(
                     put("status", iss.status)
                     put("isCritical", iss.isCritical)
                     put("targetDate", iss.targetDate)
+                    put("actionBy", iss.actionBy)
                 })
             }
 
@@ -900,7 +901,8 @@ class GoogleDriveSyncManager(
                     timestamp = iss.optLong("timestamp", System.currentTimeMillis()),
                     status = iss.optString("status", "Pending"),
                     isCritical = iss.optBoolean("isCritical", false),
-                    targetDate = iss.optString("targetDate", "")
+                    targetDate = iss.optString("targetDate", ""),
+                    actionBy = iss.optString("actionBy", "")
                 )
                 projectDao.insertProjectIssue(issue)
             }

@@ -29,7 +29,7 @@ class BlueBookFormsTest {
         PendingDocument(projectId = 1, documentName = name, status = status, remarks = remarks)
 
     private val docs = listOf(
-        doc("Work Suspension No. 1 (Full)", "Approved", "Duration: 146 Days | Effectivity: 2019-01-03 | End: 2019-05-29"),
+        doc("Work Suspension No. 1 (Full)", "Approved", "Duration: 146 Days | Effectivity: 2019-01-03 | End: 2019-05-29 | Reason: Road widening"),
         doc("Work Resumption No. 1", "Approved", "Effectivity: 2019-05-30 | Remarks: "),
         doc("Time Extension No. 1 - 146 Days", "Approved", "Reason: Right of way"),
         doc("Time Extension No. 2 - 130 Days", "Pending", "Reason: Rain"),
@@ -44,12 +44,12 @@ class BlueBookFormsTest {
     @Test
     fun orders_becomeTheProfileLists() {
         val logs = ContractLogs.from(project, docs)
-        assertEquals(listOf("Work Suspension No. 1 (Full)" to "January 3, 2019 – May 29, 2019"), logs.suspensions)
+        assertEquals(listOf("Work Suspension No. 1 (Full)" to "January 3, 2019 – May 29, 2019; Reason: Road widening"), logs.suspensions)
         assertEquals(listOf("Work Resumption No. 1" to "May 30, 2019"), logs.resumptions)
         assertEquals(listOf("1" to 146, "2" to 130), logs.extensions.map { it.no to it.days })
         assertEquals("(for approval)", logs.extensions[1].status)
         assertEquals("Right of way", logs.extensions[0].reason)
-        assertEquals(listOf("Variation Order No. 1" to "Php 0"), logs.variations)
+        assertEquals(listOf("Variation Order No. 1" to "Php 0; Reason: Realignment"), logs.variations)
     }
 
     @Test
@@ -90,6 +90,32 @@ class BlueBookFormsTest {
         )
         assertEquals(listOf("Typed in report", "Right of way", "Sunday"), week.map { it.description })
         assertEquals("Target: November 5, 2026", week[1].remarks)
+    }
+
+    @Test
+    fun monthly_listsLoggedMonthsWithTotals_andPutsActionsUnderWhoTookThem() {
+        fun issue(text: String, by: String) = com.example.data.model.ProjectIssue(
+            projectId = 1, date = "2019-03-10", description = text, actionTaken = "Act on $text", remarks = "", loggedBy = "", actionBy = by
+        )
+        val html = BlueBookForms.monthlyReport(
+            project, YearMonth.of(2019, 3), null, emptyList(), emptyList(),
+            listOf(issue("Office", "Implementing Office"), issue("Contractor", "Contractor/Developer"), issue("Old", "")),
+            ContractLogs.from(project, docs), emptyList(),
+            listOf(day("2019-01-05", hours(5)), day("2019-03-01", hours(0)), day("2019-03-02", hours(9)), day("2019-04-01", hours(9))),
+            null, Signatories("", "", "", "", "", "")
+        )
+        // October 2018 start: January is contract month 4, March month 6; February and April are left out.
+        assertTrue(html.contains("<tr><td class='c'>4</td><td>January 2019</td><td class='n'>0</td><td class='n'>1</td></tr>"))
+        assertTrue(html.contains("<tr><td class='c'>6</td><td>March 2019</td><td class='n'>1</td><td class='n'>1</td></tr>"))
+        assertFalse(html.contains("February 2019"))
+        assertFalse(html.contains("April 2019"))
+        assertTrue(html.contains("<tr class='tot'><td colspan='2'>GRAND TOTAL</td><td class='n'>1</td><td class='n'>2</td></tr>"))
+        assertTrue(html.contains("1. Office</td><td>March 10, 2019</td><td>Act on Office</td><td></td>"))
+        assertTrue(html.contains("2. Contractor</td><td>March 10, 2019</td><td></td><td>Act on Contractor</td>"))
+        assertTrue(html.contains("3. Old</td><td>March 10, 2019</td><td>Act on Old</td><td></td>"))
+        assertTrue(html.contains("Variation Order No. 1: Php 0; Reason: Realignment"))
+        assertTrue(html.contains("Reason: Road widening"))
+        assertTrue(html.contains("Right of way"))
     }
 
     @Test

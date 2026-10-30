@@ -306,7 +306,7 @@ fun IssueCard(
             if (issue.actionTaken.isNotBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "ACTION TAKEN",
+                    text = "ACTION TAKEN" + if (issue.actionBy.isBlank()) "" else " BY ${issue.actionBy.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

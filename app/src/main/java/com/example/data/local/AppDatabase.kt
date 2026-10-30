@@ -40,7 +40,7 @@ import androidx.security.crypto.MasterKey
         DeveloperRequest::class,
         SyncOutboxEvent::class
     ],
-    version = 28,
+    version = 29,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -335,6 +335,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_28_29 = object : Migration(28, 29) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE project_issues ADD COLUMN actionBy TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         val SIGNATORY_COLUMNS = listOf("preparedByName", "preparedByPosition", "checkedByName", "checkedByPosition", "notedByName", "notedByPosition")
         val WEEKLY_SIGNATORY_COLUMNS = listOf("weeklyCheckedByName", "weeklyCheckedByPosition", "weeklyNotedByName", "weeklyNotedByPosition")
 
@@ -347,7 +353,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance

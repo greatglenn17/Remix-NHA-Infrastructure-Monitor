@@ -31,11 +31,16 @@ data class ProjectIssue(
     val isCritical: Boolean = false,
     // When the issue must be settled by; blank when there is no deadline.
     val targetDate: String = "",
+    // Who took the action: one of ISSUE_ACTION_BY, or blank on issues logged before it existed.
+    val actionBy: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** The two "Action taken" columns of the monthly report's issues table. */
+val ISSUE_ACTION_BY = listOf("Implementing Office", "Contractor/Developer")
 
 /** Still pending after its target date. */
 fun ProjectIssue.isOverdue(today: java.time.LocalDate = java.time.LocalDate.now()): Boolean =
