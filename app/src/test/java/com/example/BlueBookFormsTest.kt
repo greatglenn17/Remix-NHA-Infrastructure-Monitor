@@ -116,6 +116,9 @@ class BlueBookFormsTest {
         assertTrue(html.contains("Variation Order No. 1: Php 0; Reason: Realignment"))
         assertTrue(html.contains("Reason: Road widening"))
         assertTrue(html.contains("Right of way"))
+        // Every section after II. Project Status is numbered, through VIII. Recommendations.
+        listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",
+            "VII. ISSUES / CONCERNS", "VIII. RECOMMENDATIONS").forEach { assertTrue(it, html.contains(it)) }
     }
 
     @Test

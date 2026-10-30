@@ -251,7 +251,7 @@ object BlueBookForms {
         }
         b.append("<tr class='tot'><td>TOTAL</td><td class='n'>${pct(items.sumOf { it.weightPct })}</td><td class='n'>${lastWeekly?.let { pct(it.targetAccomplishmentPct) } ?: ""}</td><td class='n'>${lastWeekly?.let { pct(it.actualAccomplishmentPct) } ?: ""}</td><td class='n'>${pct(items.sumOf { it.weightPct * it.actualPct / 100 })}</td></tr></table>")
 
-        b.append("<table><tr><th colspan='6' class='sub'>STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>GROSS AMOUNT</th><th>%</th></tr>")
+        b.append("<table><tr><th colspan='6' class='sec'>III. STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>GROSS AMOUNT</th><th>%</th></tr>")
         val paid = payments.filter { p -> parseDate(p.date)?.let { YearMonth.from(it) <= month } ?: true }
         repeat(maxOf(3, paid.size)) { i ->
             val p = paid.getOrNull(i)
@@ -259,7 +259,7 @@ object BlueBookForms {
         }
         b.append("</table>")
 
-        b.append("<table><tr><th colspan='7' class='sub'>CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>")
+        b.append("<table><tr><th colspan='7' class='sec'>IV. CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>")
         // Each extension adds its days to the running duration, as the Key Dates card does.
         var duration = project.contractDurationDays
         val start = parseDate(project.dateStarted)
@@ -271,7 +271,7 @@ object BlueBookForms {
         }
         b.append("</table>")
 
-        b.append("<table><tr><th colspan='4' class='sub'>SUMMARY OF UNWORKABLE DAYS DUE TO WEATHER CONDITION</th></tr><tr><th>MONTH NO.</th><th>PERIOD COVERED</th><th>NO. OF WORKABLE DAYS</th><th>NO. OF UNWORKABLE DAYS</th></tr>")
+        b.append("<table><tr><th colspan='4' class='sec'>V. SUMMARY OF UNWORKABLE DAYS DUE TO WEATHER CONDITION</th></tr><tr><th>MONTH NO.</th><th>PERIOD COVERED</th><th>NO. OF WORKABLE DAYS</th><th>NO. OF UNWORKABLE DAYS</th></tr>")
         // Only months with weather logged, numbered by contract month when the start date is known.
         val logged = workableDays(weather).filterKeys { it <= month }.toSortedMap()
         val first = start?.let { YearMonth.from(it) }
@@ -282,11 +282,11 @@ object BlueBookForms {
         }
         b.append("<tr class='tot'><td colspan='2'>GRAND TOTAL</td><td class='n'>${logged.values.sumOf { it.first }}</td><td class='n'>${logged.values.sumOf { it.second }}</td></tr></table>")
 
-        b.append("<table><tr><th colspan='3' class='sub'>STATUS OF SUBMISSION OF DOCUMENTARY REQUIREMENTS</th></tr><tr><th>DOCUMENT</th><th>STATUS</th><th>REMARKS</th></tr>")
+        b.append("<table><tr><th colspan='3' class='sec'>VI. STATUS OF SUBMISSION OF DOCUMENTARY REQUIREMENTS</th></tr><tr><th>DOCUMENT</th><th>STATUS</th><th>REMARKS</th></tr>")
         numbered(maxOf(5, documents.size)) { i -> documents.getOrNull(i).let { listOf(it?.documentName, it?.status, it?.remarks) } }.let(b::append)
         b.append("</table>")
 
-        b.append("<table><tr><th colspan='4' class='sub'>ISSUES / CONCERNS / SITE INSTRUCTIONS</th></tr>")
+        b.append("<table><tr><th colspan='4' class='sec'>VII. ISSUES / CONCERNS / SITE INSTRUCTIONS</th></tr>")
         b.append("<tr><th rowspan='2'>ISSUES/CONCERNS/OBSERVATIONS (INCLUDING COMPLIANCE WITH CPES REQUIREMENTS, ETC.)</th><th colspan='3'>ACTION TAKEN</th></tr><tr><th>DATE</th><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th></tr>")
         val monthIssues = issues.filter { parseDate(it.date)?.let { d -> YearMonth.from(d) == month } ?: false }
         numbered(maxOf(5, monthIssues.size)) { i ->
@@ -299,7 +299,7 @@ object BlueBookForms {
         }.let(b::append)
         b.append("</table>")
 
-        b.append("<div class='keep'><table><tr><th class='sec'>III. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
+        b.append("<div class='keep'><table><tr><th class='sec'>VIII. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on or before end of each month.</p>")
         b.append(signatures(signatories)).append("</div>")
         return page("Monthly Project Engineer's Report", b.toString(), banner)
