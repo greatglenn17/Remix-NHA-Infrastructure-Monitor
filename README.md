@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.9.5%20%28Build%20195%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.9.6%20%28Build%20196%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.9.5`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.9.5_Build195.apk`** to download the installation package.
+2. Tap the latest release (`v1.9.6`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.9.6_Build196.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.9.6`** | **`196`** | 📝 Monthly Report: unworkable days list only the logged months with a grand total; issues record whether the Implementing Office or the Contractor/Developer took the action; variation orders, suspensions and time extensions have a reason; sections after Project Status are numbered III to VIII; table titles no longer print alone at the bottom of a page
 | **`v1.9.5`** | **`195`** | 🛠️ Field Feedback: edit the scope of works with Wt% worked out from the amounts; only approved time extensions add contract days, and a logged suspension can get a Continuance; two-decimal percentages; +/− buttons for manpower and equipment; activities over a range of days; separate weekly signatories; scan or photograph the DV; weekly photo albums with geo-tag and titles; lots take a typed %, several lots can get the same progress at once, and lot photos are stamped with block and lot; developer requests are tracked until packaged; issues get a target date and show on that week's print |
 | **`v1.9.4`** | **`194`** | 🖨️ Blue Book Forms: print or save as PDF the Project Profile and the weekly and monthly Project Engineer's Reports on A4, with the NHA header; weekly reports use the app's weather clocks; Prepared, Checked and Noted by names and positions (with dropdowns, including Officer-in-Charge) are asked before printing and remembered per project; Edit Project adds Projected Beneficiaries, Board Resolution, Notice of Award and Notice to Proceed |
 | **`v1.9.3`** | **`193`** | 🗺️ Subdivision Lots: lots and open spaces are found automatically on a CAD-exported plan PDF, with tap-to-add, renumbering and block split/join; lot areas come from the plan scale; plans, lots and progress sync between phones; lots are coloured by progress in five bands (0–25% red, 26–50% orange, 51–75% yellow, 76–99% blue, 100%/RFO green) with a matching filter and legend; Viewers see the plan read-only |
