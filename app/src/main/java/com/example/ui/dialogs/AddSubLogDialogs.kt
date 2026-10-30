@@ -188,18 +188,18 @@ fun AddCustomDocumentDialog(
     // Work Suspension
     var wsNo by remember { mutableStateOf("") }
     var wsType by remember { mutableStateOf("Full") }
-    var wsExpanded by remember { mutableStateOf(false) }
     var wsDays by remember { mutableStateOf("") }
     var wsEffectivity by remember { mutableStateOf("") }
     var wsReason by remember { mutableStateOf("") }
 
     // Work Resumption
     var wrNo by remember { mutableStateOf("") }
+    var wrType by remember { mutableStateOf("Full") }
     var wrEffectivity by remember { mutableStateOf("") }
     var wrRemarks by remember { mutableStateOf("") }
 
     val voAmountError = FormValidation.amountError(voAmount, false)
-    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason, wrNo, wrEffectivity, wrRemarks) }
+    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason, wrNo, wrType, wrEffectivity, wrRemarks) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -302,40 +302,14 @@ fun AddCustomDocumentDialog(
                     }
                     "Work Suspension Order" -> {
                         OutlinedTextField(value = wsNo, onValueChange = { wsNo = it }, label = { Text("Suspension No.") }, modifier = Modifier.fillMaxWidth())
-                        ExposedDropdownMenuBox(
-                            expanded = wsExpanded,
-                            onExpandedChange = { wsExpanded = it },
-                        ) {
-                            OutlinedTextField(
-                                modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                readOnly = true,
-                                value = wsType,
-                                onValueChange = {},
-                                label = { Text("Type of Suspension") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = wsExpanded) },
-                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                            )
-                            ExposedDropdownMenu(
-                                expanded = wsExpanded,
-                                onDismissRequest = { wsExpanded = false },
-                            ) {
-                                listOf("Full", "Partial").forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            wsType = option
-                                            wsExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
+                        FullOrPartialPicker("Type of Suspension", wsType) { wsType = it }
                         OutlinedTextField(value = wsDays, onValueChange = { wsDays = it }, label = { Text("No. of Days") }, isError = daysError(wsDays) != null, supportingText = daysError(wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                         DateField(label = "Effectivity Date", value = wsEffectivity, onValueChange = { wsEffectivity = it }, clearable = true)
                         OutlinedTextField(value = wsReason, onValueChange = { wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
                     }
                     "Work Resumption Order" -> {
                         OutlinedTextField(value = wrNo, onValueChange = { wrNo = it }, label = { Text("Resumption No.") }, modifier = Modifier.fillMaxWidth())
+                        FullOrPartialPicker("Type of Resumption", wrType) { wrType = it }
                         DateField(label = "Effectivity Date", value = wrEffectivity, onValueChange = { wrEffectivity = it }, clearable = true)
                         OutlinedTextField(value = wrRemarks, onValueChange = { wrRemarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                     }
@@ -354,7 +328,7 @@ fun AddCustomDocumentDialog(
                     "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
                     "Variation Order" -> voDocumentName(voNo, voType, voAmount)
                     "Work Suspension Order" -> "Work Suspension No. $wsNo ($wsType)"
-                    "Work Resumption Order" -> "Work Resumption No. $wrNo"
+                    "Work Resumption Order" -> "Work Resumption No. $wrNo ($wrType)"
                     else -> "New Document"
                 }
                 val finalRemarks = when (selectedType) {
@@ -389,6 +363,29 @@ fun AddCustomDocumentDialog(
         },
         dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
+}
+
+/** Full or Partial, for work suspension, continuance and resumption orders; saved in the order's name. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FullOrPartialPicker(label: String, value: String, onChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            readOnly = true,
+            value = value,
+            onValueChange = {},
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            listOf("Full", "Partial").forEach { option ->
+                DropdownMenuItem(text = { Text(option) }, onClick = { onChange(option); expanded = false })
+            }
+        }
+    }
 }
 
 /** Whole-number day counts: blank is fine, anything else must be a non-negative integer. */

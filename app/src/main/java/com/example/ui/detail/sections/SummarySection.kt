@@ -93,8 +93,11 @@ fun SummarySection(
         ) { openOrder = null }
     }
     continueFrom?.let { ws ->
-        val (name, startsOn) = remember(ws, documents) { ProjectSchedule.nextContinuance(ws, documents) }
-        ContinuanceDialog(name, startsOn, onDismiss = { continueFrom = null }) { days, effectivity ->
+        val startsOn = remember(ws, documents) { ProjectSchedule.nextContinuance(ws, documents).second }
+        ContinuanceDialog(
+            nameFor = { type -> ProjectSchedule.nextContinuance(ws, documents, type).first },
+            initialType = ProjectSchedule.suspensionType(ws), startsOn = startsOn, onDismiss = { continueFrom = null }
+        ) { name, days, effectivity ->
             onAddContinuance(name, ProjectSchedule.suspensionRemarks(days, effectivity))
             continueFrom = null
         }
@@ -259,7 +262,15 @@ private fun scopeItems(json: String): List<Triple<String, Double, Double>> = try
 
 /** A Continuance of Work Suspension Order: more days on a logged suspension, starting where it ends. */
 @Composable
-private fun ContinuanceDialog(name: String, startsOn: String, onDismiss: () -> Unit, onSave: (days: Int, effectivity: String) -> Unit) {
+private fun ContinuanceDialog(
+    nameFor: (type: String) -> String,
+    initialType: String,
+    startsOn: String,
+    onDismiss: () -> Unit,
+    onSave: (name: String, days: Int, effectivity: String) -> Unit
+) {
+    var type by remember { mutableStateOf(initialType) }
+    val name = nameFor(type)
     var days by remember { mutableStateOf("") }
     var effectivity by remember { mutableStateOf(startsOn) }
     val dayCount = days.trim().toIntOrNull()?.takeIf { it > 0 }
@@ -269,6 +280,7 @@ private fun ContinuanceDialog(name: String, startsOn: String, onDismiss: () -> U
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                com.example.ui.dialogs.FullOrPartialPicker("Type of Suspension", type) { type = it }
                 OutlinedTextField(
                     value = days, onValueChange = { days = it.filter(Char::isDigit) }, label = { Text("No. of Days") }, singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
@@ -282,7 +294,7 @@ private fun ContinuanceDialog(name: String, startsOn: String, onDismiss: () -> U
             }
         },
         confirmButton = {
-            Button(onClick = { dayCount?.let { onSave(it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
+            Button(onClick = { dayCount?.let { onSave(name, it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )

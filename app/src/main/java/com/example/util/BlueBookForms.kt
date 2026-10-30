@@ -522,9 +522,9 @@ object BlueBookForms {
         body.full .period { font-size: 10pt; margin-bottom: 2mm; }
         div.plan { position: relative; text-align: center; }
         div.plan img { max-width: 100%; max-height: 244mm; }
-        table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 8pt; margin: 0; }
-        table.lg th, table.lg td { padding: 0.6mm 1.2mm; height: auto; white-space: nowrap; }
-        i.sw { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1.2mm; vertical-align: middle; }
+        table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 10pt; margin: 0; }
+        table.lg th, table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
+        i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
         </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>
     """.trimIndent()
 }

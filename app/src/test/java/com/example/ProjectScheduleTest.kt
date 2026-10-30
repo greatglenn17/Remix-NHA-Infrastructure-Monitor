@@ -110,5 +110,11 @@ class ProjectScheduleTest {
         assertEquals("Continuance No. 2 of Work Suspension No. 1 (Full)" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1)))
         assertTrue(ProjectSchedule.isSuspension(ws))
         assertFalse(ProjectSchedule.isSuspension(c1))
+        // A continuance may be Partial on a Full suspension; the type sits before "of" so the chain still counts it.
+        assertEquals("Full", ProjectSchedule.suspensionType(ws))
+        val c2 = doc(ProjectSchedule.nextContinuance(ws, listOf(ws, c1), "Partial").first, "Pending", ProjectSchedule.suspensionRemarks(10, "2026-02-15"))
+        assertEquals("Continuance No. 2 (Partial) of Work Suspension No. 1 (Full)", c2.documentName)
+        assertEquals("Continuance No. 3 (Full) of Work Suspension No. 1 (Full)" to "2026-02-25", ProjectSchedule.nextContinuance(ws, listOf(ws, c1, c2), "Full"))
+        assertEquals("Partial", ProjectSchedule.suspensionType(doc("Work Suspension No. 2 (Partial)", "Pending", "")))
     }
 }

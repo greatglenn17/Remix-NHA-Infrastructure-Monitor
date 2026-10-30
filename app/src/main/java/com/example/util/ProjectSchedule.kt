@@ -61,16 +61,19 @@ object ProjectSchedule {
     fun isSuspension(doc: PendingDocument) = doc.documentName.startsWith("Work Suspension No.", ignoreCase = true)
 
     /**
-     * Name of the next Continuance of [suspension], e.g. "Continuance No. 2 of Work Suspension No. 1 (Full)",
-     * and the day it starts: the latest End of the suspension and its continuances so far.
+     * Name of the next Continuance of [suspension], e.g. "Continuance No. 2 (Partial) of Work Suspension No. 1 (Full)"
+     * with [type] given, and the day it starts: the latest End of the suspension and its continuances so far.
      */
-    fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>): Pair<String, String> {
+    fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>, type: String? = null): Pair<String, String> {
         val base = suspension.documentName.trim()
         val chain = documents.filter { it.documentName.trim().endsWith("of $base", ignoreCase = true) }
         val no = chain.size + 1
         val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
-        return "Continuance No. $no of $base" to (lastEnd?.toString() ?: "")
+        return "Continuance No. $no${type?.let { " ($it)" } ?: ""} of $base" to (lastEnd?.toString() ?: "")
     }
+
+    /** "Partial" when the suspension's name says so, else "Full". */
+    fun suspensionType(suspension: PendingDocument) = if (suspension.documentName.contains("(Partial)", ignoreCase = true)) "Partial" else "Full"
 
     /** Remarks in the same "Duration | Effectivity | End" form as a suspension, so the schedule and forms read it. */
     fun suspensionRemarks(days: Int, effectivity: String): String {
