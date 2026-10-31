@@ -1,8 +1,8 @@
 {
-  "versionCode": 203,
-  "versionName": "2.0.3",
-  "releaseNotes": "v2.0.3: Project Profile: each order's reason is on its own line in parentheses under the days or amount; continuances show no reason; sub-rows are indented; variation orders have their own group; Revised Contract Cost is blank until a variation order is approved.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.3/NHA_Monitor_v2.0.3_Build203.apk",
-  "apkSha256": "9022ff2197b917d3c9f094ba1726f710a9cbd64a9cd0cc190ba79abb4fb4692d",
+  "versionCode": 204,
+  "versionName": "2.0.4",
+  "releaseNotes": "v2.0.4: Photos can be deleted from the photo viewer (it asks first; the photo is removed on every phone). Subdivision Plan: found lots come in with no Block and Lot (Unassigned lot) for the engineer to name.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.4/NHA_Monitor_v2.0.4_Build204.apk",
+  "apkSha256": "b0b53d9904d192767a166b68585f89fc8c0bf5f0eaf412b500d3882110623b9f",
   "isMandatory": true
 }
