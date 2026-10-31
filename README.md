@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v1.9.8%20%28Build%20198%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v1.9.9%20%28Build%20199%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v1.9.8`).
-3. Under **Assets**, tap **`NHA_Monitor_v1.9.8_Build198.apk`** to download the installation package.
+2. Tap the latest release (`v1.9.9`).
+3. Under **Assets**, tap **`NHA_Monitor_v1.9.9_Build199.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v1.9.9`** | **`199`** | ⌨️ A signatory Office or Position not in the list can be typed while the list is open
 | **`v1.9.8`** | **`198`** | 📨 Letters to Contractor with reason and date received; weekly VIII lists that week's developer requests and letters; signatories get an Office (Bulacan District Office / Region 3 Office); Documents has Suspension / Resumption (with continuances), Time Extensions, Variation Orders and Letters tabs; print opens a zoomable preview; photos open full screen with pinch zoom; Needs attention shows only when something needs action
 | **`v1.9.7`** | **`197`** | 🗺️ Subdivision Plan: crop the plan to its frame; mark each lot Saleable, Non-saleable, Road or Open Space; road lots are tagged Road completed and Drainage completed; the plan is colour-coded without lot labels; Status of Construction prints on a full A4 page with the legend at the bottom-left. Orders: Full / Partial on suspensions, continuances and resumptions, named "Partial Work Suspension Order No. 1" and "1st Continuance of …"; the Project Profile lists orders as days, dates, amount and reason
 | **`v1.9.6`** | **`196`** | 📝 Monthly Report: unworkable days list only the logged months with a grand total; issues record whether the Implementing Office or the Contractor/Developer took the action; variation orders, suspensions and time extensions have a reason; sections after Project Status are numbered III to VIII; table titles no longer print alone at the bottom of a page
