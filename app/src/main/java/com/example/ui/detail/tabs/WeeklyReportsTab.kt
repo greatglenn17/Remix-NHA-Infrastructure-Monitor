@@ -103,6 +103,7 @@ fun WeeklyReportsTab(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeeklyReportCard(
     report: WeeklyReport,
@@ -138,10 +139,11 @@ private fun WeeklyReportCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    // On a narrow phone the icons drop under the week instead of squeezing it mid-word.
+                    FlowRow(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = report.reportingWeek,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.align(Alignment.CenterVertically),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
