@@ -3110,7 +3110,8 @@ fun UpdateLotProgressDialog(
     var lotUse by remember { mutableStateOf(lot.use) }
     var blockName by remember { mutableStateOf(lot.blockNumber) }
     var lotName by remember { mutableStateOf(lot.lotNumber) }
-    val nameTaken = (blockName.trim() to lotName.trim()) in takenNames
+    // "2-b" and "2-B" are the same lot on the plan.
+    val nameTaken = takenNames.any { (b, l) -> b.equals(blockName.trim(), ignoreCase = true) && l.equals(lotName.trim(), ignoreCase = true) }
     val nameError = when {
         blockName.isBlank() || lotName.isBlank() -> "Block and lot can't be blank"
         nameTaken -> "Block ${blockName.trim()} Lot ${lotName.trim()} already exists"

@@ -1264,7 +1264,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             logAuditAction(
                 projectId = lot.projectId,
                 actionType = "Lot Renamed",
-                details = "Renamed B${lot.blockNumber}-L${lot.lotNumber} to B$block-L$lotNo",
+                details = "Renamed B${lot.blockNumber}-L${lot.lotNumber} to B$block-L$lotNo (Lot ID: ${lot.id})",
                 oldValue = "Block ${lot.blockNumber} Lot ${lot.lotNumber}",
                 newValue = "Block $block Lot $lotNo"
             )
