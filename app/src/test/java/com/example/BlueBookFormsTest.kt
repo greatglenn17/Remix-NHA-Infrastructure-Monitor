@@ -60,12 +60,18 @@ class BlueBookFormsTest {
     fun profile_putsReasonsUnderTheDaysOrAmount_andContinuancesCarryNone() {
         val continuance = doc("1st Continuance of Work Suspension Order No. 1", "Pending", "Duration: 30 Days | Effectivity: 2019-05-30 | End: 2019-06-28 | Reason: Road widening")
         val html = BlueBookForms.projectProfile(project, ContractLogs.from(project, docs + continuance), Preparer("", "", ""), LocalDate.of(2026, 5, 31))
-        assertTrue(html.contains("Work Suspension Order No. 1</td><td class='pc'>:</td><td>146 calendar days – January 3, 2019 to May 29, 2019<br>Road widening</td>"))
+        assertTrue(html.contains("Work Suspension Order No. 1</td><td class='pc'>:</td><td>146 calendar days – January 3, 2019 to May 29, 2019<br>(Road widening)</td>"))
         assertTrue(html.contains("1st Continuance of Work Suspension Order No. 1</td><td class='pc'>:</td><td>30 calendar days – May 30, 2019 to June 28, 2019 (for approval)</td>"))
-        assertTrue(html.contains("Time Extension No. 2</td><td class='pc'>:</td><td>130 calendar days (for approval)<br>Rain</td>"))
-        assertTrue(html.contains("Variation Order/s</td><td class='pc'>:</td><td></td></tr><tr><td class='pl ps'>Variation Order No. 1</td><td class='pc'>:</td><td>Php 1,250,000.00<br>Realignment</td>"))
+        assertTrue(html.contains("Time Extension No. 2</td><td class='pc'>:</td><td>130 calendar days (for approval)<br>(Rain)</td>"))
+        assertTrue(html.contains("Variation Order/s</td><td class='pc'>:</td><td></td></tr><tr><td class='pl ps'>Variation Order No. 1</td><td class='pc'>:</td><td>Php 1,250,000.00<br>(Realignment)</td>"))
         val none = BlueBookForms.projectProfile(project, ContractLogs.from(project, emptyList()), Preparer("", "", ""), LocalDate.of(2026, 5, 31))
         assertTrue(none.contains("Variation Order/s</td><td class='pc'>:</td><td>None</td>"))
+        // The revised cost shows only once a variation order is approved.
+        assertTrue(html.contains("Revised Contract Cost</td><td class='pc'>:</td><td>Php 496,873,331.00</td>"))
+        assertTrue(none.contains("Revised Contract Cost</td><td class='pc'>:</td><td></td>"))
+        val pendingVo = docs.map { if (it.documentName.startsWith("Variation")) it.copy(status = "Pending") else it }
+        assertTrue(BlueBookForms.projectProfile(project, ContractLogs.from(project, pendingVo), Preparer("", "", ""), LocalDate.of(2026, 5, 31))
+            .contains("Revised Contract Cost</td><td class='pc'>:</td><td></td>"))
     }
 
     @Test

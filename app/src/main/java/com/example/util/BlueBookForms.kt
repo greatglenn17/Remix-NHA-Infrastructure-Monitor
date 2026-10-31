@@ -51,7 +51,8 @@ data class Order(val label: String, val value: String, val reason: String, val s
  */
 data class ContractLogs(
     val originalCost: Double,
-    val revisedCost: Double,
+    /** Null until a variation order is approved. */
+    val revisedCost: Double?,
     val revisedCompletion: String,
     val suspensions: List<Order>,
     val resumptions: List<Pair<String, String>>,
@@ -66,7 +67,7 @@ data class ContractLogs(
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
-                revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents) ?: original,
+                revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents),
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
                 // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension, without its reason again.
@@ -111,7 +112,7 @@ object BlueBookForms {
         fun sub(label: String, value: String) { rows.append("<tr><td class='pl ps'>${esc(label)}</td><td class='pc'>:</td><td>$value</td></tr>") }
         // The reason goes on its own line, under the days or amount.
         fun withReason(value: String, status: String, reason: String) =
-            esc(value + if (status.isEmpty()) "" else " $status") + if (reason.isEmpty()) "" else "<br>${esc(reason)}"
+            esc(value + if (status.isEmpty()) "" else " $status") + if (reason.isEmpty()) "" else "<br>(${esc(reason)})"
         val asOfText = asOf.format(LONG_DATE)
         row("Project Title", esc(project.name))
         row("Project Location", esc(project.location))
@@ -133,7 +134,7 @@ object BlueBookForms {
         logs.extensions.forEach { sub("Time Extension No. ${it.no}", withReason("${it.days} calendar days", it.status, it.reason)) }
         row("Variation Order/s", if (logs.variations.isEmpty()) "None" else "")
         logs.variations.forEach { sub(it.label, withReason(it.value, it.status, it.reason)) }
-        row("Revised Contract Cost", esc(peso(logs.revisedCost)))
+        row("Revised Contract Cost", logs.revisedCost?.let { esc(peso(it)) }.orEmpty())
         row("Revised Completion Date", esc(date(logs.revisedCompletion)))
         row("% Actual Accomplishment as of $asOfText", esc(pct(project.actualAccomplishment)))
         row("% Target Accomplishment as of $asOfText", esc(pct(project.targetAccomplishment)))
@@ -368,7 +369,7 @@ object BlueBookForms {
           <tr><td class='lab'>CONTRACTOR</td><td colspan='3'>${esc(project.contractor)}</td></tr>
           <tr><td class='lab'>SCOPE OF WORK</td><td colspan='3'>${scopeText(project.scopeOfWork)}</td></tr>
           <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td>${esc(peso(logs.originalCost))}</td><td class='lab'>$label1</td><td>$value1</td></tr>
-          <tr><td class='lab'>CONTRACT COST (REVISED)</td><td>${esc(peso(logs.revisedCost))}</td><td class='lab'>$label2</td><td>$value2</td></tr>
+          <tr><td class='lab'>CONTRACT COST (REVISED)</td><td>${esc(peso(logs.revisedCost ?: logs.originalCost))}</td><td class='lab'>$label2</td><td>$value2</td></tr>
           <tr><td class='lab'>CONTRACT DURATION</td><td colspan='3'>${project.contractDurationDays} calendar days</td></tr>
           <tr><td class='lab'>DATE STARTED</td><td>${esc(date(project.dateStarted))}</td><td class='lab'>TIME EXTENSION/S</td><td>$te</td></tr>
           <tr><td class='lab'>COMPLETION DATE (ORIGINAL)</td><td>${esc(date(project.completionDateOriginal))}</td><td class='lab'>REVISED COMPLETION DATE</td><td>${esc(date(logs.revisedCompletion))}</td></tr>
