@@ -71,7 +71,7 @@ class PortfolioScreenshotTest {
         totalProjects = items.size
     )
 
-    private fun capture(state: PortfolioUiState, mode: AppThemeMode, empty: Pair<String, String> = "" to "") =
+    private fun capture(state: PortfolioUiState, mode: AppThemeMode, empty: Pair<String, String> = "" to "", projectsFirst: Boolean = false) =
         captureRoboImage {
             NHATheme(themeMode = mode) { Surface(color = MaterialTheme.colorScheme.background) {
                 PortfolioContent(
@@ -79,7 +79,7 @@ class PortfolioScreenshotTest {
                     searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = "All", typeFilter = "All",
                     typeOptions = listOf("All", "Housing Project"), emptyMessage = empty,
                     onFilter = {}, onSearch = {}, onSort = {}, onStatus = {}, onType = {},
-                    onOpen = {}, onEdit = {}, onDelete = {}
+                    onOpen = {}, onEdit = {}, onDelete = {}, projectsFirst = projectsFirst
                 ) }
             }
         }
@@ -89,6 +89,10 @@ class PortfolioScreenshotTest {
 
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun phone_dark() = capture(sample, AppThemeMode.DARK)
+
+    // A field engineer sees their own projects before the office overview.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun field_engineer_phone_light() = capture(sample, AppThemeMode.LIGHT, projectsFirst = true)
 
     @Config(qualifiers = "w743dp-h1185dp")
     @Test fun tablet_portrait_light() = capture(sample, AppThemeMode.LIGHT)

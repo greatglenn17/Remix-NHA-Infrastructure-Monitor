@@ -119,6 +119,7 @@ fun DashboardScreen(
                 onEdit = if (currentUser.role.hasPermission(Permission.EDIT_PROJECT)) { project -> projectToEdit = project } else null,
                 onDelete = if (currentUser.role.hasPermission(Permission.DELETE_PROJECT)) { project -> projectToDelete = project.id } else null,
                 modifier = Modifier.weight(1f),
+                projectsFirst = currentUser.role == UserRole.FIELD_ENGINEER,
                 emptyActions = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (isSuperAdmin || currentUser.role == UserRole.ENGINEER_ADMIN) {
