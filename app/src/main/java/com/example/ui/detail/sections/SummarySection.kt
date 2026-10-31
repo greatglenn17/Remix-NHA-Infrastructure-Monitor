@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.PendingDocument
 import com.example.data.model.Permission
 import com.example.data.model.Project
+import com.example.data.model.ProjectPayment
 import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
 import com.example.data.model.hasPermission
@@ -48,6 +49,7 @@ fun SummarySection(
     requests: List<com.example.data.model.DeveloperRequest> = emptyList(),
     onSaveRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
     onDeleteRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
+    payments: List<ProjectPayment> = emptyList(),
     today: LocalDate = LocalDate.now()
 ) {
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
@@ -75,8 +77,13 @@ fun SummarySection(
         { m -> CostCard(project, documents, m) },
         { m -> LatestReportCard(latestReport, openIssues, m) }
     )
-    // Shown only when something needs action, across the full width above the cards.
-    CardColumns(cards, header = if (flags.isEmpty()) null else { { AttentionCard(flags, Modifier.fillMaxWidth()) } })
+    // Attention shows only when something needs action, across the full width above the cards;
+    // the payment table takes the full width below them so its amounts fit.
+    CardColumns(
+        cards,
+        header = if (flags.isEmpty()) null else { { AttentionCard(flags, Modifier.fillMaxWidth()) } },
+        footer = { PaymentStatusCard(payments, ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents), Modifier.fillMaxWidth()) }
+    )
     if (showRequestDialog) {
         DeveloperRequestDialog(
             projectId = project.id, existing = editRequest,
@@ -171,6 +178,65 @@ private fun CostCard(project: Project, documents: List<PendingDocument>, modifie
     }
 }
 
+/** The monthly report's III. Status of Payment as a table: each billing, then the totals against [contractCost]. */
+@Composable
+private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Double, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    SectionCard("Status of payment", Icons.Default.ReceiptLong, modifier.testTag("summary_payment_status")) {
+        if (payments.isEmpty()) {
+            EmptyLine("No billings yet")
+            return@SectionCard
+        }
+        BoxWithConstraints {
+            // On a phone the date moves under the billing name so the amounts fit on one line.
+            val wide = maxWidth >= 480.dp
+            val weights = if (wide) listOf(1.8f, 1.1f, 1.4f, 0.7f, 1.5f) else listOf(1.6f, 1.5f, 0.8f, 1.6f)
+            @Composable
+            fun Cells(values: List<String>, bold: Boolean = false, color: androidx.compose.ui.graphics.Color = scheme.onSurface) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    values.forEachIndexed { i, v ->
+                        Text(
+                            v, style = MaterialTheme.typography.bodySmall, color = color,
+                            fontWeight = if (bold) FontWeight.SemiBold else null,
+                            // Amounts and percentages line up on the right.
+                            textAlign = if (i >= values.size - 3) androidx.compose.ui.text.style.TextAlign.End else null,
+                            modifier = Modifier.weight(weights[i])
+                        )
+                    }
+                }
+            }
+            fun row(first: String, date: String, vararg amounts: String) =
+                if (wide) listOf(first, date) + amounts else listOf(listOf(first, date).filter { it.isNotBlank() }.joinToString("\n")) + amounts
+            Column {
+                Cells(row("Billing / period covered", "Date", "Gross amount (PHP)", "%", "Balance (PHP)"), bold = true, color = scheme.onSurfaceVariant)
+                HorizontalDivider(color = scheme.outlineVariant)
+                payments.forEach { p ->
+                    Cells(
+                        row(
+                            listOf(p.name, p.periodCovered).filter { it.isNotBlank() }.joinToString("\n").ifBlank { "-" },
+                            p.date.ifBlank { "-" },
+                            CurrencyFormatter.formatDecimal(p.grossAmount),
+                            "%.2f%%".format(p.percentage),
+                            CurrencyFormatter.formatDecimal(p.balanceAmount)
+                        )
+                    )
+                    HorizontalDivider(color = scheme.outlineVariant)
+                }
+                val total = payments.sumOf { it.grossAmount }
+                Cells(
+                    row(
+                        "Total", "",
+                        CurrencyFormatter.formatDecimal(total),
+                        if (contractCost > 0) "%.2f%%".format(total / contractCost * 100) else "-",
+                        CurrencyFormatter.formatDecimal(contractCost - total)
+                    ),
+                    bold = true
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, modifier: Modifier) {
     SectionCard("Latest weekly report", Icons.Default.Assignment, modifier) {
@@ -224,7 +290,7 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
                 Surface(color = scheme.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text("${index + 1}. $name", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                        Field("Amount · weight", "${CurrencyFormatter.formatPhp(amount)} · $weight%")
+                        Field("Amount · weight", "${CurrencyFormatter.formatPhp(amount)} · ${"%.2f".format(weight)}%")
                     }
                 }
             }

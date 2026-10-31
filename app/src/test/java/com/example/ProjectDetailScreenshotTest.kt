@@ -113,7 +113,7 @@ class ProjectDetailScreenshotTest {
     private fun Summary() = SummarySection(
         project, flags, docs, reports.first(), openIssues = 2, canEditProject = true, onEditProject = {},
         currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
-        today = LocalDate.of(2026, 10, 27)
+        payments = payments, today = LocalDate.of(2026, 10, 27)
     )
 
     @Composable

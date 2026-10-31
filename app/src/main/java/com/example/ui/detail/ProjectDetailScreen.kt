@@ -217,6 +217,7 @@ fun ProjectDetailScreen(
                             requests = developerRequests,
                             onSaveRequest = viewModel::saveDeveloperRequest,
                             onDeleteRequest = viewModel::deleteDeveloperRequest,
+                            payments = projectPayments,
                             onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
                             today = today
                         )
