@@ -82,7 +82,7 @@ class FormsScreenshotTest {
         shoot("form_add_billing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, { _, _, _, _, _, _ -> }, today) }
         shoot("form_variation_order_$t") { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }
         shoot("form_work_suspension_$t") { AddCustomDocumentDialog("Work Suspension Order", {}) { _, _ -> } }
-        shoot("form_issue_$t") { AddIssueDialog(null, {}) { _, _, _, _, _, _, _ -> } }
+        shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
         shoot("login_$t") { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
     }
 
