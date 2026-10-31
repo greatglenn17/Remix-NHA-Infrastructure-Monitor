@@ -55,3 +55,8 @@ val SdpLot.use: String get() = lotUse.ifBlank { if (blockNumber == "OS") "Open S
 val SdpLot.isSaleable: Boolean get() = use == "Saleable"
 /** Road lots carry a drainage progress besides the road's own. */
 val SdpLot.isRoadLot: Boolean get() = use == "Road Lot"
+
+/** Found lots come in with no block or lot; the engineer names them (Update Progress, Renumber block). */
+val SdpLot.isUnassigned: Boolean get() = blockNumber.isBlank() || lotNumber.isBlank()
+/** "Block 3 Lot 12", or "Unassigned lot" until the lot is named. */
+val SdpLot.label: String get() = if (isUnassigned) "Unassigned lot" else "Block $blockNumber Lot $lotNumber"

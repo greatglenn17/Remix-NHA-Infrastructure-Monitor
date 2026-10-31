@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.0.3%20%28Build%20203%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.0.4%20%28Build%20204%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.0.3`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.0.3_Build203.apk`** to download the installation package.
+2. Tap the latest release (`v2.0.4`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.0.4_Build204.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.0.4`** | **`204`** | 🗑️ Photos: a weekly report photo can be deleted from the photo viewer (asks first; removed on every phone); Subdivision Plan: found lots come in with no Block and Lot ("Unassigned lot") for the engineer to name in Update Progress or with Number lots
 | **`v2.0.3`** | **`203`** | 📄 Project Profile: each order's reason sits on its own line in parentheses under the days or amount; continuances of a suspension show no reason; sub-rows are indented; variation orders have their own group; Revised Contract Cost is blank until a variation order is approved
 | **`v2.0.2`** | **`202`** | 📱 Weekly reports: on a phone the week title no longer breaks mid-word; the Print, Edit and Delete icons move under it
 | **`v2.0.1`** | **`201`** | 🏷️ Subdivision Plan: Block and Lot names can be edited in a lot's Update Progress; each lot is billed twice, M1 (80%) then M2 (20%), with its own date and reference; lots already marked billed count as M1

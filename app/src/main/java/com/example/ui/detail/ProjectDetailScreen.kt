@@ -354,7 +354,10 @@ fun ProjectDetailScreen(
                                 },
                                 auditLogs = auditLogs
                             )
-                                "Photos" -> PhotoGalleryTab(weeklyReports = weeklyReports)
+                                "Photos" -> PhotoGalleryTab(
+                                    weeklyReports = weeklyReports,
+                                    onDeletePhoto = if (currentUser.role.hasPermission(Permission.EDIT_REPORT)) viewModel::deleteWeeklyReportPhoto else null
+                                )
                                 "Weather" -> WeatherChartTab(
                                     dailyWeatherLogs = dailyWeatherLogs,
                                     weeklyReports = weeklyReports
