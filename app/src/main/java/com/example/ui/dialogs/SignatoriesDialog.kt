@@ -19,6 +19,7 @@ private val CHECKED_POSITIONS = listOf("District Manager", "Officer-in-Charge")
 private val NOTED_POSITIONS = listOf("Regional Manager", "Officer-in-Charge")
 private val WEEKLY_CHECKED_POSITIONS = listOf("Principal Engineer A", "Principal Architect A")
 private val WEEKLY_NOTED_POSITIONS = CHECKED_POSITIONS
+private val OFFICES = listOf("Bulacan District Office", "Region 3 Office")
 
 /** Asks who signs a weekly or monthly Blue Book report before it is printed. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,29 +36,41 @@ fun SignatoriesDialog(
     var checkedPosition by remember { mutableStateOf(initial.checkedPosition) }
     var notedName by remember { mutableStateOf(initial.notedName) }
     var notedPosition by remember { mutableStateOf(initial.notedPosition) }
+    var preparedOffice by remember { mutableStateOf(initial.preparedOffice) }
+    var checkedOffice by remember { mutableStateOf(initial.checkedOffice) }
+    var notedOffice by remember { mutableStateOf(initial.notedOffice) }
 
+    // Editable, so a value that is not in the list can still be typed.
     @Composable
-    fun Signer(title: String, name: String, onName: (String) -> Unit, position: String, onPosition: (String) -> Unit, positions: List<String>) {
+    fun Choice(label: String, value: String, onValue: (String) -> Unit, options: List<String>) {
         var expanded by remember { mutableStateOf(false) }
-        Text(title, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 8.dp))
-        OutlinedTextField(value = name, onValueChange = onName, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        // Editable, so a position that is not in the list can still be typed.
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
             OutlinedTextField(
-                value = position, onValueChange = onPosition, label = { Text("Position") }, singleLine = true,
+                value = value, onValueChange = onValue, label = { Text(label) }, singleLine = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth()
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                positions.forEach { option ->
+                options.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option) },
-                        onClick = { onPosition(option); expanded = false },
+                        onClick = { onValue(option); expanded = false },
                         contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                     )
                 }
             }
         }
+    }
+
+    @Composable
+    fun Signer(
+        title: String, name: String, onName: (String) -> Unit, position: String, onPosition: (String) -> Unit, positions: List<String>,
+        office: String, onOffice: (String) -> Unit
+    ) {
+        Text(title, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 8.dp))
+        OutlinedTextField(value = name, onValueChange = onName, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Choice("Position", position, onPosition, positions)
+        Choice("Office", office, onOffice, OFFICES)
     }
 
     AlertDialog(
@@ -66,15 +79,18 @@ fun SignatoriesDialog(
         title = { Text(if (weekly) "Weekly report signatories" else "Monthly report signatories") },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Signer("Prepared by", preparedName, { preparedName = it }, preparedPosition, { preparedPosition = it }, PREPARED_POSITIONS)
-                Signer(if (weekly) "Checked and Reviewed by" else "Checked by", checkedName, { checkedName = it }, checkedPosition, { checkedPosition = it }, if (weekly) WEEKLY_CHECKED_POSITIONS else CHECKED_POSITIONS)
-                Signer("Noted by", notedName, { notedName = it }, notedPosition, { notedPosition = it }, if (weekly) WEEKLY_NOTED_POSITIONS else NOTED_POSITIONS)
+                Signer("Prepared by", preparedName, { preparedName = it }, preparedPosition, { preparedPosition = it }, PREPARED_POSITIONS, preparedOffice) { preparedOffice = it }
+                Signer(if (weekly) "Checked and Reviewed by" else "Checked by", checkedName, { checkedName = it }, checkedPosition, { checkedPosition = it }, if (weekly) WEEKLY_CHECKED_POSITIONS else CHECKED_POSITIONS, checkedOffice) { checkedOffice = it }
+                Signer("Noted by", notedName, { notedName = it }, notedPosition, { notedPosition = it }, if (weekly) WEEKLY_NOTED_POSITIONS else NOTED_POSITIONS, notedOffice) { notedOffice = it }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    onPrint(Signatories(preparedName.trim(), preparedPosition.trim(), checkedName.trim(), checkedPosition.trim(), notedName.trim(), notedPosition.trim()))
+                    onPrint(Signatories(
+                        preparedName.trim(), preparedPosition.trim(), checkedName.trim(), checkedPosition.trim(), notedName.trim(), notedPosition.trim(),
+                        preparedOffice.trim(), checkedOffice.trim(), notedOffice.trim()
+                    ))
                 },
                 modifier = Modifier.testTag("signatories_print_button")
             ) { Text("Print") }

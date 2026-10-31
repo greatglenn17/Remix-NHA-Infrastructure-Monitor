@@ -10,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.data.model.PendingDocument
 import com.example.data.model.ProjectPayment
 import com.example.data.model.Permission
 import com.example.data.model.UserRole
@@ -21,19 +20,14 @@ import com.example.ui.detail.tabs.ViewDvScanDialog
 import com.example.util.BillingProgress
 import com.example.utils.CurrencyFormatter
 
-/** Money: billing summary, payments as cards (2 columns from 600dp) and the variation orders log. */
+/** Money: billing summary and payments as cards (2 columns from 600dp); variation orders are under Documents. */
 @Composable
 fun MoneySection(
     payments: List<ProjectPayment>,
     // Cost billings are measured against; see ContractCost.current.
     contractCost: Double,
     actualPercent: Double,
-    documents: List<PendingDocument>,
-    canAddVariationOrder: Boolean,
-    onAddVariationOrder: () -> Unit,
     currentUserRole: UserRole,
-    onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
-    onDeleteOrder: (Long) -> Unit,
     onAddPayment: (String, String, String, String, Double, Double, Double, Double, String) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
     onDeletePayment: (ProjectPayment) -> Unit
@@ -79,7 +73,6 @@ fun MoneySection(
                     }
                 }
             }
-            item { VariationOrdersLog(documents, canAddVariationOrder, onAddVariationOrder, currentUserRole, onUpdateOrderStatus, onDeleteOrder) }
         }
         if (canManagePayments) ExtendedFloatingActionButton(
             onClick = { showAddDialog = true },
@@ -149,55 +142,4 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
             )
         }
     }
-}
-
-/** Money › Variation orders: every order, pending too, so a new one shows; only approved ones change the cost. */
-@Composable
-fun VariationOrdersLog(
-    documents: List<PendingDocument>,
-    canAddVariationOrder: Boolean,
-    onAddVariationOrder: () -> Unit,
-    currentUserRole: UserRole,
-    onUpdateStatus: (PendingDocument, String, String) -> Unit,
-    onDeleteDocument: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
-    val voLogs = documents.filter { it.documentName.contains("Variation Order", ignoreCase = true) }
-    SectionCard(
-        "Variation orders (${voLogs.size})",
-        Icons.Default.ReceiptLong,
-        modifier,
-        action = if (canAddVariationOrder) {
-            {
-                IconButton(onClick = onAddVariationOrder, modifier = Modifier.testTag("add_variation_button")) {
-                    Icon(Icons.Default.AddCircle, contentDescription = "Add variation order", tint = MaterialTheme.colorScheme.primary)
-                }
-            }
-        } else null
-    ) {
-        if (voLogs.isEmpty()) EmptyLine("No variation orders recorded.")
-        voLogs.forEach { vo ->
-            val dateApproved = Regex("\\|\\s*Date Approved:\\s*([^|]+)").find(vo.remarks)?.groupValues?.get(1)?.trim()
-            val cleanRemarks = vo.remarks.replace("^Remarks:\\s*".toRegex(RegexOption.IGNORE_CASE), "")
-                .replace(Regex("\\|\\s*Date Approved:[^|]*"), "").trim()
-            val displayText = if (cleanRemarks.startsWith("Reason:", ignoreCase = true)) {
-                cleanRemarks
-            } else if (cleanRemarks.isNotBlank()) {
-                "Reason: $cleanRemarks"
-            } else ""
-            val type = when {
-                vo.documentName.contains("Additive", ignoreCase = true) -> "Additive"
-                vo.documentName.contains("Deductive", ignoreCase = true) -> "Deductive"
-                else -> ""
-            }
-            LogEntry(
-                vo.documentName,
-                MaterialTheme.colorScheme.onSurface,
-                listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText),
-                onClick = if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) { { openOrder = vo } } else null
-            )
-        }
-    }
-    openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateStatus, onDeleteDocument) { openOrder = null } }
 }

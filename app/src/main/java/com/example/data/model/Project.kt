@@ -52,6 +52,12 @@ data class Project(
     val weeklyCheckedByPosition: String = "",
     val weeklyNotedByName: String = "",
     val weeklyNotedByPosition: String = "",
+    // The office printed under each signatory's position, e.g. Bulacan District Office.
+    val preparedByOffice: String = "",
+    val checkedByOffice: String = "",
+    val notedByOffice: String = "",
+    val weeklyCheckedByOffice: String = "",
+    val weeklyNotedByOffice: String = "",
     val contractCostOriginal: Double,
     val contractCostRevised: Double,
     val contractDurationDays: Int,

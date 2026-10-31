@@ -14,8 +14,14 @@ object SectionChips {
     fun progress(isHousing: Boolean): List<String> =
         listOfNotNull("Weekly", "Monthly", "Lots".takeIf { isHousing }, "Photos", "Weather", "Issues")
 
+    const val SUSPENSIONS = "Suspension / Resumption"
+    const val TIME_EXTENSIONS = "Time Extensions"
+    const val VARIATION_ORDERS = "Variation Orders"
+    const val LETTERS = "Letters to Contractor"
+    val ORDER_CHIPS = listOf(SUSPENSIONS, TIME_EXTENSIONS, VARIATION_ORDERS, LETTERS)
+
     fun documents(canViewAuditLogs: Boolean): List<String> =
-        listOfNotNull("Related Files", "Audit log".takeIf { canViewAuditLogs })
+        ORDER_CHIPS + listOfNotNull("Related Files", "Audit log".takeIf { canViewAuditLogs })
 
     fun chipOrFirst(chips: List<String>, chip: String?): String = chip?.takeIf { it in chips } ?: chips.first()
 }

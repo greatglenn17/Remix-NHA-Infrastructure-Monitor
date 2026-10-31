@@ -29,7 +29,7 @@ import com.example.util.ProjectSchedule
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/** Summary: attention flags, the master profile, key dates with their orders, contract cost, and the latest weekly report with open issues. */
+/** Summary: attention flags (only when there are any), the master profile, key dates with their orders, contract cost, and the latest weekly report with open issues. */
 @Composable
 fun SummarySection(
     project: Project,
@@ -59,7 +59,6 @@ fun SummarySection(
     var showRequestDialog by remember { mutableStateOf(false) }
     var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
-        { m -> AttentionCard(flags, m) },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
         { m ->
             KeyDatesCard(
@@ -76,7 +75,8 @@ fun SummarySection(
         { m -> CostCard(project, documents, m) },
         { m -> LatestReportCard(latestReport, openIssues, m) }
     )
-    CardColumns(cards)
+    // Shown only when something needs action, across the full width above the cards.
+    CardColumns(cards, header = if (flags.isEmpty()) null else { { AttentionCard(flags, Modifier.fillMaxWidth()) } })
     if (showRequestDialog) {
         DeveloperRequestDialog(
             projectId = project.id, existing = editRequest,
@@ -85,23 +85,7 @@ fun SummarySection(
             onDelete = { onDeleteRequest(it); showRequestDialog = false }
         )
     }
-    var continueFrom by remember { mutableStateOf<PendingDocument?>(null) }
-    openOrder?.let { order ->
-        OrderStatusDialog(
-            order, currentUserRole, onUpdateOrderStatus, onDeleteOrder,
-            onAddContinuance = { continueFrom = order }.takeIf { ProjectSchedule.isSuspension(order) }
-        ) { openOrder = null }
-    }
-    continueFrom?.let { ws ->
-        val startsOn = remember(ws, documents) { ProjectSchedule.nextContinuance(ws, documents).second }
-        ContinuanceDialog(
-            nameFor = { type -> ProjectSchedule.nextContinuance(ws, documents, type).first },
-            initialType = ProjectSchedule.suspensionType(ws), startsOn = startsOn, onDismiss = { continueFrom = null }
-        ) { name, days, effectivity ->
-            onAddContinuance(name, ProjectSchedule.suspensionRemarks(days, effectivity))
-            continueFrom = null
-        }
-    }
+    OrderDialogs(openOrder, documents, currentUserRole, onUpdateOrderStatus, onDeleteOrder, onAddContinuance) { openOrder = null }
 }
 
 private val SCHEDULE_ORDER_TYPES = listOf("Time Extension", "Work Suspension", "Work Resumption")
@@ -110,7 +94,6 @@ private val SCHEDULE_ORDER_TYPES = listOf("Time Extension", "Work Suspension", "
 private fun AttentionCard(flags: List<AttentionFlag>, modifier: Modifier) {
     val colors = LocalNHAColors.current
     SectionCard("Needs attention", Icons.Default.NotificationImportant, modifier) {
-        if (flags.isEmpty()) EmptyLine("Nothing needs attention")
         flags.forEach { flag ->
             val color = levelColor(flag.level, colors)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
@@ -259,43 +242,3 @@ private fun scopeItems(json: String): List<Triple<String, Double, Double>> = try
 } catch (e: Exception) {
     listOf(Triple(json, 0.0, 100.0))
 }.filter { it.first.isNotBlank() }
-
-/** A Continuance of Work Suspension Order: more days on a logged suspension, starting where it ends. */
-@Composable
-private fun ContinuanceDialog(
-    nameFor: (type: String) -> String,
-    initialType: String,
-    startsOn: String,
-    onDismiss: () -> Unit,
-    onSave: (name: String, days: Int, effectivity: String) -> Unit
-) {
-    var type by remember { mutableStateOf(initialType) }
-    val name = nameFor(type)
-    var days by remember { mutableStateOf("") }
-    var effectivity by remember { mutableStateOf(startsOn) }
-    val dayCount = days.trim().toIntOrNull()?.takeIf { it > 0 }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Continuance of Work Suspension") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                com.example.ui.dialogs.FullOrPartialPicker("Type of Suspension", type) { type = it }
-                OutlinedTextField(
-                    value = days, onValueChange = { days = it.filter(Char::isDigit) }, label = { Text("No. of Days") }, singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                com.example.ui.components.DateField(label = "Effectivity Date", value = effectivity, onValueChange = { effectivity = it })
-                Text(
-                    "Saved as Pending. Like the suspension, it adds no days to the contract; an approved Time Extension does.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { dayCount?.let { onSave(name, it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-}

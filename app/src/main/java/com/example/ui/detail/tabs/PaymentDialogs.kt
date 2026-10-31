@@ -1,5 +1,6 @@
 package com.example.ui.detail.tabs
 
+import com.example.ui.components.zoomable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -202,7 +203,8 @@ fun ViewDvScanDialog(
                             .fillMaxWidth()
                             .height(260.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(cs.surfaceVariant),
+                            .background(cs.surfaceVariant)
+                            .zoomable(),
                         contentScale = ContentScale.Fit
                     )
                 } else {

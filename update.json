@@ -1,8 +1,8 @@
 {
-  "versionCode": 197,
-  "versionName": "1.9.7",
-  "releaseNotes": "v1.9.7: Subdivision plan print and Full / Partial orders. Crop the plan to its frame; mark lots Saleable, Non-saleable, Road or Open Space; road lots are tagged Road completed and Drainage completed; Status of Construction prints on a full A4 page with a legend; continuances and resumptions can be Full or Partial, named \"Partial Work Suspension Order No. 1\" and \"1st Continuance of ...\"; the Project Profile lists orders with days, dates, amount and reason.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.7/NHA_Monitor_v1.9.7_Build197.apk",
-  "apkSha256": "c2a9a1fd904acdbaa078cebf35fade19b36500fa200e16d64b7d0de0f747eb86",
+  "versionCode": 198,
+  "versionName": "1.9.8",
+  "releaseNotes": "v1.9.8: Letters to Contractor with reason and date received; weekly report VIII lists that week's developer requests and letters; signatories get an Office (Bulacan District Office or Region 3 Office) under the position; Documents has Suspension / Resumption (with continuances), Time Extensions, Variation Orders and Letters tabs; printing opens a zoomable preview; photos open full screen with pinch zoom; Needs attention shows only when something needs action.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.8/NHA_Monitor_v1.9.8_Build198.apk",
+  "apkSha256": "fae5d20f0a8f183b7568479b88ee165d809726df679b85b9e2332d1acda4fb2f",
   "isMandatory": true
 }

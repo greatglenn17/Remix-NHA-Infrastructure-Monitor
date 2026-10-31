@@ -15,9 +15,10 @@ class ProjectSectionTest {
 
     @Test
     fun documents_auditOnlyWithPermission() {
-        assertEquals(listOf("Related Files", "Audit log"), SectionChips.documents(true))
+        val orders = listOf("Suspension / Resumption", "Time Extensions", "Variation Orders", "Letters to Contractor")
+        assertEquals(orders + listOf("Related Files", "Audit log"), SectionChips.documents(true))
         assertFalse("Audit log" in SectionChips.documents(false))
-        assertEquals(listOf("Related Files"), SectionChips.documents(false))
+        assertEquals(orders + "Related Files", SectionChips.documents(false))
     }
 
     @Test

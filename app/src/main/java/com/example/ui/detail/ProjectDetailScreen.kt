@@ -38,7 +38,7 @@ fun ProjectDetailScreen(
     onAddWeeklyReportClick: () -> Unit,
     onAddMonthlyReportClick: () -> Unit,
     onAddTimeExtensionClick: () -> Unit,
-    onAddVariationOrderClick: () -> Unit,
+    onAddOrderClick: (type: String) -> Unit,
     onAddWorkSuspensionClick: () -> Unit,
     onAddWorkResumptionClick: () -> Unit,
     onAddDocumentClick: () -> Unit,
@@ -87,9 +87,18 @@ fun ProjectDetailScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val printScope = rememberCoroutineScope()
-    // Blue Book forms open in the system print screen (A4), where "Save as PDF" is one of the printers.
+    // Blue Book forms open in a zoomable preview first; its Print button opens the system print screen (A4),
+    // where "Save as PDF" is one of the printers.
+    var preview by remember { mutableStateOf<Pair<String, String>?>(null) }
     fun printForm(jobName: String, build: suspend () -> String?) {
-        printScope.launch { build()?.let { com.example.util.BlueBookPrint.print(context, jobName, it) } }
+        printScope.launch { build()?.let { preview = jobName to it } }
+    }
+    preview?.let { (jobName, html) ->
+        com.example.ui.components.PrintPreview(
+            title = jobName, html = html,
+            onPrint = { preview = null; com.example.util.BlueBookPrint.print(context, jobName, html) },
+            onDismiss = { preview = null }
+        )
     }
     // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
     // (weekly?, print): the weekly and monthly reports keep separate checkers and noters.
@@ -361,12 +370,7 @@ fun ProjectDetailScreen(
                         payments = projectPayments,
                         contractCost = contractCost,
                         actualPercent = currentProject.actualAccomplishment,
-                        documents = pendingDocuments,
-                        canAddVariationOrder = currentUser.role.hasPermission(Permission.UPLOAD_DOCUMENT),
-                        onAddVariationOrder = onAddVariationOrderClick,
                         currentUserRole = currentUser.role,
-                        onUpdateOrderStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
-                        onDeleteOrder = { viewModel.deletePendingDocument(it) },
                         onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
                             viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
                         },
@@ -381,6 +385,15 @@ fun ProjectDetailScreen(
                         ChipRow(chips, chip) { documentsChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
                             when (chip) {
+                                in SectionChips.ORDER_CHIPS -> com.example.ui.detail.sections.OrdersList(
+                                    chip = chip,
+                                    documents = pendingDocuments,
+                                    currentUserRole = currentUser.role,
+                                    onAddOrder = onAddOrderClick,
+                                    onAddDocument = { name, remarks -> viewModel.addPendingDocument(currentProject.id, name, remarks) },
+                                    onUpdateStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
+                                    onDelete = { viewModel.deletePendingDocument(it) }
+                                )
                                 "Related Files" -> RelatedFilesList(
                                     documents = pendingDocuments,
                                     currentUserRole = currentUser.role,

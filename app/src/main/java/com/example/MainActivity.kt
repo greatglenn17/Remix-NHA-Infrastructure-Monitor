@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
                                 onAddWeeklyReportClick = { showAddWeeklyReportDialog = true },
                                 onAddMonthlyReportClick = { showAddMonthlyReportDialog = true },
                                 onAddTimeExtensionClick = { showAddTimeExtensionDialog = true },
-                                onAddVariationOrderClick = { addDocumentInitialType = "Variation Order"; showAddDocumentDialog = true },
+                                onAddOrderClick = { addDocumentInitialType = it; showAddDocumentDialog = true },
                                 onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
                                 onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
                                 onAddDocumentClick = { addDocumentInitialType = "Time Extension"; showAddDocumentDialog = true },
