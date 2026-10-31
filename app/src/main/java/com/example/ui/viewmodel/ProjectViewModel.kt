@@ -1617,31 +1617,40 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         val user = currentUserAccount.value
         val preparedName = project.preparedByName.ifBlank { user.name }
         val preparedPosition = project.preparedByPosition.ifBlank { user.title.ifBlank { "Site Engineer" } }
+        // Offices not yet chosen default to the project's district office; the Regional Manager to the region.
+        val district = project.implementingOffice.ifBlank { "Bulacan District Office" }
+        val preparedOffice = project.preparedByOffice.ifBlank { district }
         return if (weekly) com.example.util.Signatories(
             preparedName, preparedPosition,
             checkedName = project.weeklyCheckedByName,
             checkedPosition = project.weeklyCheckedByPosition.ifBlank { "Principal Engineer A" },
             notedName = project.weeklyNotedByName,
-            notedPosition = project.weeklyNotedByPosition.ifBlank { "District Manager" }
+            notedPosition = project.weeklyNotedByPosition.ifBlank { "District Manager" },
+            preparedOffice = preparedOffice,
+            checkedOffice = project.weeklyCheckedByOffice.ifBlank { district },
+            notedOffice = project.weeklyNotedByOffice.ifBlank { district }
         ) else com.example.util.Signatories(
             preparedName, preparedPosition,
             checkedName = project.checkedByName,
             checkedPosition = project.checkedByPosition.ifBlank { "District Manager" },
             notedName = project.notedByName,
-            notedPosition = project.notedByPosition.ifBlank { "Regional Manager" }
+            notedPosition = project.notedByPosition.ifBlank { "Regional Manager" },
+            preparedOffice = preparedOffice,
+            checkedOffice = project.checkedByOffice.ifBlank { district },
+            notedOffice = project.notedByOffice.ifBlank { "Region 3 Office" }
         )
     }
 
     /** Remembers the signatories on the project for the next printout; only roles that can edit the project save. */
     fun saveSignatories(project: Project, s: com.example.util.Signatories, weekly: Boolean) {
         if (!currentUserAccount.value.role.hasPermission(Permission.EDIT_PROJECT)) return
-        val prepared = project.copy(preparedByName = s.preparedName, preparedByPosition = s.preparedPosition)
+        val prepared = project.copy(preparedByName = s.preparedName, preparedByPosition = s.preparedPosition, preparedByOffice = s.preparedOffice)
         val updated = if (weekly) prepared.copy(
-            weeklyCheckedByName = s.checkedName, weeklyCheckedByPosition = s.checkedPosition,
-            weeklyNotedByName = s.notedName, weeklyNotedByPosition = s.notedPosition
+            weeklyCheckedByName = s.checkedName, weeklyCheckedByPosition = s.checkedPosition, weeklyCheckedByOffice = s.checkedOffice,
+            weeklyNotedByName = s.notedName, weeklyNotedByPosition = s.notedPosition, weeklyNotedByOffice = s.notedOffice
         ) else prepared.copy(
-            checkedByName = s.checkedName, checkedByPosition = s.checkedPosition,
-            notedByName = s.notedName, notedByPosition = s.notedPosition
+            checkedByName = s.checkedName, checkedByPosition = s.checkedPosition, checkedByOffice = s.checkedOffice,
+            notedByName = s.notedName, notedByPosition = s.notedPosition, notedByOffice = s.notedOffice
         )
         if (updated != project) updateProjectMaster(updated)
     }
@@ -1677,7 +1686,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             photos,
             contractLogs(project),
             signatories,
-            blueBookBanner
+            blueBookBanner,
+            com.example.util.BlueBookForms.weekDocuments(report, repository.getPendingDocuments(project.id).first(), projectDao.getDeveloperRequestsForProject(project.id).first())
         )
     }
 

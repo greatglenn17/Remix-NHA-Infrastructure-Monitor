@@ -1,5 +1,7 @@
 package com.example.ui.detail.tabs
 
+import androidx.compose.ui.platform.testTag
+import com.example.ui.components.zoomable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -143,14 +145,15 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
 
         // Full Screen Image Modal Dialog
         selectedPhoto?.let { photo ->
-            Dialog(onDismissRequest = { selectedPhoto = null }) {
+            // Full screen so the photo can be pinched to zoom.
+            Dialog(onDismissRequest = { selectedPhoto = null }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.Black
+                    color = Color.Black,
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -175,8 +178,9 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                             contentDescription = "Enlarged Photo",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(300.dp)
-                                .clip(RoundedCornerShape(12.dp)),
+                                .weight(1f)
+                                .zoomable()
+                                .testTag("photo_viewer_image"),
                             contentScale = ContentScale.Fit
                         )
 

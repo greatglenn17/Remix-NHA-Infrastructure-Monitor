@@ -14,6 +14,7 @@ class ThemeGuardTest {
             "ui/components/AttachmentPicker.kt",
             "ui/components/FormKit.kt",
             "ui/components/TopAppBarHeader.kt",
+            "ui/components/Zoom.kt",
             "ui/dashboard/DashboardScreen.kt",
             "ui/dashboard/NeedsAttentionPane.kt",
             "ui/dashboard/PortfolioContent.kt",

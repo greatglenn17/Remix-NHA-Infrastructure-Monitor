@@ -84,7 +84,8 @@ fun PortfolioContent(
 
             item(key = "counts") { PortfolioCounts(state.summary, state.filter, wide, onFilter) }
 
-            item(key = "attention") {
+            // Hidden when nothing needs attention, so the overview has no empty box.
+            if (state.attention.isNotEmpty()) item(key = "attention") {
                 AttentionCard(
                     queue = state.attention,
                     showAll = showAllAttention,
@@ -124,7 +125,7 @@ internal fun AttentionCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
-    Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant)) {
+    Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text("Needs attention", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)

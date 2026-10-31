@@ -76,12 +76,16 @@ object ProjectSchedule {
     /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st. */
     fun ordinal(n: Int) = "$n" + if (n % 100 in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
 
+    /** The continuances of [suspension] among [documents], in the order they were added. */
+    fun continuances(suspension: PendingDocument, documents: List<PendingDocument>) =
+        documents.filter { continuanceOf(it.documentName) == baseOf(suspension.documentName) }
+
     /**
      * Name of the next continuance of [suspension] of [type], e.g. "2nd Partial Continuance of Work Suspension Order No. 1",
      * and the day it starts: the latest End of the suspension and its continuances so far.
      */
     fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>, type: String = suspensionType(suspension)): Pair<String, String> {
-        val chain = documents.filter { continuanceOf(it.documentName) == baseOf(suspension.documentName) }
+        val chain = continuances(suspension, documents)
         val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
         return "${ordinal(chain.size + 1)}${if (type == "Partial") " Partial" else ""} Continuance of ${baseOf(suspension.documentName)}" to (lastEnd?.toString() ?: "")
     }

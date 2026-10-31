@@ -1,11 +1,13 @@
 package com.example
 
 import com.example.data.model.DailyHourlyWeather
+import com.example.data.model.DeveloperRequest
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.data.model.WeeklyReport
 import com.example.util.BlueBookForms
 import com.example.util.ContractLogs
+import com.example.util.ContractorLetters
 import com.example.util.Preparer
 import com.example.util.Signatories
 import java.time.LocalDate
@@ -121,6 +123,44 @@ class BlueBookFormsTest {
         // Every section after II. Project Status is numbered, through VIII. Recommendations.
         listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",
             "VII. ISSUES / CONCERNS", "VIII. RECOMMENDATIONS").forEach { assertTrue(it, html.contains(it)) }
+    }
+
+    @Test
+    fun weeklyDocuments_listThatWeeksDeveloperRequestsAndLettersReceived() {
+        val report = WeeklyReport(
+            projectId = 1, reportingWeek = "Oct 26, 2026 - Nov 1, 2026", daysElapsed = 0, remainingDays = 0,
+            targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0, manpowerJson = "[]", equipmentJson = "[]",
+            activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
+            attachedPhotoUrlsJson = "[]", submittedByStaff = ""
+        )
+        val letters = listOf(
+            doc(ContractorLetters.name("1"), "Pending", ContractorLetters.remarks("Slow progress", "2026-10-30")),
+            doc(ContractorLetters.name("2"), "Pending", ContractorLetters.remarks("Before the week", "2026-10-20")),
+            doc(ContractorLetters.name("3"), "Pending", ContractorLetters.remarks("Not yet received", ""))
+        )
+        assertEquals(4, ContractorLetters.nextNo(letters))
+        val requests = listOf(
+            DeveloperRequest(projectId = 1, requestType = "Time Extension", details = "Letter 12", dateRequested = "2026-10-20", dateReceived = "2026-10-27"),
+            DeveloperRequest(projectId = 1, requestType = "Variation Order", dateReceived = "2026-11-02")
+        )
+        val rows = BlueBookForms.weekDocuments(report, docs + letters, requests)
+        assertEquals(
+            listOf(
+                listOf("Developer's request: Time Extension – Letter 12", "October 27, 2026", "Received; not yet packaged", "Requested October 20, 2026"),
+                listOf("Letter to Contractor No. 1: Slow progress", "October 30, 2026", "Letter issued", "Received October 30, 2026")
+            ),
+            rows
+        )
+        val html = BlueBookForms.weeklyReport(
+            project, report, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), ContractLogs.from(project, docs),
+            Signatories("Glenn C. Aprovechado", "Principal Engineer C", "", "", "", "", preparedOffice = "Bulacan District Office", notedOffice = "Region 3 Office"),
+            documentsIssued = rows
+        )
+        assertTrue(html.contains("<tr><td>2. Letter to Contractor No. 1: Slow progress</td><td>October 30, 2026</td><td>Letter issued</td><td>Received October 30, 2026</td></tr>"))
+        // Spare rows stay for writing by hand.
+        assertTrue(html.contains("<tr><td>5. </td><td></td><td></td><td></td></tr>"))
+        assertTrue(html.contains("Principal Engineer C<br>Bulacan District Office</td>"))
+        assertTrue(html.contains("<br>Region 3 Office</td>"))
     }
 
     @Test

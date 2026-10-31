@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.example.data.model.AccomplishmentItem
 import com.example.data.model.DailyActivity
 import com.example.data.model.DailyHourlyWeather
+import com.example.data.model.DeveloperRequest
 import com.example.data.model.EquipmentItem
 import com.example.data.model.ISSUE_ACTION_BY
 import com.example.data.model.ManpowerItem
@@ -35,7 +36,8 @@ data class Preparer(val name: String, val title: String, val office: String)
 data class Signatories(
     val preparedName: String, val preparedPosition: String,
     val checkedName: String, val checkedPosition: String,
-    val notedName: String, val notedPosition: String
+    val notedName: String, val notedPosition: String,
+    val preparedOffice: String = "", val checkedOffice: String = "", val notedOffice: String = ""
 )
 
 data class Extension(val no: String, val days: Int, val reason: String, val status: String)
@@ -151,7 +153,8 @@ object BlueBookForms {
         photos: List<Pair<String, String>>,  // image src to its title
         logs: ContractLogs,
         signatories: Signatories,
-        banner: String = ""
+        banner: String = "",
+        documentsIssued: List<List<String>> = emptyList()  // weekDocuments
     ): String {
         val b = StringBuilder()
         b.append(header("For the Week of ${esc(report.reportingWeek.replace(Regex("^Week \\d+: "), ""))}"))
@@ -207,8 +210,8 @@ object BlueBookForms {
 
         b.append("<table><tr><th colspan='4' class='sec'>VIII. DOCUMENTS ISSUED (If any) – SITE INSTRUCTION / SITE MEMORANDUM / NON-CONFORMANCE REPORT, ETC.</th></tr>")
         b.append("<tr><th rowspan='2'>DOCUMENTS ISSUED / RECEIVED BY THE CONTRACTOR/DEVELOPER</th><th colspan='3'>ACTION TAKEN</th></tr><tr><th>DATE</th><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/ DEVELOPER</th></tr>")
-        // The weekly form does not record these yet, so the rows are left for writing by hand.
-        numbered(5) { listOf(null, null, null, null) }.let(b::append)
+        // Developer requests and letters to the contractor from that week; spare rows are left for writing by hand.
+        numbered(maxOf(5, documentsIssued.size)) { i -> documentsIssued.getOrNull(i) ?: listOf(null, null, null, null) }.let(b::append)
         b.append("</table>")
 
         b.append("<table class='photos'><tr><th colspan='2' class='sec'>IX. ATTACHED PHOTOS FOR THE UPDATES IN THE SITE</th></tr>")
@@ -362,11 +365,13 @@ object BlueBookForms {
         """
     }
 
+    private fun office(name: String) = if (name.isBlank()) "" else "<br>${esc(name.trim())}"
+
     private fun signatures(s: Signatories, checkedTitle: String = "Checked by") = """
         <table class='sig'><tr>
-          <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}</td>
-          <td>$checkedTitle:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}</td>
-          <td>Noted by:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}</td>
+          <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}${office(s.preparedOffice)}</td>
+          <td>$checkedTitle:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}${office(s.checkedOffice)}</td>
+          <td>Noted by:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}${office(s.notedOffice)}</td>
         </tr></table>
     """
 
@@ -451,6 +456,28 @@ object BlueBookForms {
     }
 
     /** The report's own issues, then the Issues tab entries dated within its week. */
+    /**
+     * Section VIII rows for [report]'s week as (document, date, implementing office, contractor/developer):
+     * developer requests NHA received that week and letters the contractor received that week, by date.
+     */
+    fun weekDocuments(report: WeeklyReport, documents: List<PendingDocument>, requests: List<DeveloperRequest>): List<List<String>> {
+        val start = weekStart(report.reportingWeek) ?: return emptyList()
+        fun inWeek(day: String) = parseDate(day)?.let { !it.isBefore(start) && !it.isAfter(start.plusDays(6)) } == true
+        val fromDeveloper = requests.filter { inWeek(it.dateReceived) }.map { r ->
+            listOf(
+                "Developer's request: ${r.requestType}" + r.details.takeIf { it.isNotBlank() }?.let { " – $it" }.orEmpty(),
+                r.dateReceived,
+                if (r.datePackaged.isBlank()) "Received; not yet packaged" else "Packaged ${date(r.datePackaged)}",
+                r.dateRequested.takeIf { it.isNotBlank() }?.let { "Requested ${date(it)}" }.orEmpty()
+            )
+        }
+        val letters = documents.filter { ContractorLetters.isLetter(it) && inWeek(ContractorLetters.received(it)) }.map { d ->
+            val received = ContractorLetters.received(d)
+            listOf(d.documentName + ContractorLetters.reason(d).takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(), received, "Letter issued", "Received ${date(received)}")
+        }
+        return (fromDeveloper + letters).sortedBy { it[1] }.map { row -> row.toMutableList().also { it[1] = date(it[1]) } }
+    }
+
     fun weekIssues(report: WeeklyReport, reportIssues: List<WeeklyIssue>, logged: List<ProjectIssue>): List<WeeklyIssue> {
         val start = weekStart(report.reportingWeek) ?: return reportIssues
         val inWeek = logged
@@ -484,6 +511,8 @@ object BlueBookForms {
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
         @page { size: A4; margin: ${if (fullPage) "6mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
+        /* On screen (the app's print preview) the form sits on an A4-wide sheet; printing ignores this. */
+        @media screen { html { background: #9e9e9e; } body { width: ${if (fullPage) "198mm" else "186mm"}; padding: ${if (fullPage) "6mm" else "12mm"}; margin: 6mm auto; } }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
         /* A title or column-header row never ends a page: it moves on with the rows below it. */
