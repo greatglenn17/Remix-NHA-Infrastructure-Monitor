@@ -80,7 +80,12 @@ fun EmptyLine(text: String) {
 
 /** Cards in one column, or two side by side from 600dp ("use the width"). */
 @Composable
-fun CardColumns(cards: List<@Composable (Modifier) -> Unit>, modifier: Modifier = Modifier, header: (@Composable () -> Unit)? = null) {
+fun CardColumns(
+    cards: List<@Composable (Modifier) -> Unit>,
+    modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null
+) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val perRow = if (maxWidth >= 600.dp) 2 else 1
         LazyColumn(
@@ -97,6 +102,7 @@ fun CardColumns(cards: List<@Composable (Modifier) -> Unit>, modifier: Modifier 
                     }
                 }
             }
+            footer?.let { item { it() } }
         }
     }
 }
