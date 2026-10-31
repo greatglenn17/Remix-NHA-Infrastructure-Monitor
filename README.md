@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.0.1%20%28Build%20201%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.0.2%20%28Build%20202%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.0.1`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.0.1_Build201.apk`** to download the installation package.
+2. Tap the latest release (`v2.0.2`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.0.2_Build202.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.0.2`** | **`202`** | 📱 Weekly reports: on a phone the week title no longer breaks mid-word; the Print, Edit and Delete icons move under it
 | **`v2.0.1`** | **`201`** | 🏷️ Subdivision Plan: Block and Lot names can be edited in a lot's Update Progress; each lot is billed twice, M1 (80%) then M2 (20%), with its own date and reference; lots already marked billed count as M1
 | **`v2.0.0`** | **`200`** | 💳 Summary has a Status of payment table (each billing, date, gross amount, %, balance, and the total); scope of works weights show two decimals
 | **`v1.9.9`** | **`199`** | ⌨️ A signatory Office or Position not in the list can be typed while the list is open

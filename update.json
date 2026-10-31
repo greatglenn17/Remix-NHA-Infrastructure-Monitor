@@ -1,8 +1,8 @@
 {
-  "versionCode": 201,
-  "versionName": "2.0.1",
-  "releaseNotes": "v2.0.1: Subdivision Plan lots can be renamed (Block and Lot) in Update Progress, and each lot is billed twice: M1 (80%) then M2 (20%), each with its own date and reference. Lots already marked billed count as M1.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.1/NHA_Monitor_v2.0.1_Build201.apk",
-  "apkSha256": "8b394562bd2da4cd9abc101aea1238d3463cf7cde25f05b1758de77e39ef0d9d",
+  "versionCode": 202,
+  "versionName": "2.0.2",
+  "releaseNotes": "v2.0.2: On a phone, the weekly report title no longer breaks mid-word; the Print, Edit and Delete icons move under it.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.2/NHA_Monitor_v2.0.2_Build202.apk",
+  "apkSha256": "82a70806d4765cff4df5d1109bb9fba2fcc0e28bcbaf7b8dc993a56f340b634d",
   "isMandatory": true
 }
