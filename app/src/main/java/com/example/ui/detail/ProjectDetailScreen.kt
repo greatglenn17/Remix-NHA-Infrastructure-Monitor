@@ -268,6 +268,7 @@ fun ProjectDetailScreen(
                                 onSetPlanScale = viewModel::setSdpPlanScale,
                                 onLotArea = viewModel::sdpLotArea,
                                 onSetLotUse = viewModel::setSdpLotUse,
+                                onRenameLot = viewModel::renameSdpLot,
                                 onSetPlanFrame = viewModel::setSdpPlanFrame,
                                 onPrintPlan = {
                                     activeSdpPlan?.let { plan ->
@@ -319,12 +320,13 @@ fun ProjectDetailScreen(
                                         )
                                     }
                                 },
-                                onUpdateLotBillingStatus = { lotId: Long, isBilled: Boolean, reference: String, remarks: String ->
+                                onUpdateLotBillingStatus = { lotId: Long, milestone: Int, isBilled: Boolean, reference: String, remarks: String ->
                                     activeSdpPlan?.let { plan ->
                                         viewModel.updateLotBillingStatus(
                                             projectId = currentProject.id,
                                             sdpPlanId = plan.id,
                                             sdpLotId = lotId,
+                                            milestone = milestone,
                                             isBilled = isBilled,
                                             billingReference = reference,
                                             billingRemarks = remarks

@@ -53,6 +53,10 @@ import com.example.data.model.SdpPlan
 import com.example.data.model.SdpRoad
 import com.example.data.model.UserRole
 import com.example.data.model.LOT_USES
+import com.example.data.model.anyBilled
+import com.example.data.model.billingLabel
+import com.example.data.model.m1Billed
+import com.example.data.model.m2Billed
 import com.example.data.model.isRoadLot
 import com.example.data.model.isSaleable
 import com.example.data.model.use
@@ -127,10 +131,10 @@ fun isLotMatchingFilter(
         if (!matchesQuery) return false
     }
 
-    if (billingFilter != "ALL") {
-        val isBilled = progress?.billingStatus == "BILLED"
-        if (billingFilter == "BILLED" && !isBilled) return false
-        if (billingFilter == "NOT BILLED" && isBilled) return false
+    when (billingFilter) {
+        "M1 BILLED" -> if (!progress.m1Billed) return false
+        "M2 BILLED" -> if (!progress.m2Billed) return false
+        "NOT BILLED" -> if (progress.anyBilled) return false
     }
 
     if (completionFilter != "ALL") {
@@ -277,6 +281,8 @@ fun SubdivisionPlanTab(
     ) -> Unit,
     onUpdateLotBillingStatus: (
         sdpLotId: Long,
+        // 1: M1 (80%), 2: M2 (20%).
+        milestone: Int,
         isBilled: Boolean,
         reference: String,
         remarks: String
@@ -301,6 +307,7 @@ fun SubdivisionPlanTab(
     onSetPlanScale: (SdpPlan, Int) -> Unit = { _, _ -> },
     onLotArea: (SdpPlan, List<Pair<Float, Float>>, (Double?) -> Unit) -> Unit = { _, _, done -> done(null) },
     onSetLotUse: (List<SdpLot>, String) -> Unit = { _, _ -> },
+    onRenameLot: (SdpLot, block: String, lot: String) -> Unit = { _, _, _ -> },
     // Null: the whole page.
     onSetPlanFrame: (SdpPlan, List<Float>?) -> Unit = { _, _ -> },
     onPrintPlan: () -> Unit = {}
@@ -348,6 +355,8 @@ fun SubdivisionPlanTab(
     var interactionMode by remember { mutableStateOf(SdpInteractionMode.MONITORING) }
     val isDrawMode = interactionMode != SdpInteractionMode.MONITORING && interactionMode != SdpInteractionMode.TAP_ADD_LOT
     var selectedLot by remember { mutableStateOf<SdpLot?>(null) }
+    // Keeps the selected lot's name and use current after a rename or use change.
+    LaunchedEffect(activeLots) { selectedLot = selectedLot?.let { s -> activeLots.find { it.id == s.id } ?: s } }
     var selectedRoad by remember { mutableStateOf<SdpRoad?>(null) }
     // Group select: lots that get the same progress in one save (null: off).
     var groupIds by remember { mutableStateOf<Set<Long>?>(null) }
@@ -400,7 +409,8 @@ fun SubdivisionPlanTab(
     var showLotAuditTrailDialogLot by remember { mutableStateOf<SdpLot?>(null) }
     var lotToDeactivate by remember { mutableStateOf<SdpLot?>(null) }
     var roadToDeactivate by remember { mutableStateOf<SdpRoad?>(null) }
-    var lotToToggleBilling by remember { mutableStateOf<Pair<SdpLot, Boolean>?>(null) }
+    // Lot, milestone (1: M1, 2: M2), mark as billed.
+    var lotToToggleBilling by remember { mutableStateOf<Triple<SdpLot, Int, Boolean>?>(null) }
 
     val canManageSdp = currentUserRole.hasPermission(com.example.data.model.Permission.MANAGE_SDP_PLANS)
     val canDigitize = currentUserRole.hasPermission(com.example.data.model.Permission.EDIT_PROJECT)
@@ -411,8 +421,9 @@ fun SubdivisionPlanTab(
     // Counted over saleable lots: open spaces, road lots and the like are not housing units.
     val saleableLots = activeLots.filter { it.isSaleable }
     val totalLots = saleableLots.size
-    val billedLotsCount = saleableLots.count { lotProgressMap[it.id]?.billingStatus == "BILLED" }
-    val notBilledLotsCount = totalLots - billedLotsCount
+    val m1BilledCount = saleableLots.count { lotProgressMap[it.id].m1Billed }
+    val m2BilledCount = saleableLots.count { lotProgressMap[it.id].m2Billed }
+    val notBilledLotsCount = saleableLots.count { !lotProgressMap[it.id].anyBilled }
     val completedLotsCount = saleableLots.count { (lotProgressMap[it.id]?.physicalProgress ?: 0) >= 100 }
     val avgPhysicalProgress = if (totalLots > 0) {
         saleableLots.sumOf { lotProgressMap[it.id]?.physicalProgress ?: 0 }.toDouble() / totalLots
@@ -686,7 +697,8 @@ fun SubdivisionPlanTab(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         KpiChip(label = "SALEABLE LOTS", value = "$totalLots", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                        KpiChip(label = "BILLED", value = "$billedLotsCount", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                        KpiChip(label = "M1 BILLED", value = "$m1BilledCount", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                        KpiChip(label = "M2 BILLED", value = "$m2BilledCount", color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
                         KpiChip(label = "NOT BILLED", value = "$notBilledLotsCount", color = LocalNHAColors.current.neutral, modifier = Modifier.weight(1f))
                         KpiChip(label = "COMPLETED", value = "$completedLotsCount", color = LocalNHAColors.current.onTrack, modifier = Modifier.weight(1f))
                         KpiChip(label = "AVG PROGRESS", value = String.format("%.1f%%", avgPhysicalProgress), color = LocalNHAColors.current.watch, modifier = Modifier.weight(1.2f))
@@ -972,7 +984,7 @@ fun SubdivisionPlanTab(
                                         modifier = Modifier.weight(1f)
                                     )
                                     DropdownMenu(expanded = billExpanded, onDismissRequest = { billExpanded = false }) {
-                                        listOf("ALL", "BILLED", "NOT BILLED").forEach { opt ->
+                                        listOf("ALL", "M1 BILLED", "M2 BILLED", "NOT BILLED").forEach { opt ->
                                             DropdownMenuItem(text = { Text(opt) }, onClick = { selectedBillingFilter = opt; billExpanded = false })
                                         }
                                     }
@@ -1368,7 +1380,7 @@ fun SubdivisionPlanTab(
                                 val isSelected = selectedLot?.id == lot.id || previewNumber != null || groupIds?.contains(lot.id) == true
                                 val progressRecord = lotProgressMap[lot.id]
                                 val progressValue = progressRecord?.physicalProgress ?: 0
-                                val isBilled = progressRecord?.billingStatus == "BILLED"
+                                val isBilled = progressRecord.anyBilled
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
                                 val baseProgressColor = if (lot.isSaleable || lot.isRoadLot) lotProgressFill(progressValue, nhaMap) else nhaMap.neutral
@@ -1768,7 +1780,7 @@ fun SubdivisionPlanTab(
                                 if (selectedLot != null) {
                                     val progressRecord = lotProgressMap[selectedLot!!.id]
                                     val progressVal = progressRecord?.physicalProgress ?: 0
-                                    val isBilled = progressRecord?.billingStatus == "BILLED"
+                                    val isBilled = progressRecord.anyBilled
 
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1785,7 +1797,7 @@ fun SubdivisionPlanTab(
                                                 border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outlineVariant)
                                             ) {
                                                 Text(
-                                                    text = if (isBilled) "● BILLED" else "NOT BILLED",
+                                                    text = if (isBilled) "● ${progressRecord.billingLabel}" else "NOT BILLED",
                                                     style = MaterialTheme.typography.labelSmall.copy(
                                                         color = if (isBilled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant,
                                                         fontWeight = FontWeight.Bold
@@ -1949,6 +1961,7 @@ fun SubdivisionPlanTab(
     if (showProgressDialogLot != null && activeSdpPlan != null) {
         val targetLot = showProgressDialogLot!!
         val currentProgress = lotProgressMap[targetLot.id]
+        var pendingRename: Pair<String, String>? = null
         UpdateLotProgressDialog(
             lot = targetLot,
             currentProgress = currentProgress,
@@ -1956,7 +1969,10 @@ fun SubdivisionPlanTab(
             canManageBilling = canDigitize,
             onDismiss = { showProgressDialogLot = null },
             onSubmitProgress = { progressVal: Int, status: String, activity: String, startDate: String, targetDate: String, contractor: String, remarks: String, photos: List<String>, use: String, drainage: Int? ->
-                if (use != targetLot.use) onSetLotUse(listOf(targetLot), use)
+                // Both writes carry the new name and use, so neither undoes the other.
+                val name = pendingRename
+                if (use != targetLot.use) onSetLotUse(listOf(name?.let { targetLot.copy(blockNumber = it.first, lotNumber = it.second) } ?: targetLot), use)
+                if (name != null) onRenameLot(targetLot.copy(lotUse = use), name.first, name.second)
                 onUpdateLotProgress(
                     targetLot.id,
                     progressVal,
@@ -1971,9 +1987,12 @@ fun SubdivisionPlanTab(
                 )
                 showProgressDialogLot = null
             },
-            onToggleBillingRequested = { shouldBeBilled: Boolean ->
-                lotToToggleBilling = Pair(targetLot, shouldBeBilled)
-            }
+            onToggleBillingRequested = { milestone: Int, shouldBeBilled: Boolean ->
+                lotToToggleBilling = Triple(targetLot, milestone, shouldBeBilled)
+            },
+            takenNames = activeLots.filter { it.id != targetLot.id }.map { it.blockNumber to it.lotNumber }.toSet(),
+            // Called right before onSubmitProgress on Save.
+            onRename = { block, lotNo -> pendingRename = block to lotNo }
         )
     }
 
@@ -2001,7 +2020,8 @@ fun SubdivisionPlanTab(
 
     // 4. DEVELOPER BILLING CONFIRMATION DIALOG
     if (lotToToggleBilling != null) {
-        val (targetLot, markAsBilled) = lotToToggleBilling!!
+        val (targetLot, milestone, markAsBilled) = lotToToggleBilling!!
+        val share = if (milestone == 1) "M1 (80%)" else "M2 (20%)"
         var billingRef by remember { mutableStateOf("") }
         var billingRemarks by remember { mutableStateOf("") }
 
@@ -2013,7 +2033,7 @@ fun SubdivisionPlanTab(
                     Icon(Icons.Default.ReceiptLong, contentDescription = "Billing", tint = if (markAsBilled) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (markAsBilled) "Mark Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as BILLED?" else "Mark Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as NOT BILLED?",
+                        text = if (markAsBilled) "Mark $share of Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as BILLED?" else "Mark $share of Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as NOT BILLED?",
                         style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     )
                 }
@@ -2024,7 +2044,7 @@ fun SubdivisionPlanTab(
                         text = if (markAsBilled)
                             "This lot will be highlighted with a distinct cyan billing border on the Interactive SDP."
                         else
-                            "Developer billing border will be removed from this lot.",
+                            "The $share billing will be removed from this lot.",
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                     if (markAsBilled) {
@@ -2046,7 +2066,7 @@ fun SubdivisionPlanTab(
             confirmButton = {
                 Button(
                     onClick = {
-                        onUpdateLotBillingStatus(targetLot.id, markAsBilled, billingRef.trim(), billingRemarks.trim())
+                        onUpdateLotBillingStatus(targetLot.id, milestone, markAsBilled, billingRef.trim(), billingRemarks.trim())
                         lotToToggleBilling = null
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -2054,7 +2074,7 @@ fun SubdivisionPlanTab(
                         contentColor = MaterialTheme.colorScheme.surface
                     )
                 ) {
-                    Text(if (markAsBilled) "CONFIRM BILLED" else "CONFIRM UNBILL", fontWeight = FontWeight.Bold)
+                    Text(if (markAsBilled) "CONFIRM M$milestone BILLED" else "CONFIRM M$milestone UNBILL", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -2349,7 +2369,8 @@ fun RecordInspectionSnapshotDialog(
     var currentActivity by remember { mutableStateOf(currentProgress?.currentActivity ?: "") }
     var contractor by remember { mutableStateOf(currentProgress?.contractor?.ifBlank { defaultContractor } ?: defaultContractor) }
     var remarks by remember { mutableStateOf("") }
-    var billingStatus by remember { mutableStateOf(currentProgress?.billingStatus ?: "NOT BILLED") }
+    // The snapshot keeps both billings, e.g. "M1 BILLED (80%)".
+    var billingStatus by remember { mutableStateOf(currentProgress.billingLabel) }
     var billingRef by remember { mutableStateOf(currentProgress?.billingReference ?: "") }
 
     val intProgress = progressSlider.toInt().coerceIn(0, 100)
@@ -2436,7 +2457,7 @@ fun LotInfoDialog(
 ) {
     val progressVal = currentProgress?.physicalProgress ?: 0
     val derivedColor = getLotProgressFillColor(progressVal)
-    val isBilled = currentProgress?.billingStatus == "BILLED"
+    val isBilled = currentProgress.anyBilled
 
     val inspectionsList by onGetInspections().collectAsState(initial = emptyList())
 
@@ -2481,7 +2502,7 @@ fun LotInfoDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Developer Billing", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                            Text(if (isBilled) "● BILLED" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                            Text(if (isBilled) "● ${currentProgress.billingLabel}" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
                         }
                         Text("Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                         Text("Housing Unit: ${lot.housingUnitNumber.ifBlank { "N/A" }} • Area: ${lot.lotAreaSqM} sq.m", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
@@ -2606,7 +2627,7 @@ fun LotInfoDialog(
                                                 Text(
                                                     text = inspection.billingStatus,
                                                     style = MaterialTheme.typography.labelSmall.copy(
-                                                        color = if (inspection.billingStatus == "BILLED") LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        color = if (inspection.billingStatus != "NOT BILLED") LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 )
@@ -3080,9 +3101,21 @@ fun UpdateLotProgressDialog(
         // Road lots only.
         drainage: Int?
     ) -> Unit,
-    onToggleBillingRequested: (shouldBeBilled: Boolean) -> Unit
+    // milestone 1: M1 (80%), 2: M2 (20%).
+    onToggleBillingRequested: (milestone: Int, shouldBeBilled: Boolean) -> Unit,
+    // Block and lot names other lots already use; a lot can't take one of them.
+    takenNames: Set<Pair<String, String>> = emptySet(),
+    onRename: (block: String, lot: String) -> Unit = { _, _ -> }
 ) {
     var lotUse by remember { mutableStateOf(lot.use) }
+    var blockName by remember { mutableStateOf(lot.blockNumber) }
+    var lotName by remember { mutableStateOf(lot.lotNumber) }
+    val nameTaken = (blockName.trim() to lotName.trim()) in takenNames
+    val nameError = when {
+        blockName.isBlank() || lotName.isBlank() -> "Block and lot can't be blank"
+        nameTaken -> "Block ${blockName.trim()} Lot ${lotName.trim()} already exists"
+        else -> null
+    }
     var drainageSlider by remember { mutableFloatStateOf(currentProgress?.drainageProgress?.toFloat() ?: 0f) }
     val isRoad = lotUse == "Road Lot"
     var progressSlider by remember { mutableFloatStateOf(currentProgress?.physicalProgress?.toFloat() ?: 0f) }
@@ -3096,7 +3129,7 @@ fun UpdateLotProgressDialog(
 
     val intProgress = progressSlider.toInt().coerceIn(0, 100)
     val derivedColor = getLotProgressFillColor(intProgress)
-    val isBilled = currentProgress?.billingStatus == "BILLED"
+    val isBilled = currentProgress.anyBilled
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3119,6 +3152,18 @@ fun UpdateLotProgressDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (canManageBilling) {
+                    // The lot's name as the team calls it, e.g. Block 12 Lot 5-A.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = blockName, onValueChange = { blockName = it }, label = { Text("Block") }, singleLine = true,
+                            isError = nameError != null, modifier = Modifier.weight(1f).testTag("lot_block_name")
+                        )
+                        OutlinedTextField(
+                            value = lotName, onValueChange = { lotName = it }, label = { Text("Lot") }, singleLine = true,
+                            isError = nameError != null, modifier = Modifier.weight(1f).testTag("lot_lot_name")
+                        )
+                    }
+                    nameError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     Text("Lot use", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         LOT_USES.forEach { use ->
@@ -3231,53 +3276,68 @@ fun UpdateLotProgressDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("DEVELOPER BILLING STATUS", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                                Text(
-                                    text = if (isBilled) "● BILLED" else "NOT BILLED",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                            }
-
-                            if (canManageBilling) {
-                                Button(
-                                    onClick = { onToggleBillingRequested(!isBilled) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isBilled) LocalNHAColors.current.behind else LocalNHAColors.current.onTrack,
-                                        contentColor = MaterialTheme.colorScheme.surface
-                                    ),
-                                    shape = RoundedCornerShape(6.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
+                        Text("DEVELOPER BILLING STATUS", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                        Text(
+                            text = if (isBilled) "● ${currentProgress.billingLabel}" else "NOT BILLED",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        // A lot is billed twice: M1 for 80%, then M2 for the last 20%.
+                        val m1 = currentProgress.m1Billed
+                        val m2 = currentProgress.m2Billed
+                        listOf(
+                            Triple(1, m1, listOf(currentProgress?.billingDate, currentProgress?.billedBy, currentProgress?.billingReference)),
+                            Triple(2, m2, listOf(currentProgress?.m2BillingDate, currentProgress?.m2BilledBy, currentProgress?.m2BillingReference))
+                        ).forEach { (milestone, billed, info) ->
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (isBilled) "MARK AS NOT BILLED" else "MARK AS BILLED",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
+                                        text = (if (milestone == 1) "M1 · 80%" else "M2 · 20%") + if (billed) " · BILLED" else " · NOT BILLED",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = if (billed) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     )
+                                    if (billed) {
+                                        val (date, by, ref) = info
+                                        Text(
+                                            text = "${date?.ifBlank { null } ?: "N/A"} • By: ${by?.ifBlank { null } ?: "N/A"}" + (ref?.takeIf { it.isNotBlank() }?.let { " • Ref No: $it" } ?: ""),
+                                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        )
+                                    }
+                                }
+                                if (canManageBilling) {
+                                    // M2 follows M1: it is billed after M1 and unbilled before M1.
+                                    val enabled = if (milestone == 1) !(billed && m2) else billed || m1
+                                    Button(
+                                        onClick = { onToggleBillingRequested(milestone, !billed) },
+                                        enabled = enabled,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (billed) LocalNHAColors.current.behind else LocalNHAColors.current.onTrack,
+                                            contentColor = MaterialTheme.colorScheme.surface
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp).testTag("bill_m$milestone")
+                                    ) {
+                                        Text(
+                                            text = if (billed) "MARK M$milestone NOT BILLED" else "MARK M$milestone BILLED",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
-
-                        if (isBilled) {
-                            Text(
-                                text = "Billed Date: ${currentProgress?.billingDate ?: "N/A"} • By: ${currentProgress?.billedBy ?: "N/A"}",
-                                style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            )
-                            if (currentProgress?.billingReference?.isNotBlank() == true) {
-                                Text(
-                                    text = "Ref No: ${currentProgress.billingReference}",
-                                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary)
-                                )
-                            }
+                        if (canManageBilling && !m1) {
+                            Text("M2 can be marked once M1 is billed.", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                     }
                 }
@@ -3285,7 +3345,9 @@ fun UpdateLotProgressDialog(
         },
         confirmButton = {
             Button(
+                enabled = !canManageBilling || nameError == null,
                 onClick = {
+                    if (canManageBilling) onRename(blockName.trim(), lotName.trim())
                     onSubmitProgress(
                         intProgress,
                         constructionStatus,

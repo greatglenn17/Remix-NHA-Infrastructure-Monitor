@@ -40,7 +40,7 @@ import androidx.security.crypto.MasterKey
         DeveloperRequest::class,
         SyncOutboxEvent::class
     ],
-    version = 31,
+    version = 32,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -357,6 +357,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Lots are billed twice; the existing billing columns hold M1 (80%), these M2 (20%).
+        private val MIGRATION_31_32 = object : Migration(31, 32) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN m2BillingStatus TEXT NOT NULL DEFAULT 'NOT BILLED'")
+                for (column in listOf("m2BillingDate", "m2BilledBy", "m2BillingReference", "m2BillingRemarks")) {
+                    db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN $column TEXT NOT NULL DEFAULT ''")
+                }
+            }
+        }
+
         val OFFICE_COLUMNS = listOf("preparedByOffice", "checkedByOffice", "notedByOffice", "weeklyCheckedByOffice", "weeklyNotedByOffice")
         val SIGNATORY_COLUMNS = listOf("preparedByName", "preparedByPosition", "checkedByName", "checkedByPosition", "notedByName", "notedByPosition")
         val WEEKLY_SIGNATORY_COLUMNS = listOf("weeklyCheckedByName", "weeklyCheckedByPosition", "weeklyNotedByName", "weeklyNotedByPosition")
@@ -370,7 +380,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance
