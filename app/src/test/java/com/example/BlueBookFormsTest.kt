@@ -8,6 +8,7 @@ import com.example.data.model.WeeklyReport
 import com.example.util.BlueBookForms
 import com.example.util.ContractLogs
 import com.example.util.ContractorLetters
+import com.example.util.Order
 import com.example.util.Preparer
 import com.example.util.Signatories
 import java.time.LocalDate
@@ -47,12 +48,24 @@ class BlueBookFormsTest {
     fun orders_becomeTheProfileLists() {
         val logs = ContractLogs.from(project, docs)
         // Older names read in the new form; Full is left out.
-        assertEquals(listOf("Work Suspension Order No. 1" to "146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)"), logs.suspensions)
+        assertEquals(listOf(Order("Work Suspension Order No. 1", "146 calendar days – January 3, 2019 to May 29, 2019", "Road widening", "")), logs.suspensions)
         assertEquals(listOf("Work Resumption Order No. 1" to "May 30, 2019"), logs.resumptions)
         assertEquals(listOf("1" to 146, "2" to 130), logs.extensions.map { it.no to it.days })
         assertEquals("(for approval)", logs.extensions[1].status)
         assertEquals("Right of way", logs.extensions[0].reason)
-        assertEquals(listOf("Variation Order No. 1" to "Php 1,250,000.00 (Realignment)"), logs.variations)
+        assertEquals(listOf(Order("Variation Order No. 1", "Php 1,250,000.00", "Realignment", "")), logs.variations)
+    }
+
+    @Test
+    fun profile_putsReasonsUnderTheDaysOrAmount_andContinuancesCarryNone() {
+        val continuance = doc("1st Continuance of Work Suspension Order No. 1", "Pending", "Duration: 30 Days | Effectivity: 2019-05-30 | End: 2019-06-28 | Reason: Road widening")
+        val html = BlueBookForms.projectProfile(project, ContractLogs.from(project, docs + continuance), Preparer("", "", ""), LocalDate.of(2026, 5, 31))
+        assertTrue(html.contains("Work Suspension Order No. 1</td><td class='pc'>:</td><td>146 calendar days – January 3, 2019 to May 29, 2019<br>Road widening</td>"))
+        assertTrue(html.contains("1st Continuance of Work Suspension Order No. 1</td><td class='pc'>:</td><td>30 calendar days – May 30, 2019 to June 28, 2019 (for approval)</td>"))
+        assertTrue(html.contains("Time Extension No. 2</td><td class='pc'>:</td><td>130 calendar days (for approval)<br>Rain</td>"))
+        assertTrue(html.contains("Variation Order/s</td><td class='pc'>:</td><td></td></tr><tr><td class='pl ps'>Variation Order No. 1</td><td class='pc'>:</td><td>Php 1,250,000.00<br>Realignment</td>"))
+        val none = BlueBookForms.projectProfile(project, ContractLogs.from(project, emptyList()), Preparer("", "", ""), LocalDate.of(2026, 5, 31))
+        assertTrue(none.contains("Variation Order/s</td><td class='pc'>:</td><td>None</td>"))
     }
 
     @Test
@@ -72,7 +85,6 @@ class BlueBookFormsTest {
         assertFalse(html.contains("<Phase 1>"))
         assertTrue(html.contains("September 24, 2018"))
         assertTrue(html.contains("GLENN C. APROVECHADO"))
-        assertTrue(html.contains("Time Extension No. 2</td><td class='pc'>:</td><td>130 C.D. (Rain) (for approval)</td>"))
     }
 
     @Test
@@ -118,7 +130,7 @@ class BlueBookFormsTest {
         assertTrue(html.contains("2. Contractor</td><td>March 10, 2019</td><td></td><td>Act on Contractor</td>"))
         assertTrue(html.contains("3. Old</td><td>March 10, 2019</td><td>Act on Old</td><td></td>"))
         assertTrue(html.contains("Variation Order No. 1: Php 1,250,000.00 (Realignment)"))
-        assertTrue(html.contains("Work Suspension Order No. 1: 146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)"))
+        assertTrue(html.contains("Work Suspension Order No. 1: 146 calendar days – January 3, 2019 to May 29, 2019 (Road widening)"))
         assertTrue(html.contains("Right of way"))
         // Every section after II. Project Status is numbered, through VIII. Recommendations.
         listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",

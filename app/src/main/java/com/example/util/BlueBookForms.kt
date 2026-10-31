@@ -42,6 +42,9 @@ data class Signatories(
 
 data class Extension(val no: String, val days: Int, val reason: String, val status: String)
 
+/** A suspension or variation as the forms list it, e.g. "Work Suspension Order No. 1", "146 calendar days – January 3, 2019 to May 29, 2019". */
+data class Order(val label: String, val value: String, val reason: String, val status: String)
+
 /**
  * The contract figures and orders the forms list, read from the project's Orders the same way
  * the Key Dates and Money cards read them. Orders not yet approved are marked "(for approval)".
@@ -50,30 +53,31 @@ data class ContractLogs(
     val originalCost: Double,
     val revisedCost: Double,
     val revisedCompletion: String,
-    /** Label to value, e.g. "Work Suspension Order No. 1" to "146 C.D. – January 3, 2019 to May 29, 2019 (Road widening)". */
-    val suspensions: List<Pair<String, String>>,
+    val suspensions: List<Order>,
     val resumptions: List<Pair<String, String>>,
     val extensions: List<Extension>,
-    val variations: List<Pair<String, String>>
+    val variations: List<Order>
 ) {
     companion object {
         fun from(project: Project, documents: List<PendingDocument>): ContractLogs {
             fun field(remarks: String, key: String) = Regex("$key: ([^|]*)").find(remarks)?.groupValues?.get(1)?.trim().orEmpty()
             fun mark(d: PendingDocument) = if (d.status.equals("Approved", ignoreCase = true)) "" else " (for approval)"
             fun named(prefix: String) = documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) }
-            fun reason(d: PendingDocument) = field(d.remarks, "Reason").let { if (it.isEmpty()) "" else " ($it)" }
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
                 revisedCost = ContractCost.revised(project.scopeOfWork, project.contractCostOriginal, documents) ?: original,
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
-                // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension.
+                // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension, without its reason again.
                 suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
-                    val days = field(d.remarks, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it C.D. – " }.orEmpty()
+                    val days = field(d.remarks, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it calendar days – " }.orEmpty()
                     val from = BlueBookForms.date(field(d.remarks, "Effectivity"))
                     val to = field(d.remarks, "End")
-                    ProjectSchedule.orderLabel(d.documentName) to days + (if (to.isEmpty()) from else "$from to ${BlueBookForms.date(to)}") + reason(d) + mark(d)
+                    Order(
+                        ProjectSchedule.orderLabel(d.documentName), days + (if (to.isEmpty()) from else "$from to ${BlueBookForms.date(to)}"),
+                        if (ProjectSchedule.isSuspension(d)) field(d.remarks, "Reason") else "", mark(d).trim()
+                    )
                 },
                 resumptions = documents.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }.map { d ->
                     ProjectSchedule.orderLabel(d.documentName) to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d)
@@ -84,8 +88,11 @@ data class ContractLogs(
                 },
                 variations = named("Variation Order").map { d ->
                     val amount = d.documentName.substringAfter(" - ", "")
-                    d.documentName.substringBefore(" - ").substringBefore(" (") to
-                        (amount.removePrefix("PHP").replace(",", "").toDoubleOrNull()?.let(BlueBookForms::peso) ?: amount.replace("PHP", "Php")) + reason(d) + mark(d)
+                    Order(
+                        d.documentName.substringBefore(" - ").substringBefore(" ("),
+                        amount.removePrefix("PHP").replace(",", "").toDoubleOrNull()?.let(BlueBookForms::peso) ?: amount.replace("PHP", "Php"),
+                        field(d.remarks, "Reason"), mark(d).trim()
+                    )
                 }
             )
         }
@@ -101,7 +108,10 @@ object BlueBookForms {
     fun projectProfile(project: Project, logs: ContractLogs, preparer: Preparer, asOf: LocalDate, banner: String = ""): String {
         val rows = StringBuilder()
         fun row(label: String, value: String) { rows.append("<tr><td class='pl'>${esc(label)}</td><td class='pc'>:</td><td>$value</td></tr>") }
-        fun sub(label: String, value: String) { rows.append("<tr><td class='pl ps'>${esc(label)}</td><td class='pc'>:</td><td>${esc(value)}</td></tr>") }
+        fun sub(label: String, value: String) { rows.append("<tr><td class='pl ps'>${esc(label)}</td><td class='pc'>:</td><td>$value</td></tr>") }
+        // The reason goes on its own line, under the days or amount.
+        fun withReason(value: String, status: String, reason: String) =
+            esc(value + if (status.isEmpty()) "" else " $status") + if (reason.isEmpty()) "" else "<br>${esc(reason)}"
         val asOfText = asOf.format(LONG_DATE)
         row("Project Title", esc(project.name))
         row("Project Location", esc(project.location))
@@ -116,14 +126,13 @@ object BlueBookForms {
         row("Original Contract Amount", esc(peso(logs.originalCost)))
         row("Original Contract Duration", esc("${project.contractDurationDays} calendar days (c.d.)"))
         row("Contract Suspension/s", if (logs.suspensions.isEmpty()) "None" else "")
-        logs.suspensions.forEach { (label, value) -> sub(label, value) }
+        logs.suspensions.forEach { sub(it.label, withReason(it.value, it.status, it.reason)) }
         row("Contract Resumption", if (logs.resumptions.isEmpty()) "None" else "")
-        logs.resumptions.forEach { (label, value) -> sub(label, value) }
+        logs.resumptions.forEach { (label, value) -> sub(label, esc(value)) }
         row("Contract Time Extensions", if (logs.extensions.isEmpty()) "None" else "")
-        logs.extensions.forEach {
-            sub("Time Extension No. ${it.no}", "${it.days} C.D." + (if (it.reason.isEmpty()) "" else " (${it.reason})") + if (it.status.isEmpty()) "" else " ${it.status}")
-        }
-        logs.variations.forEach { (label, value) -> row(label, esc(value)) }
+        logs.extensions.forEach { sub("Time Extension No. ${it.no}", withReason("${it.days} calendar days", it.status, it.reason)) }
+        row("Variation Order/s", if (logs.variations.isEmpty()) "None" else "")
+        logs.variations.forEach { sub(it.label, withReason(it.value, it.status, it.reason)) }
         row("Revised Contract Cost", esc(peso(logs.revisedCost)))
         row("Revised Completion Date", esc(date(logs.revisedCompletion)))
         row("% Actual Accomplishment as of $asOfText", esc(pct(project.actualAccomplishment)))
@@ -250,7 +259,9 @@ object BlueBookForms {
     ): String {
         val b = StringBuilder()
         b.append(header("For the Month of ${esc(month.format(MONTH))}"))
-        fun list(items: List<Pair<String, String>>) = items.joinToString("<br>") { (label, value) -> esc("$label: $value") }.ifEmpty { "None" }
+        fun list(items: List<Order>) = items.joinToString("<br>") {
+            esc("${it.label}: ${it.value}" + (if (it.reason.isEmpty()) "" else " (${it.reason})") + if (it.status.isEmpty()) "" else " ${it.status}")
+        }.ifEmpty { "None" }
         b.append(basicInfo(project, "VARIATION ORDER/S", list(logs.variations), "WORK SUSPENSION ORDER/S", list(logs.suspensions), logs))
 
         b.append("<table><tr><th colspan='5' class='sec'>II. PROJECT STATUS</th></tr><tr><th colspan='5' class='sub'>STATUS OF ACCOMPLISHMENT</th></tr>")
@@ -542,7 +553,7 @@ object BlueBookForms {
         table.photos img { max-width: 100%; max-height: 80mm; }
         table.profile td { border: none; padding: 0.8mm 1mm; font-size: 10.5pt; }
         td.pl { width: 38%; font-weight: bold; }
-        td.ps { font-weight: normal; padding-left: 10mm; }
+        table.profile td.ps { font-weight: normal; padding-left: 10mm; }
         td.pc { width: 3%; }
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
         img.banner { display: block; width: 100%; margin-bottom: 3mm; }
