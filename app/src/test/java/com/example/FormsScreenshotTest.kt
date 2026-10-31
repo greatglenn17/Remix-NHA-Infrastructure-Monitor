@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
@@ -14,7 +15,9 @@ import com.example.data.model.SdpLot
 import com.example.data.model.WeeklyReport
 import com.example.ui.components.DiscardChangesDialog
 import com.example.ui.detail.tabs.AddPaymentDialog
+import com.example.ui.detail.tabs.PhotoGalleryTab
 import com.example.ui.detail.tabs.RecordInspectionSnapshotDialog
+import com.example.ui.detail.tabs.UpdateLotProgressDialog
 import com.example.ui.dialogs.AddCustomDocumentDialog
 import com.example.ui.dialogs.AddIssueDialog
 import com.example.ui.dialogs.AddMonthlyReportDialog
@@ -86,11 +89,26 @@ class FormsScreenshotTest {
         shoot("login_$t") { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
     }
 
+    // A found lot has no block or lot until the engineer names it; a photo is deleted only after a confirm.
+    private fun unassignedAndPhotoDelete(t: String) {
+        shoot("form_lot_progress_unassigned_$t") {
+            UpdateLotProgressDialog(lot.copy(blockNumber = "", lotNumber = ""), null, "JRC Builders", true, {}, { _, _, _, _, _, _, _, _, _, _ -> }, { _, _ -> })
+        }
+        // The confirm is a dialog over this one, which the capture doesn't draw; UnassignedLotsAndPhotosTest covers it.
+        shoot("photo_viewer_delete_$t", steps = {
+            rule.onNode(hasContentDescription("Project Photo")).performSemanticsAction(SemanticsActions.OnClick)
+        }) { PhotoGalleryTab(listOf(badReport.copy(attachedPhotoUrlsJson = "[\"a.jpg\"]")), onDeletePhoto = { _, _ -> }) }
+    }
+
     @Config(qualifiers = "w411dp-h891dp") @Test fun phone_light() {
         all("411", AppThemeMode.LIGHT)
         shoot("form_discard_411_light") { DiscardChangesDialog({}, {}) }
+        unassignedAndPhotoDelete("411_light")
     }
-    @Config(qualifiers = "w411dp-h891dp") @Test fun phone_dark() = all("411", AppThemeMode.DARK)
+    @Config(qualifiers = "w411dp-h891dp") @Test fun phone_dark() {
+        all("411", AppThemeMode.DARK)
+        unassignedAndPhotoDelete("411_dark")
+    }
     @Config(qualifiers = "w743dp-h1185dp") @Test fun tablet_portrait_light() = all("743", AppThemeMode.LIGHT)
     @Config(qualifiers = "w743dp-h1185dp") @Test fun tablet_portrait_dark() = all("743", AppThemeMode.DARK)
     @Config(qualifiers = "w1185dp-h743dp") @Test fun tablet_landscape_light() = all("1185", AppThemeMode.LIGHT)

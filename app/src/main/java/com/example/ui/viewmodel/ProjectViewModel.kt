@@ -1147,8 +1147,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 SdpLot(
                     projectId = plan.projectId,
                     sdpPlanId = plan.id,
-                    blockNumber = if (a.isLot) a.block.toString() else "OS",
-                    lotNumber = a.lot.toString(),
+                    // No block or lot: the detector's numbers rarely match the plan, so the engineer names each lot.
+                    blockNumber = "",
+                    lotNumber = "",
+                    lotUse = if (a.isLot) "" else "Open Space",
                     lotAreaSqM = areaOn(plan, a.polygon.map { (x, y) -> x.toDouble() to y.toDouble() }) ?: 0.0,
                     polygonNormalizedJson = org.json.JSONArray(a.polygon.map { (x, y) -> org.json.JSONArray(listOf(x.toDouble(), y.toDouble())) }).toString(),
                     description = if (a.isLot) DETECTED_LOT else "$DETECTED_LOT open space or facility",
@@ -1164,7 +1166,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Lot Created",
                 details = "Added ${lots.size} lots found in SDP Plan v${plan.version}",
                 oldValue = "",
-                newValue = "${lots.count { it.blockNumber != "OS" }} lots, ${lots.count { it.blockNumber == "OS" }} larger areas"
+                newValue = "${lots.count { it.isSaleable }} lots, ${lots.count { !it.isSaleable }} larger areas"
             )
         }
     }
@@ -1364,8 +1366,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             logAuditAction(
                 projectId = renumbered.first().projectId,
                 actionType = "Lot Geometry Changed",
-                details = "Renumbered ${renumbered.size} lots of Block $oldBlock",
-                oldValue = "Block $oldBlock",
+                details = if (oldBlock.isBlank()) "Numbered ${renumbered.size} unassigned lots" else "Renumbered ${renumbered.size} lots of Block $oldBlock",
+                oldValue = if (oldBlock.isBlank()) "Unassigned" else "Block $oldBlock",
                 newValue = "Block ${renumbered.first().blockNumber}, Lots ${numbers.min()}-${numbers.max()}"
             )
         }
@@ -2219,6 +2221,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             reportDao.deleteWeeklyReport(report.id)
             logAuditAction(report.projectId, "Deleted Weekly Report", "Deleted report for ${report.reportingWeek}")
+            refreshSitePhoto(report.projectId)
+        }
+    }
+
+    /** Takes one photo off its weekly report; the report's sync then removes it on the other phones. */
+    fun deleteWeeklyReportPhoto(report: WeeklyReport, url: String) {
+        viewModelScope.launch(missingProjectGuard) {
+            // The saved copy, so a delete right after another doesn't put the first photo back.
+            val current = reportDao.getWeeklyReportsForProject(report.projectId).first().find { it.id == report.id } ?: return@launch
+            repository.updateWeeklyReport(SitePhotos.withoutPhoto(current, url), currentUserAccount.value.role)
+            logAuditAction(report.projectId, "Deleted Photo", "Deleted a photo from the report for ${report.reportingWeek}")
             refreshSitePhoto(report.projectId)
         }
     }

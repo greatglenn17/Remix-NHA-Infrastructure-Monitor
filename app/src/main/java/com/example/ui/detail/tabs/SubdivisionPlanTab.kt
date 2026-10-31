@@ -55,6 +55,8 @@ import com.example.data.model.UserRole
 import com.example.data.model.LOT_USES
 import com.example.data.model.anyBilled
 import com.example.data.model.billingLabel
+import com.example.data.model.isUnassigned
+import com.example.data.model.label
 import com.example.data.model.m1Billed
 import com.example.data.model.m2Billed
 import com.example.data.model.isRoadLot
@@ -127,7 +129,8 @@ fun isLotMatchingFilter(
         val block = "block ${lot.blockNumber}".lowercase()
         val lotStr = "lot ${lot.lotNumber}".lowercase()
         val unit = lot.housingUnitNumber.lowercase()
-        val matchesQuery = key.contains(q) || keyNoDash.contains(q) || block.contains(q) || lotStr.contains(q) || unit.contains(q)
+        val matchesQuery = if (lot.isUnassigned) lot.label.lowercase().contains(q) || unit.contains(q)
+            else key.contains(q) || keyNoDash.contains(q) || block.contains(q) || lotStr.contains(q) || unit.contains(q)
         if (!matchesQuery) return false
     }
 
@@ -378,7 +381,8 @@ fun SubdivisionPlanTab(
     var renumberOtherRow by remember { mutableStateOf(false) }
     val startRenumber = { lot: SdpLot ->
         renumberBlock = lot.blockNumber
-        renumberIds = activeLots.filter { it.blockNumber == lot.blockNumber }.map { it.id }.toSet()
+        // Unnamed lots aren't grouped into blocks yet, so the engineer taps the rest of this block.
+        renumberIds = if (lot.isUnassigned) setOf(lot.id) else activeLots.filter { it.blockNumber == lot.blockNumber }.map { it.id }.toSet()
         renumberTo = lot.blockNumber
         renumberFirst = "1"
         renumberPattern = BlockNumbering.Pattern.ODD_EVEN
@@ -1175,7 +1179,7 @@ fun SubdivisionPlanTab(
                                         } else if (interactionMode == SdpInteractionMode.TAP_ADD_LOT && activeSdpPlan != null && !isTracing) {
                                             val existing = parsedLots.firstOrNull { it.bounds.contains(tappedNorm) && pointInPolygon(tappedNorm, it.polygon) }
                                             if (existing != null) {
-                                                tapAddMessage = "Block ${existing.lot.blockNumber} Lot ${existing.lot.lotNumber} is already a lot. Tap a lot that is not shaded."
+                                                tapAddMessage = "${existing.lot.label} is already a lot. Tap a lot that is not shaded."
                                             } else {
                                                 isTracing = true
                                                 tapAddMessage = null
@@ -1411,7 +1415,7 @@ fun SubdivisionPlanTab(
                                     )
 
                                     // While renumbering, a dashed outline marks lots that still have the app's numbers.
-                                    if (renumberBlock != null && previewNumber == null && lot.description.startsWith("Auto-detected") && lot.blockNumber != "OS") {
+                                    if (renumberBlock != null && previewNumber == null && (lot.isUnassigned && lot.isSaleable || lot.description.startsWith("Auto-detected") && lot.blockNumber != "OS")) {
                                         drawPath(
                                             path = path,
                                             color = nhaMap.watch,
@@ -1600,8 +1604,9 @@ fun SubdivisionPlanTab(
                     val first = renumberFirst.trim().toIntOrNull()
                     val othersInTarget = activeLots.count { it.blockNumber == target && it.id !in renumberIds }
                     // Blocks with lots nobody has renumbered yet, and numbers two lots share.
-                    val blocksToDo = activeLots.filter { it.description.startsWith("Auto-detected") && it.blockNumber != "OS" }.map { it.blockNumber }.distinct().size
-                    val duplicates = activeLots.groupBy { it.blockNumber to it.lotNumber }.filter { it.value.size > 1 }.keys.map { (b, l) -> "B$b-L$l" }
+                    val blocksToDo = activeLots.filter { !it.isUnassigned && it.description.startsWith("Auto-detected") && it.blockNumber != "OS" }.map { it.blockNumber }.distinct().size
+                    val unnamed = activeLots.count { it.isUnassigned && it.isSaleable }
+                    val duplicates = activeLots.filter { !it.isUnassigned }.groupBy { it.blockNumber to it.lotNumber }.filter { it.value.size > 1 }.keys.map { (b, l) -> "B$b-L$l" }
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.97f),
                         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1610,16 +1615,18 @@ fun SubdivisionPlanTab(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                if (blockLots.isEmpty()) "Renumber blocks" else "Renumber Block $block (${blockLots.size} lots)",
+                                if (blockLots.isEmpty()) "Renumber blocks" else if (block.isBlank()) "Number lots (${blockLots.size} lots)" else "Renumber Block $block (${blockLots.size} lots)",
                                 style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )
                             Text(
                                 if (blockLots.isEmpty()) "Saved. Tap a lot to renumber its block."
+                                else if (block.isBlank()) "Tap the other lots of this block to add them, then type the block on the plan and its first lot."
                                 else "Check the numbers on the shaded lots against the plan. Tap a lot to add it to this block or take it out.",
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                             )
                             Text(
-                                if (blocksToDo == 0) "Every found block is renumbered."
+                                if (unnamed > 0) "$unnamed ${if (unnamed == 1) "lot has" else "lots have"} no block and lot yet (dashed outline)."
+                                else if (blocksToDo == 0) "Every found block is renumbered."
                                 else "$blocksToDo ${if (blocksToDo == 1) "block still has" else "blocks still have"} the app's numbers (dashed outline).",
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
                                 modifier = Modifier.testTag("renumber_blocks_to_do")
@@ -1787,7 +1794,7 @@ fun SubdivisionPlanTab(
                                             Icon(Icons.Default.HomeWork, contentDescription = "Lot", tint = getLotProgressFillColor(progressVal), modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "Block ${selectedLot!!.blockNumber} / Lot ${selectedLot!!.lotNumber}",
+                                                text = selectedLot!!.label,
                                                 style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
@@ -1904,7 +1911,7 @@ fun SubdivisionPlanTab(
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                         modifier = Modifier.fillMaxWidth().height(32.dp).testTag("renumber_block_button")
                                     ) {
-                                        Text("RENUMBER BLOCK ${selectedLot!!.blockNumber}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(if (selectedLot!!.isUnassigned) "NUMBER LOTS" else "RENUMBER BLOCK ${selectedLot!!.blockNumber}", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     OutlinedButton(
@@ -1990,7 +1997,7 @@ fun SubdivisionPlanTab(
             onToggleBillingRequested = { milestone: Int, shouldBeBilled: Boolean ->
                 lotToToggleBilling = Triple(targetLot, milestone, shouldBeBilled)
             },
-            takenNames = activeLots.filter { it.id != targetLot.id }.map { it.blockNumber to it.lotNumber }.toSet(),
+            takenNames = activeLots.filter { it.id != targetLot.id && !it.isUnassigned }.map { it.blockNumber to it.lotNumber }.toSet(),
             // Called right before onSubmitProgress on Save.
             onRename = { block, lotNo -> pendingRename = block to lotNo }
         )
@@ -2033,7 +2040,7 @@ fun SubdivisionPlanTab(
                     Icon(Icons.Default.ReceiptLong, contentDescription = "Billing", tint = if (markAsBilled) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (markAsBilled) "Mark $share of Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as BILLED?" else "Mark $share of Block ${targetLot.blockNumber} Lot ${targetLot.lotNumber} as NOT BILLED?",
+                        text = if (markAsBilled) "Mark $share of ${targetLot.label} as BILLED?" else "Mark $share of ${targetLot.label} as NOT BILLED?",
                         style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     )
                 }
@@ -2206,7 +2213,7 @@ fun SubdivisionPlanTab(
         AlertDialog(
             onDismissRequest = { lotToDeactivate = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Remove Block ${lotToDeactivate!!.blockNumber} Lot ${lotToDeactivate!!.lotNumber}?", color = MaterialTheme.colorScheme.onSurface) },
+            title = { Text("Remove ${lotToDeactivate!!.label}?", color = MaterialTheme.colorScheme.onSurface) },
             text = { Text("The lot is taken off the plan on every phone. Its progress and billing history stay in the audit log.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
@@ -2303,7 +2310,7 @@ fun SubdivisionPlanTab(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Found $lotCount lots in $blockCount blocks" + if (largeCount > 0) ", and $largeCount larger areas (open spaces or facilities)." else ".")
                     Text(
-                        "Blocks and lots are numbered top to bottom; use Renumber block to match the plan's own numbers. " +
+                        "The lots come in without block and lot numbers. Tap a lot and set its Block and Lot in Update Progress, or use Number lots to number a block at once. " +
                             "Earlier found lots with no progress yet are replaced; renumbered lots stay" +
                             if (updatedDetected > 0) "; the $updatedDetected with progress stay." else ".",
                         style = MaterialTheme.typography.bodySmall,
@@ -2382,7 +2389,7 @@ fun RecordInspectionSnapshotDialog(
     val dirty = snapshot() != initial
 
     LongForm(
-        title = "Record inspection: Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+        title = "Record inspection: ${lot.label}",
         dirty = dirty,
         saveEnabled = true,
         saveTag = "submit_lot_inspection",
@@ -2469,7 +2476,7 @@ fun LotInfoDialog(
                 Icon(Icons.Default.Info, contentDescription = "Info", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Lot B${lot.blockNumber}-L${lot.lotNumber} Metadata & History",
+                    text = "${lot.label} Metadata & History",
                     style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
@@ -2504,7 +2511,7 @@ fun LotInfoDialog(
                             Text("Developer Billing", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Text(if (isBilled) "● ${currentProgress.billingLabel}" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
                         }
-                        Text("Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
+                        Text(if (lot.isUnassigned) "Block and lot not assigned yet" else "Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                         Text("Housing Unit: ${lot.housingUnitNumber.ifBlank { "N/A" }} • Area: ${lot.lotAreaSqM} sq.m", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                         Text("SDP Plan Version: v$sdpVersion • Internal ID: ${lot.id}", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
@@ -2697,7 +2704,7 @@ fun LotAuditHistoryDialog(
                 Icon(Icons.Default.Shield, contentDescription = "Audit", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Audit History — Lot B${lot.blockNumber}-L${lot.lotNumber}",
+                    text = "Audit History — ${lot.label}",
                     style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
@@ -2710,7 +2717,7 @@ fun LotAuditHistoryDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Read-only system audit log entries for Block ${lot.blockNumber} Lot ${lot.lotNumber}.",
+                    text = "Read-only system audit log entries for ${lot.label}.",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
 
@@ -2718,7 +2725,7 @@ fun LotAuditHistoryDialog(
                     auditLogs.filter { log ->
                         log.details.contains("Lot ID: ${lot.id}") ||
                         log.details.contains("Lot ID ${lot.id}") ||
-                        log.details.contains("Lot B${lot.blockNumber}-L${lot.lotNumber}")
+                        (!lot.isUnassigned && log.details.contains("Lot B${lot.blockNumber}-L${lot.lotNumber}"))
                     }.sortedByDescending { it.timestamp }
                 }
 
@@ -3113,6 +3120,8 @@ fun UpdateLotProgressDialog(
     // "2-b" and "2-B" are the same lot on the plan.
     val nameTaken = takenNames.any { (b, l) -> b.equals(blockName.trim(), ignoreCase = true) && l.equals(lotName.trim(), ignoreCase = true) }
     val nameError = when {
+        // An unnamed lot can still get progress; it stays unassigned until both are filled in.
+        lot.isUnassigned && blockName.isBlank() && lotName.isBlank() -> null
         blockName.isBlank() || lotName.isBlank() -> "Block and lot can't be blank"
         nameTaken -> "Block ${blockName.trim()} Lot ${lotName.trim()} already exists"
         else -> null
@@ -3140,7 +3149,7 @@ fun UpdateLotProgressDialog(
                 Icon(Icons.Default.HomeWork, contentDescription = "Lot", tint = derivedColor)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Lot B${lot.blockNumber}-L${lot.lotNumber} Construction & Billing",
+                    text = "${lot.label} Construction & Billing",
                     style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
@@ -3448,7 +3457,7 @@ private fun ProgressPicker(value: Float, color: Color, onChange: (Float) -> Unit
 @Composable
 private fun LotPhotos(lot: SdpLot, photos: List<String>, onChange: (List<String>) -> Unit) {
     // Built when the photo comes in, so the time is when it was taken.
-    val stamp = { listOf("Block ${lot.blockNumber} Lot ${lot.lotNumber}", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", java.util.Locale.ENGLISH))) }
+    val stamp = { listOf(lot.label, java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", java.util.Locale.ENGLISH))) }
     val latest by rememberUpdatedState(photos)
     val camera = com.example.ui.components.rememberAttachmentCamera(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }
     val picker = com.example.ui.components.rememberAttachmentPicker(com.example.data.files.Attachments.Kind.PHOTO, stamp) { onChange(latest + it) }
@@ -3460,7 +3469,7 @@ private fun LotPhotos(lot: SdpLot, photos: List<String>, onChange: (List<String>
                 photos.forEach { ref ->
                     Box {
                         coil.compose.AsyncImage(
-                            model = ref, contentDescription = "Photo of Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+                            model = ref, contentDescription = "Photo of ${lot.label}",
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                             modifier = Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)).clickable { open(ref) }
                         )

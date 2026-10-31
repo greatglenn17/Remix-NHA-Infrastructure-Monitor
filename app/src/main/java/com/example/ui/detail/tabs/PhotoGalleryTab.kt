@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,12 +31,15 @@ data class PhotoItem(
     val url: String,
     val weekDate: String,
     val submittedBy: String,
-    val detail: com.example.data.files.PhotoDetail = com.example.data.files.PhotoDetail()
+    val detail: com.example.data.files.PhotoDetail = com.example.data.files.PhotoDetail(),
+    val report: WeeklyReport? = null
 )
 
+/** [onDeletePhoto] is null for users who can't edit reports; they get no Delete button. */
 @Composable
-fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
+fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyReport, String) -> Unit)? = null) {
     var selectedPhoto by remember { mutableStateOf<PhotoItem?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     // One album per reporting week, in report order.
     val albums = remember(weeklyReports) {
@@ -46,7 +50,8 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                     url = url,
                     weekDate = report.reportingWeek,
                     submittedBy = report.submittedByStaff,
-                    detail = details[url] ?: com.example.data.files.PhotoDetail()
+                    detail = details[url] ?: com.example.data.files.PhotoDetail(),
+                    report = report
                 )
             }
         }.filter { it.second.isNotEmpty() }
@@ -166,8 +171,15 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                                 text = photo.weekDate,
                                 style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
                             )
-                            IconButton(onClick = { selectedPhoto = null }) {
-                                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                            Row {
+                                if (onDeletePhoto != null && photo.report != null) {
+                                    IconButton(onClick = { confirmDelete = true }, modifier = Modifier.testTag("photo_delete_button")) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete photo", tint = Color.White)
+                                    }
+                                }
+                                IconButton(onClick = { selectedPhoto = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                                }
                             }
                         }
 
@@ -201,6 +213,24 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>) {
                             style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray)
                         )
                     }
+                }
+                if (confirmDelete) {
+                    AlertDialog(
+                        onDismissRequest = { confirmDelete = false },
+                        title = { Text("Delete this photo?") },
+                        text = { Text("It is removed from the ${photo.weekDate} weekly report on every phone. This can't be undone.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    photo.report?.let { onDeletePhoto?.invoke(it, photo.url) }
+                                    confirmDelete = false
+                                    selectedPhoto = null
+                                },
+                                modifier = Modifier.testTag("photo_delete_confirm")
+                            ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                        },
+                        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+                    )
                 }
             }
         }

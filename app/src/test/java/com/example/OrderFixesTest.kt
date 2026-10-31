@@ -51,4 +51,13 @@ class OrderFixesTest {
         assertEquals("", SitePhotos.latest(listOf(report(1, "[]"))))
         assertEquals("", SitePhotos.latest(emptyList()))
     }
+
+    @Test
+    fun withoutPhoto_dropsThePhotoAndItsCaption() {
+        val r = report(1, "[\"a.jpg\",\"b.jpg\"]").copy(photoDetailsJson = "{\"a.jpg\":{\"title\":\"Footing\"},\"b.jpg\":{\"title\":\"Roof\"}}")
+        val out = SitePhotos.withoutPhoto(r, "a.jpg")
+        assertEquals(listOf("b.jpg"), com.example.data.files.Attachments.parseList(out.attachedPhotoUrlsJson))
+        assertEquals(setOf("b.jpg"), com.example.data.files.PhotoDetails.parse(out.photoDetailsJson).keys)
+        assertEquals(r.id, out.id)
+    }
 }
