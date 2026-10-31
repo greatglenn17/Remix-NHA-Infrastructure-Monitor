@@ -1,8 +1,8 @@
 {
-  "versionCode": 202,
-  "versionName": "2.0.2",
-  "releaseNotes": "v2.0.2: On a phone, the weekly report title no longer breaks mid-word; the Print, Edit and Delete icons move under it.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.2/NHA_Monitor_v2.0.2_Build202.apk",
-  "apkSha256": "82a70806d4765cff4df5d1109bb9fba2fcc0e28bcbaf7b8dc993a56f340b634d",
+  "versionCode": 203,
+  "versionName": "2.0.3",
+  "releaseNotes": "v2.0.3: Project Profile: each order's reason is on its own line in parentheses under the days or amount; continuances show no reason; sub-rows are indented; variation orders have their own group; Revised Contract Cost is blank until a variation order is approved.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.3/NHA_Monitor_v2.0.3_Build203.apk",
+  "apkSha256": "9022ff2197b917d3c9f094ba1726f710a9cbd64a9cd0cc190ba79abb4fb4692d",
   "isMandatory": true
 }
