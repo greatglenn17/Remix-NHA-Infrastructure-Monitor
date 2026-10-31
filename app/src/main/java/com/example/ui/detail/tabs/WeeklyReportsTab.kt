@@ -138,53 +138,51 @@ private fun WeeklyReportCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = report.reportingWeek,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                    Text(
+                        text = report.reportingWeek,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onPrintClick, modifier = Modifier.size(48.dp).testTag("print_weekly_report_button")) {
-                                Icon(Icons.Default.Print, contentDescription = "Print", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                            }
-                            if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) {
-                                IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                                }
-                            }
-                            if (currentUserRole.hasPermission(Permission.DELETE_REPORT)) {
-                                var showDeleteConfirm by remember { mutableStateOf(false) }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(24.dp))
-                                }
-                                
-                                if (showDeleteConfirm) {
-                                    AlertDialog(
-                                        onDismissRequest = { showDeleteConfirm = false },
-                                        title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
-                                        text = { Text("Are you sure you want to delete this report?", color = MaterialTheme.colorScheme.onSurface) },
-                                        confirmButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = LocalNHAColors.current.behind) }
-                                        },
-                                        dismissButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                        },
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Submitted by: ${report.submittedByStaff}  |  Elapsed: ${report.daysElapsed}d, Remaining: ${report.remainingDays}d",
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
+                    // Actions sit under the title so it keeps its width on phones.
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.offset(x = (-12).dp)) {
+                        IconButton(onClick = onPrintClick, modifier = Modifier.size(48.dp).testTag("print_weekly_report_button")) {
+                            Icon(Icons.Default.Print, contentDescription = "Print", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                        }
+                        if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) {
+                            IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                        if (currentUserRole.hasPermission(Permission.DELETE_REPORT)) {
+                            var showDeleteConfirm by remember { mutableStateOf(false) }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(24.dp))
+                            }
+                            
+                            if (showDeleteConfirm) {
+                                AlertDialog(
+                                    onDismissRequest = { showDeleteConfirm = false },
+                                    title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
+                                    text = { Text("Are you sure you want to delete this report?", color = MaterialTheme.colorScheme.onSurface) },
+                                    confirmButton = {
+                                        TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = LocalNHAColors.current.behind) }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Surface(

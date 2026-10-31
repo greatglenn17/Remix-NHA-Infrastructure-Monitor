@@ -18,18 +18,16 @@ import com.example.data.model.ISSUE_ACTION_BY
 import com.example.data.model.ProjectIssue
 import com.example.ui.components.DateField
 import com.example.util.FormValidation
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddIssueDialog(
     existingIssue: ProjectIssue? = null,
     onDismiss: () -> Unit,
-    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean, targetDate: String, actionBy: String) -> Unit
+    onSubmit: (date: String, description: String, actionTaken: String, status: String, isCritical: Boolean, targetDate: String, actionBy: String) -> Unit,
+    today: java.time.LocalDate = java.time.LocalDate.now()
 ) {
-    var date by remember { mutableStateOf(existingIssue?.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())) }
+    var date by remember { mutableStateOf(existingIssue?.date ?: today.toString()) }
     var description by remember { mutableStateOf(existingIssue?.description ?: "") }
     var actionTaken by remember { mutableStateOf(existingIssue?.actionTaken ?: "") }
     var isCritical by remember { mutableStateOf(existingIssue?.isCritical ?: false) }
