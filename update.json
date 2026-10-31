@@ -1,8 +1,8 @@
 {
-  "versionCode": 198,
-  "versionName": "1.9.8",
-  "releaseNotes": "v1.9.8: Letters to Contractor with reason and date received; weekly report VIII lists that week's developer requests and letters; signatories get an Office (Bulacan District Office or Region 3 Office) under the position; Documents has Suspension / Resumption (with continuances), Time Extensions, Variation Orders and Letters tabs; printing opens a zoomable preview; photos open full screen with pinch zoom; Needs attention shows only when something needs action.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.8/NHA_Monitor_v1.9.8_Build198.apk",
-  "apkSha256": "fae5d20f0a8f183b7568479b88ee165d809726df679b85b9e2332d1acda4fb2f",
+  "versionCode": 199,
+  "versionName": "1.9.9",
+  "releaseNotes": "v1.9.9: In the report signatories, an Office or Position that is not in the list can now be typed while the list is open. Includes everything in v1.9.8 (letters to the contractor, signatory offices, order tabs, zoom).",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v1.9.9/NHA_Monitor_v1.9.9_Build199.apk",
+  "apkSha256": "0280fc8a24b3d64a71fc0c9d1f8cc7eaf8fdd8908d7099f71aaa1fc9ac60cc29",
   "isMandatory": true
 }

@@ -48,7 +48,8 @@ fun SignatoriesDialog(
             OutlinedTextField(
                 value = value, onValueChange = onValue, label = { Text(label) }, singleLine = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
+                // PrimaryEditable keeps the keyboard on the field while the list is open.
+                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth()
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { option ->
