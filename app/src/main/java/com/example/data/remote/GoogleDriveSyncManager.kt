@@ -428,6 +428,11 @@ class GoogleDriveSyncManager(
                     put("billedBy", slp.billedBy)
                     put("billingReference", slp.billingReference)
                     put("billingRemarks", slp.billingRemarks)
+                    put("m2BillingStatus", slp.m2BillingStatus)
+                    put("m2BillingDate", slp.m2BillingDate)
+                    put("m2BilledBy", slp.m2BilledBy)
+                    put("m2BillingReference", slp.m2BillingReference)
+                    put("m2BillingRemarks", slp.m2BillingRemarks)
                     put("createdBy", slp.createdBy)
                     put("createdDate", slp.createdDate)
                     put("lastModifiedBy", slp.lastModifiedBy)
@@ -1000,6 +1005,11 @@ class GoogleDriveSyncManager(
                     billedBy = slp.optString("billedBy", ""),
                     billingReference = slp.optString("billingReference", ""),
                     billingRemarks = slp.optString("billingRemarks", ""),
+                    m2BillingStatus = slp.optString("m2BillingStatus", "NOT BILLED"),
+                    m2BillingDate = slp.optString("m2BillingDate", ""),
+                    m2BilledBy = slp.optString("m2BilledBy", ""),
+                    m2BillingReference = slp.optString("m2BillingReference", ""),
+                    m2BillingRemarks = slp.optString("m2BillingRemarks", ""),
                     createdBy = slp.optString("createdBy", ""),
                     createdDate = slp.optString("createdDate", ""),
                     lastModifiedBy = slp.optString("lastModifiedBy", ""),

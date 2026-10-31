@@ -778,6 +778,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedBy = existing?.billedBy ?: "",
                 billingReference = existing?.billingReference ?: "",
                 billingRemarks = existing?.billingRemarks ?: "",
+                m2BillingStatus = existing?.m2BillingStatus ?: "NOT BILLED",
+                m2BillingDate = existing?.m2BillingDate ?: "",
+                m2BilledBy = existing?.m2BilledBy ?: "",
+                m2BillingReference = existing?.m2BillingReference ?: "",
+                m2BillingRemarks = existing?.m2BillingRemarks ?: "",
                 photosJson = photos?.let(com.example.data.files.Attachments::toJson) ?: existing?.photosJson ?: "[]",
                 createdBy = existing?.createdBy?.ifBlank { user } ?: user,
                 createdDate = existing?.createdDate?.ifBlank { currentDate } ?: currentDate,
@@ -798,10 +803,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Marks [milestone] 1 (M1, 80%) or 2 (M2, 20%) of the lot billed or not; the other milestone is kept. */
     fun updateLotBillingStatus(
         projectId: Long,
         sdpPlanId: Long,
         sdpLotId: Long,
+        milestone: Int,
         isBilled: Boolean,
         billingReference: String = "",
         billingRemarks: String = ""
@@ -810,8 +817,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val user = currentUserAccount.value.name
             val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
             val existing = activeSdpLotProgressMap.value[sdpLotId]
-            
+
             val newStatus = if (isBilled) "BILLED" else "NOT BILLED"
+            val m1 = milestone == 1
             val progressRecord = SdpLotProgress(
                 id = existing?.id ?: 0,
                 projectId = projectId,
@@ -825,27 +833,31 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 targetCompletionDate = existing?.targetCompletionDate ?: "",
                 contractor = existing?.contractor ?: "",
                 remarks = existing?.remarks ?: "",
-                billingStatus = newStatus,
-                billingDate = if (isBilled) currentDate else "",
-                billedBy = if (isBilled) user else "",
-                billingReference = if (isBilled) billingReference else "",
-                billingRemarks = if (isBilled) billingRemarks else "",
+                billingStatus = if (m1) newStatus else existing?.billingStatus ?: "NOT BILLED",
+                billingDate = if (!m1) existing?.billingDate ?: "" else if (isBilled) currentDate else "",
+                billedBy = if (!m1) existing?.billedBy ?: "" else if (isBilled) user else "",
+                billingReference = if (!m1) existing?.billingReference ?: "" else if (isBilled) billingReference else "",
+                billingRemarks = if (!m1) existing?.billingRemarks ?: "" else if (isBilled) billingRemarks else "",
+                m2BillingStatus = if (!m1) newStatus else existing?.m2BillingStatus ?: "NOT BILLED",
+                m2BillingDate = if (m1) existing?.m2BillingDate ?: "" else if (isBilled) currentDate else "",
+                m2BilledBy = if (m1) existing?.m2BilledBy ?: "" else if (isBilled) user else "",
+                m2BillingReference = if (m1) existing?.m2BillingReference ?: "" else if (isBilled) billingReference else "",
+                m2BillingRemarks = if (m1) existing?.m2BillingRemarks ?: "" else if (isBilled) billingRemarks else "",
                 photosJson = existing?.photosJson ?: "[]",
                 createdBy = existing?.createdBy?.ifBlank { user } ?: user,
                 createdDate = existing?.createdDate?.ifBlank { currentDate } ?: currentDate,
                 lastModifiedBy = user,
                 lastModifiedDate = currentDate
             )
-            
+
             repository.insertOrUpdateLotProgress(progressRecord, currentUserAccount.value.role)
-            
-            val oldVal = existing?.billingStatus ?: "NOT BILLED"
+
             logAuditAction(
                 projectId = projectId,
                 actionType = "Developer Billing Update",
-                details = "Updated Billing Status for Lot ID $sdpLotId to $newStatus (Ref: $billingReference)",
-                oldValue = oldVal,
-                newValue = "Status: $newStatus, Billed By: $user, Date: $currentDate, Ref: $billingReference"
+                details = "Updated M$milestone billing for Lot ID $sdpLotId to $newStatus (Ref: $billingReference)",
+                oldValue = existing.billingLabel,
+                newValue = "${progressRecord.billingLabel}, Billed By: $user, Date: $currentDate, Ref: $billingReference"
             )
         }
     }
@@ -1238,6 +1250,23 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 details = "Marked ${lots.size} lot(s) as $use: " + lots.take(20).joinToString { "B${it.blockNumber}-L${it.lotNumber}" },
                 oldValue = lots.map { it.use }.distinct().joinToString(),
                 newValue = use
+            )
+        }
+    }
+
+    /** Gives a lot the block and lot names the user typed, e.g. "12" and "5-A". */
+    fun renameSdpLot(lot: SdpLot, block: String, lotNo: String) {
+        if (block.isBlank() || lotNo.isBlank() || (block == lot.blockNumber && lotNo == lot.lotNumber)) return
+        viewModelScope.launch {
+            val user = currentUserAccount.value.name
+            val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+            repository.updateSdpLots(listOf(lot.copy(blockNumber = block, lotNumber = lotNo, lastModifiedBy = user, lastModifiedDate = currentDate)), currentUserAccount.value.role)
+            logAuditAction(
+                projectId = lot.projectId,
+                actionType = "Lot Renamed",
+                details = "Renamed B${lot.blockNumber}-L${lot.lotNumber} to B$block-L$lotNo (Lot ID: ${lot.id})",
+                oldValue = "Block ${lot.blockNumber} Lot ${lot.lotNumber}",
+                newValue = "Block $block Lot $lotNo"
             )
         }
     }
