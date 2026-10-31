@@ -13,6 +13,7 @@ import com.example.util.AttentionLevel
 import com.example.util.AttentionLevel.CRITICAL
 import com.example.util.AttentionLevel.STALE
 import com.example.util.AttentionLevel.WARNING
+import com.example.ui.dashboard.scheduleText
 import com.example.util.ProjectAttention
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -183,5 +184,12 @@ class ProjectAttentionTest {
         val f = flags(project(50.0, 30.0), latest = LocalDate.of(2026, 9, 1))
         assertEquals(CRITICAL, f.first().level)
         assertEquals(STALE, f.last().level)
+    }
+
+    @Test
+    fun scheduleText_saysAheadBehindOrOnSchedule() {
+        assertEquals("18.00% behind", scheduleText(ProjectAttention.slippage(project(62.0, 44.0))))
+        assertEquals("2.50% ahead", scheduleText(2.5))
+        assertEquals("on schedule", scheduleText(ProjectAttention.slippage(project(50.0, 50.0))))
     }
 }

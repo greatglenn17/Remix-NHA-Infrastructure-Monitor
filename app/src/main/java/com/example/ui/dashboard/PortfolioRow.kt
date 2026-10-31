@@ -72,12 +72,10 @@ fun PortfolioRow(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = scheme.onSurface,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Badge(formatVariance(project.variance), varianceColor, containerOf(varianceColor, colors))
                         if (onEdit != null || onDelete != null) RowMenu(project, onEdit, onDelete) else Spacer(Modifier.width(8.dp))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
@@ -100,7 +98,7 @@ fun PortfolioRow(
             val workDone: @Composable (Modifier) -> Unit = { m ->
                 ProgressLine(
                     label = "Work done",
-                    value = "%.2f%%".format(project.actualAccomplishment),
+                    value = "%.2f%% · %s".format(project.actualAccomplishment, scheduleText(ProjectAttention.slippage(project))),
                     fraction = (project.actualAccomplishment / 100).toFloat(),
                     color = varianceColor,
                     modifier = m
@@ -274,6 +272,13 @@ internal fun containerOf(color: Color, colors: NHAColors) = when (color) {
     colors.behind -> colors.behindContainer
     colors.watch -> colors.watchContainer
     else -> colors.neutralContainer
+}
+
+/** Slippage in words, so the card's one schedule number reads without a sign to decode. */
+internal fun scheduleText(slippage: Double) = when {
+    slippage > 0 -> "%.2f%% ahead".format(slippage)
+    slippage < 0 -> "%.2f%% behind".format(-slippage)
+    else -> "on schedule"
 }
 
 internal fun formatVariance(v: Double) = if (v >= 0) "+%.2f%%".format(v) else "−%.2f%%".format(-v)
