@@ -1,8 +1,8 @@
 {
-  "versionCode": 200,
-  "versionName": "2.0.0",
-  "releaseNotes": "v2.0.0: Summary has a Status of payment table listing each billing with its period covered, date, gross amount, percent and balance, plus the total billed and the balance left; scope of works weights show two decimals.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.0/NHA_Monitor_v2.0.0_Build200.apk",
-  "apkSha256": "3d6e8303d3b75a7cc1df65873acb73f7088241e737c9d6e8310a2efb3d3a0207",
+  "versionCode": 201,
+  "versionName": "2.0.1",
+  "releaseNotes": "v2.0.1: Subdivision Plan lots can be renamed (Block and Lot) in Update Progress, and each lot is billed twice: M1 (80%) then M2 (20%), each with its own date and reference. Lots already marked billed count as M1.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.1/NHA_Monitor_v2.0.1_Build201.apk",
+  "apkSha256": "8b394562bd2da4cd9abc101aea1238d3463cf7cde25f05b1758de77e39ef0d9d",
   "isMandatory": true
 }
