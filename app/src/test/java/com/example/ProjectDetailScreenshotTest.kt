@@ -102,7 +102,8 @@ class ProjectDetailScreenshotTest {
         NHATheme(themeMode = mode) {
             Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                 Column {
-                    ProjectHeader(project, billedTotal = 6_400_000.0, contractCost = 10_000_000.0, collapsed = collapsed, onClose = onClose)
+                    // The current cost (with the approved VO), as ProjectDetailScreen passes it.
+                    ProjectHeader(project, billedTotal = 6_400_000.0, contractCost = 10_450_000.0, collapsed = collapsed, onClose = onClose)
                     Box(modifier = Modifier.weight(1f)) { content() }
                 }
             }

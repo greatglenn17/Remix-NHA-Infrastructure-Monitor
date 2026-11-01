@@ -14,10 +14,11 @@ object CurrencyFormatter {
     }
 
     /**
-     * Formats double amount to PHP currency string with commas: "PHP 1,250,000.00"
+     * Formats an amount for the screen: "₱1,250,000.00", the same peso sign the dashboard uses.
      */
     fun formatPhp(amount: Double): String {
-        return "PHP ${decimalFormat.format(amount)}"
+        val sign = if (amount < 0) "-" else ""
+        return "${sign}₱${decimalFormat.format(kotlin.math.abs(amount))}"
     }
 
     /**

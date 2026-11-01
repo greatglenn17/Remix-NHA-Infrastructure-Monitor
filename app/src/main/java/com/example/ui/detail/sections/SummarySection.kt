@@ -140,10 +140,10 @@ private fun KeyDatesCard(
             }
         }
     ) {
-        Field("Date started", project.dateStarted.ifBlank { "-" })
-        Field("Original completion", project.completionDateOriginal.ifBlank { "-" })
+        Field("Date started", ProjectSchedule.displayDate(project.dateStarted.ifBlank { "-" }))
+        Field("Original completion", ProjectSchedule.displayDate(project.completionDateOriginal.ifBlank { "-" }))
         // Same date Days left counts down to: approved orders first, else the stored revised date.
-        Field("Revised completion", revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-")
+        Field("Revised completion", ProjectSchedule.displayDate(revisedCompletion ?: project.completionDateRevised.takeIf { it.isNotBlank() && it != "-" } ?: "-"))
         Field("Contract duration", "${CurrencyFormatter.formatNumber(project.contractDurationDays)} days")
         Field("Revised duration", ProjectSchedule.revisedDurationDays(project.dateStarted, project.contractDurationDays, addedDays, project.completionDateRevised, project.completionDateOriginal)?.let { "${CurrencyFormatter.formatNumber(it)} days" } ?: "-")
         Field(
@@ -214,7 +214,7 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
                     Cells(
                         row(
                             listOf(p.name, p.periodCovered).filter { it.isNotBlank() }.joinToString("\n").ifBlank { "-" },
-                            p.date.ifBlank { "-" },
+                            ProjectSchedule.displayDate(p.date.ifBlank { "-" }),
                             CurrencyFormatter.formatDecimal(p.grossAmount),
                             "%.2f%%".format(p.percentage),
                             CurrencyFormatter.formatDecimal(p.balanceAmount)

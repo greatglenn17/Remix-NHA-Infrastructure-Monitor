@@ -2,10 +2,19 @@ package com.example.util
 
 import com.example.data.model.PendingDocument
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /** Contract-time figures for weekly reports, from the project's own dates. */
 object ProjectSchedule {
+
+    private val DISPLAY_DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+
+    /** "2026-10-20" as "Oct 20, 2026" for the screen; anything that is not a yyyy-MM-dd date is shown as stored. */
+    fun displayDate(iso: String): String = runCatching { LocalDate.parse(iso.trim()).format(DISPLAY_DATE) }.getOrDefault(iso)
+
+    fun displayDate(date: LocalDate): String = date.format(DISPLAY_DATE)
 
     /** The revised completion date when one has been set, otherwise the original. */
     fun effectiveCompletion(original: String, revised: String): String =
