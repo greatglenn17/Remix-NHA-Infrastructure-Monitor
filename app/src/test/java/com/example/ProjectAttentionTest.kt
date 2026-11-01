@@ -13,7 +13,10 @@ import com.example.util.AttentionLevel
 import com.example.util.AttentionLevel.CRITICAL
 import com.example.util.AttentionLevel.STALE
 import com.example.util.AttentionLevel.WARNING
+import com.example.ui.dashboard.cardDate
+import com.example.ui.dashboard.peso
 import com.example.ui.dashboard.scheduleText
+import com.example.ui.dashboard.sortShort
 import com.example.ui.dashboard.statusColor
 import com.example.ui.theme.LightNHAColors
 import com.example.util.ProjectAttention
@@ -193,6 +196,15 @@ class ProjectAttentionTest {
         assertEquals("18.00% behind", scheduleText(ProjectAttention.slippage(project(62.0, 44.0))))
         assertEquals("2.50% ahead", scheduleText(2.5))
         assertEquals("on schedule", scheduleText(ProjectAttention.slippage(project(50.0, 50.0))))
+    }
+
+    @Test
+    fun cardLabels_readable() {
+        assertEquals("Oct 20, 2026", cardDate("2026-10-20"))
+        assertEquals("-", cardDate("-"))                         // not a date: shown as stored
+        assertEquals("₱4,000,000", peso(4_000_000.0))
+        assertEquals("Attention", sortShort(com.example.util.Portfolio.NEEDS_ATTENTION_SORT))
+        assertEquals("Worst", sortShort("Variance (Worst First)"))
     }
 
     @Test

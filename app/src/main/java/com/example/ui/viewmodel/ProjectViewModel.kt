@@ -2536,8 +2536,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    // Sync from Cloud (replaces destructive importSampleData)
-    fun importSampleData(onComplete: () -> Unit = {}) {
+    /** The empty dashboard's "Sync from Cloud": restart the cloud listener, send queued changes, restore from Drive. */
+    fun syncFromCloud(onComplete: () -> Unit = {}) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 firestoreSyncManager.startRealtimeSync()

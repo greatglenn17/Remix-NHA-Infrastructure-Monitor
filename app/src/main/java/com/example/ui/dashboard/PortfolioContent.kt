@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -331,7 +333,11 @@ private fun SortButton(sortOrder: String, onSort: (String) -> Unit) {
             contentPadding = PaddingValues(horizontal = 12.dp),
             modifier = Modifier.height(48.dp).testTag("sort_button")
         ) {
-            Icon(Icons.Default.Sort, contentDescription = "Sort: $sortOrder", modifier = Modifier.size(18.dp))
+            // The current sort stays in view, short enough to share the row with Status and Type.
+            Icon(Icons.Default.Sort, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(sortShort(sortOrder), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                modifier = Modifier.semantics { contentDescription = "Sort: $sortOrder" })
         }
         OptionsMenu(open, { open = false }, "Sort by", SORT_OPTIONS, sortOrder, onSort)
     }
@@ -381,6 +387,14 @@ private fun EmptyState(message: Pair<String, String>, actions: @Composable () ->
         Spacer(Modifier.height(20.dp))
         actions()
     }
+}
+
+internal fun sortShort(sortOrder: String) = when (sortOrder) {
+    Portfolio.NEEDS_ATTENTION_SORT -> "Attention"
+    "Variance (Worst First)" -> "Worst"
+    "Variance (Best First)" -> "Best"
+    "Completion Date" -> "Due date"
+    else -> sortOrder
 }
 
 private fun filterLabel(filter: PortfolioFilter) = when (filter) {
