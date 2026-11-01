@@ -1,7 +1,10 @@
 package com.example
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
@@ -26,7 +29,7 @@ class WeeklyReportStepsTest {
 
     @Test fun weeklyErrors_flagsOutOfRange() {
         assertEquals(
-            listOf(WeeklyStep.WEEK to "Drainage: actual 0 to 100"),
+            listOf(WeeklyStep.WEEK to "Drainage: actual must be 0 to 100%"),
             weeklyErrors(mapOf("Drainage" to ("50" to "120")), listOf("Drainage"))
         )
     }
@@ -84,5 +87,36 @@ class WeeklyReportStepsTest {
             ),
             got
         )
+    }
+
+    // All five steps fit as tabs; an error on Review takes you back to the step it belongs to.
+    @Test fun reviewError_goesToItsStep() {
+        val scope = JSONArray().put(JSONObject().put("name", "Drainage").put("amount", 1000.0).put("weightPct", 100.0))
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C",
+            scopeOfWork = scope.toString(), contractCostOriginal = 1000.0, contractCostRevised = 0.0,
+            contractDurationDays = 100, dateStarted = "2026-01-05", completionDateOriginal = "2026-12-31",
+            completionDateRevised = ""
+        )
+        val report = WeeklyReport(
+            projectId = 1, reportingWeek = "Oct 19, 2026 - Oct 25, 2026", daysElapsed = 0, remainingDays = 0,
+            targetAccomplishmentPct = 50.0, actualAccomplishmentPct = 120.0,
+            manpowerJson = "[]", equipmentJson = "[]", activitiesJson = "[]", issuesJson = "[]",
+            accomplishmentItemsJson = JSONArray().put(JSONObject().put("itemDescription", "Drainage").put("targetPct", 50.0).put("actualPct", 120.0).put("weightPct", 100.0)).toString(),
+            documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]", submittedByStaff = "me"
+        )
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                AddWeeklyReportDialog(project = project, projectId = 1, existingReport = report, onDismiss = {},
+                    onSubmit = { _, _, _, _, _, _, _, _, _, _, _, _ -> })
+            }
+        }
+        rule.onNodeWithText("Step 1 of 5: Week and progress").assertExists()
+        rule.onNodeWithText("Enter 0 to 100").assertExists()
+        rule.onNodeWithText("Review").performClick()
+        rule.onNodeWithText("Step 5 of 5: Review and save").assertExists()
+        rule.onNodeWithText("Drainage: actual must be 0 to 100%").assertExists()
+        rule.onNodeWithText("Go to Week").performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithText("Step 1 of 5: Week and progress").assertExists()
     }
 }

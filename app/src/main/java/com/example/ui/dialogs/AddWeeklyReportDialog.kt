@@ -303,11 +303,18 @@ fun AddWeeklyReportDialog(
         onDismiss = onDismiss,
         saveTag = "submit_weekly_report_button",
         topContent = {
-            ScrollableTabRow(selectedTabIndex = step.ordinal, edgePadding = 16.dp) {
+            // Fixed tabs: a scrolling row cut the first steps off on a phone ("nd issues").
+            TabRow(selectedTabIndex = step.ordinal) {
                 WeeklyStep.entries.forEach { s ->
-                    Tab(selected = s == step, onClick = { step = s }, text = { Text(s.label) })
+                    Tab(selected = s == step, onClick = { step = s }, text = { Text(s.short, maxLines = 1) })
                 }
             }
+            Text(
+                "Step ${step.ordinal + 1} of ${WeeklyStep.entries.size}: ${step.label}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            )
         },
         bottomStart = {
             TextButton(onClick = { step = WeeklyStep.entries[step.ordinal - 1] }, enabled = step.ordinal > 0) { Text("Back") }
@@ -1086,7 +1093,7 @@ fun AddWeeklyReportDialog(
                         Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
                         Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-                        Text(errStep.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("Go to ${errStep.short}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }

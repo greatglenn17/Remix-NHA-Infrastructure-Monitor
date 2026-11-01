@@ -24,9 +24,9 @@ class FormValidationTest {
 
     @Test fun percentError() {
         assertNull(FormValidation.percentError("100"))
-        assertEquals("0 to 100", FormValidation.percentError("100.5"))
+        assertEquals("Enter 0 to 100", FormValidation.percentError("100.5"))
         assertNull(FormValidation.percentError(""))
-        for (bad in listOf("NaN", "Infinity", "1e1", "1.2.3")) assertEquals(bad, "0 to 100", FormValidation.percentError(bad))
+        for (bad in listOf("NaN", "Infinity", "1e1", "1.2.3")) assertEquals(bad, "Enter 0 to 100", FormValidation.percentError(bad))
     }
 
     @Test fun requiredError() {
