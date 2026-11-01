@@ -37,8 +37,6 @@ import com.example.util.PortfolioItem
 import com.example.util.ProjectAttention
 import com.example.util.ProjectSchedule
 import java.text.NumberFormat
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** One project in the "All projects" list. The two bars sit side by side when [wide]. */
@@ -146,11 +144,11 @@ fun PortfolioRow(
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val completion = ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
-                MetaItem(Icons.Default.Event, "Completion ${cardDate(completion).ifBlank { "-" }}")
+                MetaItem(Icons.Default.Event, "Completion ${ProjectSchedule.displayDate(completion).ifBlank { "-" }}")
                 if (item.pendingDocsCount > 0) {
                     MetaItem(Icons.Default.Description, if (item.pendingDocsCount == 1) "1 order waiting approval" else "${item.pendingDocsCount} orders waiting approval")
                 }
-                MetaItem(Icons.Default.Update, item.lastFieldUpdate?.let { "Field update ${it.format(CARD_DATE)}" } ?: "No field update yet")
+                MetaItem(Icons.Default.Update, item.lastFieldUpdate?.let { "Field update ${ProjectSchedule.displayDate(it)}" } ?: "No field update yet")
             }
         }
     }
@@ -299,8 +297,3 @@ internal fun workDoneText(project: Project) =
 /** Whole pesos: centavos on a multi-million contract are noise at card size. */
 internal fun peso(amount: Double): String =
     NumberFormat.getCurrencyInstance(Locale("en", "PH")).apply { maximumFractionDigits = 0 }.format(amount)
-
-private val CARD_DATE = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
-
-/** "2026-10-20" as "Oct 20, 2026"; anything that is not a yyyy-MM-dd date is shown as stored. */
-internal fun cardDate(iso: String): String = runCatching { LocalDate.parse(iso.trim()).format(CARD_DATE) }.getOrDefault(iso)

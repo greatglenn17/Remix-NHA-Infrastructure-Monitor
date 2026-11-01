@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.ProjectPayment
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.TabularNumbers
+import com.example.util.ProjectSchedule
 import com.example.utils.CurrencyFormatter
 
 /** One billing (disbursement voucher); replaces a row of the old 820dp payments table. */
@@ -65,7 +66,7 @@ fun PaymentCard(
             }
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(
-                    "${payment.date.ifBlank { "-" }} · ${payment.periodCovered.ifBlank { "-" }}",
+                    "${ProjectSchedule.displayDate(payment.date.ifBlank { "-" })} · ${payment.periodCovered.ifBlank { "-" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)

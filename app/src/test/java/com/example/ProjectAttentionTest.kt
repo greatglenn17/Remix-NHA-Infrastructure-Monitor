@@ -13,7 +13,6 @@ import com.example.util.AttentionLevel
 import com.example.util.AttentionLevel.CRITICAL
 import com.example.util.AttentionLevel.STALE
 import com.example.util.AttentionLevel.WARNING
-import com.example.ui.dashboard.cardDate
 import com.example.ui.dashboard.peso
 import com.example.ui.dashboard.scheduleText
 import com.example.ui.dashboard.sortShort
@@ -200,8 +199,10 @@ class ProjectAttentionTest {
 
     @Test
     fun cardLabels_readable() {
-        assertEquals("Oct 20, 2026", cardDate("2026-10-20"))
-        assertEquals("-", cardDate("-"))                         // not a date: shown as stored
+        assertEquals("Oct 20, 2026", com.example.util.ProjectSchedule.displayDate("2026-10-20"))
+        assertEquals("-", com.example.util.ProjectSchedule.displayDate("-"))   // not a date: shown as stored
+        assertEquals("₱1,250,000.00", com.example.utils.CurrencyFormatter.formatPhp(1_250_000.0))
+        assertEquals("-₱120,000.00", com.example.utils.CurrencyFormatter.formatPhp(-120_000.0))
         assertEquals("₱4,000,000", peso(4_000_000.0))
         assertEquals("Attention", sortShort(com.example.util.Portfolio.NEEDS_ATTENTION_SORT))
         assertEquals("Worst", sortShort("Variance (Worst First)"))
