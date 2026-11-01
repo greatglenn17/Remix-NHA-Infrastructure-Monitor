@@ -203,7 +203,7 @@ fun AddRelatedDocumentDialog(
                                         Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontWeight = FontWeight.Bold))
                                     }
                                     TextButton(onClick = { fileUrl = "" }) {
-                                        Text("Remove", color = LocalNHAColors.current.behind, fontSize = 10.sp)
+                                        Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))

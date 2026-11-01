@@ -46,6 +46,7 @@ import com.example.ui.detail.tabs.parseIssuesList
 import com.example.ui.detail.tabs.parseManpowerList
 import com.example.ui.components.LongForm
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.dashboard.varianceColor
 import com.example.ui.theme.WeatherCloudyYellow
 import com.example.ui.theme.WeatherFairGreen
 import com.example.ui.theme.WeatherRainShowersCyan
@@ -428,7 +429,7 @@ fun AddWeeklyReportDialog(
                         val targetVal = vals.first.toDoubleOrNull() ?: 0.0
                         val actualVal = vals.second.toDoubleOrNull() ?: 0.0
                         val variance = actualVal - targetVal
-                        val varColor = if (variance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                        val varColor = varianceColor(variance, LocalNHAColors.current)
                         Text(
                             text = "${if(variance>0) "+" else ""}${"%.2f".format(variance)}",
                             modifier = Modifier.weight(1f),
@@ -444,7 +445,7 @@ fun AddWeeklyReportDialog(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                         Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                        val ovColor = if (overallVariance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                        val ovColor = varianceColor(overallVariance, LocalNHAColors.current)
                         Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ovColor))
                     }
                 }
@@ -1231,7 +1232,7 @@ private fun ManpowerInputRow(
         CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -1265,7 +1266,7 @@ private fun EquipmentInputRow(
             CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1327,7 +1328,7 @@ private fun IssueInputRow(
             )
 
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1414,7 +1415,7 @@ private fun ActivityInputRow(
             }
 
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
 

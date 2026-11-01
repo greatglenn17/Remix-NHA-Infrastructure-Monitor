@@ -124,7 +124,7 @@ fun AddPaymentDialog(
                                     Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = nha.onTrack, fontWeight = FontWeight.Bold))
                                 }
                                 TextButton(onClick = { fileUrl = "" }) {
-                                    Text("Remove", color = nha.behind, fontSize = 11.sp)
+                                    Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))

@@ -385,7 +385,7 @@ fun IssueCard(
                     }
                     if (currentUserRole.hasPermission(Permission.DELETE_ISSUE)) {
                         IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete Issue", tint = LocalNHAColors.current.behind, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Issue", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         }
                     }
                 }

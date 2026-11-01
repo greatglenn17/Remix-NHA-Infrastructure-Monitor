@@ -136,13 +136,13 @@ fun NotificationsDialog(
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = null,
-                                tint = LocalNHAColors.current.behind,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Clear all",
-                                style = MaterialTheme.typography.labelMedium.copy(color = LocalNHAColors.current.behind)
+                                style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary)
                             )
                         }
                     }

@@ -1,6 +1,8 @@
 package com.example.ui.detail.tabs
 
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.dashboard.containerOf
+import com.example.ui.dashboard.varianceColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -208,19 +210,19 @@ private fun WeeklyReportCard(
                 }
             }
 
-            val onTarget = report.actualAccomplishmentPct >= report.targetAccomplishmentPct
+            val slip = varianceColor(report.actualAccomplishmentPct - report.targetAccomplishmentPct, LocalNHAColors.current)
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Surface(
-                    color = if (onTarget) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
+                    color = containerOf(slip, LocalNHAColors.current),
                     shape = RoundedCornerShape(50.dp),
-                    border = BorderStroke(1.dp, if (onTarget) LocalNHAColors.current.onTrack.copy(alpha = 0.4f) else LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                    border = BorderStroke(1.dp, slip.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = "Actual ${"%.2f".format(report.actualAccomplishmentPct)}%",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (onTarget) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                            color = slip
                         ),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
@@ -259,7 +261,7 @@ private fun WeeklyReportCard(
                                         Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
                                         Text("T: ${"%.2f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("A: ${"%.2f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("V: ${"%.2f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
+                                        Text("V: ${"%.2f".format(acc.variancePct)}%", color = varianceColor(acc.variancePct, LocalNHAColors.current), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                 }
@@ -277,7 +279,7 @@ private fun WeeklyReportCard(
                                     "V: ${if (varPct >= 0) "+${"%.2f".format(varPct)}" else "%.2f".format(varPct)}%",
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        color = if (varPct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                                        color = varianceColor(varPct, LocalNHAColors.current)
                                     )
                                 )
                             }
@@ -467,7 +469,7 @@ private fun WeeklyReportCard(
                                         val (bgColor, textColor, borderColor) = when (item.status.trim()) {
                                             "Operational" -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
                                             "Idle" -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
-                                            "For Repair" -> Triple(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind, LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                                            "For Repair" -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
                                             else -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outlineVariant)
                                         }
 

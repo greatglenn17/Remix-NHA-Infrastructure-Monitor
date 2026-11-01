@@ -849,7 +849,7 @@ fun SubdivisionPlanTab(
                             )
                             if (removableCount > 0) {
                                 TextButton(onClick = { confirmRemoveDetected = true }, modifier = Modifier.testTag("remove_found_lots")) {
-                                    Text("Remove found lots ($removableCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LocalNHAColors.current.behind)
+                                    Text("Remove found lots ($removableCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             if (interactionMode == SdpInteractionMode.DIGITIZING_LOT && draftPoints.isNotEmpty()) {
@@ -1040,7 +1040,7 @@ fun SubdivisionPlanTab(
                                 },
                                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                             ) {
-                                Text("CLEAR FILTERS", fontSize = 10.sp, color = LocalNHAColors.current.behind, fontWeight = FontWeight.Bold)
+                                Text("CLEAR FILTERS", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1676,7 +1676,7 @@ fun SubdivisionPlanTab(
                                 if (othersInTarget > 0) {
                                     Text(
                                         "Block $target already has $othersInTarget other ${if (othersInTarget == 1) "lot" else "lots"}. They keep their numbers until you renumber them.",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.behind)
+                                        style = MaterialTheme.typography.bodySmall.copy(color = LocalNHAColors.current.watch)
                                     )
                                 }
                             }
@@ -1893,8 +1893,8 @@ fun SubdivisionPlanTab(
                                     if (canDigitize) {
                                         Button(
                                             onClick = { lotToDeactivate = selectedLot },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = LocalNHAColors.current.behind),
-                                            border = BorderStroke(1.dp, LocalNHAColors.current.behind),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                             shape = RoundedCornerShape(6.dp),
                                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                                             modifier = Modifier.weight(0.7f).height(32.dp).testTag("remove_lot_button")
@@ -2760,7 +2760,7 @@ fun LotAuditHistoryDialog(
                                 if (log.oldValue.isNotBlank() || log.newValue.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (log.oldValue.isNotBlank()) {
-                                        Text("Previous: ${log.oldValue}", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.behind, fontSize = 10.sp))
+                                        Text("Previous: ${log.oldValue}", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.neutral, fontSize = 10.sp))
                                     }
                                     if (log.newValue.isNotBlank()) {
                                         Text("New: ${log.newValue}", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontSize = 10.sp))
@@ -3330,7 +3330,7 @@ fun UpdateLotProgressDialog(
                                         onClick = { onToggleBillingRequested(milestone, !billed) },
                                         enabled = enabled,
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (billed) LocalNHAColors.current.behind else LocalNHAColors.current.onTrack,
+                                            containerColor = if (billed) LocalNHAColors.current.neutral else LocalNHAColors.current.onTrack,
                                             contentColor = MaterialTheme.colorScheme.surface
                                         ),
                                         shape = RoundedCornerShape(6.dp),

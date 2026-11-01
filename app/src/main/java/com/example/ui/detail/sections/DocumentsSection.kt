@@ -184,7 +184,7 @@ fun RelatedFilesList(
                                 "Approved" -> colors.onTrack
                                 "Notarized", "Signed" -> scheme.primary
                                 "Submitted" -> colors.watch
-                                else -> colors.behind
+                                else -> colors.neutral
                             }
                             val statusContainer = when (doc.status) {
                                 "Approved" -> colors.onTrackContainer
