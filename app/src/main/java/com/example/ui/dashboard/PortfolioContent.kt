@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,7 +35,10 @@ private const val ATTENTION_PREVIEW = 5
 private val SORT_OPTIONS = listOf(Portfolio.NEEDS_ATTENTION_SORT, "Variance (Worst First)", "Variance (Best First)", "Completion Date", "Name")
 private val STATUS_OPTIONS = listOf("All", "On-going", "Behind Schedule", "Suspended")
 
-/** Portfolio home: header, four counts, needs-attention queue and the project list (spec "Portfolio home"). */
+/**
+ * Portfolio home: header, four counts, needs-attention queue and the project list (spec "Portfolio home").
+ * [projectsFirst] puts the list above the counts and queue, for a field engineer who opens the app to reach their own sites.
+ */
 @Composable
 fun PortfolioContent(
     state: PortfolioUiState,
@@ -54,6 +58,7 @@ fun PortfolioContent(
     onEdit: ((Project) -> Unit)?,
     onDelete: ((Project) -> Unit)?,
     modifier: Modifier = Modifier,
+    projectsFirst: Boolean = false,
     emptyActions: @Composable () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -82,17 +87,7 @@ fun PortfolioContent(
                 return@LazyColumn
             }
 
-            item(key = "counts") { PortfolioCounts(state.summary, state.filter, wide, onFilter) }
-
-            // Hidden when nothing needs attention, so the overview has no empty box.
-            if (state.attention.isNotEmpty()) item(key = "attention") {
-                AttentionCard(
-                    queue = state.attention,
-                    showAll = showAllAttention,
-                    onToggleAll = { showAllAttention = !showAllAttention },
-                    onOpen = onOpen
-                )
-            }
+            if (!projectsFirst) overview(state, wide, showAllAttention, { showAllAttention = !showAllAttention }, onFilter, onOpen)
 
             item(key = "list_header") {
                 ListHeader(
@@ -112,7 +107,36 @@ fun PortfolioContent(
                     PortfolioRow(item, wide, onOpen, onEdit, onDelete)
                 }
             }
+
+            if (projectsFirst) {
+                item(key = "overview_header") {
+                    Text(
+                        "Overview",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = scheme.onSurface,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+                overview(state, wide, showAllAttention, { showAllAttention = !showAllAttention }, onFilter, onOpen)
+            }
         }
+    }
+}
+
+private fun LazyListScope.overview(
+    state: PortfolioUiState,
+    wide: Boolean,
+    showAllAttention: Boolean,
+    onToggleAll: () -> Unit,
+    onFilter: (PortfolioFilter?) -> Unit,
+    onOpen: (Project) -> Unit
+) {
+    item(key = "counts") { PortfolioCounts(state.summary, state.filter, wide, onFilter) }
+
+    // Hidden when nothing needs attention, so the overview has no empty box.
+    if (state.attention.isNotEmpty()) item(key = "attention") {
+        AttentionCard(queue = state.attention, showAll = showAllAttention, onToggleAll = onToggleAll, onOpen = onOpen)
     }
 }
 
