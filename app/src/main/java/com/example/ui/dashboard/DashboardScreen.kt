@@ -43,7 +43,7 @@ fun DashboardScreen(
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showManageUsers by remember { mutableStateOf(false) }
-    var projectToDelete by remember { mutableStateOf<Long?>(null) }
+    var projectToDelete by remember { mutableStateOf<Project?>(null) }
     var projectToEdit by remember { mutableStateOf<Project?>(null) }
 
     val notifications by viewModel.notifications.collectAsState()
@@ -116,7 +116,7 @@ fun DashboardScreen(
                     onProjectClick(project)
                 },
                 onEdit = if (currentUser.role.hasPermission(Permission.EDIT_PROJECT)) { project -> projectToEdit = project } else null,
-                onDelete = if (currentUser.role.hasPermission(Permission.DELETE_PROJECT)) { project -> projectToDelete = project.id } else null,
+                onDelete = if (currentUser.role.hasPermission(Permission.DELETE_PROJECT)) { project -> projectToDelete = project } else null,
                 modifier = Modifier.weight(1f),
                 projectsFirst = currentUser.role == UserRole.FIELD_ENGINEER,
                 emptyActions = {
@@ -128,7 +128,7 @@ fun DashboardScreen(
                                 Text("New Project", fontWeight = FontWeight.Bold)
                             }
                         }
-                        OutlinedButton(onClick = { viewModel.importSampleData() }, shape = RoundedCornerShape(8.dp)) {
+                        OutlinedButton(onClick = { viewModel.syncFromCloud() }, shape = RoundedCornerShape(8.dp)) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Sync from Cloud", fontWeight = FontWeight.Medium)
@@ -175,12 +175,12 @@ fun DashboardScreen(
     if (projectToDelete != null) {
         AlertDialog(
             onDismissRequest = { projectToDelete = null },
-            title = { Text("Delete Project", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to delete this project? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Delete project?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("\u201C${projectToDelete?.name}\u201D will be deleted. This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surface,
             confirmButton = {
                 TextButton(onClick = {
-                    projectToDelete?.let { viewModel.deleteProject(it) }
+                    projectToDelete?.let { viewModel.deleteProject(it.id) }
                     projectToDelete = null
                 }) {
                     Text("Delete", color = LocalNHAColors.current.behind)

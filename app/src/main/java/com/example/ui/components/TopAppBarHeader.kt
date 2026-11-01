@@ -202,7 +202,7 @@ fun TopAppBarHeader(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "BULACAN DISTRICT OFFICE",
+                            text = currentUser.office.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Bold,
