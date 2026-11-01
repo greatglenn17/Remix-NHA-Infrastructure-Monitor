@@ -117,7 +117,7 @@ fun TopAppBarHeader(
     currentUser: UserAccount,
     onSwitchUser: (UserAccount) -> Unit,
     onBackClick: (() -> Unit)? = null,
-    isSyncing: Boolean = false,
+    sync: SyncChip = SyncChip.Synced,
     onOpenDriveSync: (() -> Unit)? = null,
     onEditProfileClick: (() -> Unit)? = null,
     onSignOut: (() -> Unit)? = null,
@@ -216,14 +216,26 @@ fun TopAppBarHeader(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Quiet green when everything is up; amber only when something hasn't reached the cloud.
+                            val nha = LocalNHAColors.current
+                            val (tone, toneContainer) = when (sync) {
+                                SyncChip.Synced -> nha.onTrack to nha.onTrackContainer
+                                is SyncChip.Uploading -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.primaryContainer
+                                else -> nha.watch to nha.watchContainer
+                            }
                             HeaderBadge(
-                                text = "LOCAL DATA",
-                                icon = Icons.Default.Storage,
-                                iconTint = LocalNHAColors.current.watch,
-                                textColor = LocalNHAColors.current.watch,
-                                backgroundColor = LocalNHAColors.current.watchContainer,
-                                borderColor = LocalNHAColors.current.watch.copy(alpha = 0.8f),
-                                isSpinning = false
+                                text = sync.label,
+                                icon = when (sync) {
+                                    SyncChip.PhoneOnly -> Icons.Default.Storage
+                                    SyncChip.Synced -> Icons.Default.CloudDone
+                                    is SyncChip.Uploading -> Icons.Default.Sync
+                                    is SyncChip.Waiting -> Icons.Default.CloudOff
+                                },
+                                iconTint = tone,
+                                textColor = tone,
+                                backgroundColor = toneContainer,
+                                borderColor = tone.copy(alpha = 0.8f),
+                                isSpinning = sync is SyncChip.Uploading
                             )
 
                             // No screen passes this until Google Drive sign-in is implemented, so the badge stays hidden.

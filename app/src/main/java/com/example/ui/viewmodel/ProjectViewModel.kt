@@ -147,8 +147,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+    /** The header's sync chip, from the upload queue. Lazy because the DAO is set up in init. */
+    val syncChip: StateFlow<com.example.ui.components.SyncChip> by lazy {
+        // The account changes on sign-in and sign-out, when the Firebase user does.
+        combine(currentUserAccount, syncOutboxDao.newPendingCount(), syncOutboxDao.failedCount()) { _, pending, failed ->
+            com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, pending, failed)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, 0, 0))
+    }
 
     // Filters & Sorting
     private val _searchQuery = MutableStateFlow("")
