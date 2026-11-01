@@ -1,8 +1,8 @@
 {
-  "versionCode": 207,
-  "versionName": "2.0.7",
-  "releaseNotes": "v2.0.7: Weekly reports: Print, Edit and Delete are in a menu on each card, which shows Actual, Target and the change from the previous report. All form steps fit on a phone, with clearer errors. Red now means critical, errors or delete; smaller slips are grey or amber.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.7/NHA_Monitor_v2.0.7_Build207.apk",
-  "apkSha256": "5409f8eddf63451f17921ccd97f9ea960ef1e1c3cec0c504db42c12bef3c3f11",
+  "versionCode": 208,
+  "versionName": "2.0.8",
+  "releaseNotes": "v2.0.8: Project screen: Progress and Documents views on one scrolling row. Summary starts with the latest weekly report and says when this week has no report yet, with a button to add it. Project profile details fold behind Show details.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.8/NHA_Monitor_v2.0.8_Build208.apk",
+  "apkSha256": "a8c1304ebac55f95ebe201e2892a4c4c0e59ffcd78ca4334c78c8d5592bbfcc0",
   "isMandatory": true
 }
