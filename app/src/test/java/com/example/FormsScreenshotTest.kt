@@ -77,7 +77,7 @@ class FormsScreenshotTest {
         rule.setContent { NHATheme(themeMode = mode) { tick; current() } }
         shoot("form_weekly_week_$t") { AddWeeklyReportDialog(project, 7, null, {}, { _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_weekly_review_$t", steps = {
-            rule.onNodeWithText("Review and save").performSemanticsAction(SemanticsActions.OnClick)
+            rule.onNodeWithText("Review").performSemanticsAction(SemanticsActions.OnClick)
         }) { AddWeeklyReportDialog(project, 7, badReport, {}, { _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
         shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
