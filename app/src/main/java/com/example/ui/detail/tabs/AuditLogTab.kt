@@ -174,7 +174,7 @@ fun AuditLogCard(log: AuditLog) {
     val (badgeColor, icon) = when {
         log.actionType.contains("Creation", ignoreCase = true) -> LocalNHAColors.current.onTrack to Icons.Default.AddCircle
         log.actionType.contains("Edit", ignoreCase = true) || log.actionType.contains("Update", ignoreCase = true) -> MaterialTheme.colorScheme.primary to Icons.Default.Edit
-        log.actionType.contains("Deletion", ignoreCase = true) -> LocalNHAColors.current.behind to Icons.Default.Delete
+        log.actionType.contains("Deletion", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Delete
         log.actionType.contains("Login", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Login
         log.actionType.contains("Logout", ignoreCase = true) -> LocalNHAColors.current.neutral to Icons.Default.Logout
         log.actionType.contains("Sync", ignoreCase = true) -> MaterialTheme.colorScheme.primary to Icons.Default.Sync
@@ -291,7 +291,7 @@ fun AuditLogCard(log: AuditLog) {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
                                 text = "Old Value: ",
-                                color = LocalNHAColors.current.behind,
+                                color = LocalNHAColors.current.neutral,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )

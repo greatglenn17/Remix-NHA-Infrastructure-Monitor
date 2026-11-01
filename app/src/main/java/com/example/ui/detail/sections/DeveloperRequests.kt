@@ -47,7 +47,7 @@ fun DeveloperRequestsCard(
             val waiting = runCatching { ChronoUnit.DAYS.between(LocalDate.parse(r.dateReceived), today) }.getOrNull()
             LogEntry(
                 r.requestType,
-                if (packaged) MaterialTheme.colorScheme.onSurface else LocalNHAColors.current.behind,
+                if (packaged) MaterialTheme.colorScheme.onSurface else LocalNHAColors.current.watch,
                 listOf(
                     "Requested: ${r.dateRequested.ifBlank { "-" }}  ·  Received: ${r.dateReceived.ifBlank { "-" }}",
                     if (packaged) "Packaged: ${r.datePackaged}" else "NOT YET PACKAGED" + (waiting?.let { " · $it days since received" } ?: ""),

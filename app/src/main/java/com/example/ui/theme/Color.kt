@@ -5,6 +5,17 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 // NHA Dynamic Theme Color Palette Data Structure
+//
+// What the status colours mean, so red keeps its weight:
+// - behind (red): critical only. 15% or more behind (varianceColor), Critical issues, overdue,
+//   errors, and the Delete item in a menu or the confirm button that deletes.
+// - watch (amber): warnings. 10-15% behind, billing ahead of work, waiting approval, advisories.
+// - neutral (grey): small slips under 10%, history (old values, deleted entries), and
+//   always-visible trash icons that only start a delete.
+// - onTrack (green): on or ahead of target.
+// - Plain actions (Clear filters, Remove attachment) use the primary colour, never red.
+// Progress against target always goes through varianceColor, not a red/green split.
+// Exception: the subdivision lot map keeps its progress scale (0-25% red ... 100% green).
 data class NHAColors(
     val background: Color,
     val surface: Color,

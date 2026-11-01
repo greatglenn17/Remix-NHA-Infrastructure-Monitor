@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.LongForm
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.dashboard.varianceColor
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.data.model.WeeklyReport
@@ -118,7 +119,7 @@ fun AddMonthlyReportDialog(
                         Text(rep.reportingWeek, modifier = Modifier.weight(2f), style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurface))
                         Text("${"%.2f".format(target)}%", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurface))
                         Text("${"%.2f".format(actual)}%", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurface))
-                        Text("${"%.2f".format(varVal)}%", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall.copy(color = if (varVal >= 0) nha.onTrack else nha.behind))
+                        Text("${"%.2f".format(varVal)}%", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall.copy(color = varianceColor(varVal, nha)))
                     }
                 }
                 
@@ -128,7 +129,7 @@ fun AddMonthlyReportDialog(
                     Text("GRAND TOTAL", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(sumTarget)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(sumActual)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
-                    Text("${"%.2f".format(varTotal)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = if (varTotal >= 0) nha.onTrack else nha.behind, fontSize = 12.sp)
+                    Text("${"%.2f".format(varTotal)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = varianceColor(varTotal, nha), fontSize = 12.sp)
                 }
             }
         }

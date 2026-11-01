@@ -115,7 +115,7 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
                         items.clear(); items.addAll(withAutoWeights(updated))
                         if (editing == index) { name = ""; amount = ""; editing = null }
                         else editing = editing?.let { if (it > index) it - 1 else it }
-                    }) { Icon(Icons.Default.Delete, contentDescription = "Remove ${item.name}", tint = nha.behind) }
+                    }) { Icon(Icons.Default.Delete, contentDescription = "Remove ${item.name}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             }
             HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(end = 12.dp, top = 4.dp, bottom = 4.dp))

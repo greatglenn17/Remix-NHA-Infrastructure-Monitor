@@ -1,6 +1,8 @@
 package com.example.ui.detail.tabs
 
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.dashboard.containerOf
+import com.example.ui.dashboard.varianceColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -177,13 +179,13 @@ private fun MonthlyReportSingleTableCard(
 
                 val isAhead = sumVariance >= 0
                 Surface(
-                    color = if (isAhead) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
+                    color = containerOf(varianceColor(sumVariance, LocalNHAColors.current), LocalNHAColors.current),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         text = if (isAhead) "AHEAD (+${"%.2f".format(sumVariance)}%)" else "SLIPPAGE (${"%.2f".format(sumVariance)}%)",
                         style = MaterialTheme.typography.labelSmall.copy(
-                            color = if (isAhead) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
+                            color = varianceColor(sumVariance, LocalNHAColors.current),
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -260,7 +262,7 @@ private fun MonthlyReportSingleTableCard(
                                     text = "${if (varVal >= 0) "+" else ""}${"%.2f".format(varVal)}%",
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        color = if (varVal >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
+                                        color = varianceColor(varVal, LocalNHAColors.current),
                                         fontWeight = FontWeight.Bold
                                     )
                                 )
@@ -297,7 +299,7 @@ private fun MonthlyReportSingleTableCard(
                                 text = "${if (sumVariance >= 0) "+" else ""}${"%.2f".format(sumVariance)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    color = if (sumVariance >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind,
+                                    color = varianceColor(sumVariance, LocalNHAColors.current),
                                     fontWeight = FontWeight.Bold
                                 )
                             )
