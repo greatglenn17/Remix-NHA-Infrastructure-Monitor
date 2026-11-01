@@ -51,10 +51,15 @@ class FirestoreSyncManager(
     private val scope: CoroutineScope
 ) {
     private val tag = "FirestoreSyncManager"
+    private companion object { const val LAST_SYNCED_AT = "last_synced_at" }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
     private val _syncStatus = MutableStateFlow<FirestoreSyncStatus>(FirestoreSyncStatus.Idle)
+    private val syncPrefs = context.getSharedPreferences("cloud_sync", Context.MODE_PRIVATE)
+    private val _lastSyncedAt = MutableStateFlow(syncPrefs.getLong(LAST_SYNCED_AT, 0L).takeIf { it > 0 })
+    /** When this phone last had every change in the cloud (epoch millis), kept across restarts; null if never. */
+    val lastSyncedAt: StateFlow<Long?> = _lastSyncedAt.asStateFlow()
     private var projectListener: ListenerRegistration? = null
     private var recordListener: ListenerRegistration? = null
     /** Reads the role, then attaches the listeners; replaced on every start. */
@@ -499,6 +504,7 @@ class FirestoreSyncManager(
         // Projects first: a record (or file) is only accepted once its project exists in the cloud.
         val pending = db.syncOutboxDao().pendingEventsList().sortedBy { if (it.entityType == "project") 0 else 1 }
         if (pending.isEmpty()) {
+            markAllSent()
             return@withContext Result.success(0)
         }
 
@@ -659,8 +665,15 @@ class FirestoreSyncManager(
         }
 
         _syncStatus.value = FirestoreSyncStatus.Synced()
+        if (db.syncOutboxDao().pendingEventsList().isEmpty()) markAllSent()
         Result.success(syncedCount)
     }
+    }
+
+    private fun markAllSent() {
+        val now = System.currentTimeMillis()
+        syncPrefs.edit().putLong(LAST_SYNCED_AT, now).apply()
+        _lastSyncedAt.value = now
     }
 
     /**

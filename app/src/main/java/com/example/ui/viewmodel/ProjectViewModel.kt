@@ -147,6 +147,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** When every change on this phone was last in the cloud, for the sync chip's window. */
+    val lastSyncedAt: StateFlow<Long?> by lazy { firestoreSyncManager.lastSyncedAt }
+
+    /** The sync chip's Retry: send the queued and failed changes again now. */
+    fun retrySync() {
+        viewModelScope.launch { firestoreSyncManager.flushOutbox() }
+    }
+
     /** The header's sync chip, from the upload queue. Lazy because the DAO is set up in init. */
     val syncChip: StateFlow<com.example.ui.components.SyncChip> by lazy {
         // The account changes on sign-in and sign-out, when the Firebase user does.

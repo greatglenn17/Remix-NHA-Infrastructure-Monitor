@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.ui.components.SyncChip
+import com.example.ui.components.meaning
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.TabularNumbers
 import com.example.util.PortfolioFilter
@@ -114,10 +116,10 @@ internal val TERM_HELP = listOf(
         "for example billed 65%, work done 38.50%.",
     "Waiting approval" to "Variation orders, time extensions, suspensions and resumptions not yet approved.",
     "Due in ${ProjectAttention.DUE_SOON_DAYS} days" to "Unfinished projects whose completion date (the revised one, if any) is ${ProjectAttention.DUE_SOON_DAYS} days away or less.",
-    SYNC_HELP_FIRST to "Every change made on this phone is in the cloud.",
-    "UPLOADING" to "Changes are being sent to the cloud now.",
-    "CHANGES WAITING" to "Changes could not be sent, usually for lack of signal. They are sent again the next time the app starts or syncs.",
-    "THIS PHONE ONLY" to "Signed in offline: changes stay on this phone and are not sent to the cloud."
+    SYNC_HELP_FIRST to SyncChip.Synced.meaning,
+    "UPLOADING" to SyncChip.Uploading(0).meaning,
+    "CHANGES WAITING" to SyncChip.Waiting(0).meaning + " Tap the chip to retry now.",
+    "THIS PHONE ONLY" to SyncChip.PhoneOnly.meaning
 )
 
 private data class CountTile(val filter: PortfolioFilter, val label: String, val count: Int, val icon: ImageVector, val tint: Color)

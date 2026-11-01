@@ -7,10 +7,18 @@ import com.example.data.model.AppThemeMode
 import com.example.data.model.DefaultUserAccount
 import com.example.ui.components.SyncChip
 import com.example.ui.components.TopAppBarHeader
+import com.example.ui.components.SyncDialog
 import com.example.ui.components.label
+import com.example.ui.components.lastSyncedText
 import com.example.ui.theme.NHATheme
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import java.time.Instant
+import java.time.ZoneId
+import org.junit.Assert.assertTrue
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -57,4 +65,34 @@ class SyncChipTest {
 
     @Config(qualifiers = "w411dp-h891dp") @Test fun header_light() = shoot(AppThemeMode.LIGHT)
     @Config(qualifiers = "w411dp-h891dp") @Test fun header_dark() = shoot(AppThemeMode.DARK)
+
+    @Test
+    fun lastSyncedText_readable() {
+        val at = Instant.parse("2026-11-01T02:42:00Z").toEpochMilli()
+        assertEquals("Last synced Nov 1, 2026, 10:42 AM", lastSyncedText(at, ZoneId.of("Asia/Manila")))
+        assertEquals("Not fully synced on this phone yet", lastSyncedText(null))
+    }
+
+    @Test
+    fun tappingTheChip_offersRetryWhileChangesWait() {
+        var retried = false
+        rule.mainClock.autoAdvance = false
+        rule.setContent { NHATheme { TopAppBarHeader(currentUser = DefaultUserAccount, onSwitchUser = {}, sync = SyncChip.Waiting(3), onRetrySync = { retried = true }) } }
+        rule.onNodeWithText("3 CHANGES WAITING").performClick()
+        rule.mainClock.advanceTimeBy(500)
+        rule.onNodeWithText("Not fully synced on this phone yet").assertExists()
+        rule.onNodeWithText("Retry now").performClick()
+        assertTrue(retried)
+    }
+
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun waiting_dialog_light() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                SyncDialog(SyncChip.Waiting(3), "Last synced Oct 31, 2026, 4:10 PM", onRetry = {}, onDismiss = {})
+            }
+        }
+        rule.waitForIdle()
+        captureScreenRoboImage("src/test/screenshots/sync_dialog_waiting_light.png")
+    }
 }

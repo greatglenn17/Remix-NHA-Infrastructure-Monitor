@@ -50,6 +50,7 @@ fun ProjectDetailScreen(
     val registeredUsers by viewModel.registeredUsers.collectAsState()
     val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val syncChip by viewModel.syncChip.collectAsState()
+    val lastSyncedAt by viewModel.lastSyncedAt.collectAsState()
     val project by viewModel.selectedProject.collectAsState()
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
@@ -150,6 +151,8 @@ fun ProjectDetailScreen(
                 onSwitchUser = { viewModel.switchUserAccount(it) },
                 onBackClick = onBackClick,
                 sync = syncChip,
+                lastSyncedAt = lastSyncedAt,
+                onRetrySync = { viewModel.retrySync() },
                 onEditProfileClick = { showEditProfileDialog = true },
                 onSignOut = { viewModel.signOutUser() },
                 unreadNotificationCount = unreadCount,
