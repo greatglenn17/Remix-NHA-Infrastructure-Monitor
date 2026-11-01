@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.0.7%20%28Build%20207%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.0.8%20%28Build%20208%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.0.7`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.0.7_Build207.apk`** to download the installation package.
+2. Tap the latest release (`v2.0.8`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.0.8_Build208.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.0.8`** | **`208`** | 🧭 Project screen: the Progress and Documents views sit on one scrolling row with a check on the open one; Summary starts with the latest weekly report and says when this week has none, with Add weekly report; Project profile keeps contractor and type in sight and folds the rest behind Show details
 | **`v2.0.7`** | **`207`** | 📝 Weekly reports: Print, Edit and Delete sit in a ⋮ menu on each card; cards show Actual, Target and the change from the previous report; all five form steps fit on a phone with "Step 1 of 5"; errors say "Enter 0 to 100" and Review links back to the step. 🎨 Red now means critical (15%+ behind), errors or the final Delete; smaller slips are grey or amber like the dashboard
 | **`v2.0.6`** | **`206`** | 📊 Dashboard: the same peso and date formats as the project screens; cards say "orders waiting approval" once; "What these mean" explains the counts and the sync chip; tap the sync chip to see when the phone last synced and Retry; on two panes with nothing flagged, a quiet prompt replaces the wide empty card
 | **`v2.0.5`** | **`205`** | 📊 Dashboard: a sync chip shows the real cloud state (Synced, Uploading, Changes waiting, This phone only); field engineers see their projects first; names wrap; one schedule chip coloured by how far behind; Needs attention lists each project once; zero tiles hidden; two panes on an upright 8" tablet; readable dates and whole pesos on cards; the sort button shows the current sort; delete names the project
