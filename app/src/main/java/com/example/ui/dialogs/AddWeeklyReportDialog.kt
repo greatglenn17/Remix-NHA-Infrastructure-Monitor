@@ -58,29 +58,67 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.atan2
 
+private typealias WeeklySubmit = (
+    reportingWeek: String,
+    targetAccomplishmentPct: Double,
+    actualAccomplishmentPct: Double,
+    activitiesJson: String,
+    attachedPhotoUrl: String,
+    dailyWeatherMap: Map<String, String>,
+    dailyWeatherDates: Map<String, String>,
+    manpowerJson: String,
+    equipmentJson: String,
+    issuesJson: String,
+    accomplishmentItemsJson: String,
+    photoDetailsJson: String
+) -> Unit
+
 @Composable
 fun AddWeeklyReportDialog(
     project: com.example.data.model.Project?,
     projectId: Long,
     existingReport: com.example.data.model.WeeklyReport? = null,
     onDismiss: () -> Unit,
-    onSubmit: (
-        reportingWeek: String,
-        targetAccomplishmentPct: Double,
-        actualAccomplishmentPct: Double,
-        activitiesJson: String,
-        attachedPhotoUrl: String,
-        dailyWeatherMap: Map<String, String>,
-        dailyWeatherDates: Map<String, String>,
-        manpowerJson: String,
-        equipmentJson: String,
-        issuesJson: String,
-        accomplishmentItemsJson: String,
-        photoDetailsJson: String
-    ) -> Unit,
+    onSubmit: WeeklySubmit,
     today: java.time.LocalDate = java.time.LocalDate.now()
 ) {
-    var reportingWeek by remember { mutableStateOf(existingReport?.reportingWeek ?: WeekRange.containing(today)) }
+    // Only new reports keep a draft; editing a saved report works as before.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var draft by remember { mutableStateOf(if (existingReport == null) WeeklyDrafts.load(context, projectId) else null) }
+    var decided by remember { mutableStateOf(draft == null) }
+    val offered = draft
+    if (!decided && offered != null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Continue your draft?") },
+            text = {
+                Text("You started a weekly report for ${offered.report.reportingWeek} (last changed ${WeeklyDrafts.savedAtText(offered.savedAt)}). It was not saved yet.")
+            },
+            confirmButton = { TextButton(onClick = { decided = true }, modifier = Modifier.testTag("continue_weekly_draft")) { Text("Continue") } },
+            dismissButton = {
+                TextButton(onClick = { WeeklyDrafts.clear(context, projectId); draft = null; decided = true }, modifier = Modifier.testTag("discard_weekly_draft")) {
+                    Text("Start over")
+                }
+            }
+        )
+        return
+    }
+    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today)
+}
+
+@Composable
+private fun WeeklyReportForm(
+    project: com.example.data.model.Project?,
+    projectId: Long,
+    existingReport: com.example.data.model.WeeklyReport?,
+    draft: WeeklyDraft?,
+    onDismiss: () -> Unit,
+    onSubmit: WeeklySubmit,
+    today: java.time.LocalDate
+) {
+    // A draft fills the form the same way a saved report does when editing.
+    val seed = existingReport ?: draft?.report
+    var reportingWeek by remember { mutableStateOf(seed?.reportingWeek ?: WeekRange.containing(today)) }
     
     val daysOfWeekWithDates = remember(reportingWeek) {
         val cal = java.util.Calendar.getInstance().apply { set(today.year, today.monthValue - 1, today.dayOfMonth) }
@@ -147,9 +185,9 @@ fun AddWeeklyReportDialog(
     // Accomps = Map of Scope Name to Pair<Target, Actual>
     val accomplishmentMap = remember { 
         mutableStateMapOf<String, Pair<String, String>>().apply {
-            if (existingReport != null) {
+            if (seed != null) {
                 try {
-                    val arr = JSONArray(existingReport.accomplishmentItemsJson)
+                    val arr = JSONArray(seed.accomplishmentItemsJson)
                     for (i in 0 until arr.length()) {
                         val obj = arr.getJSONObject(i)
                         put(obj.getString("itemDescription"), Pair(obj.getDouble("targetPct").toString(), obj.getDouble("actualPct").toString()))
@@ -168,14 +206,14 @@ fun AddWeeklyReportDialog(
     // When editing, start from the report's saved rows instead of blank defaults.
     var activityItems by remember {
         mutableStateOf(
-            existingReport?.let { parseActivitiesList(it.activitiesJson) }?.takeIf { it.isNotEmpty() }
+            seed?.let { parseActivitiesList(it.activitiesJson) }?.takeIf { it.isNotEmpty() }
                 ?: listOf(DailyActivity("Monday", "", ""))
         )
     }
     val photoUrls = remember { mutableStateListOf<String>().apply {
-        if (existingReport != null && existingReport.attachedPhotoUrlsJson.length > 4) {
+        if (seed != null && seed.attachedPhotoUrlsJson.length > 4) {
             try {
-                val arr = JSONArray(existingReport.attachedPhotoUrlsJson)
+                val arr = JSONArray(seed.attachedPhotoUrlsJson)
                 for (i in 0 until arr.length()) { add(arr.getString(i)) }
             } catch(e: Exception) {}
         }
@@ -183,7 +221,7 @@ fun AddWeeklyReportDialog(
 
     val photoDetails = remember {
         mutableStateMapOf<String, com.example.data.files.PhotoDetail>().apply {
-            putAll(com.example.data.files.PhotoDetails.parse(existingReport?.photoDetailsJson ?: "{}"))
+            putAll(com.example.data.files.PhotoDetails.parse(seed?.photoDetailsJson ?: "{}"))
         }
     }
     // Geo-tag: new photos get the time and GPS position printed on them and kept with the report.
@@ -256,7 +294,9 @@ fun AddWeeklyReportDialog(
             "Friday" to mutableStateListOf(*Array(24) { if (it in 12..15) "RAIN_SHOWERS" else "FAIR" }),
             "Saturday" to mutableStateListOf(*Array(24) { "FAIR" }),
             "Sunday" to mutableStateListOf(*Array(24) { "FAIR" })
-        )
+        ).apply {
+            draft?.weather?.forEach { (day, hours) -> if (day in keys && hours.size == 24) put(day, mutableStateListOf(*hours.toTypedArray())) }
+        }
     }
 
     var selectedWeatherDayName by remember(daysOfWeekWithDates) { mutableStateOf(daysOfWeekWithDates.first().first) }
@@ -266,7 +306,7 @@ fun AddWeeklyReportDialog(
     // headcount is ever submitted as if it were real.
     var manpowerItems by remember {
         mutableStateOf(
-            existingReport?.let { parseManpowerList(it.manpowerJson) }?.takeIf { it.isNotEmpty() }
+            seed?.let { parseManpowerList(it.manpowerJson) }?.takeIf { it.isNotEmpty() }
                 ?: listOf(
                     ManpowerItem("Project Engineer", 0),
                     ManpowerItem("Foreman", 0),
@@ -278,12 +318,12 @@ fun AddWeeklyReportDialog(
 
     // Equipment Summary Table State
     var equipmentItems by remember {
-        mutableStateOf(existingReport?.let { parseEquipmentList(it.equipmentJson) } ?: emptyList())
+        mutableStateOf(seed?.let { parseEquipmentList(it.equipmentJson) } ?: emptyList())
     }
 
     // Issues Encountered / Action Taken Table State
     var issuesItems by remember {
-        mutableStateOf(existingReport?.let { parseIssuesList(it.issuesJson) } ?: emptyList())
+        mutableStateOf(seed?.let { parseIssuesList(it.issuesJson) } ?: emptyList())
     }
 
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }
@@ -295,13 +335,43 @@ fun AddWeeklyReportDialog(
         dailyHourlyWeather.mapValues { it.value.toList() }, manpowerItems, equipmentItems, issuesItems
     )
     val initial = remember { snapshot() }
-    val dirty = snapshot() != initial
+    val current = snapshot()
+    val dirty = current != initial || draft != null
+    fun accItemsJson() = JSONArray(scopeItems.map { item ->
+        val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
+        JSONObject().put("itemDescription", item.name)
+            .put("targetPct", vals.first.toDoubleOrNull() ?: 0.0)
+            .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
+            .put("weightPct", item.weightPct)
+    }).toString()
+    // Saved or discarded: no more draft writes, even one already waiting.
+    var closed by remember { mutableStateOf(false) }
+    if (existingReport == null) LaunchedEffect(current) {
+        if (current == initial) return@LaunchedEffect
+        kotlinx.coroutines.delay(500)
+        if (closed) return@LaunchedEffect
+        WeeklyDrafts.save(context, projectId, WeeklyDraft(
+            savedAt = System.currentTimeMillis(),
+            report = com.example.data.model.WeeklyReport(
+                projectId = projectId, reportingWeek = reportingWeek, daysElapsed = 0, remainingDays = 0,
+                targetAccomplishmentPct = overallTarget, actualAccomplishmentPct = overallActual,
+                manpowerJson = encodeManpowerList(manpowerItems), equipmentJson = encodeEquipmentList(equipmentItems),
+                activitiesJson = encodeActivitiesList(activityItems), issuesJson = encodeIssuesList(issuesItems),
+                accomplishmentItemsJson = accItemsJson(), documentsIssuedReceivedJson = "[]",
+                attachedPhotoUrlsJson = JSONArray(photoUrls.toList()).toString(),
+                photoDetailsJson = com.example.data.files.PhotoDetails.toJson(photoDetails.filterKeys { it in photoUrls }),
+                submittedByStaff = ""
+            ),
+            weather = dailyHourlyWeather.mapValues { it.value.toList() }
+        ))
+    }
+    fun dropDraft() { closed = true; if (existingReport == null) WeeklyDrafts.clear(context, projectId) }
 
     LongForm(
         title = if (existingReport == null) "New weekly report" else "Edit weekly report",
         dirty = dirty,
         saveEnabled = errors.isEmpty(),
-        onDismiss = onDismiss,
+        onDismiss = { dropDraft(); onDismiss() },
         saveTag = "submit_weekly_report_button",
         topContent = {
             // Fixed tabs: a scrolling row cut the first steps off on a phone ("nd issues").
@@ -322,6 +392,7 @@ fun AddWeeklyReportDialog(
             TextButton(onClick = { step = WeeklyStep.entries[step.ordinal + 1] }, enabled = step != WeeklyStep.REVIEW) { Text("Next") }
         },
         onSave = {
+            dropDraft()
             val target = overallTarget
             val actual = overallActual
 
@@ -336,13 +407,7 @@ fun AddWeeklyReportDialog(
             
             val dailyWeatherDates = daysOfWeekWithDates.associate { it.first to it.third }
 
-            val accItemsJson = JSONArray(scopeItems.map { item ->
-                val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
-                JSONObject().put("itemDescription", item.name)
-                    .put("targetPct", vals.first.toDoubleOrNull() ?: 0.0)
-                    .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
-                    .put("weightPct", item.weightPct)
-            }).toString()
+            val accItemsJson = accItemsJson()
 
             onSubmit(
                 reportingWeek,
