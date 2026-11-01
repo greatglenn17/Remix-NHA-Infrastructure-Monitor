@@ -1,8 +1,8 @@
 {
-  "versionCode": 205,
-  "versionName": "2.0.5",
-  "releaseNotes": "v2.0.5: Dashboard: a sync chip shows whether your changes reached the cloud. Field engineers see their own projects first. One schedule chip coloured by how far behind. Needs attention lists each project once. Two panes on an upright tablet. Readable dates and whole pesos on cards.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.5/NHA_Monitor_v2.0.5_Build205.apk",
-  "apkSha256": "a95d1c3e699290c7ad6f06eabcce4458bbc5bce554288cfa077bc01cd6b3637d",
+  "versionCode": 206,
+  "versionName": "2.0.6",
+  "releaseNotes": "v2.0.6: Dashboard: the same peso and date formats as the project screens. Cards no longer repeat the orders waiting approval. What these mean explains the counts and the sync chip. Tap the sync chip to see when the phone last synced and retry. On a tablet with nothing flagged, a quiet prompt replaces the empty card.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.6/NHA_Monitor_v2.0.6_Build206.apk",
+  "apkSha256": "71100db7c247d63eca4ce20d8e03a3d73a6ec6b2c4c472750c2384b1e20783af",
   "isMandatory": true
 }
