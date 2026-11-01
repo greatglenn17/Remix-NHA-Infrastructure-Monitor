@@ -1,8 +1,8 @@
 {
-  "versionCode": 206,
-  "versionName": "2.0.6",
-  "releaseNotes": "v2.0.6: Dashboard: the same peso and date formats as the project screens. Cards no longer repeat the orders waiting approval. What these mean explains the counts and the sync chip. Tap the sync chip to see when the phone last synced and retry. On a tablet with nothing flagged, a quiet prompt replaces the empty card.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.6/NHA_Monitor_v2.0.6_Build206.apk",
-  "apkSha256": "71100db7c247d63eca4ce20d8e03a3d73a6ec6b2c4c472750c2384b1e20783af",
+  "versionCode": 207,
+  "versionName": "2.0.7",
+  "releaseNotes": "v2.0.7: Weekly reports: Print, Edit and Delete are in a menu on each card, which shows Actual, Target and the change from the previous report. All form steps fit on a phone, with clearer errors. Red now means critical, errors or delete; smaller slips are grey or amber.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.7/NHA_Monitor_v2.0.7_Build207.apk",
+  "apkSha256": "5409f8eddf63451f17921ccd97f9ea960ef1e1c3cec0c504db42c12bef3c3f11",
   "isMandatory": true
 }
