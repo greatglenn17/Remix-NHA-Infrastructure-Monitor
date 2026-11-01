@@ -22,6 +22,7 @@ import com.example.util.ProjectAttention
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -195,6 +196,15 @@ class ProjectAttentionTest {
         assertEquals("18.00% behind", scheduleText(ProjectAttention.slippage(project(62.0, 44.0))))
         assertEquals("2.50% ahead", scheduleText(2.5))
         assertEquals("on schedule", scheduleText(ProjectAttention.slippage(project(50.0, 50.0))))
+    }
+
+    @Test
+    fun termHelp_quotesTheThresholds() {
+        val help = com.example.ui.dashboard.TERM_HELP.toMap()
+        assertTrue(help.getValue("Behind schedule").startsWith("Work done is 10% or more behind"))
+        assertTrue("from 15% behind" in help.getValue("Behind schedule"))
+        assertTrue("more than 10% ahead" in help.getValue("Billing ahead of work"))
+        assertTrue("30 days away" in help.getValue("Due in 30 days"))
     }
 
     @Test

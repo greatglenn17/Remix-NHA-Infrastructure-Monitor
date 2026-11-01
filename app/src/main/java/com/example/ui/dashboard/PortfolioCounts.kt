@@ -2,19 +2,29 @@ package com.example.ui.dashboard
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +37,7 @@ import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.TabularNumbers
 import com.example.util.PortfolioFilter
 import com.example.util.PortfolioSummary
+import com.example.util.ProjectAttention
 
 /** The non-zero counts (a zero has nothing to filter to); tapping one filters the project list, tapping it again clears the filter. */
 @Composable
@@ -46,6 +57,7 @@ fun PortfolioCounts(
     ).filter { it.count > 0 || it.filter == selected }
     if (tiles.isEmpty()) return
     val rows = if (wide) listOf(tiles) else tiles.chunked(2)
+    var showHelp by rememberSaveable { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -56,8 +68,57 @@ fun PortfolioCounts(
                 if (!wide && row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+        TextButton(onClick = { showHelp = true }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("What these mean", style = MaterialTheme.typography.labelLarge)
+        }
     }
+    if (showHelp) TermHelpDialog(onDismiss = { showHelp = false })
 }
+
+@Composable
+internal fun TermHelpDialog(onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("What these mean", color = scheme.onSurface) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TERM_HELP.forEach { (term, meaning) ->
+                    if (term == SYNC_HELP_FIRST) {
+                        HorizontalDivider(color = scheme.outlineVariant)
+                        Text("Sync chip at the top", style = MaterialTheme.typography.labelLarge, color = scheme.primary)
+                    }
+                    Column {
+                        Text(term, style = MaterialTheme.typography.titleSmall, color = scheme.onSurface)
+                        Text(meaning, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        containerColor = scheme.surface,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+private fun pct(points: Double) = "%.0f%%".format(points)
+
+private const val SYNC_HELP_FIRST = "SYNCED"
+
+/** The count tiles and the top-bar sync chip in plain words, from the same thresholds ProjectAttention checks. */
+internal val TERM_HELP = listOf(
+    "Behind schedule" to "Work done is ${pct(-ProjectAttention.WARNING_SLIPPAGE)} or more behind the plan, or the project is marked Behind Schedule. " +
+        "Shown in red from ${pct(-ProjectAttention.CRITICAL_SLIPPAGE)} behind.",
+    "Billing ahead of work" to "Billed is more than ${pct(ProjectAttention.BILLING_GAP_POINTS)} ahead of work done, " +
+        "for example billed 65%, work done 38.50%.",
+    "Waiting approval" to "Variation orders, time extensions, suspensions and resumptions not yet approved.",
+    "Due in ${ProjectAttention.DUE_SOON_DAYS} days" to "Unfinished projects whose completion date (the revised one, if any) is ${ProjectAttention.DUE_SOON_DAYS} days away or less.",
+    SYNC_HELP_FIRST to "Every change made on this phone is in the cloud.",
+    "UPLOADING" to "Changes are being sent to the cloud now.",
+    "CHANGES WAITING" to "Changes could not be sent, usually for lack of signal. They are sent again the next time the app starts or syncs.",
+    "THIS PHONE ONLY" to "Signed in offline: changes stay on this phone and are not sent to the cloud."
+)
 
 private data class CountTile(val filter: PortfolioFilter, val label: String, val count: Int, val icon: ImageVector, val tint: Color)
 
