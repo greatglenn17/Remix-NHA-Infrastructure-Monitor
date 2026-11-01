@@ -1,5 +1,7 @@
 package com.example
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -222,7 +224,9 @@ class ProjectDetailScreenshotTest {
         mainClock.autoAdvance = false
         setContent { frame(mode) { content() } }
         repeat(10) { onRoot().performTouchInput { swipeUp() }; mainClock.advanceTimeBy(1000) }
-        if (lazy) { onNode(hasScrollToIndexAction()).performScrollToIndex(12); mainClock.advanceTimeBy(1000) }
+        // The view row is a lazy list too; the reports list is the vertical one.
+        if (lazy) {
+            onNode(hasScrollToIndexAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performScrollToIndex(12); mainClock.advanceTimeBy(1000) }
         captureScreenRoboImage("src/test/screenshots/$name.png")
     }
 
