@@ -154,14 +154,6 @@ internal fun AttentionCard(
                     Badge("${projects.size}", colors.behind, colors.behindContainer)
                 }
             }
-            if (projects.isEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.onTrack, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Nothing needs attention", style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
-                }
-                return@Column
-            }
             val shown = if (showAll) projects else projects.take(ATTENTION_PREVIEW)
             shown.forEach { (item, flags) ->
                 val worst = flags.first()

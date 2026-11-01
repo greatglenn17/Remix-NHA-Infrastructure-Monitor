@@ -185,13 +185,17 @@ class ProjectDetailScreenshotTest {
     @Config(qualifiers = "w743dp-h1185dp")
     @Test fun two_pane_project_upright() = twoPane("743")
 
-    private fun twoPane(width: String) {
-        val item = PortfolioItem(project, flags, 0.64f, 6_400_000.0, 10_450_000.0, 1, LocalDate.of(2026, 10, 11))
+    // No project open and nothing flagged: a quiet prompt in the right pane, not a wide empty card.
+    @Config(qualifiers = "w743dp-h1185dp")
+    @Test fun two_pane_quiet_upright() = twoPane("743", quiet = true)
+
+    private fun twoPane(width: String, quiet: Boolean = false) {
+        val item = PortfolioItem(project, if (quiet) emptyList() else flags, 0.64f, 6_400_000.0, 10_450_000.0, if (quiet) 0 else 1, LocalDate.of(2026, 10, 11))
         val state = PortfolioUiState(
             summary = Portfolio.summarize(listOf(item)), attention = Portfolio.attentionQueue(listOf(item)),
             rows = listOf(item), filter = null, totalProjects = 1
         )
-        captureRoboImage("src/test/screenshots/detail_two_pane_project_${width}_light.png") {
+        captureRoboImage("src/test/screenshots/detail_two_pane_${if (quiet) "quiet" else "project"}_${width}_light.png") {
             NHATheme(themeMode = AppThemeMode.LIGHT) {
                 Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                     TwoPanes(
@@ -205,7 +209,7 @@ class ProjectDetailScreenshotTest {
                             )
                         },
                         fab = {},
-                        detail = { frame(AppThemeMode.LIGHT, onClose = {}) { Money() } }
+                        detail = { if (quiet) NeedsAttentionPane(emptyList()) {} else frame(AppThemeMode.LIGHT, onClose = {}) { Money() } }
                     )
                 }
             }
