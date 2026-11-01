@@ -31,6 +31,7 @@ import com.example.data.model.ProjectStatus
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.NHAColors
 import com.example.ui.theme.TabularNumbers
+import com.example.util.AttentionKind
 import com.example.util.AttentionLevel
 import com.example.util.PortfolioItem
 import com.example.util.ProjectAttention
@@ -88,7 +89,7 @@ fun PortfolioRow(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(8.dp))
-                        StatusBadge(project.status, colors)
+                        StatusBadge(project, colors)
                     }
                 }
             }
@@ -98,7 +99,7 @@ fun PortfolioRow(
             val workDone: @Composable (Modifier) -> Unit = { m ->
                 ProgressLine(
                     label = "Work done",
-                    value = "%.2f%% · %s".format(project.actualAccomplishment, scheduleText(ProjectAttention.slippage(project))),
+                    value = workDoneText(project),
                     fraction = (project.actualAccomplishment / 100).toFloat(),
                     color = varianceColor,
                     modifier = m
@@ -126,10 +127,12 @@ fun PortfolioRow(
                 }
             }
 
-            item.flags.firstOrNull()?.let { flag ->
+            // Slippage already shows on the Work done line, bar and status chip.
+            val flags = item.flags.filter { it.kind != AttentionKind.BEHIND }
+            flags.firstOrNull()?.let { flag ->
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = flag.message + if (item.flags.size > 1) "  +${item.flags.size - 1} more" else "",
+                    text = flag.message + if (flags.size > 1) "  +${flags.size - 1} more" else "",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = levelColor(flag.level, colors),
@@ -230,14 +233,18 @@ private fun MetaItem(icon: ImageVector, text: String) {
     }
 }
 
+/** The recorded status, coloured by slippage so the chip never reads green on a project that is behind. */
 @Composable
-internal fun StatusBadge(status: String, colors: NHAColors) {
-    val color = when (status) {
-        ProjectStatus.BEHIND_SCHEDULE.label -> colors.behind
-        ProjectStatus.SUSPENDED.label -> colors.neutral
-        else -> colors.onTrack
-    }
-    Badge(status, color, containerOf(color, colors))
+internal fun StatusBadge(project: Project, colors: NHAColors) {
+    val color = statusColor(project, colors)
+    Badge(project.status, color, containerOf(color, colors))
+}
+
+internal fun statusColor(project: Project, colors: NHAColors): Color {
+    if (project.status == ProjectStatus.SUSPENDED.label) return colors.neutral
+    val slip = varianceColor(ProjectAttention.slippage(project), colors)
+    // Marked behind by the engineer but the numbers are close: still not green.
+    return if (project.status == ProjectStatus.BEHIND_SCHEDULE.label && slip in listOf(colors.onTrack, colors.neutral)) colors.watch else slip
 }
 
 @Composable
@@ -281,6 +288,7 @@ internal fun scheduleText(slippage: Double) = when {
     else -> "on schedule"
 }
 
-internal fun formatVariance(v: Double) = if (v >= 0) "+%.2f%%".format(v) else "−%.2f%%".format(-v)
+internal fun workDoneText(project: Project) =
+    "%.2f%% · %s".format(project.actualAccomplishment, scheduleText(ProjectAttention.slippage(project)))
 
 internal fun peso(amount: Double): String = NumberFormat.getCurrencyInstance(Locale("en", "PH")).format(amount)

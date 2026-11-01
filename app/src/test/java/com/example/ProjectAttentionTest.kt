@@ -14,6 +14,8 @@ import com.example.util.AttentionLevel.CRITICAL
 import com.example.util.AttentionLevel.STALE
 import com.example.util.AttentionLevel.WARNING
 import com.example.ui.dashboard.scheduleText
+import com.example.ui.dashboard.statusColor
+import com.example.ui.theme.LightNHAColors
 import com.example.util.ProjectAttention
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -191,5 +193,14 @@ class ProjectAttentionTest {
         assertEquals("18.00% behind", scheduleText(ProjectAttention.slippage(project(62.0, 44.0))))
         assertEquals("2.50% ahead", scheduleText(2.5))
         assertEquals("on schedule", scheduleText(ProjectAttention.slippage(project(50.0, 50.0))))
+    }
+
+    @Test
+    fun statusColor_followsSlippageNotTheLabel() {
+        val c = LightNHAColors
+        assertEquals(c.behind, statusColor(project(62.0, 44.0), c))                          // "On-going" but 18% behind
+        assertEquals(c.onTrack, statusColor(project(50.0, 52.0), c))
+        assertEquals(c.watch, statusColor(project(50.0, 50.0, status = "Behind Schedule"), c)) // marked behind, numbers even
+        assertEquals(c.neutral, statusColor(project(62.0, 44.0, status = "Suspended"), c))
     }
 }
