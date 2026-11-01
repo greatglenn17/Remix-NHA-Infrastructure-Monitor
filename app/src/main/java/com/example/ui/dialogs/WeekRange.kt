@@ -17,4 +17,10 @@ object WeekRange {
         val monday = day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         return "${monday.format(format)} - ${monday.plusDays(6).format(format)}"
     }
+
+    /** First and last day of a range; null for labels written another way (older "Week 41: ..." reports). */
+    fun parse(range: String): Pair<LocalDate, LocalDate>? = runCatching {
+        val (start, end) = range.split(" - ").map { LocalDate.parse(it.trim(), format) }
+        start to end
+    }.getOrNull()
 }
