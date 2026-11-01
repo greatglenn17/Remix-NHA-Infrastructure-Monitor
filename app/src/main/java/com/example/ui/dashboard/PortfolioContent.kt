@@ -82,6 +82,8 @@ fun PortfolioContent(
 
             item(key = "list_header") {
                 ListHeader(
+                    // A wider gap where the overview ends and the list begins than between cards.
+                    modifier = Modifier.padding(top = if (!projectsFirst && state.attention.isNotEmpty()) 12.dp else 0.dp),
                     shown = state.rows.size,
                     total = state.totalProjects,
                     filter = state.filter,
@@ -213,10 +215,11 @@ private fun ListHeader(
     onSearch: (String) -> Unit,
     onSort: (String) -> Unit,
     onStatus: (String) -> Unit,
-    onType: (String) -> Unit
+    onType: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("All projects", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
             Spacer(Modifier.width(8.dp))

@@ -93,7 +93,7 @@ class ProjectDetailScreenshotTest {
     )
 
     private val flags = listOf(
-        AttentionFlag(AttentionKind.BEHIND, AttentionLevel.CRITICAL, "18.0% behind schedule"),
+        AttentionFlag(AttentionKind.BEHIND, AttentionLevel.CRITICAL, "18.00% behind schedule"),
         AttentionFlag(AttentionKind.WAITING_APPROVAL, AttentionLevel.WARNING, "1 order waiting approval")
     )
 
