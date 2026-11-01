@@ -222,7 +222,9 @@ fun ProjectDetailScreen(
                             onDeleteRequest = viewModel::deleteDeveloperRequest,
                             payments = projectPayments,
                             onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
-                            today = today
+                            today = today,
+                            weeklyReports = weeklyReports,
+                            onAddWeeklyReport = onAddWeeklyReportClick.takeIf { currentUser.role.hasPermission(Permission.SUBMIT_REPORT) }
                         )
                     }
                     ProjectSection.PROGRESS -> Column {

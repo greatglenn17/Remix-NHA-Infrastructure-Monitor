@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -15,6 +16,8 @@ import com.example.data.model.PendingDocument
 import com.example.data.model.Permission
 import com.example.data.model.Project
 import com.example.data.model.ProjectPayment
+import com.example.data.model.ProjectStatus
+import com.example.ui.dialogs.WeekRange
 import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
 import com.example.data.model.hasPermission
@@ -50,8 +53,11 @@ fun SummarySection(
     onSaveRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
     onDeleteRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
     payments: List<ProjectPayment> = emptyList(),
-    today: LocalDate = LocalDate.now()
+    today: LocalDate = LocalDate.now(),
+    weeklyReports: List<WeeklyReport> = emptyList(),
+    onAddWeeklyReport: (() -> Unit)? = null
 ) {
+    val missingWeek = WeekRange.containing(today).takeIf { onAddWeeklyReport != null && needsThisWeeksReport(project, weeklyReports, today) }
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
         ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
     }
@@ -60,7 +66,9 @@ fun SummarySection(
     val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     var showRequestDialog by remember { mutableStateOf(false) }
     var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
+    // What the engineer does next comes first; the profile is reference, folded below.
     val cards: List<@Composable (Modifier) -> Unit> = listOf(
+        { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
         { m ->
             KeyDatesCard(
@@ -74,8 +82,7 @@ fun SummarySection(
                 if (canUpdateOrders) { r: com.example.data.model.DeveloperRequest -> editRequest = r; showRequestDialog = true } else null, m
             )
         },
-        { m -> CostCard(project, documents, m) },
-        { m -> LatestReportCard(latestReport, openIssues, m) }
+        { m -> CostCard(project, documents, m) }
     )
     // Attention shows only when something needs action, across the full width above the cards;
     // the payment table takes the full width below them so its amounts fit.
@@ -238,8 +245,21 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
 }
 
 @Composable
-private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, modifier: Modifier) {
+private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek: String?, onAddWeeklyReport: (() -> Unit)?, modifier: Modifier) {
     SectionCard("Latest weekly report", Icons.Default.Assignment, modifier) {
+        if (missingWeek != null && onAddWeeklyReport != null) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)) {
+                    Text("No report yet for this week", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    Text(missingWeek, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    TextButton(onClick = onAddWeeklyReport, contentPadding = PaddingValues(horizontal = 0.dp), modifier = Modifier.testTag("summary_add_weekly_report")) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add weekly report")
+                    }
+                }
+            }
+        }
         if (report == null) {
             EmptyLine("No weekly reports yet")
         } else {
@@ -270,6 +290,19 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
             }
         }
     ) {
+        // Reference details fold away so the Summary is short; contractor and type stay in sight.
+        var showDetails by rememberSaveable { mutableStateOf(false) }
+        Field("Contractor", project.contractor.ifBlank { "-" })
+        Field("Project type", project.projectType.ifBlank { "-" })
+        TextButton(
+            onClick = { showDetails = !showDetails },
+            contentPadding = PaddingValues(horizontal = 0.dp),
+            modifier = Modifier.testTag("profile_details_toggle")
+        ) {
+            Text(if (showDetails) "Hide details" else "Show details")
+            Icon(if (showDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        if (!showDetails) return@SectionCard
         val hasPhoto = project.latestUpdatePhotoUrl.isNotBlank()
         SitePhoto(
             project.latestUpdatePhotoUrl,
@@ -277,8 +310,6 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
                 .padding(bottom = 8.dp).testTag("profile_site_photo")
         )
         Field("Implementing office", project.implementingOffice.ifBlank { "-" })
-        Field("Contractor", project.contractor.ifBlank { "-" })
-        Field("Project type", project.projectType.ifBlank { "-" })
         if (project.projectType.contains("Housing", ignoreCase = true)) {
             Field("Land area", project.landArea.ifBlank { "-" })
             Field("No. of units", project.numberOfUnits.ifBlank { "-" })
@@ -296,6 +327,17 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
             }
         }
     }
+}
+
+/**
+ * True when a started, unfinished, not suspended project has no report for the Monday-to-Sunday week of [today].
+ * A report counts if its range overlaps that week; older labels that don't parse never count.
+ */
+internal fun needsThisWeeksReport(project: Project, reports: List<WeeklyReport>, today: LocalDate): Boolean {
+    if (project.actualAccomplishment >= 100 || project.status == ProjectStatus.SUSPENDED.label) return false
+    if (runCatching { LocalDate.parse(project.dateStarted.trim()) }.getOrNull()?.isAfter(today) == true) return false
+    val (monday, sunday) = WeekRange.parse(WeekRange.containing(today)) ?: return false
+    return reports.none { r -> WeekRange.parse(r.reportingWeek)?.let { (s, e) -> !s.isAfter(sunday) && !e.isBefore(monday) } == true }
 }
 
 /** Scope of works JSON as (name, amount, weight %); plain text becomes one item at 100%. */
