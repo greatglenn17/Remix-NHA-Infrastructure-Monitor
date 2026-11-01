@@ -178,13 +178,19 @@ class ProjectDetailScreenshotTest {
 
     // The real two-pane row: 380dp portfolio list, divider, project in the remaining width.
     @Config(qualifiers = "w1185dp-h743dp")
-    @Test fun two_pane_project() {
+    @Test fun two_pane_project() = twoPane("1185")
+
+    // An 8" tablet upright: two panes from 720dp, the list narrows to 360dp.
+    @Config(qualifiers = "w743dp-h1185dp")
+    @Test fun two_pane_project_upright() = twoPane("743")
+
+    private fun twoPane(width: String) {
         val item = PortfolioItem(project, flags, 0.64f, 6_400_000.0, 10_450_000.0, 1, LocalDate.of(2026, 10, 11))
         val state = PortfolioUiState(
             summary = Portfolio.summarize(listOf(item)), attention = Portfolio.attentionQueue(listOf(item)),
             rows = listOf(item), filter = null, totalProjects = 1
         )
-        captureRoboImage("src/test/screenshots/detail_two_pane_project_1185_light.png") {
+        captureRoboImage("src/test/screenshots/detail_two_pane_project_${width}_light.png") {
             NHATheme(themeMode = AppThemeMode.LIGHT) {
                 Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                     TwoPanes(

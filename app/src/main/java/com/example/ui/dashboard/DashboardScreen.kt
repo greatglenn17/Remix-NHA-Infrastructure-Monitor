@@ -26,7 +26,7 @@ fun DashboardScreen(
     viewModel: ProjectViewModel,
     onProjectClick: (Project) -> Unit,
     onCreateProjectClick: () -> Unit,
-    // Two panes (840dp and up): the list keeps 380dp and this fills the rest under one top bar.
+    // Two panes (720dp and up): the list keeps 360-380dp and this fills the rest under one top bar.
     detailPane: (@Composable () -> Unit)? = null
 ) {
     val currentUser by viewModel.currentUserAccount.collectAsState()
@@ -264,7 +264,7 @@ fun DashboardScreen(
     }
 }
 
-/** Portfolio list (380dp, with its "New Project" button) beside the project pane. */
+/** Portfolio list (380dp, 360dp below 840dp so the project keeps phone width, with its "New Project" button) beside the project pane. */
 @Composable
 internal fun TwoPanes(
     list: @Composable () -> Unit,
@@ -272,12 +272,15 @@ internal fun TwoPanes(
     detail: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier) {
-        Box(modifier = Modifier.width(380.dp).fillMaxHeight()) {
-            list()
-            Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
+    BoxWithConstraints(modifier = modifier) {
+        val listWidth = if (maxWidth >= 840.dp) 380.dp else 360.dp
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.width(listWidth).fillMaxHeight()) {
+                list()
+                Box(modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
+            }
+            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detail() }
         }
-        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) { detail() }
     }
 }

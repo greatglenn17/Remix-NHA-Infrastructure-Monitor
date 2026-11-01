@@ -125,8 +125,8 @@ payments total, its latest weekly report time and today's date, and returns its 
 
 | Width | Layout |
 | --- | --- |
-| 840dp and up (Phone A sideways) | Two panes: portfolio list (about 380dp) and the selected project. Selecting another project swaps the right pane. With no selection, the right pane shows Needs attention. |
-| 600–840dp (Phone A upright) | One pane at a time; screens use the width (4 counts in a row, project detail in 2 columns). |
+| 720dp and up (Phone A sideways, 8" tablet upright) | Two panes: portfolio list (380dp; 360dp below 840dp) and the selected project. Selecting another project swaps the right pane. With no selection, the right pane shows Needs attention. |
+| 600–720dp (Phone A upright) | One pane at a time; screens use the width (4 counts in a row, project detail in 2 columns). |
 | Under 600dp (phones) | One pane at a time, single column. |
 
 - Top bar keeps sync status, notifications and the account menu. Sort and filter move into

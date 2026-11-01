@@ -4,7 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.TrendingDown
@@ -64,7 +66,9 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
     val scheme = MaterialTheme.colorScheme
     // A zero count is not a problem, so it is shown in the secondary text colour.
     val tint = if (tile.count > 0) tile.tint else scheme.onSurfaceVariant
+    // selected + onClick makes the tile selectable, so TalkBack reads it as a filter that is on or off.
     Surface(
+        selected = isSelected,
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = scheme.surface,
@@ -80,6 +84,14 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
                     style = MaterialTheme.typography.headlineSmall.merge(TabularNumbers),
                     fontWeight = FontWeight.Bold,
                     color = tint
+                )
+                Spacer(Modifier.weight(1f))
+                // The corner mark says the tile filters the list, and shows when it does.
+                Icon(
+                    if (isSelected) Icons.Default.Check else Icons.Default.FilterList,
+                    contentDescription = null,
+                    tint = if (isSelected) scheme.primary else scheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
                 )
             }
             Text(
