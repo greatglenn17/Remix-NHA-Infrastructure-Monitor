@@ -1,8 +1,8 @@
 {
-  "versionCode": 204,
-  "versionName": "2.0.4",
-  "releaseNotes": "v2.0.4: Photos can be deleted from the photo viewer (it asks first; the photo is removed on every phone). Subdivision Plan: found lots come in with no Block and Lot (Unassigned lot) for the engineer to name.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.4/NHA_Monitor_v2.0.4_Build204.apk",
-  "apkSha256": "b0b53d9904d192767a166b68585f89fc8c0bf5f0eaf412b500d3882110623b9f",
+  "versionCode": 205,
+  "versionName": "2.0.5",
+  "releaseNotes": "v2.0.5: Dashboard: a sync chip shows whether your changes reached the cloud. Field engineers see their own projects first. One schedule chip coloured by how far behind. Needs attention lists each project once. Two panes on an upright tablet. Readable dates and whole pesos on cards.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.5/NHA_Monitor_v2.0.5_Build205.apk",
+  "apkSha256": "a95d1c3e699290c7ad6f06eabcce4458bbc5bce554288cfa077bc01cd6b3637d",
   "isMandatory": true
 }
