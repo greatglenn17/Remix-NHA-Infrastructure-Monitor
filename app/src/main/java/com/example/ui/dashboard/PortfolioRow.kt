@@ -145,7 +145,9 @@ fun PortfolioRow(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val completion = ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
                 MetaItem(Icons.Default.Event, "Completion ${completion.ifBlank { "-" }}")
-                MetaItem(Icons.Default.Description, if (item.pendingDocsCount == 1) "1 order waiting approval" else "${item.pendingDocsCount} orders waiting approval")
+                if (item.pendingDocsCount > 0) {
+                    MetaItem(Icons.Default.Description, if (item.pendingDocsCount == 1) "1 order waiting approval" else "${item.pendingDocsCount} orders waiting approval")
+                }
                 MetaItem(Icons.Default.Update, item.lastFieldUpdate?.let { "Field update $it" } ?: "No field update yet")
             }
         }

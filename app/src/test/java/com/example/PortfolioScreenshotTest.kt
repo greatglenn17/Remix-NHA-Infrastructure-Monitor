@@ -75,7 +75,7 @@ class PortfolioScreenshotTest {
         captureRoboImage {
             NHATheme(themeMode = mode) { Surface(color = MaterialTheme.colorScheme.background) {
                 PortfolioContent(
-                    state = state, officeName = "Bulacan District Office",
+                    state = state,
                     searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = "All", typeFilter = "All",
                     typeOptions = listOf("All", "Housing Project"), emptyMessage = empty,
                     onFilter = {}, onSearch = {}, onSort = {}, onStatus = {}, onType = {},
@@ -93,6 +93,13 @@ class PortfolioScreenshotTest {
     // A field engineer sees their own projects before the office overview.
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun field_engineer_phone_light() = capture(sample, AppThemeMode.LIGHT, projectsFirst = true)
+
+    // Nothing flagged: no zero tiles, no attention card, no "0 orders" lines.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun quiet_phone_light() {
+        val quiet = items.take(2).map { it.copy(flags = emptyList(), pendingDocsCount = 0) }
+        capture(sample.copy(summary = Portfolio.summarize(quiet), attention = emptyList(), rows = quiet, totalProjects = quiet.size), AppThemeMode.LIGHT)
+    }
 
     @Config(qualifiers = "w743dp-h1185dp")
     @Test fun tablet_portrait_light() = capture(sample, AppThemeMode.LIGHT)

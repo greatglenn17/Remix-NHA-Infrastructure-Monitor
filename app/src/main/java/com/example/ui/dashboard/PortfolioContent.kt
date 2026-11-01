@@ -36,13 +36,13 @@ private val SORT_OPTIONS = listOf(Portfolio.NEEDS_ATTENTION_SORT, "Variance (Wor
 private val STATUS_OPTIONS = listOf("All", "On-going", "Behind Schedule", "Suspended")
 
 /**
- * Portfolio home: header, four counts, needs-attention queue and the project list (spec "Portfolio home").
+ * Portfolio home: four counts, needs-attention queue and the project list (spec "Portfolio home").
+ * The office name lives in the top bar, so the list carries the project count instead of a page header.
  * [projectsFirst] puts the list above the counts and queue, for a field engineer who opens the app to reach their own sites.
  */
 @Composable
 fun PortfolioContent(
     state: PortfolioUiState,
-    officeName: String,
     searchQuery: String,
     sortOrder: String,
     statusFilter: String,
@@ -71,17 +71,6 @@ fun PortfolioContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            item(key = "header") {
-                Column {
-                    Text(officeName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = scheme.onSurface)
-                    Text(
-                        if (state.totalProjects == 1) "1 project" else "${state.totalProjects} projects",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = scheme.onSurfaceVariant
-                    )
-                }
-            }
-
             if (state.totalProjects == 0) {
                 item(key = "empty") { EmptyState(emptyMessage, emptyActions) }
                 return@LazyColumn
@@ -92,6 +81,7 @@ fun PortfolioContent(
             item(key = "list_header") {
                 ListHeader(
                     shown = state.rows.size,
+                    total = state.totalProjects,
                     filter = state.filter,
                     onClearFilter = { onFilter(null) },
                     searchQuery = searchQuery, sortOrder = sortOrder, statusFilter = statusFilter, typeFilter = typeFilter,
@@ -108,7 +98,7 @@ fun PortfolioContent(
                 }
             }
 
-            if (projectsFirst) {
+            if (projectsFirst && state.attention.isNotEmpty()) {
                 item(key = "overview_header") {
                     Text(
                         "Overview",
@@ -149,16 +139,18 @@ internal fun AttentionCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
+    // One row per project, worst flag first; the queue is already sorted by level.
+    val projects = queue.groupBy { it.first.project.id }.values.map { pairs -> pairs.first().first to pairs.map { it.second } }
     Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text("Needs attention", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                if (queue.isNotEmpty()) {
+                if (projects.isNotEmpty()) {
                     Spacer(Modifier.width(8.dp))
-                    Badge("${queue.size}", colors.behind, colors.behindContainer)
+                    Badge("${projects.size}", colors.behind, colors.behindContainer)
                 }
             }
-            if (queue.isEmpty()) {
+            if (projects.isEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = colors.onTrack, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -166,8 +158,9 @@ internal fun AttentionCard(
                 }
                 return@Column
             }
-            val shown = if (showAll) queue else queue.take(ATTENTION_PREVIEW)
-            shown.forEach { (item, flag) ->
+            val shown = if (showAll) projects else projects.take(ATTENTION_PREVIEW)
+            shown.forEach { (item, flags) ->
+                val worst = flags.first()
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -176,7 +169,7 @@ internal fun AttentionCard(
                         .heightIn(min = 48.dp)
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Icon(levelIcon(flag.level), contentDescription = levelName(flag.level), tint = levelColor(flag.level, colors), modifier = Modifier.size(20.dp))
+                    Icon(levelIcon(worst.level), contentDescription = levelName(worst.level), tint = levelColor(worst.level, colors), modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -184,17 +177,19 @@ internal fun AttentionCard(
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = scheme.onSurface,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(flag.message, style = MaterialTheme.typography.bodySmall, color = levelColor(flag.level, colors))
+                        flags.forEach { flag ->
+                            Text(flag.message, style = MaterialTheme.typography.bodySmall, color = levelColor(flag.level, colors))
+                        }
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = scheme.onSurfaceVariant)
                 }
             }
-            if (queue.size > ATTENTION_PREVIEW) {
+            if (projects.size > ATTENTION_PREVIEW) {
                 TextButton(onClick = onToggleAll, modifier = Modifier.padding(horizontal = 4.dp)) {
-                    Text(if (showAll) "Show fewer" else "See all ${queue.size}")
+                    Text(if (showAll) "Show fewer" else "See all ${projects.size}")
                 }
             }
         }
@@ -204,6 +199,7 @@ internal fun AttentionCard(
 @Composable
 private fun ListHeader(
     shown: Int,
+    total: Int,
     filter: PortfolioFilter?,
     onClearFilter: () -> Unit,
     searchQuery: String,
@@ -222,7 +218,11 @@ private fun ListHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("All projects", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
             Spacer(Modifier.width(8.dp))
-            Text("$shown shown", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            Text(
+                when { shown < total -> "$shown of $total shown"; total == 1 -> "1 project"; else -> "$total projects" },
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant
+            )
             Spacer(Modifier.weight(1f))
             if (filter != null) {
                 InputChip(

@@ -190,7 +190,7 @@ class ProjectDetailScreenshotTest {
                     TwoPanes(
                         list = {
                             PortfolioContent(
-                                state = state, officeName = "Bulacan District Office",
+                                state = state,
                                 searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = "All", typeFilter = "All",
                                 typeOptions = listOf("All"), emptyMessage = "" to "",
                                 onFilter = {}, onSearch = {}, onSort = {}, onStatus = {}, onType = {},
