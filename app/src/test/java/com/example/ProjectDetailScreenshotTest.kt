@@ -79,8 +79,8 @@ class ProjectDetailScreenshotTest {
         ProjectPayment(id = 4, projectId = 7, name = "4th Progress Billing", dvNo = "DV-2026-10-0502", date = "2026-10-15", periodCovered = "Sep 1 – Oct 10, 2026", grossAmount = 900_000.0, percentage = 8.61, balanceAmount = 4_050_000.0, balancePercentage = 38.76)
     )
 
-    private fun report(id: Long, week: String, target: Double, actual: Double) = WeeklyReport(
-        id = id, projectId = 7, reportingWeek = week, daysElapsed = 280, remainingDays = 50,
+    private fun report(id: Long, week: String, target: Double, actual: Double, day: Int = 280) = WeeklyReport(
+        id = id, projectId = 7, reportingWeek = week, daysElapsed = day, remainingDays = 330 - day,
         targetAccomplishmentPct = target, actualAccomplishmentPct = actual,
         manpowerJson = "[]", equipmentJson = "[]", activitiesJson = "[]", issuesJson = "[]",
         accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]",
@@ -89,7 +89,7 @@ class ProjectDetailScreenshotTest {
 
     private val reports = listOf(
         report(2, "Week 41: October 5 - October 11, 2026", 62.0, 44.0),
-        report(1, "Week 40: September 28 - October 4, 2026", 60.0, 43.0)
+        report(1, "Week 40: September 28 - October 4, 2026", 60.0, 43.0, day = 273)
     )
 
     private val flags = listOf(
@@ -227,7 +227,7 @@ class ProjectDetailScreenshotTest {
     }
 
     private fun progressFab(mode: AppThemeMode) = fabAtEnd("progress_fab_411_${mode.name.lowercase()}", mode, lazy = true) {
-        val many = (1..12).map { report(it.toLong(), "Week $it: October $it - October ${it + 6}, 2026", 50.0 + it, 40.0 + it) }
+        val many = (1..12).map { report(it.toLong(), "Week $it: October $it - October ${it + 6}, 2026", 50.0 + it, 40.0 + it, day = 200 + 7 * it) }
         Column {
             ChipRow(SectionChips.progress(true), "Weekly") {}
             WeeklyReportsTab(many, UserRole.ENGINEER_ADMIN, {}, {}, {})

@@ -88,7 +88,7 @@ fun WeeklyReportsTab(
                 }
 
                 items(weeklyReports, key = { it.id }) { report ->
-                    WeeklyReportCard(report = report, currentUserRole = currentUserRole, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) }, onPrintClick = { onPrintWeeklyReportClick(report) })
+                    WeeklyReportCard(report = report, currentUserRole = currentUserRole, previousActual = previousReport(weeklyReports, report)?.actualAccomplishmentPct, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) }, onPrintClick = { onPrintWeeklyReportClick(report) })
                 }
             }
             if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
@@ -103,11 +103,16 @@ fun WeeklyReportsTab(
     }
 }
 
+/** The report for the week before [report]: lists come newest-added first, which is not always week order. */
+internal fun previousReport(reports: List<WeeklyReport>, report: WeeklyReport): WeeklyReport? =
+    reports.filter { it.daysElapsed < report.daysElapsed }.maxByOrNull { it.daysElapsed }
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WeeklyReportCard(
     report: WeeklyReport,
     currentUserRole: UserRole,
+    previousActual: Double?,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onPrintClick: () -> Unit
@@ -139,69 +144,59 @@ private fun WeeklyReportCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    // On a narrow phone the icons drop under the week instead of squeezing it mid-word.
-                    FlowRow(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = report.reportingWeek,
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                    Text(
+                        text = report.reportingWeek,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onPrintClick, modifier = Modifier.size(48.dp).testTag("print_weekly_report_button")) {
-                                Icon(Icons.Default.Print, contentDescription = "Print", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                            }
-                            if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) {
-                                IconButton(onClick = onEditClick, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                                }
-                            }
-                            if (currentUserRole.hasPermission(Permission.DELETE_REPORT)) {
-                                var showDeleteConfirm by remember { mutableStateOf(false) }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(48.dp)) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = LocalNHAColors.current.behind, modifier = Modifier.size(24.dp))
-                                }
-                                
-                                if (showDeleteConfirm) {
-                                    AlertDialog(
-                                        onDismissRequest = { showDeleteConfirm = false },
-                                        title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
-                                        text = { Text("Are you sure you want to delete this report?", color = MaterialTheme.colorScheme.onSurface) },
-                                        confirmButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = LocalNHAColors.current.behind) }
-                                        },
-                                        dismissButton = {
-                                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                        },
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Submitted by: ${report.submittedByStaff}  |  Elapsed: ${report.daysElapsed}d, Remaining: ${report.remainingDays}d",
+                        text = "${report.submittedByStaff} · Day ${report.daysElapsed}, ${report.remainingDays} days left",
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                 }
 
-                Surface(
-                    color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
-                    shape = RoundedCornerShape(50.dp),
-                    border = BorderStroke(1.dp, if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrack.copy(alpha = 0.4f) else LocalNHAColors.current.behind.copy(alpha = 0.4f))
-                ) {
-                    Text(
-                        text = "Actual: ${"%.1f".format(report.actualAccomplishmentPct)}%",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = if (report.actualAccomplishmentPct >= report.targetAccomplishmentPct) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
-                        ),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                // Print, Edit and Delete live in one menu so Delete is not a red button on every card.
+                Box {
+                    var menuOpen by remember { mutableStateOf(false) }
+                    var showDeleteConfirm by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("weekly_report_menu")) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Report actions", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Print") },
+                            leadingIcon = { Icon(Icons.Default.Print, contentDescription = null) },
+                            onClick = { menuOpen = false; onPrintClick() },
+                            modifier = Modifier.testTag("print_weekly_report_button")
+                        )
+                        if (currentUserRole.hasPermission(Permission.EDIT_REPORT)) DropdownMenuItem(
+                            text = { Text("Edit") },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = { menuOpen = false; onEditClick() }
+                        )
+                        if (currentUserRole.hasPermission(Permission.DELETE_REPORT)) DropdownMenuItem(
+                            text = { Text("Delete", color = LocalNHAColors.current.behind) },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = LocalNHAColors.current.behind) },
+                            onClick = { menuOpen = false; showDeleteConfirm = true }
+                        )
+                    }
+                    if (showDeleteConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteConfirm = false },
+                            title = { Text("Delete Report", color = MaterialTheme.colorScheme.onSurface) },
+                            text = { Text("Are you sure you want to delete this report?", color = MaterialTheme.colorScheme.onSurface) },
+                            confirmButton = {
+                                TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) { Text("Delete", color = LocalNHAColors.current.behind) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    }
                 }
 
                 IconButton(onClick = { expanded = !expanded }) {
@@ -211,6 +206,33 @@ private fun WeeklyReportCard(
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+
+            val onTarget = report.actualAccomplishmentPct >= report.targetAccomplishmentPct
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(
+                    color = if (onTarget) LocalNHAColors.current.onTrackContainer else LocalNHAColors.current.behindContainer,
+                    shape = RoundedCornerShape(50.dp),
+                    border = BorderStroke(1.dp, if (onTarget) LocalNHAColors.current.onTrack.copy(alpha = 0.4f) else LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        text = "Actual ${"%.2f".format(report.actualAccomplishmentPct)}%",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = if (onTarget) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+                Text(
+                    text = listOfNotNull(
+                        "Target ${"%.2f".format(report.targetAccomplishmentPct)}%",
+                        previousActual?.let { "%+.2f%% from previous report".format(report.actualAccomplishmentPct - it) }
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
             }
 
             AnimatedVisibility(visible = expanded) {
@@ -235,9 +257,9 @@ private fun WeeklyReportCard(
                                 parsedAccItems.forEach { acc ->
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
-                                        Text("T: ${"%.1f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("A: ${"%.1f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                        Text("V: ${"%.1f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
+                                        Text("T: ${"%.2f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                        Text("A: ${"%.2f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                        Text("V: ${"%.2f".format(acc.variancePct)}%", color = if (acc.variancePct >= 0) LocalNHAColors.current.onTrack else LocalNHAColors.current.behind, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                 }
