@@ -26,7 +26,7 @@ import com.example.ui.theme.TabularNumbers
 import com.example.util.PortfolioFilter
 import com.example.util.PortfolioSummary
 
-/** The four counts; tapping one filters the project list, tapping it again clears the filter. */
+/** The non-zero counts (a zero has nothing to filter to); tapping one filters the project list, tapping it again clears the filter. */
 @Composable
 fun PortfolioCounts(
     summary: PortfolioSummary,
@@ -41,7 +41,8 @@ fun PortfolioCounts(
         CountTile(PortfolioFilter.BILLING_AHEAD, "Billing ahead of work", summary.billingAhead, Icons.Default.Payments, colors.watch),
         CountTile(PortfolioFilter.WAITING_APPROVAL, "Waiting approval", summary.waitingApproval, Icons.Default.HourglassTop, colors.watch),
         CountTile(PortfolioFilter.DUE_SOON, "Due in 30 days", summary.dueSoon, Icons.Default.Event, colors.watch)
-    )
+    ).filter { it.count > 0 || it.filter == selected }
+    if (tiles.isEmpty()) return
     val rows = if (wide) listOf(tiles) else tiles.chunked(2)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
@@ -49,6 +50,8 @@ fun PortfolioCounts(
                 row.forEach { tile ->
                     CountTileView(tile, tile.filter == selected, onClick = { onFilter(tile.filter) }, modifier = Modifier.weight(1f))
                 }
+                // An odd tile on a phone keeps the half width of its neighbours.
+                if (!wide && row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }

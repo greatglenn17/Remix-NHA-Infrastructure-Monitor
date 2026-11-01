@@ -100,7 +100,6 @@ fun DashboardScreen(
 
             PortfolioContent(
                 state = portfolio,
-                officeName = currentUser.office,
                 searchQuery = searchQuery,
                 sortOrder = sortOrder,
                 statusFilter = statusFilter,
