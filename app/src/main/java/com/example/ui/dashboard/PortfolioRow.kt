@@ -127,8 +127,8 @@ fun PortfolioRow(
                 }
             }
 
-            // Slippage already shows on the Work done line, bar and status chip.
-            val flags = item.flags.filter { it.kind != AttentionKind.BEHIND }
+            // Slippage already shows on the Work done line, bar and status chip; waiting orders on the meta line below.
+            val flags = item.flags.filter { it.kind != AttentionKind.BEHIND && it.kind != AttentionKind.WAITING_APPROVAL }
             flags.firstOrNull()?.let { flag ->
                 Spacer(Modifier.height(8.dp))
                 Text(
