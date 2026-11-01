@@ -33,6 +33,7 @@ fun DashboardScreen(
     val registeredUsers by viewModel.registeredUsers.collectAsState()
     val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val syncChip by viewModel.syncChip.collectAsState()
+    val lastSyncedAt by viewModel.lastSyncedAt.collectAsState()
     val projects by viewModel.filteredProjects.collectAsState()
     val scopedProjects by viewModel.userScopedProjects.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -145,6 +146,8 @@ fun DashboardScreen(
                 currentUser = currentUser,
                 onSwitchUser = { viewModel.switchUserAccount(it) },
                 sync = syncChip,
+                lastSyncedAt = lastSyncedAt,
+                onRetrySync = { viewModel.retrySync() },
                 onEditProfileClick = { showEditProfileDialog = true },
                 onSignOut = { viewModel.signOutUser() },
                 unreadNotificationCount = unreadCount,

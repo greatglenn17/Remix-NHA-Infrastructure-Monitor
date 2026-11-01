@@ -13,7 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 import androidx.compose.animation.core.*
 
 import androidx.compose.ui.platform.testTag
@@ -91,24 +94,39 @@ fun HeaderBadge(
         }
     }
 
-    if (onClick != null) {
-        Surface(
-            onClick = onClick,
-            color = backgroundColor,
-            border = BorderStroke(1.dp, borderColor),
-            shape = RoundedCornerShape(50.dp)
-        ) {
-            content()
-        }
-    } else {
-        Surface(
-            color = backgroundColor,
-            border = BorderStroke(1.dp, borderColor),
-            shape = RoundedCornerShape(50.dp)
-        ) {
-            content()
-        }
+    // clickable, not Surface(onClick): that pads the chip to 48dp and makes the header taller.
+    // Compose still widens the touch area of a small clickable to 48dp.
+    Surface(
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
+        shape = RoundedCornerShape(50.dp),
+        modifier = if (onClick != null) Modifier.clip(RoundedCornerShape(50.dp)).clickable(role = Role.Button, onClick = onClick) else Modifier
+    ) {
+        content()
     }
+}
+
+/** What the sync chip's state means, when everything was last sent, and Retry while changes are waiting. */
+@Composable
+fun SyncDialog(sync: SyncChip, lastSynced: String, onRetry: (() -> Unit)?, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val canRetry = sync is SyncChip.Waiting && onRetry != null
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(sync.label.lowercase().replaceFirstChar { it.uppercase() }, color = scheme.onSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(sync.meaning, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                if (sync != SyncChip.PhoneOnly) Text(lastSynced, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
+            }
+        },
+        containerColor = scheme.surface,
+        confirmButton = {
+            if (canRetry) TextButton(onClick = { onRetry?.invoke(); onDismiss() }) { Text("Retry now") }
+            else TextButton(onClick = onDismiss) { Text("Close") }
+        },
+        dismissButton = if (canRetry) { { TextButton(onClick = onDismiss) { Text("Close") } } } else null
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,6 +136,8 @@ fun TopAppBarHeader(
     onSwitchUser: (UserAccount) -> Unit,
     onBackClick: (() -> Unit)? = null,
     sync: SyncChip = SyncChip.Synced,
+    lastSyncedAt: Long? = null,
+    onRetrySync: (() -> Unit)? = null,
     onOpenDriveSync: (() -> Unit)? = null,
     onEditProfileClick: (() -> Unit)? = null,
     onSignOut: (() -> Unit)? = null,
@@ -129,6 +149,7 @@ fun TopAppBarHeader(
 ) {
     var showUserMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showSyncDialog by remember { mutableStateOf(false) }
     var availableUpdate by remember { mutableStateOf<com.example.util.AppUpdateInfo?>(null) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -235,6 +256,7 @@ fun TopAppBarHeader(
                                 textColor = tone,
                                 backgroundColor = toneContainer,
                                 borderColor = tone.copy(alpha = 0.8f),
+                                onClick = { showSyncDialog = true },
                                 isSpinning = sync is SyncChip.Uploading
                             )
 
@@ -494,6 +516,8 @@ fun TopAppBarHeader(
             }
         }
     }
+
+    if (showSyncDialog) SyncDialog(sync, lastSyncedText(lastSyncedAt), onRetrySync) { showSyncDialog = false }
 
     if (showAboutDialog) {
         AlertDialog(
