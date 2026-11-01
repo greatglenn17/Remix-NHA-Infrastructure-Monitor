@@ -14,12 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Project
-import com.example.ui.dashboard.Badge
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.dashboard.StatusBadge
-import com.example.ui.dashboard.containerOf
-import com.example.ui.dashboard.formatVariance
 import com.example.ui.dashboard.varianceColor
+import com.example.ui.dashboard.workDoneText
 import com.example.ui.theme.LocalNHAColors
 import com.example.util.BillingProgress
 import com.example.util.ProjectAttention
@@ -51,9 +49,7 @@ fun ProjectHeader(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                StatusBadge(project.status, colors)
-                Spacer(Modifier.width(6.dp))
-                Badge(formatVariance(project.variance), varianceColor, containerOf(varianceColor, colors))
+                StatusBadge(project, colors)
                 if (onClose != null) {
                     IconButton(onClick = onClose, modifier = Modifier.testTag("close_project_button")) {
                         Icon(Icons.Default.Close, contentDescription = "Close project", tint = scheme.onSurfaceVariant)
@@ -74,21 +70,37 @@ fun ProjectHeader(
                         )
                     }
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    val workDone: @Composable (Modifier) -> Unit = { m ->
                         ProgressLine(
                             label = "Work done",
-                            value = "%.2f%%".format(project.actualAccomplishment),
+                            value = workDoneText(project),
                             fraction = (project.actualAccomplishment / 100).toFloat(),
                             color = varianceColor,
-                            modifier = Modifier.weight(1f)
+                            modifier = m
                         )
+                    }
+                    val billed: @Composable (Modifier) -> Unit = { m ->
                         ProgressLine(
                             label = "Billed",
                             value = BillingProgress.label(billedTotal, contractCost),
                             fraction = billedFraction ?: 0f,
                             color = scheme.primary,
-                            modifier = Modifier.weight(1f)
+                            modifier = m
                         )
+                    }
+                    // Side by side only where "44.00% · 18.00% behind" fits; stacked on a phone, like the dashboard card.
+                    BoxWithConstraints {
+                        if (maxWidth >= 600.dp) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                workDone(Modifier.weight(1f))
+                                billed(Modifier.weight(1f))
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                workDone(Modifier.fillMaxWidth())
+                                billed(Modifier.fillMaxWidth())
+                            }
+                        }
                     }
                 }
             }
