@@ -163,6 +163,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, 0, 0))
     }
 
+    /** Uuids of records queued for the cloud and not confirmed yet, for the cards' "Waiting to upload"; none when signed in offline. */
+    val pendingUploads: StateFlow<Set<String>> by lazy {
+        combine(currentUserAccount, syncOutboxDao.pendingEvents()) { _, events ->
+            if (authManager.currentFirebaseUser == null) emptySet()
+            else events.filter { it.entityType.startsWith(com.example.data.local.RecordSyncSchema.ENTITY_PREFIX) }.mapTo(HashSet()) { it.entityUuid }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    }
+
     // Filters & Sorting
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

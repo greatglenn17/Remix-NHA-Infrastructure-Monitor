@@ -13,6 +13,7 @@ class ThemeGuardTest {
             "MainActivity.kt",
             "ui/components/AttachmentPicker.kt",
             "ui/components/FormKit.kt",
+            "ui/components/PendingUpload.kt",
             "ui/components/SyncChip.kt",
             "ui/components/TopAppBarHeader.kt",
             "ui/components/Zoom.kt",

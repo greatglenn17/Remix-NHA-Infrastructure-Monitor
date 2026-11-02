@@ -84,21 +84,24 @@ class MainActivity : ComponentActivity() {
                         // Dialogs and sheets are their own windows, so they take Back before this does.
                         BackHandler(enabled = selectedProjectId != null) { viewModel.selectProject(null) }
                         val projectDetail: @Composable (Boolean) -> Unit = { embedded ->
-                            ProjectDetailScreen(
-                                viewModel = viewModel,
-                                onBackClick = {
-                                    viewModel.selectProject(null)
-                                },
-                                onAddWeeklyReportClick = { showAddWeeklyReportDialog = true },
-                                onAddMonthlyReportClick = { showAddMonthlyReportDialog = true },
-                                onAddTimeExtensionClick = { showAddTimeExtensionDialog = true },
-                                onAddOrderClick = { addDocumentInitialType = it; showAddDocumentDialog = true },
-                                onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
-                                onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
-                                onAddDocumentClick = { addDocumentInitialType = "Time Extension"; showAddDocumentDialog = true },
-                                onAddIssueClick = { showAddIssueDialog = true },
-                                embedded = embedded
-                            )
+                            val pendingUploads by viewModel.pendingUploads.collectAsState()
+                            CompositionLocalProvider(com.example.ui.components.LocalPendingUploads provides pendingUploads) {
+                                ProjectDetailScreen(
+                                    viewModel = viewModel,
+                                    onBackClick = {
+                                        viewModel.selectProject(null)
+                                    },
+                                    onAddWeeklyReportClick = { showAddWeeklyReportDialog = true },
+                                    onAddMonthlyReportClick = { showAddMonthlyReportDialog = true },
+                                    onAddTimeExtensionClick = { showAddTimeExtensionDialog = true },
+                                    onAddOrderClick = { addDocumentInitialType = it; showAddDocumentDialog = true },
+                                    onAddWorkSuspensionClick = { showAddWorkSuspensionDialog = true },
+                                    onAddWorkResumptionClick = { showAddWorkResumptionDialog = true },
+                                    onAddDocumentClick = { addDocumentInitialType = "Time Extension"; showAddDocumentDialog = true },
+                                    onAddIssueClick = { showAddIssueDialog = true },
+                                    embedded = embedded
+                                )
+                            }
                         }
                         // Two panes at 720dp and wider (spec "Navigation and tablet layout"), so an upright 8" tablet (743dp)
                         // shows the project beside the list; one pane at a time below.

@@ -158,6 +158,7 @@ private fun WeeklyReportCard(
                         text = "${report.submittedByStaff} · Day ${report.daysElapsed}, ${report.remainingDays} days left",
                         style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
+                    com.example.ui.components.PendingUploadMark(report.uuid, Modifier.padding(top = 2.dp))
                 }
 
                 // Print, Edit and Delete live in one menu so Delete is not a red button on every card.

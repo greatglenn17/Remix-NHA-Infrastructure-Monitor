@@ -276,6 +276,7 @@ fun IssueCard(
                     }
                 }
             }
+            com.example.ui.components.PendingUploadMark(issue.uuid, Modifier.padding(top = 6.dp))
 
             Spacer(modifier = Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
