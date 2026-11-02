@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.data.auth.personName
 import com.example.data.model.UserRole
 import com.example.ui.theme.*
 
@@ -51,7 +53,10 @@ fun LoginScreen(
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var fullName by remember { mutableStateOf("") }
+    var firstName by remember { mutableStateOf("") }
+    var middleInitial by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    val fullName = personName(firstName, middleInitial, lastName)
     var positionTitle by remember { mutableStateOf("") }
     var officeRegion by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
@@ -60,6 +65,19 @@ fun LoginScreen(
     var resetEmailInput by remember { mutableStateOf("") }
 
     val keyboardController = LocalSoftwareKeyboardController.current
+    // A new account needs its first and last name.
+    val canSubmit = email.isNotBlank() && password.isNotBlank() && (!isSignUpMode || (firstName.isNotBlank() && lastName.isNotBlank()))
+    val nameKeyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next)
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.secondary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        focusedLabelColor = MaterialTheme.colorScheme.secondary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+    )
     val scrollState = rememberScrollState()
 
     Box(
@@ -344,12 +362,11 @@ fun LoginScreen(
                         exit = fadeOut() + shrinkVertically()
                     ) {
                         Column {
-                            // Full Name Field
+                            // The account shows "First M. Last".
                             OutlinedTextField(
-                                value = fullName,
-                                onValueChange = { fullName = it },
-                                label = { Text("Full Name") },
-                                placeholder = { Text("e.g. Engr. Juan Dela Cruz") },
+                                value = firstName,
+                                onValueChange = { firstName = it },
+                                label = { Text("First Name") },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Person,
@@ -357,81 +374,39 @@ fun LoginScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 },
+                                keyboardOptions = nameKeyboard,
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("input_full_name"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    focusedLabelColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
+                                    .testTag("input_first_name"),
+                                colors = fieldColors
                             )
                             Spacer(modifier = Modifier.height(14.dp))
-
-                            // Position / Title Field
-                            OutlinedTextField(
-                                value = positionTitle,
-                                onValueChange = { positionTitle = it },
-                                label = { Text("Position / Designation") },
-                                placeholder = { Text("e.g. Supervising Project Engineer") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Badge,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                singleLine = true,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("input_position_title"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    focusedLabelColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = middleInitial,
+                                    onValueChange = { middleInitial = it.take(2) },
+                                    label = { Text("M.I.") },
+                                    keyboardOptions = nameKeyboard,
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(0.4f)
+                                        .testTag("input_middle_initial"),
+                                    colors = fieldColors
                                 )
-                            )
+                                OutlinedTextField(
+                                    value = lastName,
+                                    onValueChange = { lastName = it },
+                                    label = { Text("Last Name") },
+                                    keyboardOptions = nameKeyboard,
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("input_last_name"),
+                                    colors = fieldColors
+                                )
+                            }
                             Spacer(modifier = Modifier.height(14.dp))
-
-                            // Office / Department / Region Field
-                            OutlinedTextField(
-                                value = officeRegion,
-                                onValueChange = { officeRegion = it },
-                                label = { Text("Office / Department / Region") },
-                                placeholder = { Text("e.g. NHA Regional Office III") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Business,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                singleLine = true,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("input_office_region"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                    focusedLabelColor = MaterialTheme.colorScheme.secondary,
-                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
                         }
                     }
 
@@ -504,11 +479,11 @@ fun LoginScreen(
                         ),
                         keyboardActions = KeyboardActions(onDone = {
                             keyboardController?.hide()
-                            if (email.isNotBlank() && password.isNotBlank()) {
+                            if (canSubmit) {
                                 onLoginSuccess(
                                     email.trim(),
                                     password.trim(),
-                                    fullName.trim().ifBlank { null },
+                                    fullName.ifBlank { null },
                                     selectedRole,
                                     isSignUpMode,
                                     positionTitle.trim().ifBlank { null },
@@ -551,6 +526,66 @@ fun LoginScreen(
                             )
                         }
                     } else {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        // Optional; the account's title and office.
+                        // Position / Title Field
+                        OutlinedTextField(
+                            value = positionTitle,
+                            onValueChange = { positionTitle = it },
+                            label = { Text("Position / Designation") },
+                            placeholder = { Text("e.g. Supervising Project Engineer") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Badge,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("input_position_title"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Office / Department / Region Field
+                        OutlinedTextField(
+                            value = officeRegion,
+                            onValueChange = { officeRegion = it },
+                            label = { Text("Office / Department / Region") },
+                            placeholder = { Text("e.g. NHA Regional Office III") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("input_office_region"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
                         Spacer(modifier = Modifier.height(14.dp))
                     }
 
@@ -608,14 +643,14 @@ fun LoginScreen(
                             onLoginSuccess(
                                 email.trim(),
                                 password.trim(),
-                                fullName.trim().ifBlank { null },
+                                fullName.ifBlank { null },
                                 selectedRole,
                                 isSignUpMode,
                                 positionTitle.trim().ifBlank { null },
                                 officeRegion.trim().ifBlank { null }
                             )
                         },
-                        enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
+                        enabled = !isLoading && canSubmit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)

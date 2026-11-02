@@ -704,24 +704,25 @@ class FirestoreSyncManager(
     /**
      * Synchronize authoritative user profile to Firestore users/{uid} collection.
      * [role] is sent only at registration; after that only the Super Admin changes it.
+     * A null name, position or office keeps what the server has.
      */
     suspend fun syncUserProfile(
         uid: String,
         email: String,
-        displayName: String,
+        displayName: String?,
         role: String?,
-        position: String,
-        office: String
+        position: String?,
+        office: String?
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val userProfile = hashMapOf<String, Any>(
                 "uid" to uid,
                 "email" to email.trim().lowercase(),
-                "displayName" to displayName,
-                "position" to position,
-                "office" to office,
                 "updatedAt" to System.currentTimeMillis()
             )
+            if (displayName != null) userProfile["displayName"] = displayName
+            if (position != null) userProfile["position"] = position
+            if (office != null) userProfile["office"] = office
             if (role != null) userProfile["role"] = role
             firestore.collection("users")
                 .document(uid)

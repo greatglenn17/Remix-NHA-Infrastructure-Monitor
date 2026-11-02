@@ -12,6 +12,15 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.tasks.await
 
+/** "Juan C. Dela Cruz" from its parts; the middle initial is optional and gets its dot. */
+fun personName(first: String, middleInitial: String, last: String): String =
+    listOf(first.trim(), middleInitial.trim().trimEnd('.').let { if (it.isEmpty()) "" else "${it.uppercase()}." }, last.trim())
+        .filter { it.isNotEmpty() }.joinToString(" ")
+
+/** True for no name, or one made from the email, e.g. "Great Glenn17" for great.glenn17@gmail.com. */
+fun isEmailName(name: String?, email: String): Boolean =
+    name.isNullOrBlank() || name.filter(Char::isLetterOrDigit).equals(email.substringBefore("@").filter(Char::isLetterOrDigit), ignoreCase = true)
+
 class AuthManager(private val context: Context) {
 
     private val prefs = try {
@@ -86,11 +95,13 @@ class AuthManager(private val context: Context) {
         office: String?
     ): UserAccount {
         val cleanEmail = email.trim().lowercase()
-        val regName = prefs.getString("reg_name_$cleanEmail", null) ?: displayName
+        val localName = prefs.getString("reg_name_$cleanEmail", null)
+        // A name typed at sign-up, here or saved on the server from another phone, wins over one made from the email.
+        val regName = listOfNotNull(displayName, localName).firstOrNull { !isEmailName(it, cleanEmail) } ?: localName ?: displayName
         val regRoleStr = prefs.getString("reg_role_$cleanEmail", null) ?: fallbackRole.name
         val regRole = try { UserRole.valueOf(regRoleStr) } catch (_: Exception) { fallbackRole }
-        val regPos = prefs.getString("reg_pos_$cleanEmail", null) ?: position
-        val regOffice = prefs.getString("reg_office_$cleanEmail", null) ?: office
+        val regPos = prefs.getString("reg_pos_$cleanEmail", null)?.ifBlank { null } ?: position
+        val regOffice = prefs.getString("reg_office_$cleanEmail", null)?.ifBlank { null } ?: office
 
         return mapToUserAccount(
             email = cleanEmail,
@@ -367,6 +378,11 @@ class AuthManager(private val context: Context) {
             office = office
         )
         saveUserSession(updated, email)
+        prefs.edit()
+            .putString("reg_name_${email.trim().lowercase()}", name.trim())
+            .putString("reg_pos_${email.trim().lowercase()}", position.trim())
+            .putString("reg_office_${email.trim().lowercase()}", office.trim())
+            .apply()
         return updated
     }
 
