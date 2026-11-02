@@ -30,8 +30,11 @@ object RecordSyncSchema {
     /** Developer requests, synced from database 28; the table is created with its sync columns. */
     val REQUEST_TABLES = listOf("developer_requests")
 
+    /** Letters to the contractor, synced from database 34; also created with their sync columns. */
+    val LETTER_TABLES = listOf("contractor_letters")
+
     /** Tables synced as records, in the order a fresh device should apply them. */
-    val TABLES = REPORT_TABLES + SDP_TABLES + REQUEST_TABLES
+    val TABLES = REPORT_TABLES + SDP_TABLES + REQUEST_TABLES + LETTER_TABLES
 
     /**
      * Columns holding another synced row's local id: table -> (column -> the table it points at).

@@ -74,6 +74,20 @@ class RecordSyncRemovalTest {
         for (synced in RecordSyncSchema.TABLES + "daily_hourly_weather") assertFalse(synced in tables)
     }
 
+    // A letter to the contractor syncs like any record, and its reply letter counts as one of the project's files.
+    @Test
+    fun contractorLetter_isQueued_andItsReplyIsAProjectFile() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        markAllSynced()
+        val reply = "nhafile:${p.projectUuid}/0f8fad5b-d9cb-469f-a165-70867728950e.pdf"
+        db.projectDao().insertContractorLetter(
+            com.example.data.model.ContractorLetter(projectId = id, dateSent = "2026-10-20", subject = "Notice of delay", replyFileUrl = reply)
+        )
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:contractor_letters' AND state = 'PENDING'"))
+        assertTrue(reply in recordSync.attachmentRefsOf(id))
+    }
+
     @Test
     fun pendingRecordEdit_keepsProject_andRemovalTombstonesNothing() = runBlocking {
         val p = project("P")

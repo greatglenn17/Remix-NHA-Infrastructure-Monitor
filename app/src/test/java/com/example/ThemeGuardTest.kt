@@ -54,6 +54,7 @@ class ThemeGuardTest {
             "ui/dialogs/NotificationsDialog.kt",
             "ui/dialogs/ScopeOfWorksEditor.kt",
             "ui/detail/sections/DeveloperRequests.kt",
+            "ui/detail/sections/ContractorLetters.kt",
             "ui/dialogs/SignatoriesDialog.kt",
             "ui/dialogs/UpdateAvailableDialog.kt",
             "ui/dialogs/WeekRange.kt",

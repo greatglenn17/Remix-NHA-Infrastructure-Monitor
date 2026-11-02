@@ -715,6 +715,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    val contractorLetters: StateFlow<List<com.example.data.model.ContractorLetter>> = _selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else projectDao.getContractorLettersForProject(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val pendingDocuments: StateFlow<List<PendingDocument>> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getPendingDocuments(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -2434,6 +2439,32 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 details = "${request.requestType} request received ${request.dateReceived}" + if (request.datePackaged.isNotBlank()) ", packaged ${request.datePackaged}" else "",
                 oldValue = "",
                 newValue = request.details
+            )
+        }
+    }
+
+    fun saveContractorLetter(letter: com.example.data.model.ContractorLetter) {
+        viewModelScope.launch(missingProjectGuard) {
+            if (letter.id == 0L) projectDao.insertContractorLetter(letter) else projectDao.updateContractorLetter(letter)
+            logAuditAction(
+                projectId = letter.projectId,
+                actionType = "Letter to Contractor",
+                details = "Letter of ${letter.dateSent}: ${letter.subject}" + if (letter.dateReplied.isNotBlank()) ", replied ${letter.dateReplied}" else "",
+                oldValue = "",
+                newValue = letter.actionTaken
+            )
+        }
+    }
+
+    fun deleteContractorLetter(letter: com.example.data.model.ContractorLetter) {
+        viewModelScope.launch(missingProjectGuard) {
+            projectDao.deleteContractorLetter(letter.id)
+            logAuditAction(
+                projectId = letter.projectId,
+                actionType = "Letter to Contractor",
+                details = "Deleted letter of ${letter.dateSent}: ${letter.subject}",
+                oldValue = letter.actionTaken,
+                newValue = ""
             )
         }
     }

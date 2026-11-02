@@ -59,6 +59,9 @@ fun SummarySection(
     requests: List<com.example.data.model.DeveloperRequest> = emptyList(),
     onSaveRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
     onDeleteRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
+    letters: List<com.example.data.model.ContractorLetter> = emptyList(),
+    onSaveLetter: (com.example.data.model.ContractorLetter) -> Unit = {},
+    onDeleteLetter: (com.example.data.model.ContractorLetter) -> Unit = {},
     payments: List<ProjectPayment> = emptyList(),
     today: LocalDate = LocalDate.now(),
     weeklyReports: List<WeeklyReport> = emptyList(),
@@ -75,6 +78,8 @@ fun SummarySection(
     val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     var showRequestDialog by remember { mutableStateOf(false) }
     var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
+    var showLetterDialog by remember { mutableStateOf(false) }
+    var editLetter by remember { mutableStateOf<com.example.data.model.ContractorLetter?>(null) }
     // What the engineer does next comes first; the profile is reference, below.
     val cards = listOfNotNull<@Composable (Modifier) -> Unit>(
         { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
@@ -92,6 +97,12 @@ fun SummarySection(
                 if (canUpdateOrders) { r: com.example.data.model.DeveloperRequest -> editRequest = r; showRequestDialog = true } else null, m
             )
         },
+        { m ->
+            ContractorLettersCard(
+                letters, { editLetter = null; showLetterDialog = true }.takeIf { canUpdateOrders },
+                if (canUpdateOrders) { l: com.example.data.model.ContractorLetter -> editLetter = l; showLetterDialog = true } else null, m
+            )
+        },
         { m -> CostCard(project, documents, m) }
     )
     // Attention shows only when something needs action, across the full width above the cards;
@@ -107,6 +118,15 @@ fun SummarySection(
             onDismiss = { showRequestDialog = false },
             onSave = { onSaveRequest(it); showRequestDialog = false },
             onDelete = { onDeleteRequest(it); showRequestDialog = false }
+        )
+    }
+    if (showLetterDialog) {
+        ContractorLetterDialog(
+            projectId = project.id, existing = editLetter,
+            onDismiss = { showLetterDialog = false },
+            onSave = { onSaveLetter(it); showLetterDialog = false },
+            onDelete = { onDeleteLetter(it); showLetterDialog = false },
+            today = today
         )
     }
     OrderDialogs(openOrder, documents, currentUserRole, onUpdateOrderStatus, onDeleteOrder, onAddContinuance) { openOrder = null }
