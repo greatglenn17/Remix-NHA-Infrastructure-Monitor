@@ -5,4 +5,6 @@
     <!-- Attachments opened in a viewer app, and camera photos before they are shrunk. -->
     <files-path name="attachments" path="attachments/" />
     <cache-path name="camera" path="camera/" />
+    <!-- Reports emailed as PDF. -->
+    <cache-path name="pdf" path="pdf/" />
 </paths>
