@@ -1,8 +1,8 @@
 {
-  "versionCode": 221,
-  "versionName": "2.2.1",
-  "releaseNotes": "v2.2.1: Email printouts as PDF. The print preview of the project profile, weekly and monthly reports and the Status of Construction has an Email button.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.1/NHA_Monitor_v2.2.1_Build221.apk",
-  "apkSha256": "a3ec1594fbdf77ea075d0db0da395ec61a58834002ed0db69004456f90621044",
+  "versionCode": 222,
+  "versionName": "2.2.2",
+  "releaseNotes": "v2.2.2: Email opens Gmail with the PDF attached instead of \"No apps can perform this action\".",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.2/NHA_Monitor_v2.2.2_Build222.apk",
+  "apkSha256": "f55d4995aa395eff84e03542545abf9c28a43f254c3ef900f6079322a528e4fb",
   "isMandatory": true
 }
