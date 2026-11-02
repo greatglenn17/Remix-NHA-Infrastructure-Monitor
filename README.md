@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.1.6%20%28Build%20216%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.1.7%20%28Build%20217%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.1.6`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.1.6_Build216.apk`** to download the installation package.
+2. Tap the latest release (`v2.1.7`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.1.7_Build217.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.1.7`** | **`217`** | 🗺️ SDP: a new lot picks its Lot Use first. Saleable, open space, breaker / buffer and facility lots take a block and lot; road lots and easements take one number and show as "Road Lot 4" or "Easement 2" |
 | **`v2.1.6`** | **`216`** | 🏘️ Summary: Status of construction shows its as-of date, and a Status of billing table counts the lots billed for Land acquisition, Land development, M1 (80%) and M2 (20%), each as a share of the saleable units |
 | **`v2.1.5`** | **`215`** | 📅 Weekly reports: the reporting week runs Saturday to Friday. A new report defaults to that week, its weather days start on Saturday, the Summary's missing-week prompt checks it, and the print's weather chart and activities run Saturday to Friday |
 | **`v2.1.4`** | **`214`** | 📘 Blue Book: III. Status of Payment prints each billing under NET AMOUNT, after retention; the % and balance stay on the gross, as in the app |
