@@ -1,8 +1,8 @@
 {
-  "versionCode": 219,
-  "versionName": "2.1.9",
-  "releaseNotes": "v2.1.9: The Status of Construction print shows the road lot colours (not completed, concreting, completed) without counts.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.9/NHA_Monitor_v2.1.9_Build219.apk",
-  "apkSha256": "6427efb3ba2c9b876f09d379849ae8cdfa70cc5b3a4ed98b52a19f34b30e6f51",
+  "versionCode": 220,
+  "versionName": "2.2.0",
+  "releaseNotes": "v2.2.0: Accounts show First M. Last instead of the email. Create Account asks for first name, middle initial and last name, then email and password.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.0/NHA_Monitor_v2.2.0_Build220.apk",
+  "apkSha256": "09e5c714513ad2d4cf62e0d3a477889b1d50cbd05c6f81869d25a2446c6d843d",
   "isMandatory": true
 }
