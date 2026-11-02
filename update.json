@@ -1,8 +1,8 @@
 {
-  "versionCode": 222,
-  "versionName": "2.2.2",
-  "releaseNotes": "v2.2.2: Email opens Gmail with the PDF attached instead of \"No apps can perform this action\".",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.2/NHA_Monitor_v2.2.2_Build222.apk",
-  "apkSha256": "f55d4995aa395eff84e03542545abf9c28a43f254c3ef900f6079322a528e4fb",
+  "versionCode": 223,
+  "versionName": "2.2.3",
+  "releaseNotes": "v2.2.3: Every phone signed in to the same account shows the same name, position and office.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.3/NHA_Monitor_v2.2.3_Build223.apk",
+  "apkSha256": "bd739ce621ed6c72b74698233e3f9b481deabdcf50b0fb8a7fb387c9aef6fabc",
   "isMandatory": true
 }
