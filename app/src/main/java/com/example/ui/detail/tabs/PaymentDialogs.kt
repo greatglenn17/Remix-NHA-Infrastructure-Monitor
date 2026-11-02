@@ -2,6 +2,8 @@ package com.example.ui.detail.tabs
 
 import com.example.ui.components.zoomable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,27 +20,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.ProjectPayment
+import com.example.data.model.billingUnitName
 import com.example.ui.components.DateField
 import com.example.ui.components.rememberDiscardGuard
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.detail.sections.Field
 import com.example.util.FormValidation
+import com.example.utils.CurrencyFormatter
 
 // Add-billing and scanned-DV dialogs, used by the Money section.
-/** Adds a billing, or with [existing] edits every field of that one. */
+/** Adds a billing, or with [existing] edits every field of that one. Balances are left to the caller. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddPaymentDialog(
     baseCost: Double,
     currentTotalPaid: Double,
     onDismiss: () -> Unit,
-    onSubmit: (String, String, String, String, Double, String) -> Unit,
+    onSubmit: (ProjectPayment) -> Unit,
     today: java.time.LocalDate = java.time.LocalDate.now(),
-    existing: ProjectPayment? = null
+    existing: ProjectPayment? = null,
+    // Housing projects bill land per lot and M1/M2 per housing unit.
+    isHousing: Boolean = false,
+    // Earlier billings; the latest of a type prefills its amount per lot or unit.
+    previous: List<ProjectPayment> = emptyList()
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var dvNo by remember { mutableStateOf(existing?.dvNo ?: "") }
@@ -46,12 +58,21 @@ fun AddPaymentDialog(
     var periodCovered by remember { mutableStateOf(existing?.periodCovered ?: currentMonthPeriod(today)) }
     var amountStr by remember { mutableStateOf(existing?.let { "%.2f".format(java.util.Locale.US, it.grossAmount) } ?: "") }
     var fileUrl by remember { mutableStateOf(existing?.fileUrl ?: "") }
+    var type by remember { mutableStateOf(existing?.billingType ?: "") }
+    var unitsStr by remember { mutableStateOf(existing?.units?.takeIf { it > 0 }?.toString() ?: "") }
+    var priceStr by remember { mutableStateOf(existing?.unitPrice?.takeIf { it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
+    var retention by remember { mutableStateOf(existing?.retentionPct ?: 0.0) }
 
     val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
 
     val nha = LocalNHAColors.current
-    val amountErr = FormValidation.amountError(amountStr, true)
-    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl) }
+    val byUnit = type.isNotBlank()
+    val units = unitsStr.trim().toIntOrNull()?.takeIf { it > 0 }
+    val amountErr = if (byUnit) null else FormValidation.amountError(amountStr, true)
+    val unitsErr = if (!byUnit) null else if (unitsStr.isBlank()) "Required" else if (units == null) "Enter a whole number" else null
+    val priceErr = if (byUnit) FormValidation.amountError(priceStr, true) else null
+    val gross = if (byUnit) (units ?: 0) * (FormValidation.parseAmount(priceStr) ?: 0.0) else FormValidation.parseAmount(amountStr) ?: 0.0
+    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -68,6 +89,7 @@ fun AddPaymentDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -89,16 +111,73 @@ fun AddPaymentDialog(
                     label = { Text("Period Covered") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = amountStr, onValueChange = { amountStr = it },
-                    label = { Text("Gross Amount (PHP)") },
-                    placeholder = { Text("e.g. 15000000") },
-                    isError = amountErr != null,
-                    supportingText = amountErr?.let { { Text(it) } },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (isHousing || byUnit) {
+                    Text("Billed for", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (HOUSING_BILLING_TYPES + "").forEach { t ->
+                            FilterChip(
+                                selected = t == type,
+                                onClick = {
+                                    if (t != type) {
+                                        type = t
+                                        priceStr = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
+                                            .maxByOrNull { it.id }?.let { "%.2f".format(java.util.Locale.US, it.unitPrice) } ?: ""
+                                    }
+                                },
+                                label = { Text(t.ifBlank { "Other" }) },
+                                modifier = Modifier.testTag("billing_type_${t.ifBlank { "Other" }}")
+                            )
+                        }
+                    }
+                }
+                if (byUnit) {
+                    val unit = billingUnitName(type)
+                    OutlinedTextField(
+                        value = unitsStr, onValueChange = { unitsStr = it },
+                        label = { Text("Number of ${unit}s") },
+                        isError = unitsErr != null,
+                        supportingText = unitsErr?.let { { Text(it) } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = priceStr, onValueChange = { priceStr = it },
+                        label = { Text("Amount per $unit (PHP)") },
+                        isError = priceErr != null,
+                        supportingText = priceErr?.let { { Text(it) } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = amountStr, onValueChange = { amountStr = it },
+                        label = { Text("Gross Amount (PHP)") },
+                        placeholder = { Text("e.g. 15000000") },
+                        isError = amountErr != null,
+                        supportingText = amountErr?.let { { Text(it) } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Text("Retention", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0.0, 5.0, 10.0).forEach { r ->
+                        FilterChip(
+                            selected = r == retention,
+                            onClick = { retention = r },
+                            label = { Text(if (r == 0.0) "None" else "${r.toInt()}%") },
+                            modifier = Modifier.testTag("retention_${r.toInt()}")
+                        )
+                    }
+                }
+                if (gross > 0) Column {
+                    Field("Gross amount", CurrencyFormatter.formatPhp(gross))
+                    if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(gross * retention / 100))
+                    Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100)))
+                }
 
                 // Scanned Copy Attachment Section
                 Column(
@@ -149,10 +228,14 @@ fun AddPaymentDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val gross = FormValidation.parseAmount(amountStr) ?: 0.0
-                    onSubmit(name, dvNo, date, periodCovered, gross, fileUrl)
+                    val base = existing ?: ProjectPayment(projectId = 0, name = "", date = "", periodCovered = "", grossAmount = 0.0, percentage = 0.0, balanceAmount = 0.0, balancePercentage = 0.0)
+                    onSubmit(base.copy(
+                        name = name.ifBlank { type }, dvNo = dvNo, date = date, periodCovered = periodCovered, grossAmount = gross, fileUrl = fileUrl,
+                        billingType = type, units = if (byUnit) units ?: 0 else 0,
+                        unitPrice = if (byUnit) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = retention
+                    ))
                 },
-                enabled = amountErr == null,
+                enabled = amountErr == null && unitsErr == null && priceErr == null,
                 shape = RoundedCornerShape(50.dp)
             ) {
                 Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.Bold)

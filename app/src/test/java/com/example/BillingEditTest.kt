@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.data.model.AppThemeMode
 import com.example.data.model.ProjectPayment
+import com.example.data.model.netAmount
 import com.example.ui.detail.sections.PaymentCard
 import com.example.ui.detail.sections.editedBillings
 import com.example.ui.theme.NHATheme
@@ -61,5 +62,15 @@ class BillingEditTest {
         assertEquals(25.0, saved[0].percentage, 1e-9)
         assertEquals(listOf(6500.0, 3500.0), saved.map { it.balanceAmount })
         assertEquals(listOf(65.0, 35.0), saved.map { it.balancePercentage })
+    }
+
+    @Test
+    fun retention_leavesTheNetAndShowsIt() {
+        val held = first.copy(billingType = "M1 - Housing unit", units = 4, unitPrice = 250.0, retentionPct = 10.0)
+        assertEquals(900.0, held.netAmount, 1e-9)
+        assertEquals(1000.0, first.netAmount, 1e-9)
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { PaymentCard(held, {}, {}, {}) } }
+        rule.onNodeWithText("M1 - Housing unit · 4 housing units × ₱250.00").assertExists()
+        rule.onNodeWithText("Retention (10%)").assertExists()
     }
 }

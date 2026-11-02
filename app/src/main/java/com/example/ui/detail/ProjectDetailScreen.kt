@@ -388,9 +388,8 @@ fun ProjectDetailScreen(
                         contractCost = contractCost,
                         actualPercent = currentProject.actualAccomplishment,
                         currentUserRole = currentUser.role,
-                        onAddPayment = { name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl ->
-                            viewModel.addProjectPayment(currentProject.id, name, dvNo, date, period, gross, pct, balAmt, balPct, fileUrl)
-                        },
+                        isHousing = isHousingProject,
+                        onAddPayment = { viewModel.addProjectPayment(it.copy(projectId = currentProject.id)) },
                         onUpdatePayment = { payment ->
                             viewModel.updateProjectPayment(payment)
                         },

@@ -2331,28 +2331,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
 
-    fun addProjectPayment(projectId: Long, name: String, dvNo: String, date: String, periodCovered: String, grossAmount: Double, percentage: Double, balanceAmount: Double, balancePercentage: Double, fileUrl: String = "") {
+    fun addProjectPayment(payment: ProjectPayment) {
         viewModelScope.launch(missingProjectGuard) {
-            projectDao.insertProjectPayment(
-                ProjectPayment(
-                    projectId = projectId,
-                    name = name,
-                    dvNo = dvNo,
-                    date = date,
-                    periodCovered = periodCovered,
-                    grossAmount = grossAmount,
-                    percentage = percentage,
-                    balanceAmount = balanceAmount,
-                    balancePercentage = balancePercentage,
-                    fileUrl = fileUrl
-                )
-            )
+            projectDao.insertProjectPayment(payment)
             logAuditAction(
-                projectId = projectId,
+                projectId = payment.projectId,
                 actionType = "Payment Creation",
-                details = "Created payment billing: $name ($dvNo)",
+                details = "Created payment billing: ${payment.name} (${payment.dvNo})",
                 oldValue = "",
-                newValue = "Billing: $name, DV: $dvNo, Gross: ₱$grossAmount"
+                newValue = "Billing: ${payment.name}, DV: ${payment.dvNo}, Gross: ₱${payment.grossAmount}, Retention: ${payment.retentionPct}%"
             )
         }
     }
