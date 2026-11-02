@@ -1,8 +1,8 @@
 {
-  "versionCode": 217,
-  "versionName": "2.1.7",
-  "releaseNotes": "v2.1.7: When adding a lot to the subdivision plan, pick its Lot Use first. Road lots and easements take one number; other lots take a block and lot.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.7/NHA_Monitor_v2.1.7_Build217.apk",
-  "apkSha256": "7c518f3035d3c3f7bd9fd2245e5a704e1fcf5b50361b39e663999650d51806ca",
+  "versionCode": 218,
+  "versionName": "2.1.8",
+  "releaseNotes": "v2.1.8: Road lots can be marked Concreting, and show red, yellow or green. The Status of Construction print legend counts road lots by colour and no longer shows the area.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.8/NHA_Monitor_v2.1.8_Build218.apk",
+  "apkSha256": "c1338af2e6092e0626fda2b9f27cc128b26d04c58b873bce9f5e29987893843d",
   "isMandatory": true
 }
