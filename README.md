@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.2.4%20%28Build%20224%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.2.5%20%28Build%20225%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.2.4`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.2.4_Build224.apk`** to download the installation package.
+2. Tap the latest release (`v2.2.5`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.2.5_Build225.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.2.5`** | **`225`** | 📎 Developer requests take the developer's request letter, scanned or uploaded; a paperclip on the request opens it |
 | **`v2.2.4`** | **`224`** | ✉️ Letters to contractor in Summary: a table of date, subject and the action taken by the contractor, with the contractor's reply letter scanned or uploaded |
 | **`v2.2.3`** | **`223`** | 🐛 Every phone signed in to the same account shows the same name: opening the app takes the name, position and office from the server |
 | **`v2.2.2`** | **`222`** | 🐛 Email opens Gmail with the PDF attached instead of "No apps can perform this action"; with several email apps it opens the share sheet |
