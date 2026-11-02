@@ -1,8 +1,8 @@
 {
-  "versionCode": 214,
-  "versionName": "2.1.4",
-  "releaseNotes": "v2.1.4: The Blue Book Status of Payment shows the net amount of each billing, after retention.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.4/NHA_Monitor_v2.1.4_Build214.apk",
-  "apkSha256": "9cb7ee02a15d641e79a8aba4a143497f7a7b076d5f5236631e9c7c024c5f6710",
+  "versionCode": 215,
+  "versionName": "2.1.5",
+  "releaseNotes": "v2.1.5: The weekly reporting week runs Saturday to Friday: new reports default to it, and the weekly print lists Saturday first.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.5/NHA_Monitor_v2.1.5_Build215.apk",
+  "apkSha256": "49d55cf9c6703f601cb2d1d33cf9af19bcf361e400896086d4b9da1add5a0500",
   "isMandatory": true
 }
