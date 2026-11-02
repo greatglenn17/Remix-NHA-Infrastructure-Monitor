@@ -1,8 +1,8 @@
 {
-  "versionCode": 211,
-  "versionName": "2.1.1",
-  "releaseNotes": "v2.1.1: On an 8-inch tablet held upright, a project opens on its own screen again. Billings can be renamed from their menu (Edit name).",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.1/NHA_Monitor_v2.1.1_Build211.apk",
-  "apkSha256": "32f71b3f375fce76b783aa27c903f1dd19c6d909cbfe19cc09196b4747db4d8c",
+  "versionCode": 212,
+  "versionName": "2.1.2",
+  "releaseNotes": "v2.1.2: Edit a whole billing (name, DV, date, period, amount, scan); balances stay right. Summary shows the full project profile, and housing projects show Status of construction: units by stage with a grand total.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.2/NHA_Monitor_v2.1.2_Build212.apk",
+  "apkSha256": "5a02ecf07f23a78417f93b5c5e189768971b5cedf6fea0a88c922783102d43af",
   "isMandatory": true
 }
