@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
@@ -30,7 +31,8 @@ fun PaymentCard(
     onAttachScan: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
-    canEdit: Boolean = true
+    canEdit: Boolean = true,
+    onEditName: () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
@@ -63,7 +65,7 @@ fun PaymentCard(
                         Icon(Icons.Default.AttachFile, contentDescription = "View scanned DV", tint = scheme.primary)
                     }
                 }
-                if (canEdit) PaymentMenu(hasScan, onAttachScan, onDelete)
+                if (canEdit) PaymentMenu(hasScan, onEditName, onAttachScan, onDelete)
             }
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(
@@ -82,13 +84,18 @@ fun PaymentCard(
 }
 
 @Composable
-private fun PaymentMenu(hasScan: Boolean, onAttachScan: () -> Unit, onDelete: () -> Unit) {
+private fun PaymentMenu(hasScan: Boolean, onEditName: () -> Unit, onAttachScan: () -> Unit, onDelete: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Default.MoreVert, contentDescription = "More actions", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Edit name") },
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                onClick = { open = false; onEditName() }
+            )
             DropdownMenuItem(
                 text = { Text(if (hasScan) "Replace scan" else "Attach scan") },
                 leadingIcon = { Icon(Icons.Default.UploadFile, contentDescription = null) },
