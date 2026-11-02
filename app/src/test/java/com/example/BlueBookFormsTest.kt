@@ -119,8 +119,12 @@ class BlueBookFormsTest {
         fun issue(text: String, by: String) = com.example.data.model.ProjectIssue(
             projectId = 1, date = "2019-03-10", description = text, actionTaken = "Act on $text", remarks = "", loggedBy = "", actionBy = by
         )
+        val billing = com.example.data.model.ProjectPayment(
+            projectId = 1, name = "M1 - Housing unit", date = "2019-03-05", periodCovered = "Feb 2019",
+            grossAmount = 1_000_000.0, percentage = 0.2, balanceAmount = 494_623_331.0, balancePercentage = 99.8, retentionPct = 10.0
+        )
         val html = BlueBookForms.monthlyReport(
-            project, YearMonth.of(2019, 3), null, emptyList(), emptyList(),
+            project, YearMonth.of(2019, 3), null, emptyList(), listOf(billing),
             listOf(issue("Office", "Implementing Office"), issue("Contractor", "Contractor/Developer"), issue("Old", "")),
             ContractLogs.from(project, docs), emptyList(),
             listOf(day("2019-01-05", hours(5)), day("2019-03-01", hours(0)), day("2019-03-02", hours(9)), day("2019-04-01", hours(9))),
@@ -138,6 +142,10 @@ class BlueBookFormsTest {
         assertTrue(html.contains("Variation Order No. 1: Php 1,250,000.00 (Realignment)"))
         assertTrue(html.contains("Work Suspension Order No. 1: 146 calendar days – January 3, 2019 to May 29, 2019 (Road widening)"))
         assertTrue(html.contains("Right of way"))
+        // Payments made are the net of retention.
+        assertTrue(html.contains("<th>NET AMOUNT</th>"))
+        assertTrue(html.contains("900,000.00"))
+        assertFalse(html.contains("1,000,000.00"))
         // Every section after II. Project Status is numbered, through VIII. Recommendations.
         listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",
             "VII. ISSUES / CONCERNS", "VIII. RECOMMENDATIONS").forEach { assertTrue(it, html.contains(it)) }
