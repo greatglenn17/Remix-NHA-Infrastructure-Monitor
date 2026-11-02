@@ -1,8 +1,8 @@
 {
-  "versionCode": 218,
-  "versionName": "2.1.8",
-  "releaseNotes": "v2.1.8: Road lots can be marked Concreting, and show red, yellow or green. The Status of Construction print legend counts road lots by colour and no longer shows the area.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.8/NHA_Monitor_v2.1.8_Build218.apk",
-  "apkSha256": "c1338af2e6092e0626fda2b9f27cc128b26d04c58b873bce9f5e29987893843d",
+  "versionCode": 219,
+  "versionName": "2.1.9",
+  "releaseNotes": "v2.1.9: The Status of Construction print shows the road lot colours (not completed, concreting, completed) without counts.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.9/NHA_Monitor_v2.1.9_Build219.apk",
+  "apkSha256": "6427efb3ba2c9b876f09d379849ae8cdfa70cc5b3a4ed98b52a19f34b30e6f51",
   "isMandatory": true
 }
