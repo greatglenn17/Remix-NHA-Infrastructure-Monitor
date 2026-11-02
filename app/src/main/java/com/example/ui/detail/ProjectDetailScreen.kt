@@ -13,6 +13,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import com.example.data.model.Permission
+import com.example.data.model.use
 import com.example.data.model.Project
 import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
@@ -224,7 +225,12 @@ fun ProjectDetailScreen(
                             onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
                             today = today,
                             weeklyReports = weeklyReports,
-                            onAddWeeklyReport = onAddWeeklyReportClick.takeIf { currentUser.role.hasPermission(Permission.SUBMIT_REPORT) }
+                            onAddWeeklyReport = onAddWeeklyReportClick.takeIf { currentUser.role.hasPermission(Permission.SUBMIT_REPORT) },
+                            construction = remember(isHousingProject, activeSdpLots, activeSdpLotProgressMap) {
+                                com.example.util.SdpSummary.of(
+                                    activeSdpLots.map { lot -> com.example.util.SdpSummary.Item(lot.use, lot.lotAreaSqM, activeSdpLotProgressMap[lot.id]?.physicalProgress ?: 0) }
+                                ).takeIf { isHousingProject && it.saleable.count > 0 }
+                            }
                         )
                     }
                     ProjectSection.PROGRESS -> Column {
