@@ -90,7 +90,7 @@ fun ProjectDetailScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val printScope = rememberCoroutineScope()
     // Blue Book forms open in a zoomable preview first; its Print button opens the system print screen (A4),
-    // where "Save as PDF" is one of the printers.
+    // where "Save as PDF" is one of the printers, and its Email button attaches the same pages as a PDF.
     var preview by remember { mutableStateOf<Pair<String, String>?>(null) }
     fun printForm(jobName: String, build: suspend () -> String?) {
         printScope.launch { build()?.let { preview = jobName to it } }
@@ -99,7 +99,8 @@ fun ProjectDetailScreen(
         com.example.ui.components.PrintPreview(
             title = jobName, html = html,
             onPrint = { preview = null; com.example.util.BlueBookPrint.print(context, jobName, html) },
-            onDismiss = { preview = null }
+            onDismiss = { preview = null },
+            onEmail = { preview = null; com.example.util.BlueBookPrint.email(context, jobName, html) }
         )
     }
     // Weekly and monthly reports ask for their signatories first; set while that dialog is open.

@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -49,7 +50,7 @@ fun Modifier.zoomable(): Modifier = composed {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PrintPreview(title: String, html: String, onPrint: () -> Unit, onDismiss: () -> Unit) {
+fun PrintPreview(title: String, html: String, onPrint: () -> Unit, onDismiss: () -> Unit, onEmail: (() -> Unit)? = null) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
@@ -60,6 +61,9 @@ fun PrintPreview(title: String, html: String, onPrint: () -> Unit, onDismiss: ()
                     actions = {
                         IconButton(onClick = { webView?.zoomOut() }, modifier = Modifier.testTag("preview_zoom_out")) { Icon(Icons.Default.ZoomOut, contentDescription = "Zoom out") }
                         IconButton(onClick = { webView?.zoomIn() }, modifier = Modifier.testTag("preview_zoom_in")) { Icon(Icons.Default.ZoomIn, contentDescription = "Zoom in") }
+                        if (onEmail != null) {
+                            IconButton(onClick = onEmail, modifier = Modifier.testTag("preview_email_button")) { Icon(Icons.Default.Email, contentDescription = "Email as PDF") }
+                        }
                         Button(onClick = onPrint, modifier = Modifier.padding(end = 8.dp).testTag("preview_print_button")) {
                             Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
