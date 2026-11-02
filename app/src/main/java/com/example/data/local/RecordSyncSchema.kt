@@ -33,8 +33,11 @@ object RecordSyncSchema {
     /** Letters to the contractor, synced from database 34; also created with their sync columns. */
     val LETTER_TABLES = listOf("contractor_letters")
 
+    /** The project audit log, synced from database 36 so every phone (and a web portal) sees the whole history. */
+    val AUDIT_TABLES = listOf("audit_logs")
+
     /** Tables synced as records, in the order a fresh device should apply them. */
-    val TABLES = REPORT_TABLES + SDP_TABLES + REQUEST_TABLES + LETTER_TABLES
+    val TABLES = REPORT_TABLES + SDP_TABLES + REQUEST_TABLES + LETTER_TABLES + AUDIT_TABLES
 
     /**
      * Columns holding another synced row's local id: table -> (column -> the table it points at).

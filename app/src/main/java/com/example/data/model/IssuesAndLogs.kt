@@ -57,7 +57,7 @@ fun ProjectIssue.isOverdue(today: java.time.LocalDate = java.time.LocalDate.now(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["projectId"])]
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
 )
 data class AuditLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -68,7 +68,11 @@ data class AuditLog(
     val actionType: String,
     val oldValue: String = "",
     val newValue: String = "",
-    val details: String = ""
+    val details: String = "",
+    // Only entries with a project sync; sign-ins and account changes stay on the phone.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 @Entity(
