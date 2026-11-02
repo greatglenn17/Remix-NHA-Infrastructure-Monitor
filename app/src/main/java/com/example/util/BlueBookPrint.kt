@@ -1,6 +1,7 @@
 package com.example.util
 
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -40,13 +41,15 @@ object BlueBookPrint {
             putExtra(Intent.EXTRA_SUBJECT, jobName)
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            // Only email apps.
-            selector = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
         }
+        // An email app is one that takes both mailto: and a sent PDF (a mailto selector finds no apps on newer Android).
+        val pm = context.packageManager
+        fun screens(intent: Intent) = pm.queryIntentActivities(intent, 0).map { ComponentName(it.activityInfo.packageName, it.activityInfo.name) }
+        val emailApp = screens(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))).intersect(screens(send).toSet()).singleOrNull()
         try {
-            context.startActivity(Intent.createChooser(send, "Email $jobName"))
+            context.startActivity(emailApp?.let { Intent(send).setComponent(it) } ?: Intent.createChooser(send, "Email $jobName"))
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No email app found on this phone.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "No app on this phone can send the PDF.", Toast.LENGTH_LONG).show()
         }
     }
 
