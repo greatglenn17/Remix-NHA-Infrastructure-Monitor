@@ -85,11 +85,9 @@ class SummaryReportPromptTest {
         rule.onNodeWithText("No report yet for this week").assertDoesNotExist()
     }
 
-    @Test fun profileDetails_foldedUntilAsked() {
+    @Test fun profileDetails_allShown() {
         summary(null)
         rule.onNodeWithText("JRC Builders").assertExists()
-        rule.onNodeWithText("NHA Bulacan").assertDoesNotExist()
-        rule.onNodeWithTag("profile_details_toggle").performClick()
         rule.onNodeWithText("NHA Bulacan").assertExists()
     }
 }

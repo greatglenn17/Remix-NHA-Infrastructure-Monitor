@@ -6,7 +6,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -290,19 +289,6 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
             }
         }
     ) {
-        // Reference details fold away so the Summary is short; contractor and type stay in sight.
-        var showDetails by rememberSaveable { mutableStateOf(false) }
-        Field("Contractor", project.contractor.ifBlank { "-" })
-        Field("Project type", project.projectType.ifBlank { "-" })
-        TextButton(
-            onClick = { showDetails = !showDetails },
-            contentPadding = PaddingValues(horizontal = 0.dp),
-            modifier = Modifier.testTag("profile_details_toggle")
-        ) {
-            Text(if (showDetails) "Hide details" else "Show details")
-            Icon(if (showDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        if (!showDetails) return@SectionCard
         val hasPhoto = project.latestUpdatePhotoUrl.isNotBlank()
         SitePhoto(
             project.latestUpdatePhotoUrl,
@@ -310,6 +296,8 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
                 .padding(bottom = 8.dp).testTag("profile_site_photo")
         )
         Field("Implementing office", project.implementingOffice.ifBlank { "-" })
+        Field("Contractor", project.contractor.ifBlank { "-" })
+        Field("Project type", project.projectType.ifBlank { "-" })
         if (project.projectType.contains("Housing", ignoreCase = true)) {
             Field("Land area", project.landArea.ifBlank { "-" })
             Field("No. of units", project.numberOfUnits.ifBlank { "-" })
