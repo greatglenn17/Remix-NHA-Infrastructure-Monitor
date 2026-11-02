@@ -357,14 +357,14 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
 }
 
 /**
- * True when a started, unfinished, not suspended project has no report for the Monday-to-Sunday week of [today].
+ * True when a started, unfinished, not suspended project has no report for the Saturday-to-Friday week of [today].
  * A report counts if its range overlaps that week; older labels that don't parse never count.
  */
 internal fun needsThisWeeksReport(project: Project, reports: List<WeeklyReport>, today: LocalDate): Boolean {
     if (project.actualAccomplishment >= 100 || project.status == ProjectStatus.SUSPENDED.label) return false
     if (runCatching { LocalDate.parse(project.dateStarted.trim()) }.getOrNull()?.isAfter(today) == true) return false
-    val (monday, sunday) = WeekRange.parse(WeekRange.containing(today)) ?: return false
-    return reports.none { r -> WeekRange.parse(r.reportingWeek)?.let { (s, e) -> !s.isAfter(sunday) && !e.isBefore(monday) } == true }
+    val (start, end) = WeekRange.parse(WeekRange.containing(today)) ?: return false
+    return reports.none { r -> WeekRange.parse(r.reportingWeek)?.let { (s, e) -> !s.isAfter(end) && !e.isBefore(start) } == true }
 }
 
 /** Scope of works JSON as (name, amount, weight %); plain text becomes one item at 100%. */

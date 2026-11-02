@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 class SummaryReportPromptTest {
     @get:Rule val rule = createComposeRule()
 
-    private val today = LocalDate.of(2026, 10, 27) // a Tuesday; the week is Oct 26 - Nov 1
+    private val today = LocalDate.of(2026, 10, 27) // a Tuesday; the week is Saturday Oct 24 - Friday Oct 30
     private val project = Project(
         name = "P", location = "L", implementingOffice = "NHA Bulacan", contractor = "JRC Builders",
         scopeOfWork = "[]", contractCostOriginal = 1000.0, contractCostRevised = 0.0,
@@ -48,10 +48,10 @@ class SummaryReportPromptTest {
 
     @Test fun needsReport_onlyWhenThisWeekHasNone() {
         assertTrue(needsThisWeeksReport(project, emptyList(), today))
-        assertTrue(needsThisWeeksReport(project, listOf(report("Oct 19, 2026 - Oct 25, 2026")), today))
+        assertTrue(needsThisWeeksReport(project, listOf(report("Oct 17, 2026 - Oct 23, 2026")), today))
         // Older labels don't parse, so they never count as this week.
         assertTrue(needsThisWeeksReport(project, listOf(report("Week 41: October 5 - October 11, 2026")), today))
-        assertFalse(needsThisWeeksReport(project, listOf(report("Oct 26, 2026 - Nov 1, 2026")), today))
+        assertFalse(needsThisWeeksReport(project, listOf(report("Oct 24, 2026 - Oct 30, 2026")), today))
         // A range picked by hand that overlaps the week counts too.
         assertFalse(needsThisWeeksReport(project, listOf(report("Oct 28, 2026 - Nov 3, 2026")), today))
     }
@@ -76,7 +76,7 @@ class SummaryReportPromptTest {
         var opened = false
         summary { opened = true }
         rule.onNodeWithText("No report yet for this week").assertExists()
-        rule.onNodeWithText("Oct 26, 2026 - Nov 1, 2026").assertExists()
+        rule.onNodeWithText("Oct 24, 2026 - Oct 30, 2026").assertExists()
         rule.onNodeWithTag("summary_add_weekly_report").performClick()
         assertTrue(opened)
     }

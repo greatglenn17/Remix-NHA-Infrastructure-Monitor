@@ -147,12 +147,12 @@ private fun WeeklyReportForm(
                     cal.set(java.util.Calendar.YEAR, today.year)
                 }
             } else {
-                cal.firstDayOfWeek = java.util.Calendar.MONDAY
-                cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
+                cal.firstDayOfWeek = java.util.Calendar.SATURDAY
+                cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SATURDAY)
             }
         } catch (e: Exception) {
-            cal.firstDayOfWeek = java.util.Calendar.MONDAY
-            cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.MONDAY)
+            cal.firstDayOfWeek = java.util.Calendar.SATURDAY
+            cal.set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SATURDAY)
         }
         val sdfDisplay = java.text.SimpleDateFormat("MMMM dd, yyyy", java.util.Locale.US)
         val sdfDb = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)

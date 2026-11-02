@@ -8,22 +8,22 @@ import java.time.LocalDate
 class WeekRangeTest {
 
     @Test
-    fun sunday_belongsToTheWeekThatStartedOnMonday() {
-        assertEquals("Oct 19, 2026 - Oct 25, 2026", WeekRange.containing(LocalDate.of(2026, 10, 25)))
+    fun friday_belongsToTheWeekThatStartedOnSaturday() {
+        assertEquals("Oct 24, 2026 - Oct 30, 2026", WeekRange.containing(LocalDate.of(2026, 10, 30)))
     }
 
     @Test
-    fun midweek_givesTheSameMondayToSundayRange() {
-        assertEquals("Oct 19, 2026 - Oct 25, 2026", WeekRange.containing(LocalDate.of(2026, 10, 21)))
+    fun midweek_givesTheSameSaturdayToFridayRange() {
+        assertEquals("Oct 24, 2026 - Oct 30, 2026", WeekRange.containing(LocalDate.of(2026, 10, 27)))
     }
 
     @Test
-    fun monday_startsANewWeek_acrossMonths() {
-        assertEquals("Oct 26, 2026 - Nov 1, 2026", WeekRange.containing(LocalDate.of(2026, 10, 26)))
+    fun saturday_startsANewWeek_acrossMonths() {
+        assertEquals("Oct 31, 2026 - Nov 6, 2026", WeekRange.containing(LocalDate.of(2026, 10, 31)))
     }
 
     @Test
     fun weekAcrossNewYear_showsEachYear() {
-        assertEquals("Dec 28, 2026 - Jan 3, 2027", WeekRange.containing(LocalDate.of(2026, 12, 31)))
+        assertEquals("Dec 26, 2026 - Jan 1, 2027", WeekRange.containing(LocalDate.of(2026, 12, 31)))
     }
 }

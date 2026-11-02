@@ -459,7 +459,7 @@ object BlueBookForms {
 
     fun parseMonth(month: String): YearMonth? = runCatching { YearMonth.parse(month.trim(), MONTH) }.getOrNull()
 
-    /** Monday of a reporting week: "Oct 26, 2026 - Nov 1, 2026", or the older "Week 30: July 20 - July 26, 2026". */
+    /** First day of a reporting week: "Oct 24, 2026 - Oct 30, 2026", or the older "Week 30: July 20 - July 26, 2026". */
     fun weekStart(reportingWeek: String): LocalDate? {
         val parts = reportingWeek.replace(Regex("^Week \\d+: "), "").split(" - ").map { it.trim() }
         if (parts.size != 2) return null
