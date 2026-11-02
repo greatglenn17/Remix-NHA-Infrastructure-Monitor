@@ -101,7 +101,7 @@ class SummaryReportPromptTest {
                 )
             }
         }
-        rule.onNodeWithText("120 saleable units").assertExists()
+        rule.onNodeWithText("120 units").assertExists()
         rule.onNodeWithText("100% / RFO").assertExists()
         rule.onNodeWithText("40").assertExists()
     }

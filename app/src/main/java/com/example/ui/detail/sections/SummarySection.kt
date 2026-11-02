@@ -29,6 +29,7 @@ import com.example.ui.dashboard.levelColor
 import com.example.ui.dashboard.levelIcon
 import com.example.ui.dashboard.levelName
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.theme.TabularNumbers
 import com.example.utils.CurrencyFormatter
 import com.example.util.AttentionFlag
 import com.example.util.ContractCost
@@ -286,8 +287,7 @@ private fun ConstructionCard(summary: SdpSummary.Summary, modifier: Modifier) {
     // The first % of each band picks its colour on the lot map.
     val colors = listOf(0, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
     SectionCard("Status of construction", Icons.Default.HomeWork, modifier.testTag("summary_construction")) {
-        Text("${summary.saleable.count} saleable units", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).height(10.dp).clip(RoundedCornerShape(5.dp))) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).height(10.dp).clip(RoundedCornerShape(5.dp))) {
             summary.saleableBands.forEachIndexed { i, units ->
                 if (units > 0) Box(Modifier.weight(units.toFloat()).fillMaxHeight().background(colors[i]))
             }
@@ -298,6 +298,12 @@ private fun ConstructionCard(summary: SdpSummary.Summary, modifier: Modifier) {
                 Spacer(Modifier.width(8.dp))
                 Field(band, "${summary.saleableBands[i]}", Modifier.weight(1f))
             }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
+        // Lined up with the band names and counts above.
+        Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp).testTag("construction_grand_total")) {
+            Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            Text("${summary.saleable.count} units", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
