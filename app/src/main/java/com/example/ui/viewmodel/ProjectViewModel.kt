@@ -14,6 +14,7 @@ import kotlinx.coroutines.tasks.await
 import com.example.data.remote.AssignmentPolicy
 import com.example.data.remote.DriveSyncResult
 import com.example.data.remote.FirestoreSyncManager
+import com.example.data.auth.isEmailName
 import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
 import com.example.util.AppNotificationManager
@@ -113,6 +114,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             }.getOrNull()
             ?: return null
         return runCatching { UserRole.valueOf(name.uppercase()) }.getOrNull()
+    }
+
+    /** The name, position and office saved on the server, for a phone the account was not registered on. */
+    private suspend fun serverProfile(): Triple<String?, String?, String?>? {
+        val user = authManager.currentFirebaseUser ?: return null
+        val doc = runCatching {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(user.uid).get().await()
+        }.getOrNull() ?: return null
+        return Triple(doc.getString("displayName")?.ifBlank { null }, doc.getString("position")?.ifBlank { null }, doc.getString("office")?.ifBlank { null })
     }
 
     /** Applies a role the Super Admin changed since this phone last signed in. */
@@ -483,12 +493,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 val result = authManager.signIn(cleanEmail, cleanPass)
                 if (result.isSuccess) {
+                    val server = serverProfile()
                     val localAcc = authManager.getRegisteredUserAccount(
                         email = cleanEmail,
                         fallbackRole = UserRole.FIELD_ENGINEER,
-                        displayName = displayName,
-                        position = position,
-                        office = office
+                        displayName = server?.first ?: displayName,
+                        position = server?.second ?: position,
+                        office = server?.third ?: office
                     )
                     // The role is the server's; the on-device copy only covers being offline.
                     val userAcc = serverRole()?.let { localAcc.copy(role = it) } ?: localAcc
@@ -503,13 +514,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     firestoreSyncManager.flushOutbox()
                     val currentFirebaseUser = authManager.currentFirebaseUser
                     if (currentFirebaseUser != null) {
+                        // Only a real name goes back; position and office stay as the server has them.
                         firestoreSyncManager.syncUserProfile(
                             uid = currentFirebaseUser.uid,
                             email = cleanEmail,
-                            displayName = userAcc.name,
+                            displayName = userAcc.name.takeUnless { isEmailName(it, cleanEmail) },
                             role = null,
-                            position = position.orEmpty(),
-                            office = office.orEmpty()
+                            position = null,
+                            office = null
                         )
                     }
 
@@ -579,6 +591,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     fun updateUserProfile(name: String, position: String, office: String) {
         val updated = authManager.updateUserProfile(name, position, office)
         _currentUserAccount.value = updated
+        // So the account shows the same name and title on every phone.
+        authManager.currentFirebaseUser?.let { user ->
+            viewModelScope.launch {
+                firestoreSyncManager.syncUserProfile(user.uid, user.email.orEmpty(), name.trim(), null, position.trim(), office.trim())
+            }
+        }
         logAuditAction(
             projectId = null,
             actionType = "Update Profile",

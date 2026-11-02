@@ -100,6 +100,9 @@ class FormsScreenshotTest {
         shoot("form_work_suspension_$t") { AddCustomDocumentDialog("Work Suspension Order", {}) { _, _ -> } }
         shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
         shoot("login_$t") { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
+        shoot("signup_$t", steps = {
+            rule.onNodeWithText("Create Account").performSemanticsAction(SemanticsActions.OnClick)
+        }) { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
     }
 
     // A found lot has no block or lot until the engineer names it; a photo is deleted only after a confirm.
