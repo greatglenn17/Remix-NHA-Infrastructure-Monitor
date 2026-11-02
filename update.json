@@ -1,8 +1,8 @@
 {
-  "versionCode": 213,
-  "versionName": "2.1.3",
-  "releaseNotes": "v2.1.3: Housing billings by type: land acquisition and development per lot, M1/M2 per housing unit (units x amount). Retention 5% or 10% on any billing; billing cards and the Status of payment table show the net amount.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.3/NHA_Monitor_v2.1.3_Build213.apk",
-  "apkSha256": "fa5758e39008e44e67dd66d2b3bd3477d57aaf98ef4eac2fc536dc97f8eee4fe",
+  "versionCode": 214,
+  "versionName": "2.1.4",
+  "releaseNotes": "v2.1.4: The Blue Book Status of Payment shows the net amount of each billing, after retention.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.4/NHA_Monitor_v2.1.4_Build214.apk",
+  "apkSha256": "9cb7ee02a15d641e79a8aba4a143497f7a7b076d5f5236631e9c7c024c5f6710",
   "isMandatory": true
 }

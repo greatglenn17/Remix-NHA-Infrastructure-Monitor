@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.1.3%20%28Build%20213%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.1.4%20%28Build%20214%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.1.3`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.1.3_Build213.apk`** to download the installation package.
+2. Tap the latest release (`v2.1.4`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.1.4_Build214.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.1.4`** | **`214`** | 📘 Blue Book: III. Status of Payment prints each billing under NET AMOUNT, after retention; the % and balance stay on the gross, as in the app |
 | **`v2.1.3`** | **`213`** | 💳 Billings: housing projects bill Land acquisition and Land development per lot and M1/M2 housing units per unit (number × amount, the amount carried from the last billing of that type); every billing can hold back 5% or 10% retention, and cards and the Status of payment table show the net amount while share and balance stay on the gross |
 | **`v2.1.2`** | **`212`** | 💳 Billings: Edit opens the whole billing (name, DV, date, period, amount, scan); a changed amount moves its own and every later balance so the running balance stays right. 🏘️ Summary: the full project profile shows again, and housing projects with a subdivision plan get Status of construction: saleable units by stage with a grand total, as the lot map and the print count them
 | **`v2.1.1`** | **`211`** | 📱 An 8" tablet held upright opens a project on its own screen again instead of sharing the width with Needs attention (side by side only from 840dp, e.g. turned sideways). 💳 A billing's ⋮ menu has Edit name; amounts, DV and scan stay as they are
