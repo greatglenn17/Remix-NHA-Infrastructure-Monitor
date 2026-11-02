@@ -1,8 +1,8 @@
 {
-  "versionCode": 223,
-  "versionName": "2.2.3",
-  "releaseNotes": "v2.2.3: Every phone signed in to the same account shows the same name, position and office.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.3/NHA_Monitor_v2.2.3_Build223.apk",
-  "apkSha256": "bd739ce621ed6c72b74698233e3f9b481deabdcf50b0fb8a7fb387c9aef6fabc",
+  "versionCode": 224,
+  "versionName": "2.2.4",
+  "releaseNotes": "v2.2.4: Letters to contractor in Summary, with the action taken by the contractor and their reply letter.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.4/NHA_Monitor_v2.2.4_Build224.apk",
+  "apkSha256": "5cea27066452fe226e507147bdf6a3ddd1193ba31bdde7154d44c1cad597975f",
   "isMandatory": true
 }
