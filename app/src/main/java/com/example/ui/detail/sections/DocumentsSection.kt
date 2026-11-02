@@ -28,9 +28,9 @@ import com.example.ui.theme.LocalNHAColors
 import com.example.util.ContractorLetters
 import com.example.util.ProjectSchedule
 
-/** One log entry: a title and its detail lines (blank lines skipped). With [onClick] it opens that entry's status. */
+/** One log entry: a title and its detail lines (blank lines skipped). With [onClick] it opens that entry's status; [uuid] marks a record not uploaded yet. */
 @Composable
-fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null) {
+fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null, uuid: String = "") {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(8.dp)
     val modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -41,6 +41,7 @@ fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (()
                 lines.filter { it.isNotBlank() }.forEach {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
+                com.example.ui.components.PendingUploadMark(uuid, Modifier.padding(top = 2.dp))
             }
             if (onClick != null) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = scheme.onSurfaceVariant)
         }
@@ -201,6 +202,7 @@ fun RelatedFilesList(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
+                            com.example.ui.components.PendingUploadMark(doc.uuid, Modifier.padding(top = 2.dp))
                         }
                         IconButton(onClick = { viewingDocForScan = doc }) {
                             if (doc.fileUrl.isNotBlank()) {
@@ -407,7 +409,7 @@ private fun OrdersCard(
 
 @Composable
 private fun OrderEntry(doc: PendingDocument, onOpen: ((PendingDocument) -> Unit)?) {
-    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpen?.let { open -> { open(doc) } })
+    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
 }
 
 /** Adds or edits a letter to the contractor: its reason and the day the contractor received it. */

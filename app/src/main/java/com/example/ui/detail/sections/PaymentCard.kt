@@ -56,6 +56,7 @@ fun PaymentCard(
                         style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
                         color = scheme.onSurfaceVariant
                     )
+                    com.example.ui.components.PendingUploadMark(payment.uuid, Modifier.padding(top = 2.dp))
                 }
                 if (hasScan) {
                     IconButton(onClick = onViewScan) {
