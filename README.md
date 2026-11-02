@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.2.0%20%28Build%20220%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.2.1%20%28Build%20221%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.2.0`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.2.0_Build220.apk`** to download the installation package.
+2. Tap the latest release (`v2.2.1`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.2.1_Build221.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.2.1`** | **`221`** | ✉️ Email printouts: the print preview of the project profile, weekly and monthly reports and the Status of Construction has an Email button that attaches the same A4 pages as a PDF |
 | **`v2.2.0`** | **`220`** | 👤 Accounts: Create Account asks for First Name, M.I. and Last Name before email and password, and the account shows "First M. Last". Signing in on another phone reads the name, position and office from the server instead of making a name from the email, and profile edits reach the server |
 | **`v2.1.9`** | **`219`** | 🛣️ Status of Construction print: the Road lot legend shows only its three colours (not completed, concreting, completed), without counts |
 | **`v2.1.8`** | **`218`** | 🛣️ SDP: road lots can be marked Concreting besides Road completed, and show red (not completed), yellow (concreting) or green (completed). The Status of Construction print's legend counts road lots that way and no longer shows the area |

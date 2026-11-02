@@ -1,8 +1,8 @@
 {
-  "versionCode": 220,
-  "versionName": "2.2.0",
-  "releaseNotes": "v2.2.0: Accounts show First M. Last instead of the email. Create Account asks for first name, middle initial and last name, then email and password.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.0/NHA_Monitor_v2.2.0_Build220.apk",
-  "apkSha256": "09e5c714513ad2d4cf62e0d3a477889b1d50cbd05c6f81869d25a2446c6d843d",
+  "versionCode": 221,
+  "versionName": "2.2.1",
+  "releaseNotes": "v2.2.1: Email printouts as PDF. The print preview of the project profile, weekly and monthly reports and the Status of Construction has an Email button.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.1/NHA_Monitor_v2.2.1_Build221.apk",
+  "apkSha256": "a3ec1594fbdf77ea075d0db0da395ec61a58834002ed0db69004456f90621044",
   "isMandatory": true
 }
