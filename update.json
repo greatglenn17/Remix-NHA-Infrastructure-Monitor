@@ -1,8 +1,8 @@
 {
-  "versionCode": 224,
-  "versionName": "2.2.4",
-  "releaseNotes": "v2.2.4: Letters to contractor in Summary, with the action taken by the contractor and their reply letter.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.4/NHA_Monitor_v2.2.4_Build224.apk",
-  "apkSha256": "5cea27066452fe226e507147bdf6a3ddd1193ba31bdde7154d44c1cad597975f",
+  "versionCode": 225,
+  "versionName": "2.2.5",
+  "releaseNotes": "v2.2.5: Developer requests take the request letter, scanned or uploaded.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.5/NHA_Monitor_v2.2.5_Build225.apk",
+  "apkSha256": "7b06786490a5955d56560caa42a567494c33afcaa5fc9afd61c55977b0e528ee",
   "isMandatory": true
 }
