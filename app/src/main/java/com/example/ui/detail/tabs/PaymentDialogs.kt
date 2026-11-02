@@ -30,20 +30,22 @@ import com.example.ui.theme.LocalNHAColors
 import com.example.util.FormValidation
 
 // Add-billing and scanned-DV dialogs, used by the Money section.
+/** Adds a billing, or with [existing] edits every field of that one. */
 @Composable
 fun AddPaymentDialog(
     baseCost: Double,
     currentTotalPaid: Double,
     onDismiss: () -> Unit,
     onSubmit: (String, String, String, String, Double, String) -> Unit,
-    today: java.time.LocalDate = java.time.LocalDate.now()
+    today: java.time.LocalDate = java.time.LocalDate.now(),
+    existing: ProjectPayment? = null
 ) {
-    var name by remember { mutableStateOf("") }
-    var dvNo by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(today.toString()) }
-    var periodCovered by remember { mutableStateOf(currentMonthPeriod(today)) }
-    var amountStr by remember { mutableStateOf("") }
-    var fileUrl by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(existing?.name ?: "") }
+    var dvNo by remember { mutableStateOf(existing?.dvNo ?: "") }
+    var date by remember { mutableStateOf(existing?.date ?: today.toString()) }
+    var periodCovered by remember { mutableStateOf(existing?.periodCovered ?: currentMonthPeriod(today)) }
+    var amountStr by remember { mutableStateOf(existing?.let { "%.2f".format(java.util.Locale.US, it.grossAmount) } ?: "") }
+    var fileUrl by remember { mutableStateOf(existing?.fileUrl ?: "") }
 
     val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
 
@@ -59,7 +61,7 @@ fun AddPaymentDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Billing / Disbursement Voucher")
+                Text(if (existing == null) "Add Billing / Disbursement Voucher" else "Edit Billing")
             }
         },
         text = {
@@ -153,7 +155,7 @@ fun AddPaymentDialog(
                 enabled = amountErr == null,
                 shape = RoundedCornerShape(50.dp)
             ) {
-                Text("Save Payment", fontWeight = FontWeight.Bold)
+                Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

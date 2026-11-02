@@ -32,6 +32,7 @@ import com.example.util.AttentionFlag
 import com.example.util.AttentionKind
 import com.example.util.AttentionLevel
 import com.example.util.PortfolioItem
+import com.example.util.SdpSummary
 import com.github.takahirom.roborazzi.captureRoboImage
 import java.time.LocalDate
 import androidx.compose.ui.test.hasScrollToIndexAction
@@ -118,7 +119,8 @@ class ProjectDetailScreenshotTest {
         currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
         payments = payments, today = LocalDate.of(2026, 10, 27),
         // The fixture's older "Week 41: ..." labels don't cover this week, so the prompt shows.
-        weeklyReports = reports, onAddWeeklyReport = {}
+        weeklyReports = reports, onAddWeeklyReport = {},
+        construction = SdpSummary.Summary(listOf(18, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0))
     )
 
     @Composable

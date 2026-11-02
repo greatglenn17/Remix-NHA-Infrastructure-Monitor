@@ -12,6 +12,7 @@ import com.example.data.model.WeeklyReport
 import com.example.ui.detail.sections.SummarySection
 import com.example.ui.detail.sections.needsThisWeeksReport
 import com.example.ui.theme.NHATheme
+import com.example.util.SdpSummary
 import java.time.LocalDate
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,7 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-// Summary asks for this week's report and keeps the profile's reference details folded.
+// Summary asks for this week's report, shows the whole profile and, for housing, units by stage.
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h891dp")
@@ -85,11 +86,29 @@ class SummaryReportPromptTest {
         rule.onNodeWithText("No report yet for this week").assertDoesNotExist()
     }
 
-    @Test fun profileDetails_foldedUntilAsked() {
+    @Test fun construction_hiddenWithoutAPlan() {
+        summary(null)
+        rule.onNodeWithTag("summary_construction").assertDoesNotExist()
+    }
+
+    @Test fun construction_countsEachBand() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                SummarySection(
+                    project, emptyList(), emptyList(), null, openIssues = 0, canEditProject = false, onEditProject = {},
+                    currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
+                    today = today, construction = SdpSummary.Summary(listOf(18, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0))
+                )
+            }
+        }
+        rule.onNodeWithText("120 units").assertExists()
+        rule.onNodeWithText("100% / RFO").assertExists()
+        rule.onNodeWithText("40").assertExists()
+    }
+
+    @Test fun profileDetails_allShown() {
         summary(null)
         rule.onNodeWithText("JRC Builders").assertExists()
-        rule.onNodeWithText("NHA Bulacan").assertDoesNotExist()
-        rule.onNodeWithTag("profile_details_toggle").performClick()
         rule.onNodeWithText("NHA Bulacan").assertExists()
     }
 }

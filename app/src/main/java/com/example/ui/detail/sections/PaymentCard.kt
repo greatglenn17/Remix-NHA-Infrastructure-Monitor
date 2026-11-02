@@ -32,7 +32,7 @@ fun PaymentCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     canEdit: Boolean = true,
-    onEditName: () -> Unit = {}
+    onEdit: () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
@@ -65,7 +65,7 @@ fun PaymentCard(
                         Icon(Icons.Default.AttachFile, contentDescription = "View scanned DV", tint = scheme.primary)
                     }
                 }
-                if (canEdit) PaymentMenu(hasScan, onEditName, onAttachScan, onDelete)
+                if (canEdit) PaymentMenu(hasScan, onEdit, onAttachScan, onDelete)
             }
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(
@@ -84,7 +84,7 @@ fun PaymentCard(
 }
 
 @Composable
-private fun PaymentMenu(hasScan: Boolean, onEditName: () -> Unit, onAttachScan: () -> Unit, onDelete: () -> Unit) {
+private fun PaymentMenu(hasScan: Boolean, onEdit: () -> Unit, onAttachScan: () -> Unit, onDelete: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
@@ -92,9 +92,9 @@ private fun PaymentMenu(hasScan: Boolean, onEditName: () -> Unit, onAttachScan: 
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(
-                text = { Text("Edit name") },
+                text = { Text("Edit") },
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                onClick = { open = false; onEditName() }
+                onClick = { open = false; onEdit() }
             )
             DropdownMenuItem(
                 text = { Text(if (hasScan) "Replace scan" else "Attach scan") },

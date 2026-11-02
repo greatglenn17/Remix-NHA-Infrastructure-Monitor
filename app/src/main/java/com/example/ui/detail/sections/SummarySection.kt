@@ -1,14 +1,16 @@
 package com.example.ui.detail.sections
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -22,14 +24,17 @@ import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
 import com.example.data.model.hasPermission
 import com.example.ui.dashboard.SitePhoto
+import com.example.ui.detail.tabs.lotProgressFill
 import com.example.ui.dashboard.levelColor
 import com.example.ui.dashboard.levelIcon
 import com.example.ui.dashboard.levelName
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.theme.TabularNumbers
 import com.example.utils.CurrencyFormatter
 import com.example.util.AttentionFlag
 import com.example.util.ContractCost
 import com.example.util.ProjectSchedule
+import com.example.util.SdpSummary
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -55,7 +60,9 @@ fun SummarySection(
     payments: List<ProjectPayment> = emptyList(),
     today: LocalDate = LocalDate.now(),
     weeklyReports: List<WeeklyReport> = emptyList(),
-    onAddWeeklyReport: (() -> Unit)? = null
+    onAddWeeklyReport: (() -> Unit)? = null,
+    // Housing units by stage from the subdivision plan; null hides the card.
+    construction: SdpSummary.Summary? = null
 ) {
     val missingWeek = WeekRange.containing(today).takeIf { onAddWeeklyReport != null && needsThisWeeksReport(project, weeklyReports, today) }
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
@@ -66,9 +73,10 @@ fun SummarySection(
     val canUpdateOrders = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     var showRequestDialog by remember { mutableStateOf(false) }
     var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
-    // What the engineer does next comes first; the profile is reference, folded below.
-    val cards: List<@Composable (Modifier) -> Unit> = listOf(
+    // What the engineer does next comes first; the profile is reference, below.
+    val cards = listOfNotNull<@Composable (Modifier) -> Unit>(
         { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
+        construction?.let { c -> { m -> ConstructionCard(c, m) } },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
         { m ->
             KeyDatesCard(
@@ -272,6 +280,34 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek
     }
 }
 
+/** Saleable units of the subdivision plan by progress band, counted and coloured as the Status of Construction print. */
+@Composable
+private fun ConstructionCard(summary: SdpSummary.Summary, modifier: Modifier) {
+    val nha = LocalNHAColors.current
+    // The first % of each band picks its colour on the lot map.
+    val colors = listOf(0, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
+    SectionCard("Status of construction", Icons.Default.HomeWork, modifier.testTag("summary_construction")) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).height(10.dp).clip(RoundedCornerShape(5.dp))) {
+            summary.saleableBands.forEachIndexed { i, units ->
+                if (units > 0) Box(Modifier.weight(units.toFloat()).fillMaxHeight().background(colors[i]))
+            }
+        }
+        SdpSummary.BANDS.forEachIndexed { i, band ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(colors[i]))
+                Spacer(Modifier.width(8.dp))
+                Field(band, "${summary.saleableBands[i]}", Modifier.weight(1f))
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
+        // Lined up with the band names and counts above.
+        Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp).testTag("construction_grand_total")) {
+            Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            Text("${summary.saleable.count} units", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
 @Composable
 private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject: () -> Unit, onPrintProfile: () -> Unit, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -290,19 +326,6 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
             }
         }
     ) {
-        // Reference details fold away so the Summary is short; contractor and type stay in sight.
-        var showDetails by rememberSaveable { mutableStateOf(false) }
-        Field("Contractor", project.contractor.ifBlank { "-" })
-        Field("Project type", project.projectType.ifBlank { "-" })
-        TextButton(
-            onClick = { showDetails = !showDetails },
-            contentPadding = PaddingValues(horizontal = 0.dp),
-            modifier = Modifier.testTag("profile_details_toggle")
-        ) {
-            Text(if (showDetails) "Hide details" else "Show details")
-            Icon(if (showDetails) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        if (!showDetails) return@SectionCard
         val hasPhoto = project.latestUpdatePhotoUrl.isNotBlank()
         SitePhoto(
             project.latestUpdatePhotoUrl,
@@ -310,6 +333,8 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
                 .padding(bottom = 8.dp).testTag("profile_site_photo")
         )
         Field("Implementing office", project.implementingOffice.ifBlank { "-" })
+        Field("Contractor", project.contractor.ifBlank { "-" })
+        Field("Project type", project.projectType.ifBlank { "-" })
         if (project.projectType.contains("Housing", ignoreCase = true)) {
             Field("Land area", project.landArea.ifBlank { "-" })
             Field("No. of units", project.numberOfUnits.ifBlank { "-" })
