@@ -67,11 +67,11 @@ class SdpSummaryTest {
         assertTrue(html.contains("<div class='plan'><img src='data:image/png;base64,AA'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
         assertTrue(html.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
-        // Road lots: red not completed, yellow concreting, green completed.
-        assertTrue(html.contains("<th class='sub'>Road lot</th><th class='sub'>Lots</th>"))
-        assertTrue(html.contains("background:#111111'></i>Not completed</td><td class='n'>2</td>"))
-        assertTrue(html.contains("background:#333333'></i>Concreting</td><td class='n'>1</td>"))
-        assertTrue(html.contains("background:#555555'></i>Completed</td><td class='n'>1</td>"))
+        // Road lots: red not completed, yellow concreting, green completed; colours only, no counts.
+        assertTrue(html.contains("<th class='sub' colspan='2'>Road lot</th>"))
+        assertTrue(html.contains("<td colspan='2'><i class='sw' style='background:#111111'></i>Not completed</td></tr>"))
+        assertTrue(html.contains("<td colspan='2'><i class='sw' style='background:#333333'></i>Concreting</td></tr>"))
+        assertTrue(html.contains("<td colspan='2'><i class='sw' style='background:#555555'></i>Completed</td></tr>"))
         for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage", "Area (sq.m.)")) assertTrue(gone, !html.contains(gone))
         // No road lots, no road rows.
         val noRoads = BlueBookForms.sdpPlan(project, SdpSummary.of(listOf(Item("Saleable", 40.0, 10))), "data:image/png;base64,AA", bands, LocalDate.of(2026, 10, 30))
