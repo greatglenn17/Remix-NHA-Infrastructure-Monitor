@@ -7,6 +7,16 @@ object SdpSummary {
     /** Same bands as the lot colours on the plan. */
     val BANDS = listOf("0–25%", "26–50%", "51–75%", "76–99%", "100% / RFO")
 
+    /** Road lots are marked, not tracked by %: none (0%), concreting (1-99%, saved as [ROAD_CONCRETING]) or completed (100%). */
+    val ROAD_STATES = listOf("Not completed", "Concreting", "Completed")
+    const val ROAD_CONCRETING = 50
+
+    fun roadState(progress: Int): Int = when {
+        progress >= 100 -> 2
+        progress > 0 -> 1
+        else -> 0
+    }
+
     fun band(progress: Int): Int = when {
         progress >= 100 -> 4
         progress >= 76 -> 3
@@ -23,14 +33,17 @@ object SdpSummary {
     data class Summary(
         /** Saleable lots per band of [BANDS]. */
         val saleableBands: List<Int>,
-        val saleable: Totals
+        val saleable: Totals,
+        /** Road lots per state of [ROAD_STATES]. */
+        val roadLots: List<Int> = listOf(0, 0, 0)
     )
 
     fun of(items: List<Item>): Summary {
         val saleable = items.filter { it.use == "Saleable" }
         return Summary(
             saleableBands = BANDS.indices.map { b -> saleable.count { band(it.progress) == b } },
-            saleable = Totals(saleable.size, saleable.sumOf { it.areaSqM })
+            saleable = Totals(saleable.size, saleable.sumOf { it.areaSqM }),
+            roadLots = ROAD_STATES.indices.map { r -> items.count { it.use == "Road Lot" && roadState(it.progress) == r } }
         )
     }
 

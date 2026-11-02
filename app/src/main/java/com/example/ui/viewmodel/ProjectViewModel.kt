@@ -1313,8 +1313,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             ?: com.example.util.SdpSummary.frameAround(polygons.values.toList())
             ?: listOf(0f, 0f, 1f, 1f)
         val colors = com.example.ui.theme.LightNHAColors
-        fun fill(lot: SdpLot) = if (lot.isSaleable || lot.isRoadLot)
-            com.example.ui.detail.tabs.lotProgressFill(progress[lot.id]?.physicalProgress ?: 0, colors) else colors.neutral
+        fun fill(lot: SdpLot) = com.example.ui.detail.tabs.lotFill(lot, progress[lot.id]?.physicalProgress ?: 0, colors)
         val image = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@withContext null
             runCatching {

@@ -172,6 +172,16 @@ fun lotProgressFill(progress: Int, nha: NHAColors): Color = when {
     else -> nha.behind
 }
 
+/** Road lots: red not completed, yellow concreting, green completed. */
+fun roadLotFill(progress: Int, nha: NHAColors): Color = listOf(nha.behind, nha.progressQuarter3, nha.onTrack)[com.example.util.SdpSummary.roadState(progress)]
+
+/** A lot's colour on the plan; lots that are not built on stay neutral. */
+fun lotFill(lot: SdpLot, progress: Int, nha: NHAColors): Color = when {
+    lot.isRoadLot -> roadLotFill(progress, nha)
+    lot.isSaleable -> lotProgressFill(progress, nha)
+    else -> nha.neutral
+}
+
 @Composable
 fun getLotProgressFillColor(progress: Int): Color = lotProgressFill(progress, LocalNHAColors.current)
 
@@ -1388,7 +1398,7 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord.anyBilled
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = if (lot.isSaleable || lot.isRoadLot) lotProgressFill(progressValue, nhaMap) else nhaMap.neutral
+                                val baseProgressColor = lotFill(lot, progressValue, nhaMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -1815,7 +1825,7 @@ fun SubdivisionPlanTab(
                                             }
                                         }
                                         Text(
-                                            text = (if (selectedLot!!.isRoadLot) "Road: ${if (progressVal >= 100) "Completed" else "Not completed"} • Drainage: ${if ((progressRecord?.drainageProgress ?: 0) >= 100) "Completed" else "Not completed"}"
+                                            text = (if (selectedLot!!.isRoadLot) "Road: ${com.example.util.SdpSummary.ROAD_STATES[com.example.util.SdpSummary.roadState(progressVal)]} • Drainage: ${if ((progressRecord?.drainageProgress ?: 0) >= 100) "Completed" else "Not completed"}"
                                                 else "Progress: ${progressVal}% (${progressRecord?.constructionStatus ?: "Not Started"})") + " • Area: ${selectedLot!!.lotAreaSqM} sq.m • Unit: ${selectedLot!!.housingUnitNumber.ifBlank { "N/A" }}",
                                             style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         )
@@ -3091,6 +3101,9 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
                 LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(100), label = "100% Completed / RFO")
+                LegendRow(color = roadLotFill(0, LocalNHAColors.current), label = "Road lot: not completed")
+                LegendRow(color = roadLotFill(com.example.util.SdpSummary.ROAD_CONCRETING, LocalNHAColors.current), label = "Road lot: concreting")
+                LegendRow(color = roadLotFill(100, LocalNHAColors.current), label = "Road lot: completed")
                 LegendRow(color = LocalNHAColors.current.neutral, label = "Non-saleable (open space, breaker, easement, facility)")
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -3211,8 +3224,17 @@ fun UpdateLotProgressDialog(
                 }
 
                 if (isRoad) {
-                    // Road lots are tagged done instead of tracked by %; done is saved as 100%.
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Road lots are tagged instead of tracked by %: concreting is saved as 50%, done as 100%.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                        FilterChip(
+                            selected = intProgress in 1..99,
+                            onClick = {
+                                progressSlider = if (intProgress in 1..99) 0f else com.example.util.SdpSummary.ROAD_CONCRETING.toFloat()
+                                constructionStatus = statusForProgress(progressSlider.toInt())
+                            },
+                            label = { Text("Concreting") },
+                            modifier = Modifier.testTag("road_concreting")
+                        )
                         FilterChip(
                             selected = intProgress == 100,
                             onClick = {

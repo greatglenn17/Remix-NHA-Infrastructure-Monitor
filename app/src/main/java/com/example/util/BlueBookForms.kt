@@ -331,16 +331,21 @@ object BlueBookForms {
     /**
      * The subdivision plan coloured by lot progress, filling a portrait A4 page, with a legend of saleable
      * units per band over its bottom-left corner. [planImage] is the framed plan as a data URI;
-     * [bandHex] the colour of each band of [SdpSummary.BANDS].
+     * [bandHex] the colour of each band of [SdpSummary.BANDS]; road lots take its red, yellow and green.
      */
     fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
-        val area = summary.saleable.areaSqM.let { if (it > 0) "%,.2f".format(Locale.US, it) else "&#8212;" }
         val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
         SdpSummary.BANDS.forEachIndexed { i, band ->
             legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
         }
         legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
-        legend.append("<tr><td>Area (sq.m.)</td><td class='n'>$area</td></tr></table>")
+        if (summary.roadLots.sum() > 0) {
+            legend.append("<tr><th class='sub'>Road lot</th><th class='sub'>Lots</th></tr>")
+            SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
+                legend.append("<tr><td><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td><td class='n'>${summary.roadLots[i]}</td></tr>")
+            }
+        }
+        legend.append("</table>")
         val plan = "<div class='plan'><img src='$planImage'>$legend</div>"
         return page(
             "Subdivision Plan Progress",
