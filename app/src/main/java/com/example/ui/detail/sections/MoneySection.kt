@@ -35,6 +35,7 @@ fun MoneySection(
     var showAddDialog by remember { mutableStateOf(false) }
     var viewingDvPayment by remember { mutableStateOf<ProjectPayment?>(null) }
     var paymentToAttachScan by remember { mutableStateOf<ProjectPayment?>(null) }
+    var paymentToRename by remember { mutableStateOf<ProjectPayment?>(null) }
     val canManagePayments = currentUserRole.hasPermission(Permission.MANAGE_PAYMENTS)
 
     // Uploads a scanned copy straight to an existing payment
@@ -66,7 +67,8 @@ fun MoneySection(
                                 onAttachScan = { viewingDvPayment = payment },
                                 onDelete = { onDeletePayment(payment) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                                canEdit = canManagePayments
+                                canEdit = canManagePayments,
+                                onEditName = { paymentToRename = payment }
                             )
                         }
                         if (row.size < perRow) Spacer(Modifier.weight(1f))
@@ -95,6 +97,13 @@ fun MoneySection(
                 showAddDialog = false
             }
         )
+    }
+
+    paymentToRename?.let { payment ->
+        EditBillingNameDialog(payment.name, onDismiss = { paymentToRename = null }) { name ->
+            onUpdatePayment(payment.copy(name = name))
+            paymentToRename = null
+        }
     }
 
     if (viewingDvPayment != null) {
@@ -142,4 +151,28 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
             )
         }
     }
+}
+
+/** The trimmed new billing name, or null when it is blank or unchanged (Save stays off). */
+internal fun renamedBilling(current: String, typed: String): String? = typed.trim().takeIf { it.isNotEmpty() && it != current }
+
+/** Renames a billing; the amounts, DV and scan stay as they are. */
+@Composable
+private fun EditBillingNameDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit billing name") },
+        text = {
+            OutlinedTextField(
+                value = name, onValueChange = { name = it }, label = { Text("Billing name") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("billing_name_field")
+            )
+        },
+        confirmButton = {
+            val renamed = renamedBilling(current, name)
+            TextButton(onClick = { renamed?.let(onSave) }, enabled = renamed != null) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }

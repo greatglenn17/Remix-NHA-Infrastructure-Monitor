@@ -103,9 +103,9 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        // Two panes at 720dp and wider (spec "Navigation and tablet layout"), so an upright 8" tablet (743dp)
-                        // shows the project beside the list; one pane at a time below.
-                        val twoPane = LocalConfiguration.current.screenWidthDp >= 720
+                        // Two panes at 840dp and wider (a tablet on its side); an upright 8" tablet (743dp) opens a project
+                        // full screen, as users preferred to the list and Needs attention sharing the width.
+                        val twoPane = LocalConfiguration.current.screenWidthDp >= 840
                         if (twoPane || selectedProjectId == null) {
                             val portfolio by viewModel.portfolioState.collectAsState()
                             DashboardScreen(

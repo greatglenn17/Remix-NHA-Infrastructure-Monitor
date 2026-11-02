@@ -185,13 +185,9 @@ class ProjectDetailScreenshotTest {
     @Config(qualifiers = "w1185dp-h743dp")
     @Test fun two_pane_project() = twoPane("1185")
 
-    // An 8" tablet upright: two panes from 720dp, the list narrows to 360dp.
-    @Config(qualifiers = "w743dp-h1185dp")
-    @Test fun two_pane_project_upright() = twoPane("743")
-
     // No project open and nothing flagged: a quiet prompt in the right pane, not a wide empty card.
-    @Config(qualifiers = "w743dp-h1185dp")
-    @Test fun two_pane_quiet_upright() = twoPane("743", quiet = true)
+    @Config(qualifiers = "w1185dp-h743dp")
+    @Test fun two_pane_quiet() = twoPane("1185", quiet = true)
 
     private fun twoPane(width: String, quiet: Boolean = false) {
         val item = PortfolioItem(project, if (quiet) emptyList() else flags, 0.64f, 6_400_000.0, 10_450_000.0, if (quiet) 0 else 1, LocalDate.of(2026, 10, 11))
