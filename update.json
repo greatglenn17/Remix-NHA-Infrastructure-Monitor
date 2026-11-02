@@ -1,8 +1,8 @@
 {
-  "versionCode": 212,
-  "versionName": "2.1.2",
-  "releaseNotes": "v2.1.2: Edit a whole billing (name, DV, date, period, amount, scan); balances stay right. Summary shows the full project profile, and housing projects show Status of construction: units by stage with a grand total.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.2/NHA_Monitor_v2.1.2_Build212.apk",
-  "apkSha256": "5a02ecf07f23a78417f93b5c5e189768971b5cedf6fea0a88c922783102d43af",
+  "versionCode": 213,
+  "versionName": "2.1.3",
+  "releaseNotes": "v2.1.3: Housing billings by type: land acquisition and development per lot, M1/M2 per housing unit (units x amount). Retention 5% or 10% on any billing; billing cards and the Status of payment table show the net amount.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.3/NHA_Monitor_v2.1.3_Build213.apk",
+  "apkSha256": "fa5758e39008e44e67dd66d2b3bd3477d57aaf98ef4eac2fc536dc97f8eee4fe",
   "isMandatory": true
 }
