@@ -125,15 +125,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         return Triple(doc.getString("displayName")?.ifBlank { null }, doc.getString("position")?.ifBlank { null }, doc.getString("office")?.ifBlank { null })
     }
 
-    /** Applies a role the Super Admin changed since this phone last signed in. */
-    private suspend fun refreshRoleFromServer(email: String) {
-        val role = serverRole() ?: return
+    /** Applies the role the Super Admin set, and the name, position and office saved from any phone, since this one last signed in. */
+    private suspend fun refreshAccountFromServer(email: String) {
+        val profile = serverProfile()
         val account = _currentUserAccount.value
-        if (role == account.role) return
-        val updated = account.copy(role = role)
+        val updated = com.example.data.auth.refreshedAccount(account, email, serverRole(), profile?.first, profile?.second, profile?.third)
+        // The server has no real name yet: this phone's goes up so the other phones get it too.
+        if (profile != null && isEmailName(profile.first, email) && !isEmailName(account.name, email)) {
+            authManager.currentFirebaseUser?.let { firestoreSyncManager.syncUserProfile(it.uid, email, account.name, null, null, null) }
+        }
+        if (updated == account) return
         _currentUserAccount.value = updated
         authManager.saveUserSession(updated, email)
-        authManager.saveRegisteredRole(email, role)
+        authManager.saveRegisteredRole(email, updated.role)
     }
 
     /** Super Admin: sets another user's role; syncUserCustomClaims turns it into their claim. [onDone] gets the message to show. */
@@ -311,7 +315,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             _isLoggedIn.value = false
         }
         authManager.currentFirebaseUser?.email?.let { email ->
-            if (_isLoggedIn.value) viewModelScope.launch { refreshRoleFromServer(email.trim().lowercase()) }
+            if (_isLoggedIn.value) viewModelScope.launch { refreshAccountFromServer(email.trim().lowercase()) }
         }
 
         // Start realtime sync if user is already logged in (AuthStateListener in FirestoreSyncManager
