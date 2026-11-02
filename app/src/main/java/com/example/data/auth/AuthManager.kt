@@ -21,6 +21,15 @@ fun personName(first: String, middleInitial: String, last: String): String =
 fun isEmailName(name: String?, email: String): Boolean =
     name.isNullOrBlank() || name.filter(Char::isLetterOrDigit).equals(email.substringBefore("@").filter(Char::isLetterOrDigit), ignoreCase = true)
 
+/** [account] with what the server has, so every phone shows the same; a missing or email-made server value keeps the phone's. */
+fun refreshedAccount(account: UserAccount, email: String, role: UserRole?, name: String?, position: String?, office: String?): UserAccount =
+    account.copy(
+        role = role ?: account.role,
+        name = name.takeUnless { isEmailName(it, email) } ?: account.name,
+        title = position ?: account.title,
+        office = office ?: account.office
+    )
+
 class AuthManager(private val context: Context) {
 
     private val prefs = try {
