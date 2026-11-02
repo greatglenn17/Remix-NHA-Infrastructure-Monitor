@@ -1,8 +1,8 @@
 {
-  "versionCode": 226,
-  "versionName": "2.2.6",
-  "releaseNotes": "v2.2.6: Faster release build; app data can no longer be read over USB.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.6/NHA_Monitor_v2.2.6_Build226.apk",
-  "apkSha256": "97de4df135d96d0cf93c1e102ea5ebb7611384058acc027b9dd4cd98397c429c",
+  "versionCode": 227,
+  "versionName": "2.2.7",
+  "releaseNotes": "v2.2.7: The project audit log now syncs, so every phone sees the full history.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.7/NHA_Monitor_v2.2.7_Build227.apk",
+  "apkSha256": "643bde2eb78a865e6e00905796d4c79b505250a425e323607714941e216492fc",
   "isMandatory": true
 }
