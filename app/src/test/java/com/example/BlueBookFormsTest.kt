@@ -197,8 +197,12 @@ class BlueBookFormsTest {
             activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
             attachedPhotoUrlsJson = "[]", submittedByStaff = "Engr. Staff"
         )
+        val activities = listOf(
+            com.example.data.model.DailyActivity("Monday", "Formworks", ""),
+            com.example.data.model.DailyActivity("Saturday", "Rebar", "")
+        )
         val html = BlueBookForms.weeklyReport(
-            project, report, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(),
+            project, report, emptyList(), emptyList(), activities, emptyList(), emptyList(),
             listOf(day("2026-07-20", hours(5))), listOf("data:image/jpeg;base64,BBBB" to "Footing, Block 3"), ContractLogs.from(project, docs),
             Signatories("Glenn C. Aprovechado", "Principal Engineer C", "Ana Cruz", "District Manager", "", "Regional Manager"),
             banner = "data:image/png;base64,AAAA"
@@ -212,5 +216,10 @@ class BlueBookFormsTest {
         assertTrue(html.contains("<img class='banner' src='data:image/png;base64,AAAA'>"))
         assertFalse(html.contains("FORM NO."))
         assertTrue(html.contains("<img src='data:image/jpeg;base64,BBBB'><div>Footing, Block 3</div>"))
+        // The week prints Saturday to Friday.
+        assertTrue(html.contains("<tr><th>SATURDAY</th><th>SUNDAY</th><th>MONDAY</th>"))
+        assertTrue(html.contains("<th>FRIDAY</th></tr>"))
+        val order = listOf("<td class='day'>SATURDAY", "<td class='day'>MONDAY", "<td class='day'>TUESDAY", "<td class='day'>FRIDAY").map(html::indexOf)
+        assertTrue(order.toString(), order.all { it >= 0 } && order == order.sorted())
     }
 }
