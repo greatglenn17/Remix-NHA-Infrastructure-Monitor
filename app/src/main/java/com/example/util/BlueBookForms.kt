@@ -340,9 +340,9 @@ object BlueBookForms {
         }
         legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
         if (summary.roadLots.sum() > 0) {
-            legend.append("<tr><th class='sub'>Road lot</th><th class='sub'>Lots</th></tr>")
+            legend.append("<tr><th class='sub' colspan='2'>Road lot</th></tr>")
             SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
-                legend.append("<tr><td><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td><td class='n'>${summary.roadLots[i]}</td></tr>")
+                legend.append("<tr><td colspan='2'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
             }
         }
         legend.append("</table>")
