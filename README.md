@@ -92,6 +92,20 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 ---
 
+## 🔑 Building a Release
+
+Releases are the **release** build, signed with the project's `debug.keystore` (the key every installed copy already has):
+
+```bash
+./gradlew lintDebug verifyRoborazziDebug assembleRelease
+```
+
+The APK is `app/build/outputs/apk/release/app-release.apk`. It is not debuggable, so app data can't be read over USB.
+
+`debug.keystore` is not in git. **Keep a backup copy somewhere safe**: without it no update can install over the phones' copy, and every phone would have to uninstall and reinstall.
+
+---
+
 ## 👤 Author & District Information
 
 - **Principal Engineer:** Engr. Glenn C. Aprovechado  
