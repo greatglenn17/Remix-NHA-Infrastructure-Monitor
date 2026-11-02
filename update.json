@@ -1,8 +1,8 @@
 {
-  "versionCode": 215,
-  "versionName": "2.1.5",
-  "releaseNotes": "v2.1.5: The weekly reporting week runs Saturday to Friday: new reports default to it, and the weekly print lists Saturday first.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.5/NHA_Monitor_v2.1.5_Build215.apk",
-  "apkSha256": "49d55cf9c6703f601cb2d1d33cf9af19bcf361e400896086d4b9da1add5a0500",
+  "versionCode": 216,
+  "versionName": "2.1.6",
+  "releaseNotes": "v2.1.6: The Summary shows the Status of construction as of today, and a Status of billing table with the lots billed for land acquisition, land development, M1 and M2.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.6/NHA_Monitor_v2.1.6_Build216.apk",
+  "apkSha256": "4c274c4c844ac5b637b5eef60da1177cc34423aa1b61a630b0192b3b27558893",
   "isMandatory": true
 }
