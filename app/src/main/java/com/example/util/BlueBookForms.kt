@@ -201,8 +201,8 @@ object BlueBookForms {
         // One row per day or day range, in week order; weekdays no activity covers stay as blank rows.
         val labels = activities.map { it.day.trim() }.distinctBy { it.lowercase() }
         val covered = labels.flatMap { ActivityDays.covered(it) }.toSet()
-        val blank = WEEK_DAYS.take(5).filterIndexed { i, _ -> i !in covered }
-        (labels + blank).sortedBy { ActivityDays.start(it) }.forEach { day ->
+        val blank = ActivityDays.DAYS.take(5).filterIndexed { i, _ -> i !in covered }
+        (labels + blank).sortedBy { ActivityDays.start(it).let { i -> if (i < 7) (i + 2) % 7 else i } }.forEach { day ->
             val list = activities.filter { it.day.trim().equals(day, ignoreCase = true) }
             b.append("<tr><td class='day'>${esc(day.uppercase())}</td><td>${lines(list.map { it.description })}</td><td>${lines(list.map { it.remarks })}</td></tr>")
         }
@@ -516,7 +516,8 @@ object BlueBookForms {
     private val LONG_DATE = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH)
     private val MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
     private val WEEK_FORMATS = listOf("MMM d, yyyy", "MMMM d, yyyy").map { DateTimeFormatter.ofPattern(it, Locale.ENGLISH) }
-    private val WEEK_DAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    // The reporting week runs Saturday to Friday.
+    private val WEEK_DAYS = listOf("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
