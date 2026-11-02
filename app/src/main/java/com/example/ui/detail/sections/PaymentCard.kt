@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.model.ProjectPayment
+import com.example.data.model.billingUnitName
+import com.example.data.model.netAmount
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.TabularNumbers
 import com.example.util.ProjectSchedule
@@ -74,7 +76,17 @@ fun PaymentCard(
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
-                Field("Gross amount", CurrencyFormatter.formatPhp(payment.grossAmount))
+                if (payment.billingType.isNotBlank()) Text(
+                    "${payment.billingType} · ${payment.units} ${billingUnitName(payment.billingType)}${if (payment.units == 1) "" else "s"} × ${CurrencyFormatter.formatPhp(payment.unitPrice)}",
+                    style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                Field("Net amount", CurrencyFormatter.formatPhp(payment.netAmount))
+                if (payment.retentionPct > 0) {
+                    Field("Gross amount", CurrencyFormatter.formatPhp(payment.grossAmount))
+                    Field("Retention (${payment.retentionPct.toInt()}%)", CurrencyFormatter.formatPhp(payment.grossAmount - payment.netAmount))
+                }
                 Field("Share of contract", "%.2f%%".format(payment.percentage))
                 Field("Balance after", CurrencyFormatter.formatPhp(payment.balanceAmount))
                 Field("Balance share", "%.2f%%".format(payment.balancePercentage))

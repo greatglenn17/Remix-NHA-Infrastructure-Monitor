@@ -127,7 +127,7 @@ class ProjectDetailScreenshotTest {
     private fun Money(payments: List<ProjectPayment> = this.payments, cost: Double = 10_450_000.0) = MoneySection(
         payments = payments, contractCost = cost, actualPercent = project.actualAccomplishment,
         currentUserRole = UserRole.ENGINEER_ADMIN,
-        onAddPayment = { _, _, _, _, _, _, _, _, _ -> }, onUpdatePayment = {}, onDeletePayment = {}
+        onAddPayment = {}, onUpdatePayment = {}, onDeletePayment = {}
     )
 
     @Composable

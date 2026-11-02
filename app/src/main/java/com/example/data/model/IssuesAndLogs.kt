@@ -95,8 +95,22 @@ data class ProjectPayment(
     val balanceAmount: Double,
     val balancePercentage: Double,
     val fileUrl: String = "",
+    // Housing billings: what is billed (one of HOUSING_BILLING_TYPES), how many lots or units, and the amount per one.
+    val billingType: String = "",
+    val units: Int = 0,
+    val unitPrice: Double = 0.0,
+    // Percent of the gross held back; balances stay on the gross.
+    val retentionPct: Double = 0.0,
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** What is paid after retention. */
+val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 100)
+
+/** What a housing project bills for; land is billed per lot, M1 and M2 per housing unit. */
+val HOUSING_BILLING_TYPES = listOf("Land acquisition", "Land development", "M1 - Housing unit", "M2 - Housing unit")
+
+fun billingUnitName(type: String): String = if (type.startsWith("Land")) "lot" else "housing unit"

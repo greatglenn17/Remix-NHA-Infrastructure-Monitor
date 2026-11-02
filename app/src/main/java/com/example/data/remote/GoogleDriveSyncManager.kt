@@ -319,6 +319,10 @@ class GoogleDriveSyncManager(
                     put("balanceAmount", pay.balanceAmount)
                     put("balancePercentage", pay.balancePercentage)
                     put("fileUrl", pay.fileUrl)
+                    put("billingType", pay.billingType)
+                    put("units", pay.units)
+                    put("unitPrice", pay.unitPrice)
+                    put("retentionPct", pay.retentionPct)
                 })
             }
 
@@ -890,7 +894,11 @@ class GoogleDriveSyncManager(
                     percentage = pay.optDouble("percentage", 0.0),
                     balanceAmount = pay.optDouble("balanceAmount", 0.0),
                     balancePercentage = pay.optDouble("balancePercentage", 0.0),
-                    fileUrl = pay.optString("fileUrl", "")
+                    fileUrl = pay.optString("fileUrl", ""),
+                    billingType = pay.optString("billingType", ""),
+                    units = pay.optInt("units", 0),
+                    unitPrice = pay.optDouble("unitPrice", 0.0),
+                    retentionPct = pay.optDouble("retentionPct", 0.0)
                 )
                 projectDao.insertProjectPayment(payment)
             }

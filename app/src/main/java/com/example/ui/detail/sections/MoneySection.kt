@@ -28,7 +28,9 @@ fun MoneySection(
     contractCost: Double,
     actualPercent: Double,
     currentUserRole: UserRole,
-    onAddPayment: (String, String, String, String, Double, Double, Double, Double, String) -> Unit,
+    // Housing projects bill land and housing units by count; see HOUSING_BILLING_TYPES.
+    isHousing: Boolean = false,
+    onAddPayment: (ProjectPayment) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
     onDeletePayment: (ProjectPayment) -> Unit
 ) {
@@ -89,11 +91,14 @@ fun MoneySection(
             baseCost = contractCost,
             currentTotalPaid = payments.sumOf { it.grossAmount },
             onDismiss = { showAddDialog = false },
-            onSubmit = { name, dvNo, date, period, gross, fileUrl ->
+            isHousing = isHousing,
+            previous = payments,
+            onSubmit = { p ->
+                val gross = p.grossAmount
                 val pct = if (contractCost > 0) (gross / contractCost) * 100 else 0.0
                 val newBal = contractCost - (payments.sumOf { it.grossAmount } + gross)
                 val balPct = if (contractCost > 0) (newBal / contractCost) * 100 else 0.0
-                onAddPayment(name, dvNo, date, period, gross, pct, newBal, balPct, fileUrl)
+                onAddPayment(p.copy(percentage = pct, balanceAmount = newBal, balancePercentage = balPct))
                 showAddDialog = false
             }
         )
@@ -105,8 +110,9 @@ fun MoneySection(
             currentTotalPaid = payments.sumOf { it.grossAmount } - old.grossAmount,
             existing = old,
             onDismiss = { paymentToEdit = null },
-            onSubmit = { name, dvNo, date, period, gross, fileUrl ->
-                val new = old.copy(name = name, dvNo = dvNo, date = date, periodCovered = period, grossAmount = gross, fileUrl = fileUrl)
+            isHousing = isHousing,
+            previous = payments,
+            onSubmit = { new ->
                 editedBillings(payments, old, new, contractCost).forEach(onUpdatePayment)
                 paymentToEdit = null
             }

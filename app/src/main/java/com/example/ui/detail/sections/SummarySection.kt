@@ -22,6 +22,7 @@ import com.example.data.model.ProjectStatus
 import com.example.ui.dialogs.WeekRange
 import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
+import com.example.data.model.netAmount
 import com.example.data.model.hasPermission
 import com.example.ui.dashboard.SitePhoto
 import com.example.ui.detail.tabs.lotProgressFill
@@ -223,25 +224,26 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
             fun row(first: String, date: String, vararg amounts: String) =
                 if (wide) listOf(first, date) + amounts else listOf(listOf(first, date).filter { it.isNotBlank() }.joinToString("\n")) + amounts
             Column {
-                Cells(row("Billing / period covered", "Date", "Gross amount (PHP)", "%", "Balance (PHP)"), bold = true, color = scheme.onSurfaceVariant)
+                Cells(row("Billing / period covered", "Date", "Net amount (PHP)", "%", "Balance (PHP)"), bold = true, color = scheme.onSurfaceVariant)
                 HorizontalDivider(color = scheme.outlineVariant)
                 payments.forEach { p ->
                     Cells(
                         row(
                             listOf(p.name, p.periodCovered).filter { it.isNotBlank() }.joinToString("\n").ifBlank { "-" },
                             ProjectSchedule.displayDate(p.date.ifBlank { "-" }),
-                            CurrencyFormatter.formatDecimal(p.grossAmount),
+                            CurrencyFormatter.formatDecimal(p.netAmount),
                             "%.2f%%".format(p.percentage),
                             CurrencyFormatter.formatDecimal(p.balanceAmount)
                         )
                     )
                     HorizontalDivider(color = scheme.outlineVariant)
                 }
+                // Share and balance stay on the gross; only the paid amount drops the retention.
                 val total = payments.sumOf { it.grossAmount }
                 Cells(
                     row(
                         "Total", "",
-                        CurrencyFormatter.formatDecimal(total),
+                        CurrencyFormatter.formatDecimal(payments.sumOf { it.netAmount }),
                         if (contractCost > 0) "%.2f%%".format(total / contractCost * 100) else "-",
                         CurrencyFormatter.formatDecimal(contractCost - total)
                     ),

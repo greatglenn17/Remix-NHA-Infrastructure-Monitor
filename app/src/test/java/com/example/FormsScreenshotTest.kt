@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
+import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpLot
 import com.example.data.model.WeeklyReport
 import com.example.ui.components.DiscardChangesDialog
@@ -60,6 +61,11 @@ class FormsScreenshotTest {
     private val lot = SdpLot(id = 1, projectId = 7, sdpPlanId = 1, blockNumber = "12", lotNumber = "5", polygonNormalizedJson = "[]")
 
     private val today = java.time.LocalDate.of(2026, 10, 27)
+    private val housingBilling = ProjectPayment(
+        projectId = 7, name = "M1 - Housing unit", dvNo = "DV-2026-10-0102", date = "2026-10-20", periodCovered = "Oct 2026",
+        grossAmount = 1_800_000.0, percentage = 18.0, balanceAmount = 6_200_000.0, balancePercentage = 62.0,
+        billingType = "M1 - Housing unit", units = 12, unitPrice = 150_000.0, retentionPct = 10.0
+    )
     private var current: @Composable () -> Unit = {}
     private var tick by mutableStateOf(0)
 
@@ -82,7 +88,8 @@ class FormsScreenshotTest {
         shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
         shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
-        shoot("form_add_billing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, { _, _, _, _, _, _ -> }, today) }
+        shoot("form_add_billing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, {}, today) }
+        shoot("form_add_billing_housing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, {}, today, existing = housingBilling, isHousing = true) }
         shoot("form_variation_order_$t") { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }
         shoot("form_work_suspension_$t") { AddCustomDocumentDialog("Work Suspension Order", {}) { _, _ -> } }
         shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
