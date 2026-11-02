@@ -28,9 +28,12 @@ import com.example.ui.theme.LocalNHAColors
 import com.example.util.ContractorLetters
 import com.example.util.ProjectSchedule
 
-/** One log entry: a title and its detail lines (blank lines skipped). With [onClick] it opens that entry's status; [uuid] marks a record not uploaded yet. */
+/**
+ * One log entry: a title and its detail lines (blank lines skipped). With [onClick] it opens that entry's status; [uuid] marks a record not uploaded yet.
+ * [trailing] sits before the chevron, e.g. a button that opens the entry's attached letter.
+ */
 @Composable
-fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null, uuid: String = "") {
+fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null, uuid: String = "", trailing: (@Composable () -> Unit)? = null) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(8.dp)
     val modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -43,6 +46,7 @@ fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (()
                 }
                 com.example.ui.components.PendingUploadMark(uuid, Modifier.padding(top = 2.dp))
             }
+            trailing?.invoke()
             if (onClick != null) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = scheme.onSurfaceVariant)
         }
     }

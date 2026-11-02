@@ -145,6 +145,8 @@ data class DeveloperRequest(
     val dateReceived: String = "",
     // Blank until NHA has packaged the request.
     val datePackaged: String = "",
+    // The developer's request letter, scanned or uploaded; an attachment reference.
+    val requestFileUrl: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,

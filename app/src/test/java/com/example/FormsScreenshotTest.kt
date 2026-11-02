@@ -12,6 +12,9 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import com.example.data.model.AppThemeMode
 import com.example.data.model.ContractorLetter
+import com.example.data.model.DeveloperRequest
+import com.example.ui.detail.sections.DeveloperRequestDialog
+import com.example.ui.detail.sections.DeveloperRequestsCard
 import com.example.data.model.Project
 import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpLot
@@ -81,6 +84,10 @@ class FormsScreenshotTest {
         id = 1, projectId = 7, dateSent = "2026-10-20", subject = "Notice of delay, Block 12",
         actionTaken = "Added a second concreting crew", dateReplied = "2026-10-23", replyFileUrl = "nhafile:reply.pdf"
     )
+    private val scannedRequest = DeveloperRequest(
+        id = 1, projectId = 7, requestType = "Time Extension", details = "Letter 12, typhoon delays",
+        dateRequested = "2026-10-20", dateReceived = "2026-10-21", requestFileUrl = "nhafile:request.pdf"
+    )
     private var current: @Composable () -> Unit = {}
     private var tick by mutableStateOf(0)
 
@@ -114,6 +121,15 @@ class FormsScreenshotTest {
         shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
         shoot("form_contractor_letter_$t") { ContractorLetterDialog(7, null, {}, {}, null, today) }
         shoot("form_contractor_letter_reply_$t") { ContractorLetterDialog(7, repliedLetter, {}, {}, {}, today) }
+        shoot("form_developer_request_$t") { DeveloperRequestDialog(7, scannedRequest, {}, {}, {}) }
+        shoot("card_developer_requests_$t") {
+            Surface(Modifier.fillMaxSize()) {
+                DeveloperRequestsCard(
+                    listOf(scannedRequest, DeveloperRequest(id = 2, projectId = 7, requestType = "Variation Order", dateReceived = "2026-10-24")),
+                    today, {}, {}, Modifier.padding(16.dp).fillMaxWidth()
+                )
+            }
+        }
         shoot("card_contractor_letters_$t") {
             Surface(Modifier.fillMaxSize()) {
                 ContractorLettersCard(

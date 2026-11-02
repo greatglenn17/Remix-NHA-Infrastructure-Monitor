@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.MoveToInbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,6 +28,7 @@ fun DeveloperRequestsCard(
     onOpen: ((DeveloperRequest) -> Unit)?,
     modifier: Modifier
 ) {
+    val openFile = com.example.ui.components.rememberAttachmentOpener()
     SectionCard(
         "Developer requests",
         Icons.Default.MoveToInbox,
@@ -53,7 +55,14 @@ fun DeveloperRequestsCard(
                     if (packaged) "Packaged: ${r.datePackaged}" else "NOT YET PACKAGED" + (waiting?.let { " · $it days since received" } ?: ""),
                     r.details
                 ),
-                onClick = onOpen?.let { open -> { open(r) } }
+                onClick = onOpen?.let { open -> { open(r) } },
+                trailing = r.requestFileUrl.takeIf { it.isNotBlank() }?.let { file ->
+                    {
+                        IconButton(onClick = { openFile(file) }, modifier = Modifier.testTag("developer_request_file_${r.id}")) {
+                            Icon(Icons.Default.AttachFile, contentDescription = "Open the request letter", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
             )
         }
     }
@@ -74,9 +83,13 @@ fun DeveloperRequestDialog(
     var requested by remember { mutableStateOf(existing?.dateRequested ?: "") }
     var received by remember { mutableStateOf(existing?.dateReceived ?: LocalDate.now().toString()) }
     var packaged by remember { mutableStateOf(existing?.datePackaged ?: "") }
+    var requestFile by remember { mutableStateOf(existing?.requestFileUrl ?: "") }
     var expanded by remember { mutableStateOf(false) }
+    val snapshot = listOf(type, details, requested, received, packaged, requestFile)
+    val initial = remember { snapshot }
+    val close = com.example.ui.components.rememberDiscardGuard(snapshot != initial, onDismiss)
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = close,
         title = { Text(if (existing == null) "New developer request" else "Developer request") },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,6 +109,8 @@ fun DeveloperRequestDialog(
                 DateField(label = "Date of developer's request", value = requested, onValueChange = { requested = it }, clearable = true)
                 DateField(label = "Date received by NHA", value = received, onValueChange = { received = it })
                 DateField(label = "Date packaged (blank: not yet)", value = packaged, onValueChange = { packaged = it }, clearable = true)
+                Text("Developer's request letter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                LetterFileField("request", requestFile, "developer_request_file") { requestFile = it }
                 if (existing != null && onDelete != null) {
                     TextButton(onClick = { onDelete(existing) }) { Text("Delete request", color = LocalNHAColors.current.behind) }
                 }
@@ -106,11 +121,11 @@ fun DeveloperRequestDialog(
                 enabled = received.isNotBlank(),
                 onClick = {
                     val base = existing ?: DeveloperRequest(projectId = projectId, requestType = type)
-                    onSave(base.copy(requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged))
+                    onSave(base.copy(requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged, requestFileUrl = requestFile))
                 },
                 modifier = Modifier.testTag("save_developer_request_button")
             ) { Text("Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
 }
