@@ -55,7 +55,10 @@ class SdpSummaryTest {
             contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 360,
             dateStarted = "2026-04-13", completionDateOriginal = "2027-04-07", completionDateRevised = ""
         )
-        val s = SdpSummary.of(listOf(Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Road Lot", 200.0, 60), Item("Open Space", 100.0, 0)))
+        val s = SdpSummary.of(listOf(
+            Item("Saleable", 40.0, 10), Item("Saleable", 40.0, 30), Item("Open Space", 100.0, 0),
+            Item("Road Lot", 200.0, 0), Item("Road Lot", 200.0, 0), Item("Road Lot", 200.0, SdpSummary.ROAD_CONCRETING), Item("Road Lot", 200.0, 100)
+        ))
         val bands = listOf("#111111", "#222222", "#333333", "#444444", "#555555")
         val html = BlueBookForms.sdpPlan(project, s, "data:image/png;base64,AA", bands, LocalDate.of(2026, 10, 30))
         assertTrue(html.contains("size: A4; margin: 6mm;"))
@@ -64,7 +67,14 @@ class SdpSummaryTest {
         assertTrue(html.contains("<div class='plan'><img src='data:image/png;base64,AA'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
         assertTrue(html.contains("background:#111111'></i>0–25%</td><td class='n'>1</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
-        assertTrue(html.contains("<td>Area (sq.m.)</td><td class='n'>80.00</td>"))
-        for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage")) assertTrue(gone, !html.contains(gone))
+        // Road lots: red not completed, yellow concreting, green completed.
+        assertTrue(html.contains("<th class='sub'>Road lot</th><th class='sub'>Lots</th>"))
+        assertTrue(html.contains("background:#111111'></i>Not completed</td><td class='n'>2</td>"))
+        assertTrue(html.contains("background:#333333'></i>Concreting</td><td class='n'>1</td>"))
+        assertTrue(html.contains("background:#555555'></i>Completed</td><td class='n'>1</td>"))
+        for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage", "Area (sq.m.)")) assertTrue(gone, !html.contains(gone))
+        // No road lots, no road rows.
+        val noRoads = BlueBookForms.sdpPlan(project, SdpSummary.of(listOf(Item("Saleable", 40.0, 10))), "data:image/png;base64,AA", bands, LocalDate.of(2026, 10, 30))
+        assertTrue(!noRoads.contains("Road lot"))
     }
 }
