@@ -1,8 +1,8 @@
 {
-  "versionCode": 209,
-  "versionName": "2.0.9",
-  "releaseNotes": "v2.0.9: Weekly reports: a new report you are filling in is kept as a draft on this phone, so it survives the app closing. Add weekly report then offers Continue or Start over. Drafts never sync.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.0.9/NHA_Monitor_v2.0.9_Build209.apk",
-  "apkSha256": "9d570f75c45d436e7824b58bc6b809e21a085c5a9b689647026be2f289dd8b02",
+  "versionCode": 210,
+  "versionName": "2.1.0",
+  "releaseNotes": "v2.1.0: Records saved on this phone that have not reached the cloud yet show Waiting to upload on their card: weekly reports, payments, issues, documents and orders. The mark clears once the upload is done.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.0/NHA_Monitor_v2.1.0_Build210.apk",
+  "apkSha256": "7e35e7ae810fdb9ff6c894bbd4618d77f20eeffb39de7c6971b00dec474da54d",
   "isMandatory": true
 }
