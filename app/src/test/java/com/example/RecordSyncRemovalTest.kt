@@ -68,7 +68,8 @@ class RecordSyncRemovalTest {
     fun localOnlyChildTables_comeFromForeignKeys() {
         val tables = recordSync.localOnlyChildTables()
         assertEquals("projectId", tables["time_extensions"])
-        assertTrue("audit_logs" in tables)
+        // The audit log syncs since database 36.
+        assertFalse("audit_logs" in tables)
         // Subdivision plans and lots sync since v1.9.3.
         assertFalse(tables.keys.any { it.startsWith("sdp_") })
         for (synced in RecordSyncSchema.TABLES + "daily_hourly_weather") assertFalse(synced in tables)
@@ -86,6 +87,26 @@ class RecordSyncRemovalTest {
         )
         assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:contractor_letters' AND state = 'PENDING'"))
         assertTrue(reply in recordSync.attachmentRefsOf(id))
+    }
+
+    // A project's audit entry goes to the cloud with who did it; a sign-in has no project, so nothing is built for it.
+    @Test
+    fun projectAuditEntry_isUploaded_butOneWithoutAProjectIsNot() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        markAllSynced()
+        val entry = com.example.data.model.AuditLog(projectId = id, user = "Engr. R. Santos", device = "Phone", actionType = "Weekly Report Submitted")
+        val signIn = com.example.data.model.AuditLog(user = "Engr. R. Santos", device = "Phone", actionType = "User Login")
+        db.projectDao().insertAuditLog(entry)
+        db.projectDao().insertAuditLog(signIn)
+
+        assertEquals(2, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:audit_logs' AND state = 'PENDING'"))
+        val doc = recordSync.buildDocument("audit_logs", entry.uuid, "uid")!!
+        assertEquals(p.projectUuid, doc["projectUuid"])
+        val data = org.json.JSONObject(doc["data"] as String)
+        assertEquals("Engr. R. Santos", data.getString("user"))
+        assertEquals("Weekly Report Submitted", data.getString("actionType"))
+        assertNull(recordSync.buildDocument("audit_logs", signIn.uuid, "uid"))
     }
 
     @Test
