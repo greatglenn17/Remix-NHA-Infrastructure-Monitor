@@ -91,6 +91,39 @@ fun ContractorLettersCard(
     }
 }
 
+/**
+ * A letter attached to a record ([what], e.g. "reply"): Scan / Upload buttons, or once attached, View / Remove.
+ * [onChange] gets the new attachment reference, or blank when removed.
+ */
+@Composable
+fun LetterFileField(what: String, file: String, tag: String, onChange: (String) -> Unit) {
+    val scan = rememberDocumentScanner(onChange)
+    val upload = rememberAttachmentPicker(Attachments.Kind.SCAN, onAttached = onChange)
+    val openFile = rememberAttachmentOpener()
+    if (file.isNotBlank()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("${what.replaceFirstChar { it.uppercase() }} letter attached", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = { openFile(file) }) { Text("View") }
+            TextButton(onClick = { onChange("") }, modifier = Modifier.testTag("${tag}_remove")) { Text("Remove") }
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = scan, modifier = Modifier.weight(1f).testTag("${tag}_scan")) {
+                Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Scan $what")
+            }
+            OutlinedButton(onClick = { upload.launch("*/*") }, modifier = Modifier.weight(1f).testTag("${tag}_upload")) {
+                Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Upload $what")
+            }
+        }
+    }
+}
+
 /** Adds or edits a letter to the contractor; [existing] null adds one. The contractor's reply letter can be scanned or uploaded. */
 @Composable
 fun ContractorLetterDialog(
@@ -106,14 +139,6 @@ fun ContractorLetterDialog(
     var action by remember { mutableStateOf(existing?.actionTaken ?: "") }
     var dateReplied by remember { mutableStateOf(existing?.dateReplied ?: "") }
     var replyFile by remember { mutableStateOf(existing?.replyFileUrl ?: "") }
-    val attach = { ref: String ->
-        replyFile = ref
-        // A reply letter in hand means the contractor replied.
-        if (dateReplied.isBlank()) dateReplied = today.toString()
-    }
-    val scan = rememberDocumentScanner(attach)
-    val upload = rememberAttachmentPicker(Attachments.Kind.SCAN, onAttached = attach)
-    val openFile = rememberAttachmentOpener()
     val snapshot = listOf(dateSent, subject, action, dateReplied, replyFile)
     val initial = remember { snapshot }
     val close = rememberDiscardGuard(snapshot != initial, onDismiss)
@@ -133,27 +158,10 @@ fun ContractorLetterDialog(
                 )
                 Text("Contractor's reply", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 DateField(label = "Date of reply (blank: no reply yet)", value = dateReplied, onValueChange = { dateReplied = it }, clearable = true)
-                if (replyFile.isNotBlank()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Reply letter attached", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { openFile(replyFile) }) { Text("View") }
-                        TextButton(onClick = { replyFile = "" }, modifier = Modifier.testTag("contractor_reply_remove")) { Text("Remove") }
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = scan, modifier = Modifier.weight(1f).testTag("contractor_reply_scan")) {
-                            Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Scan reply")
-                        }
-                        OutlinedButton(onClick = { upload.launch("*/*") }, modifier = Modifier.weight(1f).testTag("contractor_reply_upload")) {
-                            Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Upload reply")
-                        }
-                    }
+                LetterFileField("reply", replyFile, "contractor_reply") { ref ->
+                    replyFile = ref
+                    // A reply letter in hand means the contractor replied.
+                    if (ref.isNotBlank() && dateReplied.isBlank()) dateReplied = today.toString()
                 }
                 if (existing != null && onDelete != null) {
                     TextButton(onClick = { onDelete(existing) }) { Text("Delete letter", color = LocalNHAColors.current.behind) }
