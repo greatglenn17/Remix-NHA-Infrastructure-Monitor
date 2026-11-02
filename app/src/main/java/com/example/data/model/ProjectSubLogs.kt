@@ -150,3 +150,31 @@ data class DeveloperRequest(
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** A letter NHA sent the contractor, what the contractor did about it, and the contractor's reply letter once it comes. */
+@Entity(
+    tableName = "contractor_letters",
+    foreignKeys = [
+        ForeignKey(
+            entity = Project::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
+)
+data class ContractorLetter(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val dateSent: String,
+    val subject: String,
+    val actionTaken: String = "",
+    // Blank until the contractor replies; the reply letter is an attachment reference.
+    val dateReplied: String = "",
+    val replyFileUrl: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
+)

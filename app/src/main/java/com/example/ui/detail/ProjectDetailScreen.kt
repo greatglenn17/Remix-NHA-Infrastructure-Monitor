@@ -55,6 +55,7 @@ fun ProjectDetailScreen(
     val project by viewModel.selectedProject.collectAsState()
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
+    val contractorLetters by viewModel.contractorLetters.collectAsState()
     val weeklyReports by viewModel.weeklyReports.collectAsState()
     val monthlyReports by viewModel.monthlyReports.collectAsState()
     val projectIssues by viewModel.projectIssues.collectAsState()
@@ -222,6 +223,9 @@ fun ProjectDetailScreen(
                             requests = developerRequests,
                             onSaveRequest = viewModel::saveDeveloperRequest,
                             onDeleteRequest = viewModel::deleteDeveloperRequest,
+                            letters = contractorLetters,
+                            onSaveLetter = viewModel::saveContractorLetter,
+                            onDeleteLetter = viewModel::deleteContractorLetter,
                             payments = projectPayments,
                             onPrintProfile = { printForm("Project Profile - ${currentProject.name}") { viewModel.projectProfileForm(currentProject) } },
                             today = today,

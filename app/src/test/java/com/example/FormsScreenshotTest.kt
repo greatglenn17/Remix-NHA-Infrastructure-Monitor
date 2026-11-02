@@ -11,11 +11,20 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import com.example.data.model.AppThemeMode
+import com.example.data.model.ContractorLetter
 import com.example.data.model.Project
 import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpLot
 import com.example.data.model.WeeklyReport
 import com.example.ui.components.DiscardChangesDialog
+import com.example.ui.detail.sections.ContractorLetterDialog
+import com.example.ui.detail.sections.ContractorLettersCard
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.example.ui.detail.tabs.AddLotDialog
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.detail.tabs.PhotoGalleryTab
@@ -68,6 +77,10 @@ class FormsScreenshotTest {
         grossAmount = 1_800_000.0, percentage = 18.0, balanceAmount = 6_200_000.0, balancePercentage = 62.0,
         billingType = "M1 - Housing unit", units = 12, unitPrice = 150_000.0, retentionPct = 10.0
     )
+    private val repliedLetter = ContractorLetter(
+        id = 1, projectId = 7, dateSent = "2026-10-20", subject = "Notice of delay, Block 12",
+        actionTaken = "Added a second concreting crew", dateReplied = "2026-10-23", replyFileUrl = "nhafile:reply.pdf"
+    )
     private var current: @Composable () -> Unit = {}
     private var tick by mutableStateOf(0)
 
@@ -99,6 +112,16 @@ class FormsScreenshotTest {
         shoot("form_variation_order_$t") { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }
         shoot("form_work_suspension_$t") { AddCustomDocumentDialog("Work Suspension Order", {}) { _, _ -> } }
         shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
+        shoot("form_contractor_letter_$t") { ContractorLetterDialog(7, null, {}, {}, null, today) }
+        shoot("form_contractor_letter_reply_$t") { ContractorLetterDialog(7, repliedLetter, {}, {}, {}, today) }
+        shoot("card_contractor_letters_$t") {
+            Surface(Modifier.fillMaxSize()) {
+                ContractorLettersCard(
+                    listOf(repliedLetter, ContractorLetter(id = 2, projectId = 7, dateSent = "2026-10-26", subject = "Unsafe scaffolding at Block 3")),
+                    {}, {}, Modifier.padding(16.dp).fillMaxWidth()
+                )
+            }
+        }
         shoot("login_$t") { LoginScreen(onLoginSuccess = { _, _, _, _, _, _, _ -> }) }
         shoot("signup_$t", steps = {
             rule.onNodeWithText("Create Account").performSemanticsAction(SemanticsActions.OnClick)

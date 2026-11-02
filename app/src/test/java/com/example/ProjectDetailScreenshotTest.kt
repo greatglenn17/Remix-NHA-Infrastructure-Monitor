@@ -118,6 +118,13 @@ class ProjectDetailScreenshotTest {
         project, flags, docs, reports.first(), openIssues = 2, canEditProject = true, onEditProject = {},
         currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
         payments = payments, today = LocalDate.of(2026, 10, 27),
+        letters = listOf(
+            com.example.data.model.ContractorLetter(
+                id = 2, projectId = 1, dateSent = "2026-10-20", subject = "Notice of delay, Block 12",
+                actionTaken = "Added a second concreting crew", dateReplied = "2026-10-23", replyFileUrl = "nhafile:reply.pdf"
+            ),
+            com.example.data.model.ContractorLetter(id = 1, projectId = 1, dateSent = "2026-10-26", subject = "Unsafe scaffolding at Block 3")
+        ),
         // The fixture's older "Week 41: ..." labels don't cover this week, so the prompt shows.
         weeklyReports = reports, onAddWeeklyReport = {},
         construction = SdpSummary.Summary(listOf(18, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0))

@@ -111,6 +111,18 @@ interface ProjectDao {
     @Query("DELETE FROM developer_requests WHERE id = :id")
     suspend fun deleteDeveloperRequest(id: Long)
 
+    @Query("SELECT * FROM contractor_letters WHERE projectId = :projectId ORDER BY dateSent DESC, id DESC")
+    fun getContractorLettersForProject(projectId: Long): Flow<List<ContractorLetter>>
+
+    @Insert
+    suspend fun insertContractorLetter(letter: ContractorLetter)
+
+    @Update
+    suspend fun updateContractorLetter(letter: ContractorLetter)
+
+    @Query("DELETE FROM contractor_letters WHERE id = :id")
+    suspend fun deleteContractorLetter(id: Long)
+
     @Query("SELECT * FROM project_payments WHERE projectId = :projectId ORDER BY id ASC")
     fun getProjectPaymentsForProject(projectId: Long): Flow<List<ProjectPayment>>
 
