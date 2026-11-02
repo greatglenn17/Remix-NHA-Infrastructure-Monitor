@@ -291,9 +291,9 @@ fun ProjectDetailScreen(
                                 onSelectActiveVersion = { planId: Long ->
                                     viewModel.setActiveSdpPlan(currentProject.id, planId)
                                 },
-                                onAddLot = { block: String, lot: String, unit: String, area: Double, json: String, desc: String ->
+                                onAddLot = { use: String, block: String, lot: String, unit: String, area: Double, json: String, desc: String ->
                                     activeSdpPlan?.let { plan ->
-                                        viewModel.addSdpLot(currentProject.id, plan.id, block, lot, unit, area, json, desc)
+                                        viewModel.addSdpLot(currentProject.id, plan.id, block, lot, unit, area, json, desc, use)
                                     }
                                 },
                                 onUpdateLot = { lot: com.example.data.model.SdpLot ->

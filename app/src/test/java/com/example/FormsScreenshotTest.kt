@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
@@ -15,6 +16,7 @@ import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpLot
 import com.example.data.model.WeeklyReport
 import com.example.ui.components.DiscardChangesDialog
+import com.example.ui.detail.tabs.AddLotDialog
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.detail.tabs.PhotoGalleryTab
 import com.example.ui.detail.tabs.RecordInspectionSnapshotDialog
@@ -88,6 +90,10 @@ class FormsScreenshotTest {
         shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
         shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
+        shoot("form_add_lot_road_$t", steps = {
+            rule.onNodeWithTag("add_lot_use").performSemanticsAction(SemanticsActions.OnClick); settle()
+            rule.onNodeWithText("Road Lot").performSemanticsAction(SemanticsActions.OnClick)
+        }) { AddLotDialog({}, { _, _, _, _, _, _ -> }) }
         shoot("form_add_billing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, {}, today) }
         shoot("form_add_billing_housing_$t") { AddPaymentDialog(10_000_000.0, 4_000_000.0, {}, {}, today, existing = housingBilling, isHousing = true) }
         shoot("form_variation_order_$t") { AddCustomDocumentDialog("Variation Order", {}) { _, _ -> } }

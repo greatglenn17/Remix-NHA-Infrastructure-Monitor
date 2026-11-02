@@ -1213,7 +1213,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         housingUnitNumber: String,
         lotAreaSqM: Double,
         polygonNormalizedJson: String,
-        description: String = ""
+        description: String = "",
+        lotUse: String = ""
     ) {
         viewModelScope.launch {
             val user = currentUserAccount.value.name
@@ -1228,6 +1229,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 polygonNormalizedJson = polygonNormalizedJson,
                 isActive = true,
                 description = description,
+                lotUse = lotUse,
                 createdBy = user,
                 createdDate = currentDate,
                 lastModifiedBy = user,
@@ -1239,7 +1241,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Lot Created",
                 details = "Digitized Lot B${blockNumber}-L${lotNumber} (ID: $lotId)",
                 oldValue = "",
-                newValue = "Block $blockNumber, Lot $lotNumber, Unit: $housingUnitNumber, Area: ${lotAreaSqM}sqm"
+                newValue = "${lotUse.ifBlank { "Saleable" }}: Block $blockNumber, Lot $lotNumber, Unit: $housingUnitNumber, Area: ${lotAreaSqM}sqm"
             )
         }
     }
