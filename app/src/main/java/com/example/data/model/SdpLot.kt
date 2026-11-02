@@ -58,5 +58,12 @@ val SdpLot.isRoadLot: Boolean get() = use == "Road Lot"
 
 /** Found lots come in with no block or lot; the engineer names them (Update Progress, Renumber block). */
 val SdpLot.isUnassigned: Boolean get() = blockNumber.isBlank() || lotNumber.isBlank()
-/** "Block 3 Lot 12", or "Unassigned lot" until the lot is named. */
-val SdpLot.label: String get() = if (isUnassigned) "Unassigned lot" else "Block $blockNumber Lot $lotNumber"
+/** Road lots and easements go by one number, kept as the lot number under these blocks. */
+val NUMBERED_LOT_BLOCKS = mapOf("Road Lot" to "RL", "Easement" to "EA")
+
+/** "Block 3 Lot 12", "Road Lot 4" or "Easement 2", or "Unassigned lot" until the lot is named. */
+val SdpLot.label: String get() = when {
+    isUnassigned -> "Unassigned lot"
+    NUMBERED_LOT_BLOCKS[use] == blockNumber -> "$use $lotNumber"
+    else -> "Block $blockNumber Lot $lotNumber"
+}

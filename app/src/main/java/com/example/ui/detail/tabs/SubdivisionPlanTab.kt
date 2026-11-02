@@ -53,6 +53,7 @@ import com.example.data.model.SdpPlan
 import com.example.data.model.SdpRoad
 import com.example.data.model.UserRole
 import com.example.data.model.LOT_USES
+import com.example.data.model.NUMBERED_LOT_BLOCKS
 import com.example.data.model.anyBilled
 import com.example.data.model.billingLabel
 import com.example.data.model.isUnassigned
@@ -262,7 +263,7 @@ fun SubdivisionPlanTab(
     currentUserRole: UserRole,
     onUploadSdpPlan: (planName: String, pdfUrl: String, description: String) -> Unit,
     onSelectActiveVersion: (sdpPlanId: Long) -> Unit,
-    onAddLot: (block: String, lot: String, unit: String, area: Double, json: String, desc: String) -> Unit,
+    onAddLot: (use: String, block: String, lot: String, unit: String, area: Double, json: String, desc: String) -> Unit,
     onUpdateLot: (SdpLot) -> Unit,
     onDeactivateLot: (SdpLot) -> Unit,
     onAddRoad: (name: String, type: String, json: String) -> Unit,
@@ -2145,9 +2146,9 @@ fun SubdivisionPlanTab(
                 // A traced outline is thrown away on cancel; tapped corners stay for more tapping.
                 if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) draftPoints.clear()
             },
-            onSubmit = { block: String, lot: String, unit: String, area: Double, desc: String ->
+            onSubmit = { use: String, block: String, lot: String, unit: String, area: Double, desc: String ->
                 val json = normalizedToJson(draftPoints)
-                onAddLot(block, lot, unit, area, json, desc)
+                onAddLot(use, block, lot, unit, area, json, desc)
                 draftPoints.clear()
                 showAddLotDialog = false
             }
@@ -2511,7 +2512,7 @@ fun LotInfoDialog(
                             Text("Developer Billing", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Text(if (isBilled) "● ${currentProgress.billingLabel}" else "NOT BILLED", style = MaterialTheme.typography.bodySmall.copy(color = if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
                         }
-                        Text(if (lot.isUnassigned) "Block and lot not assigned yet" else "Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
+                        Text(if (lot.isUnassigned) "Block and lot not assigned yet" else if (NUMBERED_LOT_BLOCKS[lot.use] == lot.blockNumber) "${lot.use} Number: ${lot.lotNumber}" else "Block Number: ${lot.blockNumber} • Lot Number: ${lot.lotNumber}", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                         Text("Housing Unit: ${lot.housingUnitNumber.ifBlank { "N/A" }} • Area: ${lot.lotAreaSqM} sq.m", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
                         Text("SDP Plan Version: v$sdpVersion • Internal ID: ${lot.id}", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     }
@@ -2784,12 +2785,17 @@ fun LotAuditHistoryDialog(
 }
 
 // --- HELPER DIALOGS ---
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddLotDialog(
     onDismiss: () -> Unit,
-    onSubmit: (block: String, lot: String, unit: String, area: Double, desc: String) -> Unit,
+    onSubmit: (use: String, block: String, lot: String, unit: String, area: Double, desc: String) -> Unit,
     suggestedArea: Double? = null
 ) {
+    var lotUse by remember { mutableStateOf(LOT_USES.first()) }
+    var useMenu by remember { mutableStateOf(false) }
+    // Road lots and easements have one number and no block of their own.
+    val fixedBlock = NUMBERED_LOT_BLOCKS[lotUse]
     var blockNumber by remember { mutableStateOf("") }
     var lotNumber by remember { mutableStateOf("") }
     var unitNumber by remember { mutableStateOf("") }
@@ -2804,9 +2810,29 @@ fun AddLotDialog(
         title = { Text("Save Digitized Lot Geometry", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = blockNumber, onValueChange = { blockNumber = it }, label = { Text("Block Number (e.g., 3)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = lotNumber, onValueChange = { lotNumber = it }, label = { Text("Lot Number (e.g., 25)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = unitNumber, onValueChange = { unitNumber = it }, label = { Text("Housing Unit (Optional)") }, modifier = Modifier.fillMaxWidth())
+                ExposedDropdownMenuBox(expanded = useMenu, onExpandedChange = { useMenu = it }) {
+                    OutlinedTextField(
+                        value = lotUse, onValueChange = {}, readOnly = true, label = { Text("Lot Use") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = useMenu) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth().testTag("add_lot_use")
+                    )
+                    ExposedDropdownMenu(expanded = useMenu, onDismissRequest = { useMenu = false }) {
+                        LOT_USES.forEach { use ->
+                            DropdownMenuItem(text = { Text(use) }, onClick = { lotUse = use; useMenu = false }, contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding)
+                        }
+                    }
+                }
+                if (fixedBlock == null) {
+                    OutlinedTextField(value = blockNumber, onValueChange = { blockNumber = it }, label = { Text("Block Number (e.g., 3)") }, modifier = Modifier.fillMaxWidth().testTag("add_lot_block"))
+                }
+                OutlinedTextField(
+                    value = lotNumber, onValueChange = { lotNumber = it },
+                    label = { Text(if (fixedBlock == null) "Lot Number (e.g., 25)" else "$lotUse Number (e.g., 3)") },
+                    modifier = Modifier.fillMaxWidth().testTag("add_lot_number")
+                )
+                if (lotUse == "Saleable") {
+                    OutlinedTextField(value = unitNumber, onValueChange = { unitNumber = it }, label = { Text("Housing Unit (Optional)") }, modifier = Modifier.fillMaxWidth())
+                }
                 OutlinedTextField(value = areaSqM, onValueChange = { areaSqM = it }, label = { Text("Lot Area (sq.m)") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description / Remarks") }, modifier = Modifier.fillMaxWidth())
             }
@@ -2815,11 +2841,13 @@ fun AddLotDialog(
             Button(
                 onClick = {
                     val area = areaSqM.toDoubleOrNull() ?: 50.0
-                    if (blockNumber.isNotBlank() && lotNumber.isNotBlank()) {
-                        onSubmit(blockNumber.trim(), lotNumber.trim(), unitNumber.trim(), area, description.trim())
+                    val block = fixedBlock ?: blockNumber.trim()
+                    if (block.isNotBlank() && lotNumber.isNotBlank()) {
+                        onSubmit(lotUse, block, lotNumber.trim(), if (lotUse == "Saleable") unitNumber.trim() else "", area, description.trim())
                     }
                 },
-                enabled = blockNumber.isNotBlank() && lotNumber.isNotBlank(),
+                enabled = (fixedBlock != null || blockNumber.isNotBlank()) && lotNumber.isNotBlank(),
+                modifier = Modifier.testTag("add_lot_save"),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) { Text("Save Lot", fontWeight = FontWeight.Bold) }
         },

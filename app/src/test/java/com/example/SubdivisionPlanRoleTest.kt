@@ -35,7 +35,7 @@ class SubdivisionPlanRoleTest {
             SubdivisionPlanTab(
                 project = project, sdpPlans = listOf(plan), activeSdpPlan = plan, activeLots = listOf(lot), activeRoads = emptyList(),
                 lotProgressMap = emptyMap(), currentUserRole = role,
-                onUploadSdpPlan = { _, _, _ -> }, onSelectActiveVersion = {}, onAddLot = { _, _, _, _, _, _ -> },
+                onUploadSdpPlan = { _, _, _ -> }, onSelectActiveVersion = {}, onAddLot = { _, _, _, _, _, _, _ -> },
                 onUpdateLot = {}, onDeactivateLot = {}, onAddRoad = { _, _, _ -> }, onUpdateRoad = {}, onDeactivateRoad = {},
                 onUpdateLotProgress = { _, _, _, _, _, _, _, _, _, _ -> }, onUpdateLotBillingStatus = { _, _, _, _, _ -> },
                 onRecordInspection = { _, _, _, _, _, _, _, _ -> }, onGetInspectionsForLot = { emptyFlow() }
