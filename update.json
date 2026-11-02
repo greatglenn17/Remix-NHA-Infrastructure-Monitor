@@ -1,8 +1,8 @@
 {
-  "versionCode": 216,
-  "versionName": "2.1.6",
-  "releaseNotes": "v2.1.6: The Summary shows the Status of construction as of today, and a Status of billing table with the lots billed for land acquisition, land development, M1 and M2.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.6/NHA_Monitor_v2.1.6_Build216.apk",
-  "apkSha256": "4c274c4c844ac5b637b5eef60da1177cc34423aa1b61a630b0192b3b27558893",
+  "versionCode": 217,
+  "versionName": "2.1.7",
+  "releaseNotes": "v2.1.7: When adding a lot to the subdivision plan, pick its Lot Use first. Road lots and easements take one number; other lots take a block and lot.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.7/NHA_Monitor_v2.1.7_Build217.apk",
+  "apkSha256": "7c518f3035d3c3f7bd9fd2245e5a704e1fcf5b50361b39e663999650d51806ca",
   "isMandatory": true
 }
