@@ -1,7 +1,7 @@
 # 🏢 NHA Infrastructure Monitor — Region III
 
 [![Android Version](https://img.shields.io/badge/Android-7.0%2B%20%28API%2024%2B%29-3DDC84?style=for-the-badge&logo=android)](https://developer.android.com/)
-[![Latest Release](https://img.shields.io/badge/Release-v2.1.0%20%28Build%20210%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
+[![Latest Release](https://img.shields.io/badge/Release-v2.1.1%20%28Build%20211%29-0284C7?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)
 [![Security Audited](https://img.shields.io/badge/Security-SHA--256%20%7C%20AES--256--GCM-16A34A?style=for-the-badge)](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor)
 
 An enterprise-grade, mobile-first Android application custom-engineered for the **National Housing Authority (NHA) Region III — Bulacan District Office**. Built to streamline infrastructure project monitoring, field inspections, daily weather tracking, billing verification, real-time super admin notifications, and multi-user cloud synchronization.
@@ -13,8 +13,8 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 ### Option A: Download from GitHub Releases (Recommended)
 1. Open your phone's web browser and go to:  
    👉 **[GitHub Releases Page](https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases)**
-2. Tap the latest release (`v2.1.0`).
-3. Under **Assets**, tap **`NHA_Monitor_v2.1.0_Build210.apk`** to download the installation package.
+2. Tap the latest release (`v2.1.1`).
+3. Under **Assets**, tap **`NHA_Monitor_v2.1.1_Build211.apk`** to download the installation package.
 4. Open the downloaded `.apk` file on your phone.
 5. If prompted, allow **"Install from unknown sources"** for your browser, then tap **Install**.
 
@@ -24,6 +24,7 @@ An enterprise-grade, mobile-first Android application custom-engineered for the 
 
 | Version | Build | Highlights |
 | :--- | :---: | :--- |
+| **`v2.1.1`** | **`211`** | 📱 An 8" tablet held upright opens a project on its own screen again instead of sharing the width with Needs attention (side by side only from 840dp, e.g. turned sideways). 💳 A billing's ⋮ menu has Edit name; amounts, DV and scan stay as they are
 | **`v2.1.0`** | **`210`** | ☁️ Records not uploaded yet: weekly reports, payments, issues, documents and orders saved on this phone show "Waiting to upload" until the cloud has them, matching the sync chip; nothing is marked when signed in offline
 | **`v2.0.9`** | **`209`** | 💾 Weekly reports: a new report keeps a draft on the phone while you fill it in, so it survives the app closing; Add weekly report then offers Continue or Start over. Saving or discarding the report removes the draft, and drafts never sync
 | **`v2.0.8`** | **`208`** | 🧭 Project screen: the Progress and Documents views sit on one scrolling row with a check on the open one; Summary starts with the latest weekly report and says when this week has none, with Add weekly report; Project profile keeps contractor and type in sight and folds the rest behind Show details

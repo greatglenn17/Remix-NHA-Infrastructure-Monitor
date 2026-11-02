@@ -1,8 +1,8 @@
 {
-  "versionCode": 210,
-  "versionName": "2.1.0",
-  "releaseNotes": "v2.1.0: Records saved on this phone that have not reached the cloud yet show Waiting to upload on their card: weekly reports, payments, issues, documents and orders. The mark clears once the upload is done.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.0/NHA_Monitor_v2.1.0_Build210.apk",
-  "apkSha256": "7e35e7ae810fdb9ff6c894bbd4618d77f20eeffb39de7c6971b00dec474da54d",
+  "versionCode": 211,
+  "versionName": "2.1.1",
+  "releaseNotes": "v2.1.1: On an 8-inch tablet held upright, a project opens on its own screen again. Billings can be renamed from their menu (Edit name).",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.1.1/NHA_Monitor_v2.1.1_Build211.apk",
+  "apkSha256": "32f71b3f375fce76b783aa27c903f1dd19c6d909cbfe19cc09196b4747db4d8c",
   "isMandatory": true
 }
