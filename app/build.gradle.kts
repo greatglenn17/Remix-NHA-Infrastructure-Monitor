@@ -7,6 +7,7 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -40,8 +41,13 @@ android {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("debugConfig")
+      manifestPlaceholders["crashReports"] = true
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    // Emulator and test runs would bury real crashes, so only release builds report them.
+    debug {
+      signingConfig = signingConfigs.getByName("debugConfig")
+      manifestPlaceholders["crashReports"] = false
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -96,6 +102,7 @@ dependencies {
   implementation(libs.firebase.storage)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.messaging)
+  implementation(libs.firebase.crashlytics)
   implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
