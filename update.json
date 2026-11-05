@@ -1,8 +1,8 @@
 {
-  "versionCode": 229,
-  "versionName": "2.2.9",
-  "releaseNotes": "v2.2.9: A fresh, cleaner look with smooth animations and a new sign-in screen.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.9/NHA_Monitor_v2.2.9_Build229.apk",
-  "apkSha256": "e013ffde2792c89277afc6665b7784ca814d15a924dac265b5d4a42f606e443d",
+  "versionCode": 230,
+  "versionName": "2.3.0",
+  "releaseNotes": "v2.3.0: Updates now download and install inside the app. You can also add projects that were finished before the app as completed records.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.3.0/NHA_Monitor_v2.3.0_Build230.apk",
+  "apkSha256": "820c285a8f3599623938952ea25b53e58dbccde79f9478c6dda3cd7f6566e13c",
   "isMandatory": true
 }
