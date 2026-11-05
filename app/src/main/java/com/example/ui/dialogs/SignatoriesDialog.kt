@@ -86,7 +86,7 @@ fun SignatoriesDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     onPrint(Signatories(
                         preparedName.trim(), preparedPosition.trim(), checkedName.trim(), checkedPosition.trim(), notedName.trim(), notedPosition.trim(),

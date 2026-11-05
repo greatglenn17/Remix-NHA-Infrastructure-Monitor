@@ -1,5 +1,6 @@
 package com.example.ui.detail
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -17,6 +18,7 @@ import com.example.data.model.use
 import com.example.data.model.Project
 import com.example.data.model.hasPermission
 import com.example.ui.components.TopAppBarHeader
+import com.example.ui.theme.Motion
 import kotlinx.coroutines.launch
 import com.example.ui.detail.sections.ChipRow
 import com.example.ui.detail.sections.ProjectHeader
@@ -52,7 +54,11 @@ fun ProjectDetailScreen(
     val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val syncChip by viewModel.syncChip.collectAsState()
     val lastSyncedAt by viewModel.lastSyncedAt.collectAsState()
-    val project by viewModel.selectedProject.collectAsState()
+    val liveProject by viewModel.selectedProject.collectAsState()
+    val selectedId by viewModel.selectedProjectId.collectAsState()
+    // After Back the project clears at once; keep the last one on screen while the detail animates away.
+    val kept = remember { arrayOfNulls<Project>(1) }
+    val project = (liveProject ?: kept[0]?.takeIf { selectedId == null }).also { kept[0] = it }
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
     val contractorLetters by viewModel.contractorLetters.collectAsState()
@@ -195,6 +201,7 @@ fun ProjectDetailScreen(
             }
 
             Box(modifier = Modifier.weight(1f).nestedScroll(collapseOnScroll)) {
+                AnimatedContent(section, Modifier.fillMaxSize(), transitionSpec = { Motion.fadeThrough() }, label = "section") { section ->
                 when (section) {
                     ProjectSection.SUMMARY -> {
                         val latestReport = weeklyReports.maxByOrNull { it.createdAtTimestamp }
@@ -244,6 +251,7 @@ fun ProjectDetailScreen(
                         // A new chip may not scroll, so open the header again.
                         ChipRow(chips, chip) { progressChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
+                            AnimatedContent(chip, Modifier.fillMaxSize(), transitionSpec = { Motion.fadeThrough() }, label = "chip") { chip ->
                             when (chip) {
                                 "Weekly" -> WeeklyReportsTab(
                                     weeklyReports = weeklyReports,
@@ -386,6 +394,7 @@ fun ProjectDetailScreen(
                                     onDeleteClick = { issue -> viewModel.deleteProjectIssue(issue) }
                                 )
                             }
+                            }
                         }
                     }
                     ProjectSection.MONEY -> MoneySection(
@@ -405,6 +414,7 @@ fun ProjectDetailScreen(
                         val chip = SectionChips.chipOrFirst(chips, documentsChip)
                         ChipRow(chips, chip) { documentsChip = it; headerCollapsed = false }
                         Box(modifier = Modifier.weight(1f)) {
+                            AnimatedContent(chip, Modifier.fillMaxSize(), transitionSpec = { Motion.fadeThrough() }, label = "chip") { chip ->
                             when (chip) {
                                 in SectionChips.ORDER_CHIPS -> com.example.ui.detail.sections.OrdersList(
                                     chip = chip,
@@ -430,8 +440,10 @@ fun ProjectDetailScreen(
                                 )
                                 "Audit log" -> AuditLogTab(auditLogs = auditLogs)
                             }
+                            }
                         }
                     }
+                }
                 }
             }
         }

@@ -35,7 +35,7 @@ import com.example.util.ProjectSchedule
 @Composable
 fun LogEntry(title: String, titleColor: Color, lines: List<String>, onClick: (() -> Unit)? = null, uuid: String = "", trailing: (@Composable () -> Unit)? = null) {
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(6.dp)
     val modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     val body: @Composable () -> Unit = {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -89,7 +89,7 @@ fun OrderStatusDialog(
                 if (!canApprove) Text("Only an Engineer Admin can approve.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, enabled = canEdit, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                 onAddContinuance?.let { add ->
-                    OutlinedButton(onClick = { onDismiss(); add() }, modifier = Modifier.fillMaxWidth().testTag("add_continuance_button")) {
+                    OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onDismiss(); add() }, modifier = Modifier.fillMaxWidth().testTag("add_continuance_button")) {
                         Text("Add Continuance of Work Suspension")
                     }
                 }
@@ -248,7 +248,7 @@ fun RelatedFilesList(
             title = { Text("Delete Document?") },
             text = { Text("Are you sure you want to delete \"${docToDelete?.documentName}\"? This document entry will be permanently deleted.") },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = {
                         docToDelete?.let { onDeleteDocument(it.id) }
                         docToDelete = null
@@ -441,7 +441,7 @@ private fun LetterDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = { onSave(ContractorLetters.name(no), ContractorLetters.remarks(reason, received)) },
                 enabled = no.isNotBlank(),
                 modifier = Modifier.testTag("save_letter_button")
@@ -536,7 +536,7 @@ private fun ContinuanceDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { dayCount?.let { onSave(name, it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
+            Button(shape = MaterialTheme.shapes.small, onClick = { dayCount?.let { onSave(name, it, effectivity) } }, enabled = dayCount != null && effectivity.isNotBlank(), modifier = Modifier.testTag("save_continuance_button")) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )

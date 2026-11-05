@@ -1,5 +1,14 @@
 package com.example.ui.dashboard
 
+import kotlin.math.roundToInt
+import com.example.ui.theme.Motion
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -130,22 +139,28 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
     // A zero count is not a problem, so it is shown in the secondary text colour.
     val tint = if (tile.count > 0) tile.tint else scheme.onSurfaceVariant
     // selected + onClick makes the tile selectable, so TalkBack reads it as a filter that is on or off.
+    val press = remember { MutableInteractionSource() }
+    val scale = Motion.pressScale(press)
+    // The number counts up from 0 when the tile shows and to the new count when it changes.
+    val shown = remember { Animatable(0f) }
+    LaunchedEffect(tile.count) { shown.animateTo(tile.count.toFloat(), tween(400, easing = Motion.Easing)) }
     Surface(
         selected = isSelected,
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        interactionSource = press,
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) scheme.primary else scheme.outlineVariant),
-        modifier = modifier.heightIn(min = 72.dp).testTag("count_${tile.filter.name.lowercase()}")
+        shadowElevation = CardLift,
+        modifier = modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value }.heightIn(min = 72.dp).testTag("count_${tile.filter.name.lowercase()}")
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(tile.icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "${tile.count}",
-                    style = MaterialTheme.typography.headlineSmall.merge(TabularNumbers),
-                    fontWeight = FontWeight.Bold,
+                    text = "${shown.value.roundToInt()}",
+                    style = MaterialTheme.typography.headlineMedium.merge(TabularNumbers),
                     color = tint
                 )
                 Spacer(Modifier.weight(1f))

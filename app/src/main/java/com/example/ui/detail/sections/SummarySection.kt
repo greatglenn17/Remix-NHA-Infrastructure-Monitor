@@ -279,7 +279,7 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
 private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek: String?, onAddWeeklyReport: (() -> Unit)?, modifier: Modifier) {
     SectionCard("Latest weekly report", Icons.Default.Assignment, modifier) {
         if (missingWeek != null && onAddWeeklyReport != null) {
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp)) {
                     Text("No report yet for this week", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
                     Text(missingWeek, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
@@ -403,7 +403,7 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
         if (scope.isNotEmpty()) {
             Text("Scope of works", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
             scope.forEachIndexed { index, (name, amount, weight) ->
-                Surface(color = scheme.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Surface(color = scheme.surfaceVariant, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text("${index + 1}. $name", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
                         Field("Amount · weight", "${CurrencyFormatter.formatPhp(amount)} · ${"%.2f".format(weight)}%")

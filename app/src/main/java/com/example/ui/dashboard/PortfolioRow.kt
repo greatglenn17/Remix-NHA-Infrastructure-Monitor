@@ -1,5 +1,9 @@
 package com.example.ui.dashboard
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.example.ui.theme.CardLift
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,6 +33,7 @@ import coil.compose.AsyncImage
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.theme.Motion
 import com.example.ui.theme.NHAColors
 import com.example.ui.theme.TabularNumbers
 import com.example.util.AttentionKind
@@ -55,12 +60,16 @@ fun PortfolioRow(
     val colors = LocalNHAColors.current
     val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
 
+    val press = remember { MutableInteractionSource() }
+    val scale = Motion.pressScale(press)
     Surface(
         onClick = { onOpen(project) },
-        shape = RoundedCornerShape(12.dp),
+        interactionSource = press,
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
-        modifier = modifier.fillMaxWidth().testTag("project_tile_${project.id}")
+        shadowElevation = CardLift,
+        modifier = modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value }.fillMaxWidth().testTag("project_tile_${project.id}")
     ) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +169,7 @@ fun SitePhoto(url: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.clip(RoundedCornerShape(8.dp)).background(scheme.surfaceVariant)
+        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(scheme.surfaceVariant)
     ) {
         Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = scheme.onSurfaceVariant)
         if (url.isNotBlank()) {
@@ -199,9 +208,32 @@ private fun RowMenu(project: Project, onEdit: ((Project) -> Unit)?, onDelete: ((
 }
 
 @Composable
-internal fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier) {
+internal fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier, big: Boolean = false) {
     Column(modifier = modifier) {
-        Row {
+        // Big: the headline figure (before " · ") large, the rest small beside it.
+        if (big) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row {
+                Text(
+                    value.substringBefore(" · "),
+                    style = MaterialTheme.typography.titleLarge.merge(TabularNumbers),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.alignByBaseline()
+                )
+                value.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let { rest ->
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        rest,
+                        style = MaterialTheme.typography.labelMedium.merge(TabularNumbers),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                }
+            }
+        } else Row {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             Text(
@@ -214,9 +246,13 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
             )
         }
         Spacer(Modifier.height(4.dp))
+        // The bar fills in when it first shows and glides to a new value after a save.
+        val target = fraction.coerceIn(0f, 1f)
+        val shown = remember { Animatable(0f) }
+        LaunchedEffect(target) { shown.animateTo(target, Motion.medium()) }
         LinearProgressIndicator(
-            progress = { fraction.coerceIn(0f, 1f) },
-            color = color,
+            progress = { shown.value },
+            color = androidx.compose.animation.animateColorAsState(color, Motion.medium(), label = "bar").value,
             trackColor = MaterialTheme.colorScheme.outlineVariant,
             strokeCap = StrokeCap.Round,
             gapSize = 0.dp,
@@ -252,7 +288,7 @@ internal fun statusColor(project: Project, colors: NHAColors): Color {
 
 @Composable
 internal fun Badge(text: String, color: Color, container: Color) {
-    Surface(color = container, shape = RoundedCornerShape(8.dp)) {
+    Surface(color = container, shape = RoundedCornerShape(6.dp)) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.merge(TabularNumbers),

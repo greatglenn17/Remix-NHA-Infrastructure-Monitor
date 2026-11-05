@@ -96,7 +96,7 @@ fun AddMonthlyReportDialog(
         // Read-only Weekly Summary Table
         Surface(
             color = cs.surfaceVariant,
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, cs.outlineVariant),
             modifier = Modifier.fillMaxWidth()
         ) {

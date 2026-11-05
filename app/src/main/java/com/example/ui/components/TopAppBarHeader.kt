@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -155,10 +157,15 @@ fun TopAppBarHeader(
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    // A white panel with one hairline under it, like Figma's toolbar.
+    val hairline = MaterialTheme.colorScheme.outlineVariant
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        modifier = Modifier.drawWithContent {
+            drawContent()
+            drawLine(hairline, Offset(0f, size.height - 0.5f), Offset(size.width, size.height - 0.5f), 1.dp.toPx())
+        }
     ) {
         Column(
             modifier = Modifier
@@ -215,9 +222,10 @@ fun TopAppBarHeader(
                             text = "NHA Monitoring Application",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp,
-                                lineHeight = 18.sp
+                                lineHeight = 20.sp,
+                                letterSpacing = (-0.2).sp
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -226,10 +234,10 @@ fun TopAppBarHeader(
                             text = currentUser.office.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Medium,
                                 letterSpacing = 0.6.sp,
-                                fontSize = 9.5.sp,
-                                lineHeight = 11.sp
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(3.dp))
@@ -412,7 +420,7 @@ fun TopAppBarHeader(
                                 val isSelected = appThemeMode == mode
                                 Surface(
                                     onClick = { onSetThemeMode?.invoke(mode) },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(6.dp),
                                     color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
                                     border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.weight(1f)
@@ -549,7 +557,7 @@ fun TopAppBarHeader(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -580,7 +588,7 @@ fun TopAppBarHeader(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -635,7 +643,7 @@ fun TopAppBarHeader(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(
@@ -654,7 +662,7 @@ fun TopAppBarHeader(
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(8.dp)
         )
     }
 

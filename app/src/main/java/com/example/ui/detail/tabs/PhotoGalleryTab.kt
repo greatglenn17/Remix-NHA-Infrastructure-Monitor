@@ -110,8 +110,9 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                     }
                     items(weekPhotos) { photo ->
                         Card(
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(2.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = CardDefaults.cardElevation(0.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(160.dp)

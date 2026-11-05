@@ -140,7 +140,7 @@ fun LongForm(
                         ) {
                             bottomStart()
                             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
-                                Button(onClick = onSave, enabled = saveEnabled, modifier = Modifier.testTag(saveTag)) { Text("Save") }
+                                Button(shape = MaterialTheme.shapes.small, onClick = onSave, enabled = saveEnabled, modifier = Modifier.testTag(saveTag)) { Text("Save") }
                             }
                         }
                     }

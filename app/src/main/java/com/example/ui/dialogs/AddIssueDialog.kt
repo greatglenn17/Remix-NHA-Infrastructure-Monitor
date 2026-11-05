@@ -114,7 +114,7 @@ fun AddIssueDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     tried = true
                     if (date.isNotBlank() && description.isNotBlank() && actionTaken.isNotBlank()) {

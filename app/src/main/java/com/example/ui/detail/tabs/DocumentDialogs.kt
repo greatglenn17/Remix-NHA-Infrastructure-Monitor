@@ -188,7 +188,7 @@ fun AddRelatedDocumentDialog(
                     if (fileUrl.isNotBlank()) {
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
@@ -222,7 +222,7 @@ fun AddRelatedDocumentDialog(
                         Button(
                             onClick = { filePickerLauncher.launch("*/*") },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -234,7 +234,7 @@ fun AddRelatedDocumentDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     val fullRemarks = buildString {
                         if (categoryRef.isNotBlank()) append(categoryRef)
@@ -273,7 +273,7 @@ fun ViewScannedCopyDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
@@ -313,7 +313,7 @@ fun ViewScannedCopyDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(240.dp)
-                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(6.dp))
                             .clickable { openAttachment(doc.fileUrl) },
                         contentAlignment = Alignment.Center
                     ) {
@@ -327,7 +327,7 @@ fun ViewScannedCopyDialog(
                             AsyncImage(
                                 model = doc.fileUrl,
                                 contentDescription = "Scanned Copy (tap to open)",
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
                                 contentScale = ContentScale.Fit
                             )
                         }
@@ -337,7 +337,7 @@ fun ViewScannedCopyDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(140.dp)
-                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(6.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -357,7 +357,7 @@ fun ViewScannedCopyDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
+                    OutlinedButton(shape = MaterialTheme.shapes.small, 
                         onClick = { filePickerLauncher.launch("*/*") },
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
@@ -367,7 +367,7 @@ fun ViewScannedCopyDialog(
                         Text("Upload File from Device", fontSize = 11.sp)
                     }
 
-                    Button(
+                    Button(shape = MaterialTheme.shapes.small, 
                         onClick = onDismiss
                     ) {
                         Text("Close", fontWeight = FontWeight.Bold, fontSize = 11.sp)

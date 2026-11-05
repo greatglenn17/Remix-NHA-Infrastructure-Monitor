@@ -1,5 +1,6 @@
 package com.example.ui.detail.sections
 
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,9 +27,10 @@ fun SectionCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
+        shadowElevation = CardLift,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)) {
@@ -90,13 +92,13 @@ fun CardColumns(
         val perRow = if (maxWidth >= 600.dp) 2 else 1
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             header?.let { item { it() } }
             cards.chunked(perRow).forEach { row ->
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
                         row.forEach { card -> card(Modifier.weight(1f).fillMaxHeight()) }
                         if (row.size < perRow) Spacer(Modifier.weight(1f))
                     }

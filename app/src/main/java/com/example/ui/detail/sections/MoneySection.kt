@@ -153,14 +153,16 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
                 value = BillingProgress.label(totalBilled, contractCost),
                 fraction = ((billedPct ?: 0.0) / 100).toFloat(),
                 color = scheme.primary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                big = true
             )
             ProgressLine(
                 label = "Work done",
                 value = "%.2f%%".format(actualPercent),
                 fraction = (actualPercent / 100).toFloat(),
                 color = scheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                big = true
             )
         }
     }

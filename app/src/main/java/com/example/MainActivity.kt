@@ -17,6 +17,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Surface
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -26,6 +27,7 @@ import com.example.ui.detail.ProjectDetailScreen
 import com.example.ui.dialogs.*
 import com.example.ui.login.LoginScreen
 import com.example.ui.theme.NHATheme
+import com.example.ui.theme.Motion
 import com.example.ui.viewmodel.ProjectViewModel
 
 class MainActivity : ComponentActivity() {
@@ -106,7 +108,9 @@ class MainActivity : ComponentActivity() {
                         // Two panes at 840dp and wider (a tablet on its side); an upright 8" tablet (743dp) opens a project
                         // full screen, as users preferred to the list and Needs attention sharing the width.
                         val twoPane = LocalConfiguration.current.screenWidthDp >= 840
-                        if (twoPane || selectedProjectId == null) {
+                        val showDetail = !twoPane && selectedProjectId != null
+                        AnimatedContent(showDetail, transitionSpec = { if (targetState) Motion.open() else Motion.close() }, label = "screen") { detail ->
+                        if (!detail) {
                             val portfolio by viewModel.portfolioState.collectAsState()
                             DashboardScreen(
                                 viewModel = viewModel,
@@ -118,16 +122,19 @@ class MainActivity : ComponentActivity() {
                                 },
                                 detailPane = if (!twoPane) null else {
                                     {
-                                        if (selectedProjectId != null) {
-                                            projectDetail(true)
-                                        } else {
-                                            NeedsAttentionPane(portfolio.attention) { viewModel.selectProject(it.id) }
+                                        AnimatedContent(selectedProjectId != null, transitionSpec = { Motion.fadeThrough() }, label = "pane") { open ->
+                                            if (open) {
+                                                projectDetail(true)
+                                            } else {
+                                                NeedsAttentionPane(portfolio.attention) { viewModel.selectProject(it.id) }
+                                            }
                                         }
                                     }
                                 }
                             )
                         } else {
                             projectDetail(false)
+                        }
                         }
 
                         // Render Active Dialogs

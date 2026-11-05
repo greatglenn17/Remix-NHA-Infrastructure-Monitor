@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.util.BlockNumbering
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -594,7 +595,7 @@ fun SubdivisionPlanTab(
         // --- TOP TOOLBAR & HEADER ---
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(8.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .fillMaxWidth()
@@ -778,7 +779,7 @@ fun SubdivisionPlanTab(
                         // Mode Segmented Buttons
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Row(modifier = Modifier.padding(2.dp)) {
@@ -866,7 +867,7 @@ fun SubdivisionPlanTab(
                             if (interactionMode == SdpInteractionMode.DIGITIZING_LOT && draftPoints.isNotEmpty()) {
                                 TextButton(onClick = { draftPoints.clear() }) { Text("Clear", fontSize = 11.sp) }
                                 if (draftPoints.size >= 3) {
-                                    Button(onClick = { showAddLotDialog = true }, modifier = Modifier.testTag("save_drawn_lot")) {
+                                    Button(shape = MaterialTheme.shapes.small, onClick = { showAddLotDialog = true }, modifier = Modifier.testTag("save_drawn_lot")) {
                                         Text("Save lot", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
@@ -885,7 +886,7 @@ fun SubdivisionPlanTab(
                     ) {
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, if (searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .weight(1f)
@@ -953,7 +954,7 @@ fun SubdivisionPlanTab(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = if (isFilterActive) LocalNHAColors.current.watch.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                             modifier = Modifier.height(42.dp)
                         ) {
@@ -968,7 +969,7 @@ fun SubdivisionPlanTab(
                         Spacer(modifier = Modifier.height(6.dp))
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1066,9 +1067,9 @@ fun SubdivisionPlanTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
@@ -1082,7 +1083,7 @@ fun SubdivisionPlanTab(
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(20.dp))
-                    Button(
+                    Button(shape = MaterialTheme.shapes.small, 
                         onClick = {
                             onUploadSdpPlan(
                                 "Approved Subdivision Layout Plan (Ph. 3)",
@@ -1104,9 +1105,9 @@ fun SubdivisionPlanTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                     .clipToBounds()
             ) {
                 val viewportWidth = constraints.maxWidth.toFloat()
@@ -1117,6 +1118,18 @@ fun SubdivisionPlanTab(
                 val onSurfaceMap = if (renderedBitmap != null) Color.Black else MaterialTheme.colorScheme.onSurface
                 val surfaceColor = MaterialTheme.colorScheme.surface
                 val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+
+                // Lot colours fade to their new band after a progress save instead of jumping.
+                val lotTargets = parsedLots.associate { it.lot.id to lotFill(it.lot, lotProgressMap[it.lot.id]?.physicalProgress ?: 0, nhaMap) }
+                var lotFrom by remember { mutableStateOf(lotTargets) }
+                var lotTo by remember { mutableStateOf(lotTargets) }
+                val lotFade = remember { Animatable(1f) }
+                LaunchedEffect(lotTargets) {
+                    lotFrom = lotTo.mapValues { (id, c) -> lerp(lotFrom[id] ?: c, c, lotFade.value) }
+                    lotTo = lotTargets
+                    lotFade.snapTo(0f)
+                    lotFade.animateTo(1f, com.example.ui.theme.Motion.medium())
+                }
 
                 if (isLoadingPdf) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1398,7 +1411,8 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord.anyBilled
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = lotFill(lot, progressValue, nhaMap)
+                                val baseProgressColor = lotTo[lot.id]?.let { lerp(lotFrom[lot.id] ?: it, it, lotFade.value) }
+                                    ?: lotFill(lot, progressValue, nhaMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f
@@ -1514,7 +1528,7 @@ fun SubdivisionPlanTab(
                         // FLOATING INTERACTIVE ZOOM CONTROLS TOOLBAR (TOP-RIGHT OVERLAY)
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -1697,7 +1711,7 @@ fun SubdivisionPlanTab(
                                 }
                                 if (blockLots.isNotEmpty()) {
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Button(
+                                    Button(shape = MaterialTheme.shapes.small, 
                                         enabled = target.isNotEmpty() && first != null,
                                         onClick = {
                                             onRenumberLots(
@@ -1769,7 +1783,7 @@ fun SubdivisionPlanTab(
                                     }
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Button(
+                                Button(shape = MaterialTheme.shapes.small, 
                                     enabled = group.isNotEmpty(),
                                     onClick = { showGroupProgress = true },
                                     modifier = Modifier.testTag("group_update_button")
@@ -2082,7 +2096,7 @@ fun SubdivisionPlanTab(
                 }
             },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = {
                         onUpdateLotBillingStatus(targetLot.id, milestone, markAsBilled, billingRef.trim(), billingRemarks.trim())
                         lotToToggleBilling = null
@@ -2193,7 +2207,7 @@ fun SubdivisionPlanTab(
                 }
             },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     enabled = scale != null,
                     onClick = {
                         onSetPlanScale(activeSdpPlan, scale!!)
@@ -2227,7 +2241,7 @@ fun SubdivisionPlanTab(
             title = { Text("Remove ${lotToDeactivate!!.label}?", color = MaterialTheme.colorScheme.onSurface) },
             text = { Text("The lot is taken off the plan on every phone. Its progress and billing history stay in the audit log.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = {
                         onDeactivateLot(lotToDeactivate!!)
                         selectedLot = null
@@ -2257,7 +2271,7 @@ fun SubdivisionPlanTab(
                 )
             },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = {
                         onRemoveDetectedLots(activeSdpPlan)
                         selectedLot = null
@@ -2279,7 +2293,7 @@ fun SubdivisionPlanTab(
             title = { Text("Deactivate Road '${roadToDeactivate!!.roadName}'?", color = MaterialTheme.colorScheme.onSurface) },
             text = { Text("Deactivated roads will be hidden from monitoring mode but preserved in history.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = {
                         onDeactivateRoad(roadToDeactivate!!)
                         selectedRoad = null
@@ -2330,7 +2344,7 @@ fun SubdivisionPlanTab(
                 }
             },
             confirmButton = {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = { if (plan != null) onAddDetectedLots(plan, areas.filter { it.isLot }); detectedAreas = null },
                     modifier = Modifier.testTag("add_detected_lots")
                 ) { Text("Add lots") }
@@ -2425,7 +2439,7 @@ fun RecordInspectionSnapshotDialog(
         // Physical Progress Slider
         Surface(
             color = cs.surfaceVariant,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             border = BorderStroke(1.dp, derivedColor.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -2502,7 +2516,7 @@ fun LotInfoDialog(
                 // CURRENT STATUS CARD
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     border = BorderStroke(1.dp, derivedColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -2531,7 +2545,7 @@ fun LotInfoDialog(
                 // PHASE 7 HISTORICAL TIMELINE SECTION
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -2671,7 +2685,7 @@ fun LotInfoDialog(
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                Button(shape = MaterialTheme.shapes.small, 
                     onClick = onViewAuditTrailRequested,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) {
@@ -2681,7 +2695,7 @@ fun LotInfoDialog(
                 }
 
                 if (canEdit) {
-                    Button(
+                    Button(shape = MaterialTheme.shapes.small, 
                         onClick = onEditGeometry,
                         colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.watch, contentColor = MaterialTheme.colorScheme.surface)
                     ) {
@@ -2784,7 +2798,7 @@ fun LotAuditHistoryDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
@@ -2848,7 +2862,7 @@ fun AddLotDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     val area = areaSqM.toDoubleOrNull() ?: 50.0
                     val block = fixedBlock ?: blockNumber.trim()
@@ -2884,7 +2898,7 @@ fun AddRoadDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     if (roadName.isNotBlank()) {
                         onSubmit(roadName.trim(), roadType.trim())
@@ -2959,7 +2973,7 @@ fun AddSdpPlanDialog(
                 // Select PDF File Button
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     border = BorderStroke(1.dp, if (pdfRef != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2990,7 +3004,7 @@ fun AddSdpPlanDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
                     pdfRef?.let { onSubmit(planName, it, description) }
                 },
@@ -3121,7 +3135,7 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+            Button(shape = MaterialTheme.shapes.small, onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
                 Text("CLOSE", fontWeight = FontWeight.Bold)
             }
         }
@@ -3253,7 +3267,7 @@ fun UpdateLotProgressDialog(
                     }
                 } else Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     border = BorderStroke(1.dp, derivedColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -3331,7 +3345,7 @@ fun UpdateLotProgressDialog(
                 // DEVELOPER BILLING CONTROL SECTION
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     border = BorderStroke(1.dp, if (isBilled) LocalNHAColors.current.onTrack else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -3404,7 +3418,7 @@ fun UpdateLotProgressDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 enabled = !canManageBilling || nameError == null,
                 onClick = {
                     if (canManageBilling) onRename(blockName.trim(), lotName.trim())
@@ -3457,7 +3471,7 @@ private fun GroupProgressDialog(count: Int, onDismiss: () -> Unit, onSubmit: (pr
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(intProgress, status, activity, remarks) }, modifier = Modifier.testTag("group_save_button")) {
+            Button(shape = MaterialTheme.shapes.small, onClick = { onSubmit(intProgress, status, activity, remarks) }, modifier = Modifier.testTag("group_save_button")) {
                 Text("SAVE TO $count LOTS", fontWeight = FontWeight.Bold)
             }
         },
@@ -3531,10 +3545,10 @@ private fun LotPhotos(lot: SdpLot, photos: List<String>, onChange: (List<String>
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = camera, modifier = Modifier.weight(1f)) {
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = camera, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Take photo")
             }
-            OutlinedButton(onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { picker.launch("image/*") }, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Gallery")
             }
         }

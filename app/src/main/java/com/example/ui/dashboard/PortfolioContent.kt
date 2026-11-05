@@ -1,5 +1,7 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.Motion
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -70,7 +72,7 @@ fun PortfolioContent(
         val wide = maxWidth >= 600.dp
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             if (state.totalProjects == 0) {
@@ -98,7 +100,8 @@ fun PortfolioContent(
                 item(key = "no_match") { EmptyState(emptyMessage) {} }
             } else {
                 items(state.rows, key = { it.project.id }) { item ->
-                    PortfolioRow(item, wide, onOpen, onEdit, onDelete)
+                    // Rows fade and slide into place when a filter or search changes the list.
+                    PortfolioRow(item, wide, onOpen, onEdit, onDelete, Modifier.animateItem(Motion.medium(), Motion.medium(), Motion.fast()))
                 }
             }
 
@@ -145,7 +148,7 @@ internal fun AttentionCard(
     val colors = LocalNHAColors.current
     // One row per project, worst flag first; the queue is already sorted by level.
     val projects = queue.groupBy { it.first.project.id }.values.map { pairs -> pairs.first().first to pairs.map { it.second } }
-    Surface(shape = RoundedCornerShape(12.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(8.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), shadowElevation = CardLift, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text("Needs attention", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
@@ -262,7 +265,7 @@ private fun SearchField(query: String, onSearch: (String) -> Unit, modifier: Mod
         modifier = modifier.height(48.dp).testTag("search_project_input"),
         decorationBox = { inner ->
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 color = scheme.surface,
                 border = BorderStroke(1.dp, if (query.isNotEmpty()) scheme.primary else scheme.outline),
                 modifier = Modifier.fillMaxSize()
@@ -302,7 +305,7 @@ private fun Picker(
     Box(modifier = modifier) {
         OutlinedButton(
             onClick = { open = true },
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             border = BorderStroke(1.dp, if (selected != "All") scheme.primary else scheme.outlineVariant),
             colors = ButtonDefaults.outlinedButtonColors(containerColor = scheme.surface, contentColor = scheme.onSurface),
             contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
@@ -322,7 +325,7 @@ private fun SortButton(sortOrder: String, onSort: (String) -> Unit) {
     Box {
         OutlinedButton(
             onClick = { open = true },
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             border = BorderStroke(1.dp, scheme.outlineVariant),
             colors = ButtonDefaults.outlinedButtonColors(containerColor = scheme.surface, contentColor = scheme.onSurface),
             contentPadding = PaddingValues(horizontal = 12.dp),
