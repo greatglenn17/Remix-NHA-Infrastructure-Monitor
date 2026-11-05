@@ -76,7 +76,8 @@ fun ProjectHeader(
                             value = workDoneText(project),
                             fraction = (project.actualAccomplishment / 100).toFloat(),
                             color = varianceColor,
-                            modifier = m
+                            modifier = m,
+                            big = true
                         )
                     }
                     val billed: @Composable (Modifier) -> Unit = { m ->
@@ -85,7 +86,8 @@ fun ProjectHeader(
                             value = BillingProgress.label(billedTotal, contractCost),
                             fraction = billedFraction ?: 0f,
                             color = scheme.primary,
-                            modifier = m
+                            modifier = m,
+                            big = true
                         )
                     }
                     // Side by side only where "44.00% · 18.00% behind" fits; stacked on a phone, like the dashboard card.

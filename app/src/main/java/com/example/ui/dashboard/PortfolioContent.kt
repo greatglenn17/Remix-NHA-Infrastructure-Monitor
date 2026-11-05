@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -70,7 +71,7 @@ fun PortfolioContent(
         val wide = maxWidth >= 600.dp
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             if (state.totalProjects == 0) {
@@ -145,7 +146,7 @@ internal fun AttentionCard(
     val colors = LocalNHAColors.current
     // One row per project, worst flag first; the queue is already sorted by level.
     val projects = queue.groupBy { it.first.project.id }.values.map { pairs -> pairs.first().first to pairs.map { it.second } }
-    Surface(shape = RoundedCornerShape(8.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = RoundedCornerShape(8.dp), color = scheme.surface, border = BorderStroke(1.dp, scheme.outlineVariant), shadowElevation = CardLift, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Text("Needs attention", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)

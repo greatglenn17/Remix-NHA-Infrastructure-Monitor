@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -155,10 +157,15 @@ fun TopAppBarHeader(
     val coroutineScope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    // A white panel with one hairline under it, like Figma's toolbar.
+    val hairline = MaterialTheme.colorScheme.outlineVariant
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        modifier = Modifier.drawWithContent {
+            drawContent()
+            drawLine(hairline, Offset(0f, size.height - 0.5f), Offset(size.width, size.height - 0.5f), 1.dp.toPx())
+        }
     ) {
         Column(
             modifier = Modifier
@@ -215,9 +222,10 @@ fun TopAppBarHeader(
                             text = "NHA Monitoring Application",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp,
-                                lineHeight = 18.sp
+                                lineHeight = 20.sp,
+                                letterSpacing = (-0.2).sp
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -226,10 +234,10 @@ fun TopAppBarHeader(
                             text = currentUser.office.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Medium,
                                 letterSpacing = 0.6.sp,
-                                fontSize = 9.5.sp,
-                                lineHeight = 11.sp
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(3.dp))

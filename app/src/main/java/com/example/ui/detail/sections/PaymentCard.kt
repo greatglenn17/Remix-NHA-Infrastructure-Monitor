@@ -1,5 +1,6 @@
 package com.example.ui.detail.sections
 
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,7 @@ fun PaymentCard(
         shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
+        shadowElevation = CardLift,
         modifier = modifier.fillMaxWidth().testTag("payment_card_${payment.id}")
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 12.dp)) {
@@ -57,7 +59,8 @@ fun PaymentCard(
                     )
                     Text(
                         "DV ${payment.dvNo.ifBlank { "N/A" }}",
-                        style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+                        // No tabular digits: Inter then widens the hyphens in "2026-03-0141".
+                        style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant
                     )
                     com.example.ui.components.PendingUploadMark(payment.uuid, Modifier.padding(top = 2.dp))

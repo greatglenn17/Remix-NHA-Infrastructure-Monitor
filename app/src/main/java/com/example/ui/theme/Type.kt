@@ -1,13 +1,36 @@
 package com.example.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.R
 
-// Figma-style type: Material sizes kept (read outdoors on site), tighter tracking and
-// SemiBold titles so text reads compact like Inter. Material's 0.25-0.5sp tracking is dropped.
-private val M3 = Typography()
+// Inter, Figma's own UI face, bundled as one variable font (SIL OFL, licenses/Inter-OFL.txt).
+// Below Android 8 variation settings are ignored and Compose fakes the bolder weights.
+@OptIn(ExperimentalTextApi::class)
+val Inter = FontFamily(
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { w ->
+        Font(R.font.inter, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight)))
+    }
+)
+
+// Material sizes kept (read outdoors on site), with tighter tracking and SemiBold titles.
+// Material's 0.25-0.5sp tracking is dropped.
+private val M3 = Typography().run {
+    fun TextStyle.inter() = copy(fontFamily = Inter)
+    Typography(
+        displayLarge.inter(), displayMedium.inter(), displaySmall.inter(),
+        headlineLarge.inter(), headlineMedium.inter(), headlineSmall.inter(),
+        titleLarge.inter(), titleMedium.inter(), titleSmall.inter(),
+        bodyLarge.inter(), bodyMedium.inter(), bodySmall.inter(),
+        labelLarge.inter(), labelMedium.inter(), labelSmall.inter()
+    )
+}
 
 val Typography = Typography(
     displayLarge = M3.displayLarge.copy(letterSpacing = (-0.5).sp),

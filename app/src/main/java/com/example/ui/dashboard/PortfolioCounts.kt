@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -136,6 +137,7 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
         shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) scheme.primary else scheme.outlineVariant),
+        shadowElevation = CardLift,
         modifier = modifier.heightIn(min = 72.dp).testTag("count_${tile.filter.name.lowercase()}")
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -144,8 +146,7 @@ private fun CountTileView(tile: CountTile, isSelected: Boolean, onClick: () -> U
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = "${tile.count}",
-                    style = MaterialTheme.typography.headlineSmall.merge(TabularNumbers),
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineMedium.merge(TabularNumbers),
                     color = tint
                 )
                 Spacer(Modifier.weight(1f))

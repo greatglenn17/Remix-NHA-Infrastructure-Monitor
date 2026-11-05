@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.CardLift
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -62,6 +63,7 @@ fun PortfolioRow(
         shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
+        shadowElevation = CardLift,
         modifier = modifier.fillMaxWidth().testTag("project_tile_${project.id}")
     ) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
@@ -201,9 +203,32 @@ private fun RowMenu(project: Project, onEdit: ((Project) -> Unit)?, onDelete: ((
 }
 
 @Composable
-internal fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier) {
+internal fun ProgressLine(label: String, value: String, fraction: Float, color: Color, modifier: Modifier, big: Boolean = false) {
     Column(modifier = modifier) {
-        Row {
+        // Big: the headline figure (before " · ") large, the rest small beside it.
+        if (big) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row {
+                Text(
+                    value.substringBefore(" · "),
+                    style = MaterialTheme.typography.titleLarge.merge(TabularNumbers),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.alignByBaseline()
+                )
+                value.substringAfter(" · ", "").takeIf { it.isNotEmpty() }?.let { rest ->
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        rest,
+                        style = MaterialTheme.typography.labelMedium.merge(TabularNumbers),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.alignByBaseline()
+                    )
+                }
+            }
+        } else Row {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             Text(

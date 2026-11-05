@@ -75,6 +75,9 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainerHighest = Color(0xFFF0F0F0)
 )
 
+/** Cards float on a faint shadow under their 1px hairline. */
+val CardLift = 2.dp
+
 // Small radii: controls 4-6dp, cards 8dp, dialogs and sheets 12dp.
 private val FigmaShapes = Shapes(
     extraSmall = RoundedCornerShape(4.dp),
