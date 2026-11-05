@@ -36,6 +36,9 @@ data class NHAColors(
     val progressQuarter2: Color,
     val progressQuarter3: Color,
     val progressQuarter4: Color,
+    // Login brand panel gradient; white text sits on it in both themes.
+    val heroStart: Color,
+    val heroEnd: Color,
     val isDark: Boolean
 )
 
@@ -59,6 +62,8 @@ val DarkNHAColors = NHAColors(
     progressQuarter2 = Color(0xFFFB923C),
     progressQuarter3 = Color(0xFFFACC15),
     progressQuarter4 = Color(0xFF60A5FA),
+    heroStart = Color(0xFF15508F),
+    heroEnd = Color(0xFF0A2440),
     isDark = true
 )
 
@@ -82,6 +87,8 @@ val LightNHAColors = NHAColors(
     progressQuarter2 = Color(0xFFEA580C),
     progressQuarter3 = Color(0xFFCA8A04),
     progressQuarter4 = Color(0xFF2563EB),
+    heroStart = Color(0xFF0A6FD4),
+    heroEnd = Color(0xFF06396E),
     isDark = false
 )
 
