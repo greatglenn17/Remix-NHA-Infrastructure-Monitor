@@ -1,5 +1,11 @@
 package com.example.ui.login
 
+import com.example.ui.theme.Motion
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
 import com.example.ui.theme.LocalNHAColors
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -116,6 +122,15 @@ fun LoginScreen(
                 )
         )
 
+        // Entrance: the logo, titles and card rise into place one after another.
+        val appear = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { appear.animateTo(1f, tween(480, easing = Motion.Easing)) }
+        // A failed sign-in gives the card a short sideways shake.
+        val shake = remember { Animatable(0f) }
+        LaunchedEffect(errorMessage) {
+            if (errorMessage != null) for (x in listOf(10f, -8f, 6f, -3f, 0f)) shake.animateTo(x, tween(45))
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -132,6 +147,7 @@ fun LoginScreen(
             // Logo & Header
             Box(
                 modifier = Modifier
+                    .rise(appear, 0)
                     .size(80.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
                     .border(2.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f), CircleShape)
@@ -156,7 +172,8 @@ fun LoginScreen(
                     fontSize = 22.sp,
                     letterSpacing = 0.5.sp
                 ),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.rise(appear, 1)
             )
 
             Text(
@@ -166,11 +183,12 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.secondary,
                     fontSize = 14.sp
                 ),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.rise(appear, 1)
             )
 
             Surface(
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.rise(appear, 2).padding(top = 8.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(12.dp)
@@ -191,7 +209,10 @@ fun LoginScreen(
 
             // Main Authentication Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .rise(appear, 3)
+                    .graphicsLayer { translationX = shake.value.dp.toPx() }
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -199,6 +220,8 @@ fun LoginScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Banners and the sign-up fields resize the card smoothly.
+                        .animateContentSize(Motion.medium())
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -663,7 +686,9 @@ fun LoginScreen(
                             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
-                        if (isLoading) {
+                        AnimatedContent(isLoading, transitionSpec = { Motion.fadeThrough() }, label = "submit") { loading ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (loading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
                                 color = MaterialTheme.colorScheme.onSecondary,
@@ -688,6 +713,8 @@ fun LoginScreen(
                                     fontSize = 15.sp
                                 )
                             )
+                        }
+                        }
                         }
                     }
                 }
@@ -829,4 +856,11 @@ private fun UserRoleChoiceChip(
             }
         }
     }
+}
+
+// Each step starts a little after the one before and rises 16dp into place.
+private fun Modifier.rise(appear: Animatable<Float, *>, step: Int) = graphicsLayer {
+    val p = ((appear.value - step * 0.15f) / 0.55f).coerceIn(0f, 1f)
+    alpha = p
+    translationY = (1 - p) * 16.dp.toPx()
 }

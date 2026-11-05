@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import com.example.ui.theme.Motion
 import com.example.ui.theme.CardLift
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -99,7 +100,8 @@ fun PortfolioContent(
                 item(key = "no_match") { EmptyState(emptyMessage) {} }
             } else {
                 items(state.rows, key = { it.project.id }) { item ->
-                    PortfolioRow(item, wide, onOpen, onEdit, onDelete)
+                    // Rows fade and slide into place when a filter or search changes the list.
+                    PortfolioRow(item, wide, onOpen, onEdit, onDelete, Modifier.animateItem(Motion.medium(), Motion.medium(), Motion.fast()))
                 }
             }
 

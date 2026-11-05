@@ -1,5 +1,7 @@
 package com.example.ui.dashboard
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.ui.theme.CardLift
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
@@ -58,13 +60,16 @@ fun PortfolioRow(
     val colors = LocalNHAColors.current
     val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
 
+    val press = remember { MutableInteractionSource() }
+    val scale = Motion.pressScale(press)
     Surface(
         onClick = { onOpen(project) },
+        interactionSource = press,
         shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
         shadowElevation = CardLift,
-        modifier = modifier.fillMaxWidth().testTag("project_tile_${project.id}")
+        modifier = modifier.graphicsLayer { scaleX = scale.value; scaleY = scale.value }.fillMaxWidth().testTag("project_tile_${project.id}")
     ) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 12.dp, end = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
