@@ -18,12 +18,13 @@ import androidx.core.view.WindowCompat
 import com.example.data.model.AppThemeMode
 
 private val DarkColorScheme = darkColorScheme(
-    // One accent: Figma blue. Secondary follows it so no second accent creeps in.
-    primary = Color(0xFF0D99FF),
+    // One accent: Figma blue, lifted from #0D99FF to pass 4.5:1 on the grey panels.
+    // Secondary follows it so no second accent creeps in.
+    primary = Color(0xFF3DADFF),
     onPrimary = Color(0xFF1E1E1E),
     primaryContainer = Color(0xFF1B3A57),
     onPrimaryContainer = Color(0xFFE5F4FF),
-    secondary = Color(0xFF0D99FF),
+    secondary = Color(0xFF3DADFF),
     onSecondary = Color(0xFF1E1E1E),
     secondaryContainer = Color(0xFF1B3A57),
     onSecondaryContainer = Color(0xFFE5F4FF),

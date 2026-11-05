@@ -58,7 +58,7 @@ val DarkNHAColors = NHAColors(
     neutralContainer = Color(0xFF383838),
     progressQuarter2 = Color(0xFFFB923C),
     progressQuarter3 = Color(0xFFFACC15),
-    progressQuarter4 = Color(0xFF0D99FF),
+    progressQuarter4 = Color(0xFF60A5FA),
     isDark = true
 )
 
@@ -81,7 +81,7 @@ val LightNHAColors = NHAColors(
     neutralContainer = Color(0xFFF0F0F0),
     progressQuarter2 = Color(0xFFEA580C),
     progressQuarter3 = Color(0xFFCA8A04),
-    progressQuarter4 = Color(0xFF0A6FD4),
+    progressQuarter4 = Color(0xFF2563EB),
     isDark = false
 )
 
