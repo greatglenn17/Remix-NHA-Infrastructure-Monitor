@@ -53,8 +53,12 @@ fun EditProjectDialog(
         projectedBeneficiaries: String,
         boardResolution: String,
         noticeOfAward: String,
-        noticeToProceed: String
-    ) -> Unit
+        noticeToProceed: String,
+        /** Set only when the user marks the project completed: the actual completion date, else null. */
+        completedOn: String?,
+        finalAccomplishment: Double
+    ) -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     var name by remember { mutableStateOf(project.name) }
     var projectedBeneficiaries by remember { mutableStateOf(project.projectedBeneficiaries) }
@@ -123,7 +127,10 @@ fun EditProjectDialog(
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
     val durationError = daysError(durationText)
-    fun snapshot() = listOf(
+    val completion = remember { CompletionInput(defaultCompletedOn(project, today)) }
+    val completedOnError = completion.dateError(dateStarted, today)
+    val finalError = completion.finalError()
+    fun snapshot() = listOf(completion.snapshot(), 
         name, location, selectedUids.toList(), implementingOffice, contractor, scopeItems.toList(),
         projectType, landAreaValue,
         landAreaUnit, numberOfUnits, durationText, dateStarted,
@@ -135,7 +142,7 @@ fun EditProjectDialog(
     LongForm(
         title = "Edit project",
         dirty = dirty,
-        saveEnabled = nameError == null && contractorError == null && durationError == null,
+        saveEnabled = nameError == null && contractorError == null && durationError == null && completedOnError == null && finalError == null,
         saveTag = "submit_edit_project",
         onDismiss = onDismiss,
         onSave = {
@@ -163,7 +170,9 @@ fun EditProjectDialog(
                 projectedBeneficiaries.trim(),
                 boardResolution.trim(),
                 noticeOfAward.trim(),
-                noticeToProceed.trim()
+                noticeToProceed.trim(),
+                completion.completedOn,
+                completion.finalAccomplishment
             )
         }
     ) {
@@ -370,6 +379,11 @@ fun EditProjectDialog(
                 singleLine = true,
                 readOnly = true
             )
+        }
+
+        // A logged project that finished without a 100% report; at 100% it reads Completed and the switch goes away.
+        if (!project.isCompleted) {
+            AlreadyCompletedFields(completion, "Mark as completed", "Sets work done to the final accomplishment", completedOnError, finalError)
         }
     }
 }

@@ -207,7 +207,7 @@ fun DashboardScreen(
             registeredUsers = registeredUsers,
             registeredUsersLoaded = registeredUsersLoaded,
             onDismiss = { projectToEdit = null },
-            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers, projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed ->
+            onEdit = { name, location, implementingOffice, contractor, scopeOfWork, projectType, landArea, numberOfUnits, cost, duration, dateStarted, completionDateOriginal, assignedStaff, assignedUsers, projectedBeneficiaries, boardResolution, noticeOfAward, noticeToProceed, completedOn, finalAccomplishment ->
                 val updated = projectToEdit!!.copy(
                     name = name,
                     location = location,
@@ -226,7 +226,7 @@ fun DashboardScreen(
                     dateStarted = dateStarted,
                     completionDateOriginal = completionDateOriginal,
                     assignedStaff = assignedStaff
-                )
+                ).markedCompleted(completedOn, finalAccomplishment)
                 viewModel.updateProjectMaster(updated, assignedUsers)
                 projectToEdit = null
             }

@@ -1596,13 +1596,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 contractDurationDays = contractDurationDays,
                 dateStarted = dateStarted,
                 completionDateOriginal = completionDateOriginal,
-                // The actual completion date sits in the revised date, which already syncs; no schema change.
-                completionDateRevised = completedOn ?: completionDateOriginal,
+                completionDateRevised = completionDateOriginal,
                 status = ProjectStatus.ONGOING.label,
-                targetAccomplishment = if (completedOn != null) finalAccomplishment else 0.0,
-                actualAccomplishment = if (completedOn != null) finalAccomplishment else 0.0,
+                targetAccomplishment = 0.0,
+                actualAccomplishment = 0.0,
                 assignedStaff = assignedStaff.ifBlank { currentUserAccount.value.name }
-            )
+            ).markedCompleted(completedOn, finalAccomplishment)
             val newId = repository.insertProject(newProject, currentUserAccount.value.role)
             val persistedProject = newProject.copy(id = newId)
             syncOutboxDao.enqueue(
@@ -1654,7 +1653,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
      */
     fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null) {
         viewModelScope.launch(missingProjectGuard) {
-            val previousStatus = selectedProject.value?.status ?: "Unknown"
+            val previousStatus = selectedProject.value?.displayStatus ?: "Unknown"
             val admin = currentUserAccount.value.role == UserRole.SUPER_ADMIN
             val current = projectDao.getProjectByIdOnce(project.id)
             val base = AssignmentPolicy.mergeAssignment(project, current, if (admin) assignedUsers else null)
@@ -1678,7 +1677,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Project Edit",
                 details = "Updated project master: ${updatedProject.name}",
                 oldValue = "Status: $previousStatus",
-                newValue = "Status: ${updatedProject.status}, Revised Cost: ₱${updatedProject.contractCostRevised}"
+                newValue = "Status: ${updatedProject.displayStatus}, Revised Cost: ₱${updatedProject.contractCostRevised}"
             )
         }
     }
