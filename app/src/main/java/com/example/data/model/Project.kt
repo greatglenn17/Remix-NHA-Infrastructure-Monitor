@@ -74,4 +74,14 @@ data class Project(
 ) {
     val variance: Double
         get() = actualAccomplishment - targetAccomplishment
+
+    /** Derived, not stored, so older app versions syncing the same record never meet an unknown status. */
+    val isCompleted: Boolean
+        get() = actualAccomplishment >= 100.0
+
+    /** The status as shown: "Completed" once work reaches 100%, else the recorded status. */
+    val displayStatus: String
+        get() = if (isCompleted) COMPLETED_STATUS else status
 }
+
+const val COMPLETED_STATUS = "Completed"

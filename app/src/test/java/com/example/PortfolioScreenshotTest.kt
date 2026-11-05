@@ -71,12 +71,12 @@ class PortfolioScreenshotTest {
         totalProjects = items.size
     )
 
-    private fun capture(state: PortfolioUiState, mode: AppThemeMode, empty: Pair<String, String> = "" to "", projectsFirst: Boolean = false) =
+    private fun capture(state: PortfolioUiState, mode: AppThemeMode, empty: Pair<String, String> = "" to "", projectsFirst: Boolean = false, statusFilter: String = "All") =
         captureRoboImage {
             NHATheme(themeMode = mode) { Surface(color = MaterialTheme.colorScheme.background) {
                 PortfolioContent(
                     state = state,
-                    searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = "All", typeFilter = "All",
+                    searchQuery = "", sortOrder = Portfolio.NEEDS_ATTENTION_SORT, statusFilter = statusFilter, typeFilter = "All",
                     typeOptions = listOf("All", "Housing Project"), emptyMessage = empty,
                     onFilter = {}, onSearch = {}, onSort = {}, onStatus = {}, onType = {},
                     onOpen = {}, onEdit = {}, onDelete = {}, projectsFirst = projectsFirst
@@ -106,6 +106,15 @@ class PortfolioScreenshotTest {
 
     @Config(qualifiers = "w1185dp-h743dp")
     @Test fun tablet_landscape_light() = capture(sample, AppThemeMode.LIGHT)
+
+    // Status: Completed lists finished projects, including one added after the fact; neither is flagged.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun completed_filter_phone_light() {
+        val legacy = item(project(7, "Guiguinto Resettlement Phase 1", "Guiguinto, Bulacan", "On-going", 100.0, 100.0, "2019-12-15"),
+            10_000_000.0, 0, null)
+        val done = listOf(items[5], legacy)
+        capture(sample.copy(rows = done, totalProjects = items.size + 1), AppThemeMode.LIGHT, projectsFirst = true, statusFilter = "Completed")
+    }
 
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun empty_light() = capture(

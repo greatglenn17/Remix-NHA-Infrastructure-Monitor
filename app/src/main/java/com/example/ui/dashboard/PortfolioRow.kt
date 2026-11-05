@@ -276,10 +276,11 @@ private fun MetaItem(icon: ImageVector, text: String) {
 @Composable
 internal fun StatusBadge(project: Project, colors: NHAColors) {
     val color = statusColor(project, colors)
-    Badge(project.status, color, containerOf(color, colors))
+    Badge(project.displayStatus, color, containerOf(color, colors))
 }
 
 internal fun statusColor(project: Project, colors: NHAColors): Color {
+    if (project.isCompleted) return colors.onTrack
     if (project.status == ProjectStatus.SUSPENDED.label) return colors.neutral
     val slip = varianceColor(ProjectAttention.slippage(project), colors)
     // Marked behind by the engineer but the numbers are close: still not green.

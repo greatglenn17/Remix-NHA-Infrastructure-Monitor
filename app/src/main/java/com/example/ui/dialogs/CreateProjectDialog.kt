@@ -45,7 +45,10 @@ fun CreateProjectDialog(
         contractDurationDays: Int,
         dateStarted: String,
         completionDateOriginal: String,
-        assignedStaff: String
+        assignedStaff: String,
+        /** Set only for a project finished before the app: the actual completion date, else null. */
+        completedOn: String?,
+        finalAccomplishment: Double
     ) -> Unit,
     today: LocalDate = LocalDate.now()
 ) {
@@ -66,6 +69,9 @@ fun CreateProjectDialog(
     
     var durationText by remember { mutableStateOf("") }
     var dateStarted by remember { mutableStateOf(today.toString()) }
+    var alreadyCompleted by remember { mutableStateOf(false) }
+    var completedOn by remember { mutableStateOf(today.toString()) }
+    var finalText by remember { mutableStateOf("100") }
     
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {
@@ -86,10 +92,12 @@ fun CreateProjectDialog(
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
     val durationError = daysError(durationText)
+    val completedOnError = if (alreadyCompleted) completedOnError(dateStarted, completedOn, today) else null
+    val finalError = if (alreadyCompleted) FormValidation.requiredError(finalText) ?: FormValidation.percentError(finalText) else null
     fun snapshot() = listOf(
         name, location, assignedStaff, implementingOffice, contractor, scopeItems.toList(),
         projectType, landAreaValue,
-        landAreaUnit, numberOfUnits, durationText, dateStarted
+        landAreaUnit, numberOfUnits, durationText, dateStarted, alreadyCompleted, completedOn, finalText
     )
     val initial = remember { snapshot() }
     val dirty = snapshot() != initial
@@ -97,7 +105,7 @@ fun CreateProjectDialog(
     LongForm(
         title = "New project",
         dirty = dirty,
-        saveEnabled = nameError == null && contractorError == null && durationError == null,
+        saveEnabled = nameError == null && contractorError == null && durationError == null && completedOnError == null && finalError == null,
         saveTag = "submit_create_project",
         onDismiss = onDismiss,
         onSave = {
@@ -117,7 +125,9 @@ fun CreateProjectDialog(
                 duration,
                 dateStarted,
                 completionDateOriginal,
-                assignedStaff
+                assignedStaff,
+                completedOn.takeIf { alreadyCompleted },
+                finalText.trim().toDoubleOrNull() ?: 100.0
             )
         }
     ) {
@@ -302,5 +312,44 @@ fun CreateProjectDialog(
                 readOnly = true
             )
         }
+
+        // For projects finished before this app: saved at the final accomplishment with no weekly report.
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
+                Text("Already completed", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+                Text("Finished before this app; no weekly reports needed", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+            }
+            Switch(checked = alreadyCompleted, onCheckedChange = { alreadyCompleted = it }, modifier = Modifier.testTag("switch_already_completed"))
+        }
+        if (alreadyCompleted) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DateField(label = "Actual completion", value = completedOn, onValueChange = { completedOn = it }, error = completedOnError, modifier = Modifier.weight(1f))
+                OutlinedTextField(
+                    value = finalText,
+                    onValueChange = { finalText = it },
+                    label = { Text("Final accomplishment %") },
+                    isError = finalError != null,
+                    supportingText = (finalError ?: belowFullNote(finalText))?.let { { Text(it) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f).testTag("input_final_accomplishment"),
+                    singleLine = true
+                )
+            }
+        }
     }
 }
+
+/** The actual completion date of a finished project: required, not before the start, not in the future. */
+internal fun completedOnError(dateStarted: String, completedOn: String, today: LocalDate): String? {
+    val done = runCatching { LocalDate.parse(completedOn.trim()) }.getOrNull() ?: return "Required"
+    val start = runCatching { LocalDate.parse(dateStarted.trim()) }.getOrNull()
+    return when {
+        done.isAfter(today) -> "Can't be in the future"
+        start != null && done.isBefore(start) -> "Before the start date"
+        else -> null
+    }
+}
+
+/** Only 100% reads as Completed; a lower final figure stays an unfinished project. */
+private fun belowFullNote(text: String): String? =
+    text.trim().toDoubleOrNull()?.takeIf { it < 100 }?.let { "Below 100% is not counted as completed" }
