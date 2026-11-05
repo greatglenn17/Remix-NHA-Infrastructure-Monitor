@@ -1,8 +1,8 @@
 {
-  "versionCode": 228,
-  "versionName": "2.2.8",
-  "releaseNotes": "v2.2.8: Crashes are now reported automatically so they can be fixed quickly.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.8/NHA_Monitor_v2.2.8_Build228.apk",
-  "apkSha256": "d26c17444e170b5a2e698ccb1f49b31f9cf77b9d1ecdfbe6435553f41602168c",
+  "versionCode": 229,
+  "versionName": "2.2.9",
+  "releaseNotes": "v2.2.9: A fresh, cleaner look with smooth animations and a new sign-in screen.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.2.9/NHA_Monitor_v2.2.9_Build229.apk",
+  "apkSha256": "e013ffde2792c89277afc6665b7784ca814d15a924dac265b5d4a42f606e443d",
   "isMandatory": true
 }
