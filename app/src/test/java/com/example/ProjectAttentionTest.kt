@@ -225,5 +225,15 @@ class ProjectAttentionTest {
         assertEquals(c.onTrack, statusColor(project(50.0, 52.0), c))
         assertEquals(c.watch, statusColor(project(50.0, 50.0, status = "Behind Schedule"), c)) // marked behind, numbers even
         assertEquals(c.neutral, statusColor(project(62.0, 44.0, status = "Suspended"), c))
+        assertEquals(c.onTrack, statusColor(project(100.0, 100.0, status = "Behind Schedule"), c)) // reads "Completed"
+    }
+
+    @Test
+    fun finishedProject_isNeverBehind_butBillingAndOrdersStillFlag() {
+        val done = project(100.0, 100.0, status = "Behind Schedule", completion = "2020-06-30")
+        val order = PendingDocument(projectId = 1, documentName = "Variation Order No. 1", status = "Pending")
+        val kinds = flags(done, docs = listOf(order), billed = 1_200_000.0, latest = null).map { it.kind }
+        assertEquals(listOf(BILLING_AHEAD, WAITING_APPROVAL), kinds)  // billed 120% of the contract, an open order
+        assertTrue(flags(done, billed = 1_000_000.0, latest = null).isEmpty())
     }
 }

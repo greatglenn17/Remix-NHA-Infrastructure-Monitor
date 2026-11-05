@@ -140,7 +140,7 @@ object BlueBookForms {
         row("% Actual Accomplishment as of $asOfText", esc(pct(project.actualAccomplishment)))
         row("% Target Accomplishment as of $asOfText", esc(pct(project.targetAccomplishment)))
         row("% Delay/Advance", esc(pct(project.variance)))
-        row("Status of the Project", esc(project.status))
+        row("Status of the Project", esc(project.displayStatus))
         return page(
             "Project Profile",
             """

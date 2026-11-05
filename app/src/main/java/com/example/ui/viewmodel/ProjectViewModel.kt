@@ -404,7 +404,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             }
 
             if (params.status != "All") {
-                list = list.filter { it.status.equals(params.status, ignoreCase = true) }
+                list = list.filter { it.displayStatus.equals(params.status, ignoreCase = true) }
             }
 
             if (params.type != "All") {
@@ -1543,7 +1543,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         contractDurationDays: Int,
         dateStarted: String,
         completionDateOriginal: String,
-        assignedStaff: String = currentUserAccount.value.name
+        assignedStaff: String = currentUserAccount.value.name,
+        /** A project finished before the app: its actual completion date; null for a new project. */
+        completedOn: String? = null,
+        finalAccomplishment: Double = 100.0
     ) {
         viewModelScope.launch(missingProjectGuard) {
             if (currentUserAccount.value.isDemoAccount) {
@@ -1593,10 +1596,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 contractDurationDays = contractDurationDays,
                 dateStarted = dateStarted,
                 completionDateOriginal = completionDateOriginal,
-                completionDateRevised = completionDateOriginal,
+                // The actual completion date sits in the revised date, which already syncs; no schema change.
+                completionDateRevised = completedOn ?: completionDateOriginal,
                 status = ProjectStatus.ONGOING.label,
-                targetAccomplishment = 0.0,
-                actualAccomplishment = 0.0,
+                targetAccomplishment = if (completedOn != null) finalAccomplishment else 0.0,
+                actualAccomplishment = if (completedOn != null) finalAccomplishment else 0.0,
                 assignedStaff = assignedStaff.ifBlank { currentUserAccount.value.name }
             )
             val newId = repository.insertProject(newProject, currentUserAccount.value.role)
@@ -1617,7 +1621,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 actionType = "Project Creation",
                 details = "Created new project: $name",
                 oldValue = "",
-                newValue = "Title: $name, Location: $location, Cost: ₱$contractCostOriginal, Duration: $contractDurationDays days"
+                newValue = "Title: $name, Location: $location, Cost: ₱$contractCostOriginal, Duration: $contractDurationDays days" +
+                    (completedOn?.let { ", Already completed on $it at $finalAccomplishment%" } ?: "")
             )
         }
     }

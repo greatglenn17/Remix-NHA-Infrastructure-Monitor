@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
                             CreateProjectDialog(
                                 onDismiss = { showCreateProjectDialog = false },
                                 creatorName = viewModel.currentUserAccount.collectAsState().value.name,
-                                onCreate = { name, location, office, contractor, scope, type, landArea, numberOfUnits, cost, duration, dateStarted, completionDate, assignedStaff ->
+                                onCreate = { name, location, office, contractor, scope, type, landArea, numberOfUnits, cost, duration, dateStarted, completionDate, assignedStaff, completedOn, finalAccomplishment ->
                                     viewModel.createProject(
                                         name = name,
                                         location = location,
@@ -156,7 +156,9 @@ class MainActivity : ComponentActivity() {
                                         contractDurationDays = duration,
                                         dateStarted = dateStarted,
                                         completionDateOriginal = completionDate,
-                                        assignedStaff = assignedStaff
+                                        assignedStaff = assignedStaff,
+                                        completedOn = completedOn,
+                                        finalAccomplishment = finalAccomplishment
                                     )
                                     showCreateProjectDialog = false
                                 }

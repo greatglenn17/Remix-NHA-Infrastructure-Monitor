@@ -37,7 +37,7 @@ import com.example.util.PortfolioItem
 
 private const val ATTENTION_PREVIEW = 5
 private val SORT_OPTIONS = listOf(Portfolio.NEEDS_ATTENTION_SORT, "Variance (Worst First)", "Variance (Best First)", "Completion Date", "Name")
-private val STATUS_OPTIONS = listOf("All", "On-going", "Behind Schedule", "Suspended")
+private val STATUS_OPTIONS = listOf("All", "On-going", "Behind Schedule", "Suspended", com.example.data.model.COMPLETED_STATUS)
 
 /**
  * Portfolio home: four counts, needs-attention queue and the project list (spec "Portfolio home").

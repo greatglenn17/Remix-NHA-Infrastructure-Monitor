@@ -10,6 +10,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import com.example.data.model.AppThemeMode
 import com.example.data.model.ContractorLetter
 import com.example.data.model.DeveloperRequest
@@ -108,7 +111,12 @@ class FormsScreenshotTest {
             rule.onNodeWithText("Review").performSemanticsAction(SemanticsActions.OnClick)
         }) { AddWeeklyReportDialog(project, 7, badReport, {}, { _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_monthly_$t") { AddMonthlyReportDialog(project, emptyList(), project.scopeOfWork, 10_000_000.0, null, {}, { _, _, _, _, _, _, _, _, _ -> }) }
-        shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
+        shoot("form_create_project_$t") { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
+        shoot("form_create_project_completed_$t", steps = {
+            rule.onNodeWithTag("switch_already_completed").performSemanticsAction(SemanticsActions.OnClick); settle()
+            // Swipe, not performScrollTo: its animated scroll never idles on the paused clock.
+            repeat(6) { rule.onAllNodes(hasScrollAction())[0].performTouchInput { swipeUp() }; settle() }
+        }) { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
         shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
         shoot("form_add_lot_road_$t", steps = {
             rule.onNodeWithTag("add_lot_use").performSemanticsAction(SemanticsActions.OnClick); settle()
