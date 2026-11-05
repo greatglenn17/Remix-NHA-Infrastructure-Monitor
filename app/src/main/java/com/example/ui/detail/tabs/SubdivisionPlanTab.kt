@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.util.BlockNumbering
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1118,6 +1119,18 @@ fun SubdivisionPlanTab(
                 val surfaceColor = MaterialTheme.colorScheme.surface
                 val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
 
+                // Lot colours fade to their new band after a progress save instead of jumping.
+                val lotTargets = parsedLots.associate { it.lot.id to lotFill(it.lot, lotProgressMap[it.lot.id]?.physicalProgress ?: 0, nhaMap) }
+                var lotFrom by remember { mutableStateOf(lotTargets) }
+                var lotTo by remember { mutableStateOf(lotTargets) }
+                val lotFade = remember { Animatable(1f) }
+                LaunchedEffect(lotTargets) {
+                    lotFrom = lotTo.mapValues { (id, c) -> lerp(lotFrom[id] ?: c, c, lotFade.value) }
+                    lotTo = lotTargets
+                    lotFade.snapTo(0f)
+                    lotFade.animateTo(1f, com.example.ui.theme.Motion.medium())
+                }
+
                 if (isLoadingPdf) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -1398,7 +1411,8 @@ fun SubdivisionPlanTab(
                                 val isBilled = progressRecord.anyBilled
 
                                 // DERIVED FILL COLOR FROM PROGRESS % (0-100%)
-                                val baseProgressColor = lotFill(lot, progressValue, nhaMap)
+                                val baseProgressColor = lotTo[lot.id]?.let { lerp(lotFrom[lot.id] ?: it, it, lotFade.value) }
+                                    ?: lotFill(lot, progressValue, nhaMap)
 
                                 val fillAlpha = when {
                                     isSelected -> 0.65f

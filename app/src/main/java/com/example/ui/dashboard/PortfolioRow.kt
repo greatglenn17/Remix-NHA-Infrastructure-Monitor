@@ -1,5 +1,6 @@
 package com.example.ui.dashboard
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,7 @@ import coil.compose.AsyncImage
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
 import com.example.ui.theme.LocalNHAColors
+import com.example.ui.theme.Motion
 import com.example.ui.theme.NHAColors
 import com.example.ui.theme.TabularNumbers
 import com.example.util.AttentionKind
@@ -214,9 +216,13 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
             )
         }
         Spacer(Modifier.height(4.dp))
+        // The bar fills in when it first shows and glides to a new value after a save.
+        val target = fraction.coerceIn(0f, 1f)
+        val shown = remember { Animatable(0f) }
+        LaunchedEffect(target) { shown.animateTo(target, Motion.medium()) }
         LinearProgressIndicator(
-            progress = { fraction.coerceIn(0f, 1f) },
-            color = color,
+            progress = { shown.value },
+            color = androidx.compose.animation.animateColorAsState(color, Motion.medium(), label = "bar").value,
             trackColor = MaterialTheme.colorScheme.outlineVariant,
             strokeCap = StrokeCap.Round,
             gapSize = 0.dp,
