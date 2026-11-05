@@ -1,22 +1,19 @@
 package com.example.util
 
-import android.app.DownloadManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.net.Uri
+import android.content.pm.PackageInstaller
 import android.os.Build
-import android.os.Environment
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
+import android.widget.Toast
+import androidx.core.content.IntentCompat
 import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -33,166 +30,102 @@ data class AppUpdateInfo(
 
 object AppUpdateManager {
 
-    suspend fun checkForUpdates(
-        customUpdateUrl: String? = null
-    ): AppUpdateInfo = withContext(Dispatchers.IO) {
-        val currentVersionCode = BuildConfig.VERSION_CODE
+    private const val UPDATE_URL = "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
+
+    /** Reads update.json from main. Null when it could not be reached, so callers don't claim "up to date". */
+    suspend fun checkForUpdates(customUpdateUrl: String? = null): AppUpdateInfo? = withContext(Dispatchers.IO) {
         try {
-            // Default mock/live update config check for demonstration & live sync
-            val targetUrl = customUpdateUrl ?: "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
-            val connection = URL(targetUrl).openConnection() as HttpURLConnection
-            connection.connectTimeout = 3000
-            connection.readTimeout = 3000
-            connection.requestMethod = "GET"
-
-            if (connection.responseCode == 200) {
-                val jsonStr = connection.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(jsonStr)
-                val serverVersionCode = json.optInt("versionCode", currentVersionCode)
-                val serverVersionName = json.optString("versionName", "v${BuildConfig.VERSION_NAME}")
-                val releaseNotes = json.optString("releaseNotes", "New feature updates and stability improvements.")
-                val apkUrl = json.optString("apkDownloadUrl", "")
-                val apkSha256 = json.optString("apkSha256", "").trim().lowercase()
-                val mandatory = json.optBoolean("isMandatory", false)
-
-                return@withContext AppUpdateInfo(
-                    latestVersionCode = serverVersionCode,
-                    latestVersionName = serverVersionName,
-                    releaseNotes = releaseNotes,
-                    apkDownloadUrl = apkUrl,
-                    apkSha256 = apkSha256,
-                    isMandatory = mandatory,
-                    isUpdateAvailable = serverVersionCode > currentVersionCode
-                )
-            }
+            val connection = URL(customUpdateUrl ?: UPDATE_URL).openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            if (connection.responseCode != 200) return@withContext null
+            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val serverVersionCode = json.optInt("versionCode", BuildConfig.VERSION_CODE)
+            AppUpdateInfo(
+                latestVersionCode = serverVersionCode,
+                latestVersionName = json.optString("versionName", BuildConfig.VERSION_NAME),
+                releaseNotes = json.optString("releaseNotes", ""),
+                apkDownloadUrl = json.optString("apkDownloadUrl", ""),
+                apkSha256 = json.optString("apkSha256", "").trim().lowercase(),
+                isMandatory = json.optBoolean("isMandatory", false),
+                isUpdateAvailable = serverVersionCode > BuildConfig.VERSION_CODE
+            )
         } catch (e: Exception) {
-            // Fallback simulated update info for local testing
+            null
         }
-
-        // Return latest state
-        val mockLatestCode = currentVersionCode
-        AppUpdateInfo(
-            latestVersionCode = mockLatestCode,
-            latestVersionName = "v${BuildConfig.VERSION_NAME}",
-            releaseNotes = "System is up to date with latest Bulacan District Office features.",
-            apkDownloadUrl = "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases",
-            apkSha256 = "",
-            isMandatory = false,
-            isUpdateAvailable = false
-        )
     }
 
-    fun downloadAndInstallApk(
-        context: Context,
-        apkUrl: String,
-        expectedSha256: String = "",
-        onDownloadStarted: () -> Unit = {},
-        onDownloadFailed: (String) -> Unit = {}
-    ) {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "nha_monitor_update.apk")
-        if (file.exists()) {
-            file.delete()
-        }
-
-        android.widget.Toast.makeText(
-            context,
-            "Starting live update download...",
-            android.widget.Toast.LENGTH_SHORT
-        ).show()
-        onDownloadStarted()
-
-        val validUrl = if (apkUrl.isBlank() || apkUrl.contains("example.com") || apkUrl.contains("update.json")) {
-            "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/NHA_Monitor_v1.1.0_Build110.apk"
-        } else {
-            apkUrl
-        }
-
+    /**
+     * Downloads the APK inside the app, checks its SHA-256 and hands it to Android's own installer,
+     * which asks the user to confirm once (and, the first time, to allow installs from this app).
+     * Throws with a readable message when anything fails.
+     */
+    suspend fun downloadAndInstall(context: Context, info: AppUpdateInfo, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+        if (!info.apkDownloadUrl.startsWith("https://")) throw IOException("The update link is missing.")
+        val apk = File(context.cacheDir, "update.apk")
         try {
-            val request = DownloadManager.Request(Uri.parse(validUrl)).apply {
-                setTitle("Downloading NHA Monitor Update")
-                setDescription("Fetching latest release package...")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationUri(Uri.fromFile(file))
-                setMimeType("application/vnd.android.package-archive")
-            }
-
-            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
-                ?: run {
-                    onDownloadFailed("Android Download Manager is unavailable.")
-                    return
-                }
-            val downloadId = downloadManager.enqueue(request)
-
-            val onComplete = object : BroadcastReceiver() {
-                override fun onReceive(c: Context?, intent: Intent?) {
-                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                    if (id == downloadId) {
-                        try { context.unregisterReceiver(this) } catch (_: Exception) {}
-                        if (!file.exists() || file.length() <= 500000) {
-                            onDownloadFailed("The downloaded update is incomplete.")
-                            openBrowserDownloadFallback(context)
-                        } else if (expectedSha256.isNotBlank() && !file.sha256().equals(expectedSha256, ignoreCase = true)) {
-                            onDownloadFailed("Update integrity verification failed.")
-                            file.delete()
-                        } else {
-                            installApk(context, file)
-                        }
+            // GitHub's release link redirects to its file host; HttpURLConnection follows https-to-https redirects.
+            val connection = URL(info.apkDownloadUrl).openConnection() as HttpURLConnection
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            if (connection.responseCode != 200) throw IOException("Download failed (HTTP ${connection.responseCode}).")
+            val total = connection.contentLengthLong
+            val digest = MessageDigest.getInstance("SHA-256")
+            connection.inputStream.use { input ->
+                apk.outputStream().use { out ->
+                    val buffer = ByteArray(64 * 1024)
+                    var done = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        out.write(buffer, 0, read)
+                        digest.update(buffer, 0, read)
+                        done += read
+                        if (total > 0) onProgress(done.toFloat() / total)
                     }
                 }
             }
-
-            val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-            ContextCompat.registerReceiver(context, onComplete, filter, ContextCompat.RECEIVER_EXPORTED)
-        } catch (e: Exception) {
-            onDownloadFailed(e.localizedMessage ?: "Unable to start update download.")
-            openBrowserDownloadFallback(context)
-        }
-    }
-
-    private fun openBrowserDownloadFallback(context: Context) {
-        try {
-            val browserIntent = Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases")
-            ).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val sha = digest.digest().joinToString("") { "%02x".format(it) }
+            if (info.apkSha256.isNotBlank() && sha != info.apkSha256) {
+                throw IOException("The download was damaged. Please try again.")
             }
-            context.startActivity(browserIntent)
-        } catch (e: Exception) {
-            android.widget.Toast.makeText(context, "Please visit GitHub releases to download the update.", android.widget.Toast.LENGTH_LONG).show()
+
+            val installer = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+                .apply { setAppPackageName(context.packageName) }
+            val sessionId = installer.createSession(params)
+            installer.openSession(sessionId).use { session ->
+                session.openWrite("update.apk", 0, apk.length()).use { out ->
+                    apk.inputStream().use { it.copyTo(out) }
+                    session.fsync(out)
+                }
+                // The installer fills in the result, so the PendingIntent must be mutable on Android 12+.
+                val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val result = PendingIntent.getBroadcast(context, sessionId, Intent(context, UpdateInstallReceiver::class.java), flags)
+                session.commit(result.intentSender)
+            }
+        } finally {
+            apk.delete()
         }
     }
+}
 
-    fun installApk(context: Context, apkFile: File) {
-        if (!apkFile.exists()) return
-
-        val apkUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            FileProvider.getUriForFile(
+/** Gets the installer's answer: shows Android's confirm screen, or says why the update didn't install. */
+class UpdateInstallReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java) ?: return
+                context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            PackageInstaller.STATUS_SUCCESS -> Unit
+            PackageInstaller.STATUS_FAILURE_ABORTED -> Toast.makeText(context, "Update cancelled.", Toast.LENGTH_LONG).show()
+            else -> Toast.makeText(
                 context,
-                "${context.packageName}.fileprovider",
-                apkFile
-            )
-        } else {
-            Uri.fromFile(apkFile)
+                "Update not installed: ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "error $status"}",
+                Toast.LENGTH_LONG
+            ).show()
         }
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-        }
-        context.startActivity(intent)
-    }
-
-    private fun File.sha256(): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        FileInputStream(this).use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }

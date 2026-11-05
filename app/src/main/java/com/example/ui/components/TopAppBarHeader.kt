@@ -627,7 +627,13 @@ fun TopAppBarHeader(
                                     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                                         val info = com.example.util.AppUpdateManager.checkForUpdates()
                                         isCheckingUpdate = false
-                                        if (info.isUpdateAvailable) {
+                                        if (info == null) {
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                "Couldn't check for updates. Check the internet connection and try again.",
+                                                android.widget.Toast.LENGTH_LONG
+                                            ).show()
+                                        } else if (info.isUpdateAvailable) {
                                             availableUpdate = info
                                             showAboutDialog = false
                                         } else {
