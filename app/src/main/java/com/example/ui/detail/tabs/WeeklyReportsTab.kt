@@ -128,7 +128,7 @@ private fun WeeklyReportCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
@@ -252,7 +252,7 @@ private fun WeeklyReportCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -300,7 +300,7 @@ private fun WeeklyReportCard(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -354,7 +354,7 @@ private fun WeeklyReportCard(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -427,7 +427,7 @@ private fun WeeklyReportCard(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -510,7 +510,7 @@ private fun WeeklyReportCard(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -570,7 +570,7 @@ private fun WeeklyReportCard(
                                     .fillMaxWidth()
                                     .height(160.dp)
                                     .padding(top = 6.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
+                                    .clip(RoundedCornerShape(8.dp)),
                                 contentScale = ContentScale.Crop
                             )
                         }

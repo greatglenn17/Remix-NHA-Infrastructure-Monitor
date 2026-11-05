@@ -201,7 +201,7 @@ fun EditProjectDialog(
         )
         ScopeOfWorksEditor(scopeItems)
         Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
+            OutlinedButton(shape = MaterialTheme.shapes.small, 
                 onClick = { showProjectTypeDropdown = true },
                 modifier = Modifier.fillMaxWidth(),
                 border = BorderStroke(1.dp, cs.outlineVariant),
@@ -331,7 +331,7 @@ fun EditProjectDialog(
         val autoComputedCost = scopeItems.sumOf { it.amount }
         Surface(
             color = cs.surfaceVariant,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(6.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp)) {

@@ -412,7 +412,7 @@ fun TopAppBarHeader(
                                 val isSelected = appThemeMode == mode
                                 Surface(
                                     onClick = { onSetThemeMode?.invoke(mode) },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(6.dp),
                                     color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
                                     border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.weight(1f)
@@ -549,7 +549,7 @@ fun TopAppBarHeader(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -580,7 +580,7 @@ fun TopAppBarHeader(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -635,7 +635,7 @@ fun TopAppBarHeader(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(
@@ -654,7 +654,7 @@ fun TopAppBarHeader(
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(8.dp)
         )
     }
 

@@ -84,7 +84,7 @@ fun UpdateAvailableDialog(
 
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -150,7 +150,7 @@ fun UpdateAvailableDialog(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 enabled = !isDownloading
             ) {
                 Icon(
@@ -179,6 +179,6 @@ fun UpdateAvailableDialog(
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(8.dp)
     )
 }

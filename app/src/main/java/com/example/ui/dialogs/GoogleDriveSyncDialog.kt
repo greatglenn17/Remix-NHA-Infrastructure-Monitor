@@ -75,7 +75,7 @@ fun GoogleDriveSyncDialog(
                 // Connected Account Info Box
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
@@ -142,7 +142,7 @@ fun GoogleDriveSyncDialog(
                 // Last Sync Timestamp
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 ) {
                     Row(
@@ -243,7 +243,7 @@ fun GoogleDriveSyncDialog(
                     Surface(
                         color = bgColor,
                         border = BorderStroke(1.dp, borderColor),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -263,7 +263,7 @@ fun GoogleDriveSyncDialog(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.CloudUpload,
@@ -281,7 +281,7 @@ fun GoogleDriveSyncDialog(
                     enabled = !isSyncing,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CloudDownload,
@@ -300,6 +300,6 @@ fun GoogleDriveSyncDialog(
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(8.dp)
     )
 }

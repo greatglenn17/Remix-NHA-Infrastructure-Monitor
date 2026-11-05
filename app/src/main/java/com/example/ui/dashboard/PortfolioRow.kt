@@ -57,7 +57,7 @@ fun PortfolioRow(
 
     Surface(
         onClick = { onOpen(project) },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().testTag("project_tile_${project.id}")
@@ -160,7 +160,7 @@ fun SitePhoto(url: String, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.clip(RoundedCornerShape(8.dp)).background(scheme.surfaceVariant)
+        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(scheme.surfaceVariant)
     ) {
         Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = scheme.onSurfaceVariant)
         if (url.isNotBlank()) {
@@ -252,7 +252,7 @@ internal fun statusColor(project: Project, colors: NHAColors): Color {
 
 @Composable
 internal fun Badge(text: String, color: Color, container: Color) {
-    Surface(color = container, shape = RoundedCornerShape(8.dp)) {
+    Surface(color = container, shape = RoundedCornerShape(6.dp)) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.merge(TabularNumbers),

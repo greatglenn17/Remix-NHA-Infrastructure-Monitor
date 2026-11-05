@@ -82,7 +82,7 @@ fun DashboardScreen(
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -123,13 +123,13 @@ fun DashboardScreen(
                 emptyActions = {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (isSuperAdmin || currentUser.role == UserRole.ENGINEER_ADMIN) {
-                            Button(onClick = onCreateProjectClick, shape = RoundedCornerShape(8.dp)) {
+                            Button(onClick = onCreateProjectClick, shape = RoundedCornerShape(6.dp)) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("New Project", fontWeight = FontWeight.Bold)
                             }
                         }
-                        OutlinedButton(onClick = { viewModel.syncFromCloud() }, shape = RoundedCornerShape(8.dp)) {
+                        OutlinedButton(onClick = { viewModel.syncFromCloud() }, shape = RoundedCornerShape(6.dp)) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Sync from Cloud", fontWeight = FontWeight.Medium)

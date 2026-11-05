@@ -110,12 +110,12 @@ fun LetterFileField(what: String, file: String, tag: String, onChange: (String) 
         }
     } else {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = scan, modifier = Modifier.weight(1f).testTag("${tag}_scan")) {
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = scan, modifier = Modifier.weight(1f).testTag("${tag}_scan")) {
                 Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Scan $what")
             }
-            OutlinedButton(onClick = { upload.launch("*/*") }, modifier = Modifier.weight(1f).testTag("${tag}_upload")) {
+            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { upload.launch("*/*") }, modifier = Modifier.weight(1f).testTag("${tag}_upload")) {
                 Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Upload $what")
@@ -169,7 +169,7 @@ fun ContractorLetterDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 enabled = dateSent.isNotBlank() && subject.isNotBlank(),
                 onClick = {
                     val base = existing ?: ContractorLetter(projectId = projectId, dateSent = dateSent, subject = subject)

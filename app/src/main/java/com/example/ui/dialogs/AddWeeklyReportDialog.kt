@@ -712,7 +712,7 @@ private fun WeeklyReportForm(
 
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
@@ -764,21 +764,21 @@ private fun WeeklyReportForm(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            OutlinedButton(
+                            OutlinedButton(shape = MaterialTheme.shapes.small, 
                                 onClick = { for (i in 0 until 24) currentDayHours[i] = "FAIR" },
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
                                 Text("All Fair", fontSize = 10.sp, color = WeatherFairGreen)
                             }
-                            OutlinedButton(
+                            OutlinedButton(shape = MaterialTheme.shapes.small, 
                                 onClick = { for (i in 8..17) currentDayHours[i] = "RAINY" },
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
                                 Text("Rain (8am-5pm)", fontSize = 10.sp, color = WeatherRainyBlue)
                             }
-                            OutlinedButton(
+                            OutlinedButton(shape = MaterialTheme.shapes.small, 
                                 onClick = { for (i in 0 until 24) currentDayHours[i] = "CLOUDY" },
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
@@ -840,7 +840,7 @@ private fun WeeklyReportForm(
                         Spacer(modifier = Modifier.height(4.dp))
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -974,7 +974,7 @@ private fun WeeklyReportForm(
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1033,7 +1033,7 @@ private fun WeeklyReportForm(
                             onClick = { showPhotoSourceDialog = true },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1075,7 +1075,7 @@ private fun WeeklyReportForm(
                                     Box(
                                         modifier = Modifier
                                             .size(120.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .clip(RoundedCornerShape(8.dp))
                                             .background(MaterialTheme.colorScheme.surface)
                                             .clickable { captionFor = url }
                                     ) {
@@ -1106,7 +1106,7 @@ private fun WeeklyReportForm(
                         } else {
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1184,7 +1184,7 @@ private fun WeeklyReportForm(
                 }
             },
             confirmButton = {
-                Button(onClick = { photoDetails[ref] = detail.copy(title = title.trim()); captionFor = null }, modifier = Modifier.testTag("photo_title_save")) { Text("Save") }
+                Button(shape = MaterialTheme.shapes.small, onClick = { photoDetails[ref] = detail.copy(title = title.trim()); captionFor = null }, modifier = Modifier.testTag("photo_title_save")) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { captionFor = null }) { Text("Cancel") } }
         )
@@ -1206,7 +1206,7 @@ private fun WeeklyReportForm(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1236,7 +1236,7 @@ private fun WeeklyReportForm(
 
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1341,7 +1341,7 @@ private fun EquipmentInputRow(
             OutlinedButton(
                 onClick = { showRemarksDropdown = true },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)
             ) {

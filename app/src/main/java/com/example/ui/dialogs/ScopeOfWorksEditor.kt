@@ -63,7 +63,7 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
                 onClick = ::save,
                 enabled = canSave,
                 modifier = Modifier.heightIn(min = 48.dp).testTag("scope_save_button"),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(6.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
             ) {
                 Text(if (editing != null) "Update item" else "Add Scope of Works", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -89,7 +89,7 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
         )
     }
     if (items.isEmpty()) return
-    Surface(color = cs.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = cs.surfaceVariant, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items.forEachIndexed { index, item ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {

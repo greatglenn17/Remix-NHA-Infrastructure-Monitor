@@ -39,7 +39,7 @@ fun PaymentCard(
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth().testTag("payment_card_${payment.id}")

@@ -54,7 +54,7 @@ fun AddTimeExtensionDialog(
             }
         },
         confirmButton = {
-            Button(enabled = daysError(days) == null, onClick = { onSubmit(extNo.trim().toIntOrNull()?:1, days.trim().toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
+            Button(shape = MaterialTheme.shapes.small, enabled = daysError(days) == null, onClick = { onSubmit(extNo.trim().toIntOrNull()?:1, days.trim().toIntOrNull()?:0, period, reason, revisedDate, remarks) }) {
                 Text("Save")
             }
         },
@@ -106,7 +106,7 @@ fun AddWorkSuspensionDialog(
             }
         },
         confirmButton = {
-            Button(enabled = daysError(durationStr) == null, onClick = { onSubmit(name, effectivityDate, durationStr.trim().toIntOrNull()?:0, endDate, reason, remarks) }) {
+            Button(shape = MaterialTheme.shapes.small, enabled = daysError(durationStr) == null, onClick = { onSubmit(name, effectivityDate, durationStr.trim().toIntOrNull()?:0, endDate, reason, remarks) }) {
                 Text("Save")
             }
         },
@@ -145,7 +145,7 @@ fun AddWorkResumptionDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(name, dateResumed, reason, remarks) }) {
+            Button(shape = MaterialTheme.shapes.small, onClick = { onSubmit(name, dateResumed, reason, remarks) }) {
                 Text("Save")
             }
         },
@@ -317,7 +317,7 @@ fun AddCustomDocumentDialog(
             }
         },
         confirmButton = {
-            Button(enabled = when (selectedType) {
+            Button(shape = MaterialTheme.shapes.small, enabled = when (selectedType) {
                 "Variation Order" -> voDateValid && voAmountError == null
                 "Time Extension" -> teDays.isNotBlank() && daysError(teDays) == null
                 "Work Suspension Order" -> wsDays.isNotBlank() && daysError(wsDays) == null

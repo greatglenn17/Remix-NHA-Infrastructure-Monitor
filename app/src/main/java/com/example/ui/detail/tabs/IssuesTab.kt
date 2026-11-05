@@ -186,7 +186,7 @@ fun IssueCard(
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, borderColor),
         modifier = Modifier.fillMaxWidth()
     ) {

@@ -64,7 +64,7 @@ fun PrintPreview(title: String, html: String, onPrint: () -> Unit, onDismiss: ()
                         if (onEmail != null) {
                             IconButton(onClick = onEmail, modifier = Modifier.testTag("preview_email_button")) { Icon(Icons.Default.Email, contentDescription = "Email as PDF") }
                         }
-                        Button(onClick = onPrint, modifier = Modifier.padding(end = 8.dp).testTag("preview_print_button")) {
+                        Button(shape = MaterialTheme.shapes.small, onClick = onPrint, modifier = Modifier.padding(end = 8.dp).testTag("preview_print_button")) {
                             Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Print")

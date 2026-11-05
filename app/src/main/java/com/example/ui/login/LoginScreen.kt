@@ -173,7 +173,7 @@ fun LoginScreen(
                 modifier = Modifier.padding(top = 8.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = "REGION III • BULACAN DISTRICT OFFICE",
@@ -192,7 +192,7 @@ fun LoginScreen(
             // Main Authentication Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
@@ -206,7 +206,7 @@ fun LoginScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                             .padding(4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -217,7 +217,7 @@ fun LoginScreen(
                                     isSignUpMode = false
                                     onClearError()
                                 },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = if (!isSignUpMode) LocalNHAColors.current.cardHeader else Color.Transparent,
                             border = if (!isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
                         ) {
@@ -243,7 +243,7 @@ fun LoginScreen(
                                     isSignUpMode = true
                                     onClearError()
                                 },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = if (isSignUpMode) LocalNHAColors.current.cardHeader else Color.Transparent,
                             border = if (isSignUpMode) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
                         ) {
@@ -275,7 +275,7 @@ fun LoginScreen(
                                 .padding(bottom = 16.dp),
                             color = LocalNHAColors.current.onTrack.copy(alpha = 0.15f),
                             border = BorderStroke(1.dp, LocalNHAColors.current.onTrack.copy(alpha = 0.6f)),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -319,7 +319,7 @@ fun LoginScreen(
                                 .padding(bottom = 16.dp),
                             color = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
@@ -655,7 +655,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(52.dp)
                             .testTag("login_submit_button"),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary,
                             contentColor = MaterialTheme.colorScheme.onSecondary,
@@ -753,7 +753,7 @@ fun LoginScreen(
                 },
                 confirmButton = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
+                        Button(shape = MaterialTheme.shapes.small, 
                             onClick = {
                                 if (resetEmailInput.isNotBlank()) {
                                     onSendPasswordReset(resetEmailInput.trim())
@@ -772,7 +772,7 @@ fun LoginScreen(
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(8.dp)
             )
         }
     }
@@ -790,7 +790,7 @@ private fun UserRoleChoiceChip(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = if (isSelected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(
             width = if (isSelected) 1.5.dp else 1.dp,

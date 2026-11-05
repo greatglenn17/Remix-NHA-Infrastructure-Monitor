@@ -183,7 +183,7 @@ fun AddPaymentDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp))
                         .padding(10.dp)
                 ) {
                     Text(
@@ -287,7 +287,7 @@ fun ViewDvScanDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(260.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(cs.surfaceVariant)
                             .zoomable(),
                         contentScale = ContentScale.Fit
@@ -297,7 +297,7 @@ fun ViewDvScanDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(150.dp)
-                            .background(cs.surfaceVariant, shape = RoundedCornerShape(8.dp)),
+                            .background(cs.surfaceVariant, shape = RoundedCornerShape(6.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("No scanned copy attached yet.", style = MaterialTheme.typography.bodyMedium.copy(color = cs.onSurfaceVariant))
@@ -306,7 +306,7 @@ fun ViewDvScanDialog(
 
                 Surface(
                     color = cs.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -370,7 +370,7 @@ fun DvSourceButtons(onPick: (DvSource) -> Unit) {
             Triple(DvSource.PHOTO, "Take photo", Icons.Default.CameraAlt),
             Triple(DvSource.FILE, "Upload", Icons.Default.UploadFile)
         ).forEach { (source, label, icon) ->
-            OutlinedButton(
+            OutlinedButton(shape = MaterialTheme.shapes.small, 
                 onClick = { onPick(source) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)

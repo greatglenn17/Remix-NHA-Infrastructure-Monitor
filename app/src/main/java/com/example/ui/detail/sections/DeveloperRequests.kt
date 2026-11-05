@@ -117,7 +117,7 @@ fun DeveloperRequestDialog(
             }
         },
         confirmButton = {
-            Button(
+            Button(shape = MaterialTheme.shapes.small, 
                 enabled = received.isNotBlank(),
                 onClick = {
                     val base = existing ?: DeveloperRequest(projectId = projectId, requestType = type)

@@ -26,7 +26,7 @@ fun SectionCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = scheme.surface,
         border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier.fillMaxWidth()

@@ -129,7 +129,7 @@ fun EditProfileDialog(
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(6.dp)
             ) {
                 Text("Save Changes", fontWeight = FontWeight.Bold)
             }

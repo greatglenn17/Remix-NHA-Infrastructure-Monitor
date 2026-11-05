@@ -131,7 +131,7 @@ fun MonthlyReportsTab(
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = { onPrintMonthClick(selectedMonth, monthWeeklyReports) }, modifier = Modifier.testTag("print_monthly_report_button")) {
+                OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onPrintMonthClick(selectedMonth, monthWeeklyReports) }, modifier = Modifier.testTag("print_monthly_report_button")) {
                     Icon(Icons.Default.Print, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Print Blue Book form")
@@ -161,7 +161,7 @@ private fun MonthlyReportSingleTableCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth().testTag("monthly_report_single_table_card")
     ) {
@@ -180,7 +180,7 @@ private fun MonthlyReportSingleTableCard(
                 val isAhead = sumVariance >= 0
                 Surface(
                     color = containerOf(varianceColor(sumVariance, LocalNHAColors.current), LocalNHAColors.current),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = if (isAhead) "AHEAD (+${"%.2f".format(sumVariance)}%)" else "SLIPPAGE (${"%.2f".format(sumVariance)}%)",
@@ -198,7 +198,7 @@ private fun MonthlyReportSingleTableCard(
             // Single Table synced with weekly reports
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
