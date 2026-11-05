@@ -1,8 +1,8 @@
 {
-  "versionCode": 230,
-  "versionName": "2.3.0",
-  "releaseNotes": "v2.3.0: Updates now download and install inside the app. You can also add projects that were finished before the app as completed records.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.3.0/NHA_Monitor_v2.3.0_Build230.apk",
-  "apkSha256": "820c285a8f3599623938952ea25b53e58dbccde79f9478c6dda3cd7f6566e13c",
+  "versionCode": 231,
+  "versionName": "2.3.1",
+  "releaseNotes": "v2.3.1: Projects already in the app can now be marked completed from Edit project.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.3.1/NHA_Monitor_v2.3.1_Build231.apk",
+  "apkSha256": "6c80df5c2d72f42ea70690b065a42256524fc0844cb11e6565b698fe36acdf24",
   "isMandatory": true
 }
