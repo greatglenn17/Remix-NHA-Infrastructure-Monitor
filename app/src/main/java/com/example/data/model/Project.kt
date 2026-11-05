@@ -82,6 +82,11 @@ data class Project(
     /** The status as shown: "Completed" once work reaches 100%, else the recorded status. */
     val displayStatus: String
         get() = if (isCompleted) COMPLETED_STATUS else status
+
+    /** The project finished at [finalAccomplishment] on [completedOn] (kept in the revised date); unchanged when [completedOn] is null. */
+    fun markedCompleted(completedOn: String?, finalAccomplishment: Double): Project =
+        if (completedOn == null) this
+        else copy(completionDateRevised = completedOn, targetAccomplishment = finalAccomplishment, actualAccomplishment = finalAccomplishment)
 }
 
 const val COMPLETED_STATUS = "Completed"

@@ -69,9 +69,7 @@ fun CreateProjectDialog(
     
     var durationText by remember { mutableStateOf("") }
     var dateStarted by remember { mutableStateOf(today.toString()) }
-    var alreadyCompleted by remember { mutableStateOf(false) }
-    var completedOn by remember { mutableStateOf(today.toString()) }
-    var finalText by remember { mutableStateOf("100") }
+    val completion = remember { CompletionInput(today.toString()) }
     
     val completionDateOriginal = remember(dateStarted, durationText) {
         try {
@@ -92,12 +90,12 @@ fun CreateProjectDialog(
     val nameError = FormValidation.requiredError(name)
     val contractorError = FormValidation.requiredError(contractor)
     val durationError = daysError(durationText)
-    val completedOnError = if (alreadyCompleted) completedOnError(dateStarted, completedOn, today) else null
-    val finalError = if (alreadyCompleted) FormValidation.requiredError(finalText) ?: FormValidation.percentError(finalText) else null
+    val completedOnError = completion.dateError(dateStarted, today)
+    val finalError = completion.finalError()
     fun snapshot() = listOf(
         name, location, assignedStaff, implementingOffice, contractor, scopeItems.toList(),
         projectType, landAreaValue,
-        landAreaUnit, numberOfUnits, durationText, dateStarted, alreadyCompleted, completedOn, finalText
+        landAreaUnit, numberOfUnits, durationText, dateStarted, completion.snapshot()
     )
     val initial = remember { snapshot() }
     val dirty = snapshot() != initial
@@ -126,8 +124,8 @@ fun CreateProjectDialog(
                 dateStarted,
                 completionDateOriginal,
                 assignedStaff,
-                completedOn.takeIf { alreadyCompleted },
-                finalText.trim().toDoubleOrNull() ?: 100.0
+                completion.completedOn,
+                completion.finalAccomplishment
             )
         }
     ) {
@@ -314,29 +312,56 @@ fun CreateProjectDialog(
         }
 
         // For projects finished before this app: saved at the final accomplishment with no weekly report.
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.weight(1f)) {
-                Text("Already completed", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
-                Text("Finished before this app; no weekly reports needed", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-            }
-            Switch(checked = alreadyCompleted, onCheckedChange = { alreadyCompleted = it }, modifier = Modifier.testTag("switch_already_completed"))
+        AlreadyCompletedFields(completion, "Already completed", "Finished before this app; no weekly reports needed", completedOnError, finalError)
+    }
+}
+
+/** The "completed" switch, actual completion date and final accomplishment, shared by the create and edit forms. */
+internal class CompletionInput(defaultDate: String) {
+    var on by mutableStateOf(false)
+    var date by mutableStateOf(defaultDate)
+    var finalText by mutableStateOf("100")
+    fun dateError(dateStarted: String, today: LocalDate) = if (on) completedOnError(dateStarted, date, today) else null
+    fun finalError() = if (on) FormValidation.requiredError(finalText) ?: FormValidation.percentError(finalText) else null
+    fun snapshot() = listOf(on, date, finalText)
+    /** The actual completion date when the switch is on, else null. */
+    val completedOn: String? get() = date.takeIf { on }
+    val finalAccomplishment: Double get() = finalText.trim().toDoubleOrNull() ?: 100.0
+}
+
+@Composable
+internal fun AlreadyCompletedFields(input: CompletionInput, title: String, subtitle: String, dateError: String?, finalError: String?) {
+    val cs = MaterialTheme.colorScheme
+    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        if (alreadyCompleted) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DateField(label = "Actual completion", value = completedOn, onValueChange = { completedOn = it }, error = completedOnError, modifier = Modifier.weight(1f))
-                OutlinedTextField(
-                    value = finalText,
-                    onValueChange = { finalText = it },
-                    label = { Text("Final accomplishment %") },
-                    isError = finalError != null,
-                    supportingText = (finalError ?: belowFullNote(finalText))?.let { { Text(it) } },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f).testTag("input_final_accomplishment"),
-                    singleLine = true
-                )
-            }
+        Switch(checked = input.on, onCheckedChange = { input.on = it }, modifier = Modifier.testTag("switch_already_completed"))
+    }
+    if (input.on) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DateField(label = "Actual completion", value = input.date, onValueChange = { input.date = it }, error = dateError, modifier = Modifier.weight(1f))
+            OutlinedTextField(
+                value = input.finalText,
+                onValueChange = { input.finalText = it },
+                label = { Text("Final accomplishment %") },
+                isError = finalError != null,
+                supportingText = (finalError ?: belowFullNote(input.finalText))?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f).testTag("input_final_accomplishment"),
+                singleLine = true
+            )
         }
     }
+}
+
+/** Default actual completion date for a logged project: its completion date, but never after today. */
+internal fun defaultCompletedOn(project: com.example.data.model.Project, today: LocalDate): String {
+    val due = runCatching {
+        LocalDate.parse(com.example.util.ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised).trim())
+    }.getOrNull()
+    return (if (due == null || due.isAfter(today)) today else due).toString()
 }
 
 /** The actual completion date of a finished project: required, not before the start, not in the future. */

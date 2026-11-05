@@ -41,6 +41,7 @@ import com.example.ui.dialogs.AddIssueDialog
 import com.example.ui.dialogs.AddMonthlyReportDialog
 import com.example.ui.dialogs.AddWeeklyReportDialog
 import com.example.ui.dialogs.CreateProjectDialog
+import com.example.ui.dialogs.EditProjectDialog
 import com.example.ui.login.LoginScreen
 import com.example.ui.theme.NHATheme
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -117,6 +118,11 @@ class FormsScreenshotTest {
             // Swipe, not performScrollTo: its animated scroll never idles on the paused clock.
             repeat(6) { rule.onAllNodes(hasScrollAction())[0].performTouchInput { swipeUp() }; settle() }
         }) { CreateProjectDialog({}, "Engr. R. Santos", { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today) }
+        // A logged project that finished below a 100% report, marked completed from Edit.
+        shoot("form_edit_project_mark_completed_$t", steps = {
+            rule.onNodeWithTag("switch_already_completed").performSemanticsAction(SemanticsActions.OnClick); settle()
+            repeat(8) { rule.onAllNodes(hasScrollAction())[0].performTouchInput { swipeUp() }; settle() }
+        }) { EditProjectDialog(project, onDismiss = {}, onEdit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }, today = today) }
         shoot("form_lot_inspection_$t") { RecordInspectionSnapshotDialog(lot, null, "JRC Builders", {}) { _, _, _, _, _, _, _ -> } }
         shoot("form_add_lot_road_$t", steps = {
             rule.onNodeWithTag("add_lot_use").performSemanticsAction(SemanticsActions.OnClick); settle()
