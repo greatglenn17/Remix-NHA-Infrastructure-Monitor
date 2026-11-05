@@ -58,6 +58,15 @@ class MainActivity : ComponentActivity() {
                     val authSuccessMessage by viewModel.authSuccessMessage.collectAsState()
                     val selectedProjectId by viewModel.selectedProjectId.collectAsState()
 
+                    // Look for a newer release each time the app opens, before or after sign-in.
+                    var update by remember { mutableStateOf<com.example.util.AppUpdateInfo?>(null) }
+                    LaunchedEffect(Unit) {
+                        // Unit tests (Robolectric) must not reach GitHub: a late reply stalls the next tests' Compose clock.
+                        if (Build.FINGERPRINT == "robolectric") return@LaunchedEffect
+                        update = com.example.util.AppUpdateManager.checkForUpdates()?.takeIf { it.isUpdateAvailable }
+                    }
+                    update?.let { UpdateAvailableDialog(updateInfo = it, onDismiss = { update = null }) }
+
                     if (!isLoggedIn) {
                         LoginScreen(
                             onLoginSuccess = { email, password, displayName, role, isSignUp, position, office ->

@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.util.AppUpdateInfo
 import com.example.util.AppUpdateManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 fun UpdateAvailableDialog(
@@ -26,7 +28,10 @@ fun UpdateAvailableDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var isDownloading by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = {
@@ -117,16 +122,24 @@ fun UpdateAvailableDialog(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         LinearProgressIndicator(
+                            progress = { progress },
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Downloading update in background... Please wait.",
+                            text = "Downloading update... ${(progress * 100).toInt()}%",
                             style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         )
                     }
+                }
+
+                error?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    )
                 }
             }
         },
@@ -134,17 +147,20 @@ fun UpdateAvailableDialog(
             Button(
                 onClick = {
                     isDownloading = true
-                    AppUpdateManager.downloadAndInstallApk(
-                        context = context,
-                        apkUrl = updateInfo.apkDownloadUrl,
-                        expectedSha256 = updateInfo.apkSha256,
-                        onDownloadStarted = {
-                            isDownloading = true
-                        },
-                        onDownloadFailed = {
+                    progress = 0f
+                    error = null
+                    scope.launch {
+                        try {
+                            // Android's installer takes over from here and asks the user to confirm.
+                            AppUpdateManager.downloadAndInstall(context, updateInfo) { progress = it }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            error = e.message ?: "The update could not be downloaded. Please try again."
+                        } finally {
                             isDownloading = false
                         }
-                    )
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -160,7 +176,11 @@ fun UpdateAvailableDialog(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (isDownloading) "DOWNLOADING..." else "DOWNLOAD & INSTALL UPDATE",
+                    text = when {
+                        isDownloading -> "DOWNLOADING..."
+                        error != null -> "TRY AGAIN"
+                        else -> "DOWNLOAD & INSTALL UPDATE"
+                    },
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }

@@ -58,6 +58,11 @@
             </intent-filter>
         </activity>
 
+        <!-- Hears back from Android's installer during an in-app update. -->
+        <receiver
+            android:name=".util.UpdateInstallReceiver"
+            android:exported="false" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.NhaFirebaseMessagingService"
