@@ -2,6 +2,7 @@ package com.example
 
 import com.example.data.model.Project
 import com.example.ui.dialogs.completedOnError
+import com.example.ui.dialogs.defaultCompletedOn
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -33,5 +34,24 @@ class CompletedProjectTest {
         assertEquals("Required", completedOnError("2019-03-01", "", today))
         assertEquals("Before the start date", completedOnError("2020-07-01", "2020-06-30", today))
         assertEquals("Can't be in the future", completedOnError("2019-03-01", "2026-11-06", today))
+    }
+
+    @Test
+    fun markedCompleted_setsWorkAndDate_onlyWhenADateIsGiven() {
+        val logged = project(62.0).copy(targetAccomplishment = 70.0)
+        assertEquals(logged, logged.markedCompleted(null, 100.0))
+        val done = logged.markedCompleted("2025-08-15", 100.0)
+        assertEquals(100.0, done.actualAccomplishment, 0.0)
+        assertEquals(100.0, done.targetAccomplishment, 0.0)
+        assertEquals("2025-08-15", done.completionDateRevised)
+        assertEquals("Completed", done.displayStatus)
+    }
+
+    @Test
+    fun defaultCompletedOn_isTheProjectsCompletionDate_neverAfterToday() {
+        val p = project(62.0)  // revised 2020-12-31
+        assertEquals("2020-12-31", defaultCompletedOn(p, today))
+        assertEquals("2026-11-05", defaultCompletedOn(p.copy(completionDateRevised = "2027-03-01"), today))
+        assertEquals("2026-11-05", defaultCompletedOn(p.copy(completionDateOriginal = "?", completionDateRevised = "-"), today))
     }
 }
