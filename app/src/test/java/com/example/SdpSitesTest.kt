@@ -6,6 +6,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.model.Project
 import com.example.data.model.SdpPlan
 import com.example.data.model.SdpSites
+import com.example.data.repository.ProjectRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -62,5 +63,26 @@ class SdpSitesTest {
 
         dao.renameSdpSite(1, "Phase 2", "North")
         assertEquals(listOf("Phase 1", "North"), SdpSites.current(dao.getSdpPlansForProject(1).first()).map { it.siteName })
+    }
+
+    @Test
+    fun aSecondSiteUploadedAsARevisionCanBecomeItsOwnSite() = runBlocking {
+        dao.insertProject(
+            Project(
+                id = 1, name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "[]",
+                contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 0,
+                dateStarted = "", completionDateOriginal = "", completionDateRevised = ""
+            )
+        )
+        // Before sites existed: Phase 2 went in as v2 of the unnamed site and hid v1.
+        dao.insertSdpPlan(plan(1, "", 1, false))
+        dao.insertSdpPlan(plan(2, "", 2, true))
+        val v2 = dao.getSdpPlansForProject(1).first().single { it.id == 2L }
+        ProjectRepository(dao, database.reportDao()).moveSdpPlanToNewSite(v2, "Phase 2", "Phase 1")
+
+        val plans = dao.getSdpPlansForProject(1).first().associateBy { it.id }
+        assertEquals("Phase 1" to 1, plans.getValue(1).siteName to plans.getValue(1).version)
+        assertEquals("Phase 2" to 1, plans.getValue(2).siteName to plans.getValue(2).version)
+        assertEquals(listOf(1L, 2L), SdpSites.current(plans.values.toList()).map { it.id })
     }
 }

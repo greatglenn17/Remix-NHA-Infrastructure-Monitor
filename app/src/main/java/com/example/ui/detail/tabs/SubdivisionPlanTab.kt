@@ -331,9 +331,12 @@ fun SubdivisionPlanTab(
     onPrintPlan: () -> Unit = {},
     // Another site under the same contract, with its first plan; currentSiteName names the site on screen when it has no name.
     onAddSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> },
-    onSelectSite: (String) -> Unit = {}
+    onSelectSite: (String) -> Unit = {},
+    // A plan uploaded as a revision that is really another site; currentSiteName as in onAddSite.
+    onMoveToNewSite: (plan: SdpPlan, newSite: String, currentSiteName: String) -> Unit = { _, _, _ -> }
 ) {
     var showScaleDialog by remember { mutableStateOf(false) }
+    var showMoveSiteDialog by remember { mutableStateOf(false) }
     val sites = remember(sdpPlans) { com.example.data.model.SdpSites.current(sdpPlans).map { it.siteName } }
     // Versions of the site on screen; other sites keep their own.
     val sitePlans = sdpPlans.filter { it.siteName == activeSdpPlan?.siteName }
@@ -784,6 +787,16 @@ fun SubdivisionPlanTab(
                                             },
                                             onClick = {
                                                 onSelectActiveVersion(plan.id)
+                                                dropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                    if (canManageSdp) {
+                                        HorizontalDivider()
+                                        DropdownMenuItem(
+                                            text = { Text("Make v${activeSdpPlan.version} its own site…", style = MaterialTheme.typography.bodySmall) },
+                                            onClick = {
+                                                showMoveSiteDialog = true
                                                 dropdownExpanded = false
                                             }
                                         )
@@ -2342,6 +2355,18 @@ fun SubdivisionPlanTab(
         )
     }
 
+    if (showMoveSiteDialog && activeSdpPlan != null) {
+        MoveToSiteDialog(
+            plan = activeSdpPlan,
+            takenSites = sites,
+            onDismiss = { showMoveSiteDialog = false },
+            onConfirm = { newSite, currentSiteName ->
+                onMoveToNewSite(activeSdpPlan, newSite, currentSiteName)
+                showMoveSiteDialog = false
+            }
+        )
+    }
+
     // 11. DETECTED LOTS REVIEW
     detectedAreas?.let { areas ->
         val plan = activeSdpPlan
@@ -2950,14 +2975,7 @@ fun AddSdpPlanDialog(
     // Only asked when the site already uploaded has no name, so the two can be told apart.
     val namingCurrent = currentSite?.isBlank() == true
     var currentSiteName by remember { mutableStateOf("Phase 1") }
-    val siteError = when {
-        !addingSite -> null
-        newSiteName.isBlank() -> "Name the new site"
-        namingCurrent && currentSiteName.isBlank() -> "Name the site already uploaded"
-        namingCurrent && newSiteName.trim().equals(currentSiteName.trim(), ignoreCase = true) -> "The two sites need different names"
-        takenSites.any { it.equals(newSiteName.trim(), ignoreCase = true) } -> "${newSiteName.trim()} is already a site of this project"
-        else -> null
-    }
+    val siteError = if (addingSite) siteNameError(newSiteName, namingCurrent, currentSiteName, takenSites) else null
     var planName by remember { mutableStateOf("Approved Subdivision Plan Layout") }
     var description by remember { mutableStateOf("Official Approved SDP PDF Reference Document") }
     // The pick is copied into the app and uploaded like any attachment, so every phone can open it.
@@ -3098,6 +3116,73 @@ fun AddSdpPlanDialog(
                 Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    )
+}
+
+private fun siteNameError(newSite: String, namingCurrent: Boolean, currentSiteName: String, takenSites: List<String>) = when {
+    newSite.isBlank() -> "Name the new site"
+    namingCurrent && currentSiteName.isBlank() -> "Name the site already uploaded"
+    namingCurrent && newSite.trim().equals(currentSiteName.trim(), ignoreCase = true) -> "The two sites need different names"
+    takenSites.any { it.equals(newSite.trim(), ignoreCase = true) } -> "${newSite.trim()} is already a site of this project"
+    else -> null
+}
+
+/** Moves one version of a site, with its lots and progress, into a site of its own. */
+@Composable
+fun MoveToSiteDialog(
+    plan: SdpPlan,
+    takenSites: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (newSite: String, currentSiteName: String) -> Unit
+) {
+    var newSiteName by remember { mutableStateOf("Phase ${takenSites.size + 1}") }
+    val namingCurrent = plan.siteName.isBlank()
+    var currentSiteName by remember { mutableStateOf("Phase 1") }
+    val siteError = siteNameError(newSiteName, namingCurrent, currentSiteName, takenSites)
+    val oldSite = com.example.data.model.SdpSites.label(plan.siteName)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Make v${plan.version} its own site", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    "Use this when v${plan.version} (${plan.planName}) is another site under this contract, not a revision of $oldSite. " +
+                        "Its lots, progress and inspections move with it. The other versions stay in ${if (namingCurrent) "the first site" else oldSite}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (namingCurrent) {
+                    OutlinedTextField(
+                        value = currentSiteName,
+                        onValueChange = { currentSiteName = it },
+                        label = { Text("Name of the first site") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("current_site_name")
+                    )
+                }
+                OutlinedTextField(
+                    value = newSiteName,
+                    onValueChange = { newSiteName = it },
+                    label = { Text("Name of the new site") },
+                    singleLine = true,
+                    isError = siteError != null,
+                    supportingText = { Text(siteError ?: "v${plan.version} becomes version 1 of this site.") },
+                    modifier = Modifier.fillMaxWidth().testTag("new_site_name")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                shape = MaterialTheme.shapes.small,
+                onClick = { onConfirm(newSiteName.trim(), if (namingCurrent) currentSiteName.trim() else "") },
+                enabled = siteError == null
+            ) { Text("Make site", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
     )
 }
 

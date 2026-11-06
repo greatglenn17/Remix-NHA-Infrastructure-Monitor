@@ -188,6 +188,16 @@ class ProjectRepository(
         projectDao.renameSdpSite(projectId, oldName, newName)
     }
 
+    /**
+     * Makes a plan uploaded as a revision the first plan of a site of its own.
+     * [currentSiteName] names the site it leaves when that site has no name yet.
+     */
+    suspend fun moveSdpPlanToNewSite(plan: SdpPlan, newSite: String, currentSiteName: String = "", role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        if (plan.siteName.isBlank() && currentSiteName.isNotBlank()) projectDao.renameSdpSite(plan.projectId, "", currentSiteName)
+        projectDao.moveSdpPlanToSite(plan.id, newSite)
+    }
+
     /** Saves the plan's scale and the lot areas worked out from it. */
     suspend fun setSdpPlanScale(plan: SdpPlan, lots: List<SdpLot>, role: UserRole? = null) {
         validatePermission(role, Permission.EDIT_PROJECT)

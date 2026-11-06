@@ -1254,6 +1254,21 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun moveSdpPlanToNewSite(plan: SdpPlan, newSite: String, currentSiteName: String = "") {
+        viewModelScope.launch {
+            repository.moveSdpPlanToNewSite(plan, newSite.trim(), currentSiteName.trim(), currentUserAccount.value.role)
+            selectSdpSite(plan.projectId, newSite.trim())
+            val oldSite = com.example.data.model.SdpSites.label(currentSiteName.trim().ifBlank { plan.siteName })
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Project Edit",
+                details = "Made SDP Plan v${plan.version} of $oldSite its own site: ${newSite.trim()}",
+                oldValue = "Site: $oldSite, Version: ${plan.version}",
+                newValue = "Site: ${newSite.trim()}, Version: 1"
+            )
+        }
+    }
+
     fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long) {
         viewModelScope.launch {
             repository.setActiveSdpPlan(projectId, sdpPlanId, currentUserAccount.value.role)

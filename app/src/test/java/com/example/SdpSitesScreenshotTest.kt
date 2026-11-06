@@ -9,6 +9,7 @@ import com.example.data.model.UserRole
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.ui.detail.tabs.AddSdpPlanDialog
+import com.example.ui.detail.tabs.MoveToSiteDialog
 import com.example.ui.detail.tabs.SubdivisionPlanTab
 import com.example.ui.theme.NHATheme
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -63,5 +64,16 @@ class SdpSitesScreenshotTest {
         rule.onNodeWithText("Another site under this contract").performClick()
         rule.onNodeWithText("Name of the new site").assertExists()
         captureScreenRoboImage("src/test/screenshots/sdp_add_site_dialog_light.png")
+    }
+
+    // v2 of an unnamed site that is really another site.
+    @Test fun sdp_move_to_site_dialog_light() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                MoveToSiteDialog(plan = phase2.copy(version = 2, siteName = ""), takenSites = listOf(""), onDismiss = {}, onConfirm = { _, _ -> })
+            }
+        }
+        rule.onNodeWithText("Name of the first site").assertExists()
+        captureScreenRoboImage("src/test/screenshots/sdp_move_to_site_dialog_light.png")
     }
 }

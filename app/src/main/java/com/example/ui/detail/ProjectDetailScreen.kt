@@ -287,6 +287,7 @@ fun ProjectDetailScreen(
                                     viewModel.addSdpPlan(currentProject.id, planName, pdfUrl, desc, newSite, currentSiteName)
                                 },
                                 onSelectSite = { site -> viewModel.selectSdpSite(currentProject.id, site) },
+                                onMoveToNewSite = viewModel::moveSdpPlanToNewSite,
                                 onDetectLots = viewModel::detectSdpLots,
                                 onAddDetectedLots = viewModel::addDetectedSdpLots,
                                 onTraceLot = viewModel::traceSdpLot,
