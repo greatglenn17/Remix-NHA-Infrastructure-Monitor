@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
  * The next chip peeks at the edge, and the open view is scrolled into sight.
  */
 @Composable
-fun ChipRow(chips: List<String>, selected: String, onSelect: (String) -> Unit) {
+fun ChipRow(chips: List<String>, selected: String, contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp), onSelect: (String) -> Unit) {
     val state = rememberLazyListState()
     LaunchedEffect(selected) {
         val i = chips.indexOf(selected).takeIf { it >= 0 } ?: return@LaunchedEffect
@@ -31,7 +31,7 @@ fun ChipRow(chips: List<String>, selected: String, onSelect: (String) -> Unit) {
     LazyRow(
         state = state,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = contentPadding,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
         items(chips) { chip ->

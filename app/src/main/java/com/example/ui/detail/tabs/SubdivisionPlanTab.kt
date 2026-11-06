@@ -17,6 +17,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
@@ -325,9 +328,15 @@ fun SubdivisionPlanTab(
     onRenameLot: (SdpLot, block: String, lot: String) -> Unit = { _, _, _ -> },
     // Null: the whole page.
     onSetPlanFrame: (SdpPlan, List<Float>?) -> Unit = { _, _ -> },
-    onPrintPlan: () -> Unit = {}
+    onPrintPlan: () -> Unit = {},
+    // Another site under the same contract, with its first plan; currentSiteName names the site on screen when it has no name.
+    onAddSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> },
+    onSelectSite: (String) -> Unit = {}
 ) {
     var showScaleDialog by remember { mutableStateOf(false) }
+    val sites = remember(sdpPlans) { com.example.data.model.SdpSites.current(sdpPlans).map { it.siteName } }
+    // Versions of the site on screen; other sites keep their own.
+    val sitePlans = sdpPlans.filter { it.siteName == activeSdpPlan?.siteName }
     // Area worked out from the plan scale for the lot being added; null until known.
     var draftArea by remember { mutableStateOf<Double?>(null) }
     val context = LocalContext.current
@@ -617,7 +626,7 @@ fun SubdivisionPlanTab(
                         )
                         Text(
                             text = if (activeSdpPlan != null) {
-                                "${project.name} • v${activeSdpPlan.version}"
+                                "${project.name} • " + (if (sites.size > 1) com.example.data.model.SdpSites.label(activeSdpPlan.siteName) + " • " else "") + "v${activeSdpPlan.version}"
                             } else {
                                 "No Approved Site Development Plan Uploaded"
                             },
@@ -705,6 +714,13 @@ fun SubdivisionPlanTab(
                     }
                 }
 
+                if (activeSdpPlan != null && sites.size > 1) {
+                    val labels = sites.map(com.example.data.model.SdpSites::label)
+                    com.example.ui.detail.sections.ChipRow(labels, com.example.data.model.SdpSites.label(activeSdpPlan.siteName), contentPadding = PaddingValues(0.dp)) { label ->
+                        onSelectSite(sites[labels.indexOf(label)])
+                    }
+                }
+
                 // COMPACT KPI MONITORING ROW
                 if (activeSdpPlan != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -730,7 +746,7 @@ fun SubdivisionPlanTab(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         // Version Selector
-                        if (sdpPlans.size > 1) {
+                        if (sitePlans.size > 1) {
                             var dropdownExpanded by remember { mutableStateOf(false) }
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
@@ -756,7 +772,7 @@ fun SubdivisionPlanTab(
                                     onDismissRequest = { dropdownExpanded = false },
                                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
-                                    sdpPlans.forEach { plan ->
+                                    sitePlans.forEach { plan ->
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
@@ -2309,11 +2325,18 @@ fun SubdivisionPlanTab(
     // 10. UPLOAD SDP DIALOG
     if (showUploadDialog) {
         AddSdpPlanDialog(
-            currentVersion = sdpPlans.size + 1,
+            currentVersion = (sitePlans.maxOfOrNull { it.version } ?: 0) + 1,
             onDismiss = { showUploadDialog = false },
             onSubmit = { planName: String, pdfUriString: String, desc: String ->
                 detectAfterUpload = pdfUriString.isNotBlank()
                 onUploadSdpPlan(planName, pdfUriString, desc)
+                showUploadDialog = false
+            },
+            currentSite = activeSdpPlan?.siteName,
+            takenSites = sites,
+            onSubmitNewSite = { newSite, currentSiteName, planName, pdfUriString, desc ->
+                detectAfterUpload = true
+                onAddSite(newSite, currentSiteName, planName, pdfUriString, desc)
                 showUploadDialog = false
             }
         )
@@ -2916,8 +2939,25 @@ fun AddRoadDialog(
 fun AddSdpPlanDialog(
     currentVersion: Int,
     onDismiss: () -> Unit,
-    onSubmit: (planName: String, pdfUrl: String, description: String) -> Unit
+    onSubmit: (planName: String, pdfUrl: String, description: String) -> Unit,
+    // The site on screen; null on the project's first plan, when there is nothing to revise.
+    currentSite: String? = null,
+    takenSites: List<String> = emptyList(),
+    onSubmitNewSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> }
 ) {
+    var addingSite by remember { mutableStateOf(false) }
+    var newSiteName by remember { mutableStateOf("Phase ${takenSites.size + 1}") }
+    // Only asked when the site already uploaded has no name, so the two can be told apart.
+    val namingCurrent = currentSite?.isBlank() == true
+    var currentSiteName by remember { mutableStateOf("Phase 1") }
+    val siteError = when {
+        !addingSite -> null
+        newSiteName.isBlank() -> "Name the new site"
+        namingCurrent && currentSiteName.isBlank() -> "Name the site already uploaded"
+        namingCurrent && newSiteName.trim().equals(currentSiteName.trim(), ignoreCase = true) -> "The two sites need different names"
+        takenSites.any { it.equals(newSiteName.trim(), ignoreCase = true) } -> "${newSiteName.trim()} is already a site of this project"
+        else -> null
+    }
     var planName by remember { mutableStateOf("Approved Subdivision Plan Layout") }
     var description by remember { mutableStateOf("Official Approved SDP PDF Reference Document") }
     // The pick is copied into the app and uploaded like any attachment, so every phone can open it.
@@ -2934,7 +2974,7 @@ fun AddSdpPlanDialog(
                 Icon(Icons.Default.PictureAsPdf, contentDescription = "SDP", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Upload Approved SDP (Version $currentVersion)",
+                    text = "Upload Approved SDP (Version ${if (addingSite) 1 else currentVersion})",
                     style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
@@ -2942,8 +2982,44 @@ fun AddSdpPlanDialog(
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             ) {
+                if (currentSite != null) {
+                    Column(Modifier.selectableGroup()) {
+                        listOf(false to "Revised plan for ${com.example.data.model.SdpSites.label(currentSite)}", true to "Another site under this contract").forEach { (site, text) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                                    .selectable(selected = addingSite == site, onClick = { addingSite = site }, role = Role.RadioButton)
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                RadioButton(selected = addingSite == site, onClick = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                    if (addingSite) {
+                        if (namingCurrent) {
+                            OutlinedTextField(
+                                value = currentSiteName,
+                                onValueChange = { currentSiteName = it },
+                                label = { Text("Name of the site already uploaded") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("current_site_name")
+                            )
+                        }
+                        OutlinedTextField(
+                            value = newSiteName,
+                            onValueChange = { newSiteName = it },
+                            label = { Text("Name of the new site") },
+                            singleLine = true,
+                            isError = siteError != null,
+                            supportingText = { Text(siteError ?: "Each site keeps its own lots, progress and revisions.") },
+                            modifier = Modifier.fillMaxWidth().testTag("new_site_name")
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = planName,
                     onValueChange = { planName = it },
@@ -3006,9 +3082,12 @@ fun AddSdpPlanDialog(
         confirmButton = {
             Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
-                    pdfRef?.let { onSubmit(planName, it, description) }
+                    pdfRef?.let {
+                        if (addingSite) onSubmitNewSite(newSiteName.trim(), if (namingCurrent) currentSiteName.trim() else "", planName, it, description)
+                        else onSubmit(planName, it, description)
+                    }
                 },
-                enabled = pdfRef != null,
+                enabled = pdfRef != null && siteError == null,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("Save SDP Plan", fontWeight = FontWeight.Bold)

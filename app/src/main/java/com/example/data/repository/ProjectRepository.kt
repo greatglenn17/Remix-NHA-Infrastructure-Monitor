@@ -173,12 +173,19 @@ class ProjectRepository(
 
     // SDP Plans
     fun getSdpPlansForProject(projectId: Long): Flow<List<SdpPlan>> = projectDao.getSdpPlansForProject(projectId)
-    fun getActiveSdpPlanForProject(projectId: Long): Flow<SdpPlan?> = projectDao.getActiveSdpPlanForProject(projectId)
+    fun getActiveLotsForProject(projectId: Long): Flow<List<SdpLot>> = projectDao.getActiveLotsForProject(projectId)
+    fun getLotProgressForProject(projectId: Long): Flow<List<SdpLotProgress>> = projectDao.getLotProgressForProject(projectId)
 
+    /** The new plan replaces only its own site's plan. */
     suspend fun insertSdpPlan(sdpPlan: SdpPlan, role: UserRole? = null): Long {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
-        projectDao.deactivateAllSdpPlansForProject(sdpPlan.projectId)
+        projectDao.deactivateSdpPlansForSite(sdpPlan.projectId, sdpPlan.siteName)
         return projectDao.insertSdpPlan(sdpPlan)
+    }
+
+    suspend fun renameSdpSite(projectId: Long, oldName: String, newName: String, role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        projectDao.renameSdpSite(projectId, oldName, newName)
     }
 
     /** Saves the plan's scale and the lot areas worked out from it. */

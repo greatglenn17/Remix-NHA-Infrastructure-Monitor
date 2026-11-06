@@ -762,10 +762,28 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         if (id == null) flowOf(emptyList()) else repository.getSdpPlansForProject(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val activeSdpPlan: StateFlow<SdpPlan?> = _selectedProjectId.flatMapLatest { id ->
-        if (id == null) flowOf(null) else repository.getActiveSdpPlanForProject(id)
+    // The site each project shows on this phone. Not synced, so one engineer's pick doesn't move the others.
+    private val _selectedSdpSite = MutableStateFlow<Map<Long, String>>(emptyMap())
+
+    /** The plan on screen: the picked site's plan in use, else the first site's. */
+    val activeSdpPlan: StateFlow<SdpPlan?> = combine(_selectedProjectId, sdpPlans, _selectedSdpSite) { id, plans, picked ->
+        val current = SdpSites.current(plans.filter { it.projectId == id })
+        current.firstOrNull { it.siteName == picked[id] } ?: current.firstOrNull()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun selectSdpSite(projectId: Long, site: String) = _selectedSdpSite.update { it + (projectId to site) }
+
+    /** Every site's lots of the project, for its totals. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val allSitesSdpItems: StateFlow<List<com.example.util.SdpSummary.Item>> = _selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else combine(
+            repository.getSdpPlansForProject(id), repository.getActiveLotsForProject(id), repository.getLotProgressForProject(id)
+        ) { plans, lots, progress ->
+            val inUse = SdpSites.current(plans).map { it.id }.toSet()
+            val byLot = progress.associateBy { it.sdpLotId }
+            lots.filter { it.sdpPlanId in inUse }.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, byLot[it.id]?.physicalProgress ?: 0) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val activeSdpLots: StateFlow<List<SdpLot>> = activeSdpPlan.flatMapLatest { plan ->
@@ -1018,15 +1036,28 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * [newSite]: the name of another site under this contract; null: a revision of the site on screen.
+     * [currentSiteName] names the site on screen when it has no name yet.
+     */
     fun addSdpPlan(
         projectId: Long,
         planName: String,
         pdfFileUrl: String,
-        description: String = ""
+        description: String = "",
+        newSite: String? = null,
+        currentSiteName: String = ""
     ) {
         viewModelScope.launch {
             val user = currentUserAccount.value.name
-            val existingPlans = repository.getSdpPlansForProject(projectId).first()
+            var site = activeSdpPlan.value?.takeIf { it.projectId == projectId }?.siteName ?: ""
+            if (newSite != null) {
+                if (site.isBlank() && currentSiteName.isNotBlank()) {
+                    repository.renameSdpSite(projectId, "", currentSiteName.trim(), currentUserAccount.value.role)
+                }
+                site = newSite.trim()
+            }
+            val existingPlans = repository.getSdpPlansForProject(projectId).first().filter { it.siteName == site }
             val nextVersion = (existingPlans.maxOfOrNull { it.version } ?: 0) + 1
             val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
             val plan = SdpPlan(
@@ -1037,13 +1068,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 isActive = true,
                 uploadedDate = currentDate,
                 uploadedBy = user,
-                description = description
+                description = description,
+                siteName = site
             )
             repository.insertSdpPlan(plan, currentUserAccount.value.role)
+            // Shows the new plan, so lot detection runs on it.
+            selectSdpSite(projectId, site)
+            val siteNote = if (site.isBlank()) "" else " ($site)"
             logAuditAction(
                 projectId = projectId,
                 actionType = "Document Upload",
-                details = "Uploaded Approved SDP Plan Version $nextVersion: $planName",
+                details = "Uploaded Approved SDP Plan$siteNote Version $nextVersion: $planName",
                 oldValue = "",
                 newValue = "Plan: $planName, Version: $nextVersion, File: $pdfFileUrl"
             )
