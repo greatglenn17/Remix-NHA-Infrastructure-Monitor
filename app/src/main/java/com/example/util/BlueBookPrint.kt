@@ -22,11 +22,13 @@ object BlueBookPrint {
     // The print job reads from the WebView after this call returns, so it must outlive it.
     private var pending: WebView? = null
 
-    private val A4 by lazy { PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build() }
+    // The form's own @page rule says which way the paper turns.
+    private fun a4(html: String) =
+        if (html.contains(BlueBookForms.LANDSCAPE_PAGE)) PrintAttributes.MediaSize.ISO_A4.asLandscape() else PrintAttributes.MediaSize.ISO_A4
 
     fun print(context: Context, jobName: String, html: String) = load(context, html) { view ->
         val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-        printManager.print(jobName, view.createPrintDocumentAdapter(jobName), A4)
+        printManager.print(jobName, view.createPrintDocumentAdapter(jobName), PrintAttributes.Builder().setMediaSize(a4(html)).build())
     }
 
     /** Makes the same A4 pages as [print] into a PDF and opens an email app with it attached. */
@@ -58,7 +60,7 @@ object BlueBookPrint {
         val dir = File(context.cacheDir, "pdf").apply { mkdirs() }
         val file = File(dir, pdfName(jobName))
         val attributes = PrintAttributes.Builder()
-            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setMediaSize(a4(html))
             .setResolution(PrintAttributes.Resolution("pdf", "pdf", 600, 600))
             .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
             .build()

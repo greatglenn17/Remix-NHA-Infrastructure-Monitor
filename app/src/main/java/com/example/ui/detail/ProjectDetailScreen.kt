@@ -76,6 +76,7 @@ fun ProjectDetailScreen(
     val activeSdpRoads by viewModel.activeSdpRoads.collectAsState()
     val activeSdpLotProgressMap by viewModel.activeSdpLotProgressMap.collectAsState()
     val allSitesSdpItems by viewModel.allSitesSdpItems.collectAsState()
+    val allSitesSdpLots by viewModel.allSitesSdpLots.collectAsState()
 
     var projectToEdit by remember { mutableStateOf<Project?>(null) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -288,6 +289,9 @@ fun ProjectDetailScreen(
                                 },
                                 onSelectSite = { site -> viewModel.selectSdpSite(currentProject.id, site) },
                                 onMoveToNewSite = viewModel::moveSdpPlanToNewSite,
+                                onUndoMoveToNewSite = viewModel::undoMoveSdpPlanToNewSite,
+                                allSitesLots = allSitesSdpLots.first,
+                                allSitesProgress = allSitesSdpLots.second,
                                 onDetectLots = viewModel::detectSdpLots,
                                 onAddDetectedLots = viewModel::addDetectedSdpLots,
                                 onTraceLot = viewModel::traceSdpLot,
@@ -298,10 +302,11 @@ fun ProjectDetailScreen(
                                 onSetLotUse = viewModel::setSdpLotUse,
                                 onRenameLot = viewModel::renameSdpLot,
                                 onSetPlanFrame = viewModel::setSdpPlanFrame,
-                                onPrintPlan = {
+                                onPrintPlan = { allSites, landscape ->
                                     activeSdpPlan?.let { plan ->
+                                        val plans = if (allSites) com.example.data.model.SdpSites.current(sdpPlans) else listOf(plan)
                                         printForm("SDP Progress - ${currentProject.name}") {
-                                            viewModel.sdpPlanForm(currentProject, plan, activeSdpLots, activeSdpLotProgressMap)
+                                            viewModel.sdpPlanForm(currentProject, plans, landscape)
                                         }
                                     }
                                 },

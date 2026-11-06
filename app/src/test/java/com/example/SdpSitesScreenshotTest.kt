@@ -4,12 +4,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
 import com.example.data.model.SdpLot
+import com.example.data.model.SdpLotProgress
 import com.example.data.model.SdpPlan
 import com.example.data.model.UserRole
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.ui.detail.tabs.AddSdpPlanDialog
 import com.example.ui.detail.tabs.MoveToSiteDialog
+import com.example.ui.detail.tabs.PrintPlanDialog
 import com.example.ui.detail.tabs.SubdivisionPlanTab
 import com.example.ui.theme.NHATheme
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -34,6 +36,8 @@ class SdpSitesScreenshotTest {
     private val phase1 = SdpPlan(id = 1, projectId = 1, planName = "Phase 1 SDP", pdfFileUrl = "", version = 1, isActive = true, uploadedDate = "2026-10-01", uploadedBy = "x", scaleDenominator = 1000, siteName = "Phase 1")
     private val phase2 = SdpPlan(id = 2, projectId = 1, planName = "Phase 2 SDP", pdfFileUrl = "", version = 1, isActive = true, uploadedDate = "2026-10-20", uploadedBy = "x", scaleDenominator = 1000, siteName = "Phase 2")
     private val lot = SdpLot(id = 1, projectId = 1, sdpPlanId = 2, blockNumber = "1", lotNumber = "1", polygonNormalizedJson = "[]")
+    private val phase1Lots = (2L..4L).map { SdpLot(id = it, projectId = 1, sdpPlanId = 1, blockNumber = "1", lotNumber = "$it", polygonNormalizedJson = "[]") }
+    private val progress = mapOf(2L to SdpLotProgress(projectId = 1, sdpPlanId = 1, sdpLotId = 2, physicalProgress = 100), 1L to SdpLotProgress(projectId = 1, sdpPlanId = 2, sdpLotId = 1, physicalProgress = 40))
 
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun sdp_sites_phone_light() {
@@ -45,7 +49,8 @@ class SdpSitesScreenshotTest {
                     onUploadSdpPlan = { _, _, _ -> }, onSelectActiveVersion = {}, onAddLot = { _, _, _, _, _, _, _ -> },
                     onUpdateLot = {}, onDeactivateLot = {}, onAddRoad = { _, _, _ -> }, onUpdateRoad = {}, onDeactivateRoad = {},
                     onUpdateLotProgress = { _, _, _, _, _, _, _, _, _, _ -> }, onUpdateLotBillingStatus = { _, _, _, _, _ -> },
-                    onRecordInspection = { _, _, _, _, _, _, _, _ -> }, onGetInspectionsForLot = { emptyFlow() }
+                    onRecordInspection = { _, _, _, _, _, _, _, _ -> }, onGetInspectionsForLot = { emptyFlow() },
+                    allSitesLots = phase1Lots + lot, allSitesProgress = progress
                 )
             }
         }
@@ -75,5 +80,15 @@ class SdpSitesScreenshotTest {
         }
         rule.onNodeWithText("Name of the first site").assertExists()
         captureScreenRoboImage("src/test/screenshots/sdp_move_to_site_dialog_light.png")
+    }
+
+    @Test fun sdp_print_dialog_two_sites_light() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                PrintPlanDialog(currentSite = "Phase 2", siteCount = 2, onDismiss = {}, onPrint = { _, _ -> })
+            }
+        }
+        rule.onNodeWithText("Landscape: sites side by side").assertExists()
+        captureScreenRoboImage("src/test/screenshots/sdp_print_dialog_two_sites_light.png")
     }
 }

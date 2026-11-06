@@ -195,7 +195,14 @@ class ProjectRepository(
     suspend fun moveSdpPlanToNewSite(plan: SdpPlan, newSite: String, currentSiteName: String = "", role: UserRole? = null) {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
         if (plan.siteName.isBlank() && currentSiteName.isNotBlank()) projectDao.renameSdpSite(plan.projectId, "", currentSiteName)
-        projectDao.moveSdpPlanToSite(plan.id, newSite)
+        projectDao.setSdpPlanSite(plan.id, newSite, 1, true)
+    }
+
+    /** Puts [before] (the plan as it was before [moveSdpPlanToNewSite]) back, with the first site's name. */
+    suspend fun undoMoveSdpPlanToNewSite(before: SdpPlan, currentSiteName: String = "", role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        projectDao.setSdpPlanSite(before.id, before.siteName, before.version, before.isActive)
+        if (before.siteName.isBlank() && currentSiteName.isNotBlank()) projectDao.renameSdpSite(before.projectId, currentSiteName, "")
     }
 
     /** Saves the plan's scale and the lot areas worked out from it. */

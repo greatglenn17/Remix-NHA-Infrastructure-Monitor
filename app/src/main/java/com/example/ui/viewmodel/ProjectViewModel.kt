@@ -773,16 +773,20 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun selectSdpSite(projectId: Long, site: String) = _selectedSdpSite.update { it + (projectId to site) }
 
-    /** Every site's lots of the project, for its totals. */
+    /** The lots of every site's plan in use, with their progress by lot id. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val allSitesSdpItems: StateFlow<List<com.example.util.SdpSummary.Item>> = _selectedProjectId.flatMapLatest { id ->
-        if (id == null) flowOf(emptyList()) else combine(
+    val allSitesSdpLots: StateFlow<Pair<List<SdpLot>, Map<Long, SdpLotProgress>>> = _selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList<SdpLot>() to emptyMap()) else combine(
             repository.getSdpPlansForProject(id), repository.getActiveLotsForProject(id), repository.getLotProgressForProject(id)
         ) { plans, lots, progress ->
             val inUse = SdpSites.current(plans).map { it.id }.toSet()
-            val byLot = progress.associateBy { it.sdpLotId }
-            lots.filter { it.sdpPlanId in inUse }.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, byLot[it.id]?.physicalProgress ?: 0) }
+            lots.filter { it.sdpPlanId in inUse } to progress.associateBy { it.sdpLotId }
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList<SdpLot>() to emptyMap())
+
+    /** Every site's lots of the project, for its totals. */
+    val allSitesSdpItems: StateFlow<List<com.example.util.SdpSummary.Item>> = allSitesSdpLots.map { (lots, progress) ->
+        lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -1269,6 +1273,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** [before] and [currentSiteName] as given to [moveSdpPlanToNewSite]. */
+    fun undoMoveSdpPlanToNewSite(before: SdpPlan, newSite: String, currentSiteName: String = "") {
+        viewModelScope.launch {
+            repository.undoMoveSdpPlanToNewSite(before, currentSiteName.trim(), currentUserAccount.value.role)
+            selectSdpSite(before.projectId, before.siteName)
+            val oldSite = com.example.data.model.SdpSites.label(before.siteName)
+            logAuditAction(
+                projectId = before.projectId,
+                actionType = "Project Edit",
+                details = "Undid making SDP Plan v${before.version} its own site: back in $oldSite",
+                oldValue = "Site: ${newSite.trim()}, Version: 1",
+                newValue = "Site: $oldSite, Version: ${before.version}"
+            )
+        }
+    }
+
     fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long) {
         viewModelScope.launch {
             repository.setActiveSdpPlan(projectId, sdpPlanId, currentUserAccount.value.role)
@@ -1381,17 +1401,33 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * The SDP print: the plan's frame (saved, or around all lots) with each lot coloured by
-     * progress and the summary beside it. Null when the plan PDF cannot be opened.
+     * The SDP print of [plans] (one per site): each plan's frame (saved, or around all lots) with each lot
+     * coloured by progress, and the legend over it. Null when a plan PDF cannot be opened.
      */
-    suspend fun sdpPlanForm(project: Project, plan: SdpPlan, lots: List<SdpLot>, progress: Map<Long, SdpLotProgress>): String? {
+    suspend fun sdpPlanForm(project: Project, plans: List<SdpPlan>, landscape: Boolean): String? {
+        val progress = repository.getLotProgressForProject(project.id).first().associateBy { it.sdpLotId }
+        val sheets = plans.map { plan ->
+            val lots = repository.getActiveLotsForPlan(plan.id).first()
+            val image = sdpPlanImage(plan, lots, progress) ?: return null
+            val summary = com.example.util.SdpSummary.of(
+                lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0) }
+            )
+            com.example.util.BlueBookForms.SdpSheet(plan.siteName, image, summary)
+        }
+        val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
+            "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, com.example.ui.theme.LightNHAColors).toArgb() and 0xFFFFFF)
+        }
+        return com.example.util.BlueBookForms.sdpPlan(project, sheets, bandHex, LocalDate.now(), blueBookBanner, landscape)
+    }
+
+    private suspend fun sdpPlanImage(plan: SdpPlan, lots: List<SdpLot>, progress: Map<Long, SdpLotProgress>): String? {
         val polygons = lots.associate { it.id to polygonOf(it.polygonNormalizedJson).map { (x, y) -> x.toFloat() to y.toFloat() } }
         val frame = com.example.util.SdpSummary.parseFrame(plan.frame)
             ?: com.example.util.SdpSummary.frameAround(polygons.values.toList())
             ?: listOf(0f, 0f, 1f, 1f)
         val colors = com.example.ui.theme.LightNHAColors
         fun fill(lot: SdpLot) = com.example.ui.detail.tabs.lotFill(lot, progress[lot.id]?.physicalProgress ?: 0, colors)
-        val image = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return@withContext null
             runCatching {
                 android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
@@ -1438,14 +1474,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
             }.getOrNull()
-        } ?: return null
-        val summary = com.example.util.SdpSummary.of(
-            lots.map { com.example.util.SdpSummary.Item(it.use, it.lotAreaSqM, progress[it.id]?.physicalProgress ?: 0) }
-        )
-        val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
-            "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, colors).toArgb() and 0xFFFFFF)
         }
-        return com.example.util.BlueBookForms.sdpPlan(project, summary, image, bandHex, LocalDate.now(), blueBookBanner)
     }
 
     /** Saves new block and lot numbers for one block; progress and billing follow the lot ids. */

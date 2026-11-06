@@ -84,5 +84,11 @@ class SdpSitesTest {
         assertEquals("Phase 1" to 1, plans.getValue(1).siteName to plans.getValue(1).version)
         assertEquals("Phase 2" to 1, plans.getValue(2).siteName to plans.getValue(2).version)
         assertEquals(listOf(1L, 2L), SdpSites.current(plans.values.toList()).map { it.id })
+
+        // Undo: v2 goes back into the unnamed site as it was.
+        ProjectRepository(dao, database.reportDao()).undoMoveSdpPlanToNewSite(v2, "Phase 1")
+        val back = dao.getSdpPlansForProject(1).first().associateBy { it.id }
+        assertEquals(Triple("", 1, false), back.getValue(1).let { Triple(it.siteName, it.version, it.isActive) })
+        assertEquals(Triple("", 2, true), back.getValue(2).let { Triple(it.siteName, it.version, it.isActive) })
     }
 }

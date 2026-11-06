@@ -217,8 +217,8 @@ interface ProjectDao {
     suspend fun renameSdpSite(projectId: Long, oldName: String, newName: String)
 
     // Its lots, progress and inspections follow by sdpPlanId.
-    @Query("UPDATE sdp_plans SET siteName = :siteName, version = 1, isActive = 1 WHERE id = :sdpPlanId")
-    suspend fun moveSdpPlanToSite(sdpPlanId: Long, siteName: String)
+    @Query("UPDATE sdp_plans SET siteName = :siteName, version = :version, isActive = :isActive WHERE id = :sdpPlanId")
+    suspend fun setSdpPlanSite(sdpPlanId: Long, siteName: String, version: Int, isActive: Boolean)
 
     @Query("SELECT * FROM sdp_lots WHERE projectId = :projectId AND isActive = 1")
     fun getActiveLotsForProject(projectId: Long): Flow<List<SdpLot>>
