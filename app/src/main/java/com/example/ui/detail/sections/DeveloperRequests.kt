@@ -68,24 +68,31 @@ fun DeveloperRequestsCard(
     }
 }
 
-/** Adds or edits a developer request; [existing] null adds one. */
+/**
+ * Adds or edits a developer request; [existing] null adds one. A new request also takes the details of the order it
+ * asks for, and [onSave] gets that order's document name and remarks so it goes to Documents as Pending.
+ * [documents] are the project's, for numbering a continuance.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeveloperRequestDialog(
     projectId: Long,
     existing: DeveloperRequest?,
     onDismiss: () -> Unit,
-    onSave: (DeveloperRequest) -> Unit,
-    onDelete: ((DeveloperRequest) -> Unit)?
+    onSave: (DeveloperRequest, order: Pair<String, String>?) -> Unit,
+    onDelete: ((DeveloperRequest) -> Unit)?,
+    documents: List<com.example.data.model.PendingDocument> = emptyList(),
+    today: LocalDate = LocalDate.now()
 ) {
     var type by remember { mutableStateOf(existing?.requestType ?: ProjectAttention.REQUEST_TYPES.first()) }
     var details by remember { mutableStateOf(existing?.details ?: "") }
     var requested by remember { mutableStateOf(existing?.dateRequested ?: "") }
-    var received by remember { mutableStateOf(existing?.dateReceived ?: LocalDate.now().toString()) }
+    var received by remember { mutableStateOf(existing?.dateReceived ?: today.toString()) }
     var packaged by remember { mutableStateOf(existing?.datePackaged ?: "") }
     var requestFile by remember { mutableStateOf(existing?.requestFileUrl ?: "") }
     var expanded by remember { mutableStateOf(false) }
-    val snapshot = listOf(type, details, requested, received, packaged, requestFile)
+    val order = remember { com.example.ui.dialogs.OrderFields() }
+    val snapshot = listOf(type, details, requested, received, packaged, requestFile) + order.snapshot()
     val initial = remember { snapshot }
     val close = com.example.ui.components.rememberDiscardGuard(snapshot != initial, onDismiss)
     AlertDialog(
@@ -111,6 +118,11 @@ fun DeveloperRequestDialog(
                 DateField(label = "Date packaged (blank: not yet)", value = packaged, onValueChange = { packaged = it }, clearable = true)
                 Text("Developer's request letter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 LetterFileField("request", requestFile, "developer_request_file") { requestFile = it }
+                if (existing == null) {
+                    Text("Order requested", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                    Text("Saved to Documents › $type as Pending.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    com.example.ui.dialogs.OrderFieldInputs(type, order, documents)
+                }
                 if (existing != null && onDelete != null) {
                     TextButton(onClick = { onDelete(existing) }) { Text("Delete request", color = LocalNHAColors.current.behind) }
                 }
@@ -118,10 +130,13 @@ fun DeveloperRequestDialog(
         },
         confirmButton = {
             Button(shape = MaterialTheme.shapes.small, 
-                enabled = received.isNotBlank(),
+                enabled = received.isNotBlank() && (existing != null || order.valid(type, documents)),
                 onClick = {
                     val base = existing ?: DeveloperRequest(projectId = projectId, requestType = type)
-                    onSave(base.copy(requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged, requestFileUrl = requestFile))
+                    onSave(
+                        base.copy(requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged, requestFileUrl = requestFile),
+                        if (existing == null) order.name(type, documents) to order.remarks(type) else null
+                    )
                 },
                 modifier = Modifier.testTag("save_developer_request_button")
             ) { Text("Save") }

@@ -86,7 +86,8 @@ class FormsScreenshotTest {
     )
     private val repliedLetter = ContractorLetter(
         id = 1, projectId = 7, dateSent = "2026-10-20", subject = "Notice of delay, Block 12",
-        actionTaken = "Added a second concreting crew", dateReplied = "2026-10-23", replyFileUrl = "nhafile:reply.pdf"
+        actionTaken = "Added a second concreting crew", dateReplied = "2026-10-23", replyFileUrl = "nhafile:reply.pdf",
+        dateReceived = "2026-10-21", receivedFileUrl = "nhafile:received.jpg"
     )
     private val scannedRequest = DeveloperRequest(
         id = 1, projectId = 7, requestType = "Time Extension", details = "Letter 12, typhoon delays",
@@ -135,7 +136,8 @@ class FormsScreenshotTest {
         shoot("form_issue_$t") { AddIssueDialog(null, {}, { _, _, _, _, _, _, _ -> }, today) }
         shoot("form_contractor_letter_$t") { ContractorLetterDialog(7, null, {}, {}, null, today) }
         shoot("form_contractor_letter_reply_$t") { ContractorLetterDialog(7, repliedLetter, {}, {}, {}, today) }
-        shoot("form_developer_request_$t") { DeveloperRequestDialog(7, scannedRequest, {}, {}, {}) }
+        shoot("form_developer_request_$t") { DeveloperRequestDialog(7, scannedRequest, {}, { _, _ -> }, {}, today = today) }
+        shoot("form_developer_request_new_$t") { DeveloperRequestDialog(7, null, {}, { _, _ -> }, null, today = today) }
         shoot("card_developer_requests_$t") {
             Surface(Modifier.fillMaxSize()) {
                 DeveloperRequestsCard(

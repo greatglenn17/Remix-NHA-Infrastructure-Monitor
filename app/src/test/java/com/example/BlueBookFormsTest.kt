@@ -159,20 +159,24 @@ class BlueBookFormsTest {
             activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
             attachedPhotoUrlsJson = "[]", submittedByStaff = ""
         )
-        val letters = listOf(
-            doc(ContractorLetters.name("1"), "Pending", ContractorLetters.remarks("Slow progress", "2026-10-30")),
-            doc(ContractorLetters.name("2"), "Pending", ContractorLetters.remarks("Before the week", "2026-10-20")),
-            doc(ContractorLetters.name("3"), "Pending", ContractorLetters.remarks("Not yet received", ""))
+        // Letters the Documents tab kept as documents before v2.6, merged with a letter kept as a letter.
+        val oldLetters = listOf(
+            doc("Letter to Contractor No. 1", "Pending", "Reason: Slow progress | Date Received: 2026-10-30"),
+            doc("Letter to Contractor No. 2", "Pending", "Reason: Before the week | Date Received: 2026-10-20"),
+            doc("Letter to Contractor No. 3", "Pending", "Reason: Not yet received")
         )
-        assertEquals(4, ContractorLetters.nextNo(letters))
+        val letter = com.example.data.model.ContractorLetter(projectId = 1, dateSent = "2026-10-26", subject = "Notice of delay, Block 12", dateReceived = "2026-10-28")
+        val letters = ContractorLetters.merged(listOf(letter), docs + oldLetters)
+        assertEquals(4, letters.size)
         val requests = listOf(
             DeveloperRequest(projectId = 1, requestType = "Time Extension", details = "Letter 12", dateRequested = "2026-10-20", dateReceived = "2026-10-27"),
             DeveloperRequest(projectId = 1, requestType = "Variation Order", dateReceived = "2026-11-02")
         )
-        val rows = BlueBookForms.weekDocuments(report, docs + letters, requests)
+        val rows = BlueBookForms.weekDocuments(report, letters, requests)
         assertEquals(
             listOf(
                 listOf("Developer's request: Time Extension – Letter 12", "October 27, 2026", "Received; not yet packaged", "Requested October 20, 2026"),
+                listOf("Notice of delay, Block 12", "October 28, 2026", "Letter issued", "Received October 28, 2026"),
                 listOf("Letter to Contractor No. 1: Slow progress", "October 30, 2026", "Letter issued", "Received October 30, 2026")
             ),
             rows
@@ -182,7 +186,7 @@ class BlueBookFormsTest {
             Signatories("Glenn C. Aprovechado", "Principal Engineer C", "", "", "", "", preparedOffice = "Bulacan District Office", notedOffice = "Region 3 Office"),
             documentsIssued = rows
         )
-        assertTrue(html.contains("<tr><td>2. Letter to Contractor No. 1: Slow progress</td><td>October 30, 2026</td><td>Letter issued</td><td>Received October 30, 2026</td></tr>"))
+        assertTrue(html.contains("<tr><td>3. Letter to Contractor No. 1: Slow progress</td><td>October 30, 2026</td><td>Letter issued</td><td>Received October 30, 2026</td></tr>"))
         // Spare rows stay for writing by hand.
         assertTrue(html.contains("<tr><td>5. </td><td></td><td></td><td></td></tr>"))
         assertTrue(html.contains("Principal Engineer C<br>Bulacan District Office</td>"))

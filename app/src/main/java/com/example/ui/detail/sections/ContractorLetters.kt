@@ -68,17 +68,20 @@ fun ContractorLettersCard(
         letters.forEach { letter ->
             Row(
                 Modifier.fillMaxWidth().then(if (onOpen != null) Modifier.clickable { onOpen(letter) } else Modifier)
-                    .padding(vertical = 6.dp).testTag("contractor_letter_${letter.id}"),
+                    .padding(vertical = 6.dp).testTag("contractor_letter_${letter.uuid}"),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Cell(ProjectSchedule.displayDate(letter.dateSent.ifBlank { "-" }), 0)
+                Column(Modifier.weight(weights[0])) {
+                    Text(ProjectSchedule.displayDate(letter.dateSent.ifBlank { "-" }), style = MaterialTheme.typography.bodySmall)
+                    ReceivedLine(letter, openFile)
+                }
                 Cell(letter.subject.ifBlank { "-" }, 1)
                 // No action yet stands out until the contractor does something.
                 if (letter.actionTaken.isBlank()) Cell("None yet", 2, color = LocalNHAColors.current.watch) else Cell(letter.actionTaken, 2)
                 Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
                     when {
-                        letter.replyFileUrl.isNotBlank() -> IconButton(onClick = { openFile(letter.replyFileUrl) }, modifier = Modifier.testTag("contractor_reply_${letter.id}")) {
+                        letter.replyFileUrl.isNotBlank() -> IconButton(onClick = { openFile(letter.replyFileUrl) }, modifier = Modifier.testTag("contractor_reply_${letter.uuid}")) {
                             Icon(Icons.Default.AttachFile, contentDescription = "Open the contractor's reply", tint = scheme.primary)
                         }
                         letter.dateReplied.isNotBlank() -> Text("Replied", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
@@ -91,12 +94,35 @@ fun ContractorLettersCard(
     }
 }
 
+/** When the contractor received [letter]: the date, which opens the receiving copy when there is one, or "Not received". */
+@Composable
+private fun ReceivedLine(letter: ContractorLetter, openFile: (String) -> Unit) {
+    val received = letter.dateReceived.takeIf { it.isNotBlank() }?.let { "Received ${ProjectSchedule.displayDate(it)}" }
+    if (letter.receivedFileUrl.isNotBlank()) {
+        Row(
+            Modifier.clickable { openFile(letter.receivedFileUrl) }.testTag("contractor_letter_received_${letter.uuid}"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.AttachFile, contentDescription = "Open the receiving copy", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+            Text(received ?: "Receiving copy", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+    } else {
+        Text(received ?: "Not received", style = MaterialTheme.typography.labelSmall, color = if (received == null) LocalNHAColors.current.watch else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 /**
- * A letter attached to a record ([what], e.g. "reply"): Scan / Upload buttons, or once attached, View / Remove.
+ * A letter attached to a record ([what], e.g. "reply"): Scan (camera) / Upload buttons, or once attached, View / Remove.
  * [onChange] gets the new attachment reference, or blank when removed.
  */
 @Composable
-fun LetterFileField(what: String, file: String, tag: String, onChange: (String) -> Unit) {
+fun LetterFileField(
+    what: String,
+    file: String,
+    tag: String,
+    attachedLabel: String = "${what.replaceFirstChar { it.uppercase() }} letter attached",
+    onChange: (String) -> Unit
+) {
     val scan = rememberDocumentScanner(onChange)
     val upload = rememberAttachmentPicker(Attachments.Kind.SCAN, onAttached = onChange)
     val openFile = rememberAttachmentOpener()
@@ -104,7 +130,7 @@ fun LetterFileField(what: String, file: String, tag: String, onChange: (String) 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("${what.replaceFirstChar { it.uppercase() }} letter attached", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(attachedLabel, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             TextButton(onClick = { openFile(file) }) { Text("View") }
             TextButton(onClick = { onChange("") }, modifier = Modifier.testTag("${tag}_remove")) { Text("Remove") }
         }
@@ -124,7 +150,10 @@ fun LetterFileField(what: String, file: String, tag: String, onChange: (String) 
     }
 }
 
-/** Adds or edits a letter to the contractor; [existing] null adds one. The contractor's reply letter can be scanned or uploaded. */
+/**
+ * Adds or edits a letter to the contractor; [existing] null adds one. NHA's receiving copy (the copy the contractor
+ * signed or stamped received) and the contractor's reply letter can each be scanned or uploaded.
+ */
 @Composable
 fun ContractorLetterDialog(
     projectId: Long,
@@ -139,7 +168,9 @@ fun ContractorLetterDialog(
     var action by remember { mutableStateOf(existing?.actionTaken ?: "") }
     var dateReplied by remember { mutableStateOf(existing?.dateReplied ?: "") }
     var replyFile by remember { mutableStateOf(existing?.replyFileUrl ?: "") }
-    val snapshot = listOf(dateSent, subject, action, dateReplied, replyFile)
+    var dateReceived by remember { mutableStateOf(existing?.dateReceived ?: "") }
+    var receivedFile by remember { mutableStateOf(existing?.receivedFileUrl ?: "") }
+    val snapshot = listOf(dateSent, subject, action, dateReplied, replyFile, dateReceived, receivedFile)
     val initial = remember { snapshot }
     val close = rememberDiscardGuard(snapshot != initial, onDismiss)
     AlertDialog(
@@ -152,6 +183,14 @@ fun ContractorLetterDialog(
                     value = subject, onValueChange = { subject = it }, label = { Text("Subject") },
                     modifier = Modifier.fillMaxWidth().testTag("contractor_letter_subject")
                 )
+                Text("Received by the contractor", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                DateField(label = "Date received (blank: not yet)", value = dateReceived, onValueChange = { dateReceived = it }, clearable = true)
+                LetterFileField("receiving copy", receivedFile, "contractor_letter_received", attachedLabel = "Receiving copy attached") { ref ->
+                    receivedFile = ref
+                    // A signed receiving copy means the contractor has it.
+                    if (ref.isNotBlank() && dateReceived.isBlank()) dateReceived = today.toString()
+                }
+                Text("Shows on the weekly report for the week the contractor received it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = action, onValueChange = { action = it }, label = { Text("Action taken by contractor") }, minLines = 2,
                     modifier = Modifier.fillMaxWidth().testTag("contractor_letter_action")
@@ -173,7 +212,9 @@ fun ContractorLetterDialog(
                 enabled = dateSent.isNotBlank() && subject.isNotBlank(),
                 onClick = {
                     val base = existing ?: ContractorLetter(projectId = projectId, dateSent = dateSent, subject = subject)
-                    onSave(base.copy(dateSent = dateSent, subject = subject.trim(), actionTaken = action.trim(), dateReplied = dateReplied, replyFileUrl = replyFile))
+                    onSave(base.copy(dateSent = dateSent, subject = subject.trim(), actionTaken = action.trim(), dateReplied = dateReplied, replyFileUrl = replyFile,
+                        dateReceived = dateReceived, receivedFileUrl = receivedFile
+                    ))
                 },
                 modifier = Modifier.testTag("save_contractor_letter_button")
             ) { Text("Save") }

@@ -167,39 +167,9 @@ fun AddCustomDocumentDialog(
     // Custom
     var docName by remember { mutableStateOf("") }
     var remarks by remember { mutableStateOf("") }
+    val order = remember { OrderFields() }
 
-    // Time Extension
-    var teNo by remember { mutableStateOf("") }
-    var teDays by remember { mutableStateOf("") }
-    var teReason by remember { mutableStateOf("") }
-
-    // Variation Order
-    var voNo by remember { mutableStateOf("") }
-    var voType by remember { mutableStateOf("Additive") }
-    var voTypeExpanded by remember { mutableStateOf(false) }
-    var voAmount by remember { mutableStateOf("") }
-    var voReason by remember { mutableStateOf("") }
-    var voDateApproved by remember { mutableStateOf("") }
-    // Optional while the order is still pending; when filled it must be a real date.
-    val voDateValid = remember(voDateApproved) {
-        voDateApproved.isBlank() || try { LocalDate.parse(voDateApproved.trim()); true } catch (_: DateTimeParseException) { false }
-    }
-
-    // Work Suspension
-    var wsNo by remember { mutableStateOf("") }
-    var wsType by remember { mutableStateOf("Full") }
-    var wsDays by remember { mutableStateOf("") }
-    var wsEffectivity by remember { mutableStateOf("") }
-    var wsReason by remember { mutableStateOf("") }
-
-    // Work Resumption
-    var wrNo by remember { mutableStateOf("") }
-    var wrType by remember { mutableStateOf("Full") }
-    var wrEffectivity by remember { mutableStateOf("") }
-    var wrRemarks by remember { mutableStateOf("") }
-
-    val voAmountError = FormValidation.amountError(voAmount, false)
-    val snapshot = { listOf(selectedType, docName, remarks, teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason, wrNo, wrType, wrEffectivity, wrRemarks) }
+    val snapshot = { listOf(selectedType, docName, remarks) + order.snapshot() }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -243,126 +213,198 @@ fun AddCustomDocumentDialog(
                     }
                 }
 
-                when (selectedType) {
-                    "Custom Document" -> {
-                        OutlinedTextField(value = docName, onValueChange = { docName = it }, label = { Text("Document Name") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
-                    }
-                    "Time Extension" -> {
-                        OutlinedTextField(value = teNo, onValueChange = { teNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = teDays, onValueChange = { teDays = it }, label = { Text("No. of Days") }, isError = daysError(teDays) != null, supportingText = daysError(teDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = teReason, onValueChange = { teReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
-                    }
-                    "Variation Order" -> {
-                        OutlinedTextField(value = voNo, onValueChange = { voNo = it }, label = { Text("VO No.") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        ExposedDropdownMenuBox(
-                            expanded = voTypeExpanded,
-                            onExpandedChange = { voTypeExpanded = it },
-                        ) {
-                            OutlinedTextField(
-                                modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                readOnly = true,
-                                value = voType,
-                                onValueChange = {},
-                                label = { Text("Type of Variation") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = voTypeExpanded) },
-                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                            )
-                            ExposedDropdownMenu(
-                                expanded = voTypeExpanded,
-                                onDismissRequest = { voTypeExpanded = false },
-                            ) {
-                                listOf("Additive", "Deductive").forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            voType = option
-                                            voTypeExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        OutlinedTextField(
-                            value = voAmount,
-                            onValueChange = { voAmount = it },
-                            label = { Text("Amount (PHP)") },
-                            isError = voAmountError != null,
-                            supportingText = { Text(voAmountError ?: if (voType == "Deductive") "Will be subtracted from the contract cost" else "Will be added to the contract cost") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(value = voReason, onValueChange = { voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
-                        DateField(
-                            label = "Date Approved", value = voDateApproved, onValueChange = { voDateApproved = it },
-                            clearable = true, error = if (voDateValid) null else "Not a valid date"
-                        )
-                        if (voDateValid) Text("Leave blank if not yet approved", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    "Work Suspension Order" -> {
-                        OutlinedTextField(value = wsNo, onValueChange = { wsNo = it }, label = { Text("Suspension No.") }, modifier = Modifier.fillMaxWidth())
-                        FullOrPartialPicker("Type of Suspension", wsType) { wsType = it }
-                        OutlinedTextField(value = wsDays, onValueChange = { wsDays = it }, label = { Text("No. of Days") }, isError = daysError(wsDays) != null, supportingText = daysError(wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                        DateField(label = "Effectivity Date", value = wsEffectivity, onValueChange = { wsEffectivity = it }, clearable = true)
-                        OutlinedTextField(value = wsReason, onValueChange = { wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
-                    }
-                    "Work Resumption Order" -> {
-                        OutlinedTextField(value = wrNo, onValueChange = { wrNo = it }, label = { Text("Resumption No.") }, modifier = Modifier.fillMaxWidth())
-                        FullOrPartialPicker("Type of Resumption", wrType) { wrType = it }
-                        DateField(label = "Effectivity Date", value = wrEffectivity, onValueChange = { wrEffectivity = it }, clearable = true)
-                        OutlinedTextField(value = wrRemarks, onValueChange = { wrRemarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
-                    }
+                if (selectedType == "Custom Document") {
+                    OutlinedTextField(value = docName, onValueChange = { docName = it }, label = { Text("Document Name") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    OrderFieldInputs(selectedType, order)
                 }
             }
         },
         confirmButton = {
-            Button(shape = MaterialTheme.shapes.small, enabled = when (selectedType) {
-                "Variation Order" -> voDateValid && voAmountError == null
-                "Time Extension" -> teDays.isNotBlank() && daysError(teDays) == null
-                "Work Suspension Order" -> wsDays.isNotBlank() && daysError(wsDays) == null
-                else -> true
-            }, onClick = {
-                val finalDocName = when (selectedType) {
-                    "Custom Document" -> docName.ifBlank { "New Document" }
-                    "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
-                    "Variation Order" -> voDocumentName(voNo, voType, voAmount)
-                    "Work Suspension Order" -> com.example.util.ProjectSchedule.orderName("Suspension", wsNo, wsType)
-                    "Work Resumption Order" -> com.example.util.ProjectSchedule.orderName("Resumption", wrNo, wrType)
-                    else -> "New Document"
-                }
-                val finalRemarks = when (selectedType) {
-                    "Custom Document" -> remarks
-                    "Time Extension" -> "Reason: $teReason"
-                    "Variation Order" -> "Reason: $voReason" + if (voDateApproved.isNotBlank()) " | Date Approved: ${voDateApproved.trim()}" else ""
-                    "Work Suspension Order" -> {
-                        var computedEndDate = ""
-                        try {
-                            if (wsEffectivity.isNotBlank() && wsDays.isNotBlank()) {
-                                val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                                val parsedDate = format.parse(wsEffectivity)
-                                if (parsedDate != null) {
-                                    val cal = java.util.Calendar.getInstance()
-                                    cal.time = parsedDate
-                                    cal.add(java.util.Calendar.DAY_OF_YEAR, wsDays.trim().toInt())
-                                    computedEndDate = format.format(cal.time)
-                                }
-                            }
-                        } catch (e: Exception) { }
-                        val end = if (computedEndDate.isNotBlank()) " | End: $computedEndDate" else ""
-                        val reason = if (wsReason.isNotBlank()) " | Reason: ${wsReason.trim()}" else ""
-                        "Duration: ${wsDays.trim()} Days | Effectivity: $wsEffectivity$end$reason"
-                    }
-                    "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
-                    else -> remarks
-                }
-                onSubmit(finalDocName, finalRemarks)
+            Button(shape = MaterialTheme.shapes.small, enabled = selectedType == "Custom Document" || order.valid(selectedType), onClick = {
+                if (selectedType == "Custom Document") onSubmit(docName.ifBlank { "New Document" }, remarks)
+                else onSubmit(order.name(selectedType), order.remarks(selectedType))
             }) {
                 Text("Save")
             }
         },
         dismissButton = { TextButton(onClick = close) { Text("Cancel") } }
     )
+}
+
+/**
+ * What an order form holds, for each kind of order ([ORDER_TYPES]); [name] and [remarks] are what the order is saved as.
+ * Used by Add Document and by a developer request, which logs the order it asks for.
+ */
+class OrderFields {
+    // Time Extension
+    var teNo by mutableStateOf("")
+    var teDays by mutableStateOf("")
+    var teReason by mutableStateOf("")
+
+    // Variation Order
+    var voNo by mutableStateOf("")
+    var voType by mutableStateOf("Additive")
+    var voAmount by mutableStateOf("")
+    var voReason by mutableStateOf("")
+    var voDateApproved by mutableStateOf("")
+
+    // Work Suspension
+    var wsNo by mutableStateOf("")
+    var wsType by mutableStateOf("Full")
+    var wsDays by mutableStateOf("")
+    var wsEffectivity by mutableStateOf("")
+    var wsReason by mutableStateOf("")
+
+    // Continuance of the latest work suspension (see [continued])
+    var coType by mutableStateOf("Full")
+    var coDays by mutableStateOf("")
+    var coEffectivity by mutableStateOf("")
+
+    // Work Resumption
+    var wrNo by mutableStateOf("")
+    var wrType by mutableStateOf("Full")
+    var wrEffectivity by mutableStateOf("")
+    var wrRemarks by mutableStateOf("")
+
+    fun snapshot() = listOf(
+        teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason,
+        coType, coDays, coEffectivity, wrNo, wrType, wrEffectivity, wrRemarks
+    )
+
+    // Optional while the order is still pending; when filled it must be a real date.
+    val voDateValid get() = voDateApproved.isBlank() || try { LocalDate.parse(voDateApproved.trim()); true } catch (_: DateTimeParseException) { false }
+
+    fun valid(type: String, documents: List<com.example.data.model.PendingDocument> = emptyList()) = when (type) {
+        "Variation Order" -> voDateValid && FormValidation.amountError(voAmount, false) == null
+        "Time Extension" -> teDays.isNotBlank() && daysError(teDays) == null
+        "Work Suspension Order" -> wsDays.isNotBlank() && daysError(wsDays) == null
+        CONTINUANCE -> continued(documents) != null && coDays.isNotBlank() && daysError(coDays) == null && coEffectivity.isNotBlank()
+        else -> true
+    }
+
+    fun name(type: String, documents: List<com.example.data.model.PendingDocument> = emptyList()) = when (type) {
+        "Time Extension" -> "Time Extension No. ${teNo.trim()} - ${teDays.trim()} Days"
+        "Variation Order" -> voDocumentName(voNo, voType, voAmount)
+        "Work Suspension Order" -> com.example.util.ProjectSchedule.orderName("Suspension", wsNo, wsType)
+        "Work Resumption Order" -> com.example.util.ProjectSchedule.orderName("Resumption", wrNo, wrType)
+        CONTINUANCE -> continued(documents)?.let { com.example.util.ProjectSchedule.nextContinuance(it, documents, coType).first }.orEmpty()
+        else -> "New Document"
+    }
+
+    /** Only after [valid]: the day counts must be whole numbers. */
+    fun remarks(type: String) = when (type) {
+        "Time Extension" -> "Reason: $teReason"
+        "Variation Order" -> "Reason: $voReason" + if (voDateApproved.isNotBlank()) " | Date Approved: ${voDateApproved.trim()}" else ""
+        "Work Suspension Order" ->
+            com.example.util.ProjectSchedule.suspensionRemarks(wsDays.trim().toInt(), wsEffectivity) + if (wsReason.isNotBlank()) " | Reason: ${wsReason.trim()}" else ""
+        CONTINUANCE -> com.example.util.ProjectSchedule.suspensionRemarks(coDays.trim().toInt(), coEffectivity)
+        "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
+        else -> ""
+    }
+
+    companion object {
+        const val CONTINUANCE = "Continuance of Work Suspension Order"
+        val ORDER_TYPES = listOf("Work Suspension Order", CONTINUANCE, "Work Resumption Order", "Variation Order", "Time Extension")
+
+        /** The suspension a new continuance continues: the latest one logged, or null when there is none. */
+        fun continued(documents: List<com.example.data.model.PendingDocument>) =
+            documents.filter(com.example.util.ProjectSchedule::isSuspension).maxByOrNull { it.id }
+    }
+}
+
+/** The inputs for one kind of order; [documents] are the project's, for a continuance. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OrderFieldInputs(type: String, f: OrderFields, documents: List<com.example.data.model.PendingDocument> = emptyList()) {
+    when (type) {
+        "Time Extension" -> {
+            OutlinedTextField(value = f.teNo, onValueChange = { f.teNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = f.teDays, onValueChange = { f.teDays = it }, label = { Text("No. of Days") }, isError = daysError(f.teDays) != null, supportingText = daysError(f.teDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = f.teReason, onValueChange = { f.teReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+        }
+        "Variation Order" -> {
+            var voTypeExpanded by remember { mutableStateOf(false) }
+            val voAmountError = FormValidation.amountError(f.voAmount, false)
+            OutlinedTextField(value = f.voNo, onValueChange = { f.voNo = it }, label = { Text("VO No.") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            ExposedDropdownMenuBox(
+                expanded = voTypeExpanded,
+                onExpandedChange = { voTypeExpanded = it },
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    readOnly = true,
+                    value = f.voType,
+                    onValueChange = {},
+                    label = { Text("Type of Variation") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = voTypeExpanded) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                )
+                ExposedDropdownMenu(
+                    expanded = voTypeExpanded,
+                    onDismissRequest = { voTypeExpanded = false },
+                ) {
+                    listOf("Additive", "Deductive").forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                f.voType = option
+                                voTypeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = f.voAmount,
+                onValueChange = { f.voAmount = it },
+                label = { Text("Amount (PHP)") },
+                isError = voAmountError != null,
+                supportingText = { Text(voAmountError ?: if (f.voType == "Deductive") "Will be subtracted from the contract cost" else "Will be added to the contract cost") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(value = f.voReason, onValueChange = { f.voReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+            DateField(
+                label = "Date Approved", value = f.voDateApproved, onValueChange = { f.voDateApproved = it },
+                clearable = true, error = if (f.voDateValid) null else "Not a valid date"
+            )
+            if (f.voDateValid) Text("Leave blank if not yet approved", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        "Work Suspension Order" -> {
+            OutlinedTextField(value = f.wsNo, onValueChange = { f.wsNo = it }, label = { Text("Suspension No.") }, modifier = Modifier.fillMaxWidth())
+            FullOrPartialPicker("Type of Suspension", f.wsType) { f.wsType = it }
+            OutlinedTextField(value = f.wsDays, onValueChange = { f.wsDays = it }, label = { Text("No. of Days") }, isError = daysError(f.wsDays) != null, supportingText = daysError(f.wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+            DateField(label = "Effectivity Date", value = f.wsEffectivity, onValueChange = { f.wsEffectivity = it }, clearable = true)
+            OutlinedTextField(value = f.wsReason, onValueChange = { f.wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+        }
+        OrderFields.CONTINUANCE -> {
+            val suspension = OrderFields.continued(documents)
+            if (suspension == null) {
+                Text(
+                    "No work suspension order is logged yet, so there is nothing to continue. Log the suspension first.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
+                )
+            } else {
+                // Starts where the suspension and its continuances so far end.
+                LaunchedEffect(suspension.id) {
+                    if (f.coEffectivity.isBlank()) f.coEffectivity = com.example.util.ProjectSchedule.nextContinuance(suspension, documents).second
+                }
+                Text(f.name(type, documents), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                FullOrPartialPicker("Type of Suspension", f.coType) { f.coType = it }
+                OutlinedTextField(value = f.coDays, onValueChange = { f.coDays = it }, label = { Text("No. of Days") }, isError = daysError(f.coDays) != null, supportingText = daysError(f.coDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                DateField(label = "Effectivity Date", value = f.coEffectivity, onValueChange = { f.coEffectivity = it })
+            }
+        }
+        "Work Resumption Order" -> {
+            OutlinedTextField(value = f.wrNo, onValueChange = { f.wrNo = it }, label = { Text("Resumption No.") }, modifier = Modifier.fillMaxWidth())
+            FullOrPartialPicker("Type of Resumption", f.wrType) { f.wrType = it }
+            DateField(label = "Effectivity Date", value = f.wrEffectivity, onValueChange = { f.wrEffectivity = it }, clearable = true)
+            OutlinedTextField(value = f.wrRemarks, onValueChange = { f.wrRemarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
+        }
+    }
 }
 
 /** Full or Partial, for work suspension, continuance and resumption orders; saved in the order's name. */

@@ -452,7 +452,11 @@ fun ProjectDetailScreen(
                                     onAddOrder = onAddOrderClick,
                                     onAddDocument = { name, remarks -> viewModel.addPendingDocument(currentProject.id, name, remarks) },
                                     onUpdateStatus = { doc, status, remarks -> viewModel.updatePendingDocumentStatus(doc, status, remarks) },
-                                    onDelete = { viewModel.deletePendingDocument(it) }
+                                    onDelete = { viewModel.deletePendingDocument(it) },
+                                    projectId = currentProject.id,
+                                    letters = contractorLetters,
+                                    onSaveLetter = viewModel::saveContractorLetter,
+                                    onDeleteLetter = viewModel::deleteContractorLetter
                                 )
                                 "Related Files" -> RelatedFilesList(
                                     documents = pendingDocuments,

@@ -55,6 +55,7 @@ fun SummarySection(
     onUpdateOrderStatus: (PendingDocument, String, String) -> Unit,
     onDeleteOrder: (Long) -> Unit,
     onPrintProfile: () -> Unit = {},
+    // Adds a Pending order to Documents: a continuance, or the order a new developer request asks for.
     onAddContinuance: (name: String, remarks: String) -> Unit = { _, _ -> },
     requests: List<com.example.data.model.DeveloperRequest> = emptyList(),
     onSaveRequest: (com.example.data.model.DeveloperRequest) -> Unit = {},
@@ -116,8 +117,14 @@ fun SummarySection(
         DeveloperRequestDialog(
             projectId = project.id, existing = editRequest,
             onDismiss = { showRequestDialog = false },
-            onSave = { onSaveRequest(it); showRequestDialog = false },
-            onDelete = { onDeleteRequest(it); showRequestDialog = false }
+            onSave = { request, order ->
+                onSaveRequest(request)
+                // The order the developer asks for waits in Documents as Pending.
+                order?.let { (name, remarks) -> onAddContinuance(name, remarks) }
+                showRequestDialog = false
+            },
+            onDelete = { onDeleteRequest(it); showRequestDialog = false },
+            documents = documents
         )
     }
     if (showLetterDialog) {
