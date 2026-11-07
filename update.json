@@ -1,8 +1,8 @@
 {
-  "versionCode": 231,
-  "versionName": "2.3.1",
-  "releaseNotes": "v2.3.1: Projects already in the app can now be marked completed from Edit project.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.3.1/NHA_Monitor_v2.3.1_Build231.apk",
-  "apkSha256": "6c80df5c2d72f42ea70690b065a42256524fc0844cb11e6565b698fe36acdf24",
+  "versionCode": 240,
+  "versionName": "2.4.0",
+  "releaseNotes": "v2.4.0: One project can now hold several SDP sites, with an all-sites summary and printing of every site on one page.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.4.0/NHA_Monitor_v2.4.0_Build240.apk",
+  "apkSha256": "2991f3830416e08317f8b7bf0ef7d1ab0a6cd8ed5e2235e12089758d8e700caa",
   "isMandatory": true
 }
