@@ -739,7 +739,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 pendingDocsCount = ProjectAttention.waitingApproval(projectDocs),
                 lastFieldUpdate = lastUpdate,
                 // userScopedProjects re-emits when the account changes, so reading it here stays current.
-                viewOnly = !isMine(project)
+                // A Super Viewer reads everything and edits nothing, so the tag would only mark assignments.
+                viewOnly = !isMine(project) && currentUserAccount.value.role != UserRole.SUPER_VIEWER
             )
         }
     }
