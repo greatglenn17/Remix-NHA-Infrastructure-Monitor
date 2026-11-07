@@ -1,8 +1,8 @@
 {
-  "versionCode": 250,
-  "versionName": "2.5.0",
-  "releaseNotes": "v2.5.0: See other projects in view-only mode, and a new Super Viewer role for heads and management.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.5.0/NHA_Monitor_v2.5.0_Build250.apk",
-  "apkSha256": "409f57217d0d968256e772b0209bcd74739af72c956fdcea901d83d1c73e51c5",
+  "versionCode": 260,
+  "versionName": "2.6.0",
+  "releaseNotes": "v2.6.0: Letters to contractor get a received date and receiving copy, and developer requests add their order to Documents as Pending.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.6.0/NHA_Monitor_v2.6.0_Build260.apk",
+  "apkSha256": "d6fc8d52b602ea6e2eced7b1611d68dd0619187416b73aa2dbd5237ec2dcd195",
   "isMandatory": true
 }
