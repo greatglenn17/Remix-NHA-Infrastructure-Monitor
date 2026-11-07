@@ -200,20 +200,31 @@ interface ProjectDao {
     @Query("SELECT * FROM sdp_plans WHERE projectId = :projectId ORDER BY version DESC")
     fun getSdpPlansForProject(projectId: Long): Flow<List<SdpPlan>>
 
-    @Query("SELECT * FROM sdp_plans WHERE projectId = :projectId AND isActive = 1 LIMIT 1")
-    fun getActiveSdpPlanForProject(projectId: Long): Flow<SdpPlan?>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSdpPlan(sdpPlan: SdpPlan): Long
 
     @Update
     suspend fun updateSdpPlan(sdpPlan: SdpPlan)
 
-    @Query("UPDATE sdp_plans SET isActive = 0 WHERE projectId = :projectId")
-    suspend fun deactivateAllSdpPlansForProject(projectId: Long)
+    // Sites of one contract keep their own plan in use (see SdpSites).
+    @Query("UPDATE sdp_plans SET isActive = 0 WHERE projectId = :projectId AND siteName = :siteName")
+    suspend fun deactivateSdpPlansForSite(projectId: Long, siteName: String)
 
-    @Query("UPDATE sdp_plans SET isActive = CASE WHEN id = :sdpPlanId THEN 1 ELSE 0 END WHERE projectId = :projectId")
+    @Query("UPDATE sdp_plans SET isActive = CASE WHEN id = :sdpPlanId THEN 1 ELSE 0 END WHERE projectId = :projectId AND siteName = (SELECT siteName FROM sdp_plans WHERE id = :sdpPlanId)")
     suspend fun setActiveSdpPlan(projectId: Long, sdpPlanId: Long)
+
+    @Query("UPDATE sdp_plans SET siteName = :newName WHERE projectId = :projectId AND siteName = :oldName")
+    suspend fun renameSdpSite(projectId: Long, oldName: String, newName: String)
+
+    // Its lots, progress and inspections follow by sdpPlanId.
+    @Query("UPDATE sdp_plans SET siteName = :siteName, version = :version, isActive = :isActive WHERE id = :sdpPlanId")
+    suspend fun setSdpPlanSite(sdpPlanId: Long, siteName: String, version: Int, isActive: Boolean)
+
+    @Query("SELECT * FROM sdp_lots WHERE projectId = :projectId AND isActive = 1")
+    fun getActiveLotsForProject(projectId: Long): Flow<List<SdpLot>>
+
+    @Query("SELECT * FROM sdp_lot_progress WHERE projectId = :projectId")
+    fun getLotProgressForProject(projectId: Long): Flow<List<SdpLotProgress>>
 
     // SDP Lots
     @Query("SELECT * FROM sdp_lots WHERE sdpPlanId = :sdpPlanId AND isActive = 1 ORDER BY id ASC")

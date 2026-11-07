@@ -32,8 +32,24 @@ data class SdpPlan(
     val scaleDenominator: Int = 0,
     // The plan area of the page as "minX,minY,maxX,maxY" (0..1); blank: the whole page.
     val frame: String = "",
+    // The site of the contract this plan is for ("Phase 2"); its revisions share it. Blank: the first site, unnamed.
+    val siteName: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** One contract can cover more than one site, each with its own plan and revisions. */
+object SdpSites {
+    fun label(site: String) = site.ifBlank { "Main site" }
+
+    /**
+     * Each site's plan in use, sites in the order they were added: its active revision, else its latest.
+     * An app before sites switches off every plan of the project when it uploads or picks a version.
+     */
+    fun current(plans: List<SdpPlan>): List<SdpPlan> =
+        plans.sortedBy { it.id }.groupBy { it.siteName }.values.map { site ->
+            site.filter { it.isActive }.maxByOrNull { it.version } ?: site.maxBy { it.version }
+        }
+}

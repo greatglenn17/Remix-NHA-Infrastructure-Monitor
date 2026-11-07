@@ -173,12 +173,36 @@ class ProjectRepository(
 
     // SDP Plans
     fun getSdpPlansForProject(projectId: Long): Flow<List<SdpPlan>> = projectDao.getSdpPlansForProject(projectId)
-    fun getActiveSdpPlanForProject(projectId: Long): Flow<SdpPlan?> = projectDao.getActiveSdpPlanForProject(projectId)
+    fun getActiveLotsForProject(projectId: Long): Flow<List<SdpLot>> = projectDao.getActiveLotsForProject(projectId)
+    fun getLotProgressForProject(projectId: Long): Flow<List<SdpLotProgress>> = projectDao.getLotProgressForProject(projectId)
 
+    /** The new plan replaces only its own site's plan. */
     suspend fun insertSdpPlan(sdpPlan: SdpPlan, role: UserRole? = null): Long {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
-        projectDao.deactivateAllSdpPlansForProject(sdpPlan.projectId)
+        projectDao.deactivateSdpPlansForSite(sdpPlan.projectId, sdpPlan.siteName)
         return projectDao.insertSdpPlan(sdpPlan)
+    }
+
+    suspend fun renameSdpSite(projectId: Long, oldName: String, newName: String, role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        projectDao.renameSdpSite(projectId, oldName, newName)
+    }
+
+    /**
+     * Makes a plan uploaded as a revision the first plan of a site of its own.
+     * [currentSiteName] names the site it leaves when that site has no name yet.
+     */
+    suspend fun moveSdpPlanToNewSite(plan: SdpPlan, newSite: String, currentSiteName: String = "", role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        if (plan.siteName.isBlank() && currentSiteName.isNotBlank()) projectDao.renameSdpSite(plan.projectId, "", currentSiteName)
+        projectDao.setSdpPlanSite(plan.id, newSite, 1, true)
+    }
+
+    /** Puts [before] (the plan as it was before [moveSdpPlanToNewSite]) back, with the first site's name. */
+    suspend fun undoMoveSdpPlanToNewSite(before: SdpPlan, currentSiteName: String = "", role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        projectDao.setSdpPlanSite(before.id, before.siteName, before.version, before.isActive)
+        if (before.siteName.isBlank() && currentSiteName.isNotBlank()) projectDao.renameSdpSite(before.projectId, currentSiteName, "")
     }
 
     /** Saves the plan's scale and the lot areas worked out from it. */

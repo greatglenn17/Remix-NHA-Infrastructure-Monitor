@@ -8,6 +8,7 @@ import com.example.data.local.ProjectDuplicateMerger
 import com.example.data.local.RecordSyncSchema
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.SdpPlan
 import com.example.data.model.SyncOutboxEvent
 import com.example.data.model.TimeExtension
 import com.example.data.remote.RecordSync
@@ -296,6 +297,28 @@ class RecordSyncRemovalTest {
         // A newer cloud revision (someone edited it after) still applies.
         recordSync.applyRemote(listOf(stale + ("revision" to revision + 5)))
         assertEquals(1, count("SELECT COUNT(*) FROM pending_documents"))
+    }
+
+    // An older app (before plan sites) sends a plan without siteName: the site stays here and goes back up.
+    @Test
+    fun planFromAnOlderApp_keepsItsSite_andSendsItBack() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        db.projectDao().insertSdpPlan(SdpPlan(projectId = id, planName = "Phase 2 SDP", pdfFileUrl = "", uploadedDate = "", uploadedBy = "", siteName = "Phase 2"))
+        val uuid = stringOf("SELECT uuid FROM sdp_plans")
+        val revision = count("SELECT revision FROM sdp_plans").toLong()
+        markAllSynced()
+
+        recordSync.applyRemote(listOf(mapOf(
+            "uuid" to uuid, "type" to "sdp_plans", "projectUuid" to p.projectUuid, "revision" to revision + 1,
+            "updatedAt" to 1L, "isDeleted" to false,
+            "data" to "{\"planName\":\"Phase 2 SDP\",\"pdfFileUrl\":\"\",\"version\":1,\"isActive\":0,\"scaleDenominator\":500}"
+        )))
+
+        assertEquals("Phase 2", stringOf("SELECT siteName FROM sdp_plans"))
+        assertEquals(500, count("SELECT scaleDenominator FROM sdp_plans"))
+        assertTrue(count("SELECT revision FROM sdp_plans") > revision + 1)
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", uuid))
     }
 
     private fun stringOf(query: String, vararg args: Any?): String =

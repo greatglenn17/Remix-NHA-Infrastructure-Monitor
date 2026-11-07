@@ -75,6 +75,8 @@ fun ProjectDetailScreen(
     val activeSdpLots by viewModel.activeSdpLots.collectAsState()
     val activeSdpRoads by viewModel.activeSdpRoads.collectAsState()
     val activeSdpLotProgressMap by viewModel.activeSdpLotProgressMap.collectAsState()
+    val allSitesSdpItems by viewModel.allSitesSdpItems.collectAsState()
+    val allSitesSdpLots by viewModel.allSitesSdpLots.collectAsState()
 
     var projectToEdit by remember { mutableStateOf<Project?>(null) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -238,10 +240,8 @@ fun ProjectDetailScreen(
                             today = today,
                             weeklyReports = weeklyReports,
                             onAddWeeklyReport = onAddWeeklyReportClick.takeIf { currentUser.role.hasPermission(Permission.SUBMIT_REPORT) },
-                            construction = remember(isHousingProject, activeSdpLots, activeSdpLotProgressMap) {
-                                com.example.util.SdpSummary.of(
-                                    activeSdpLots.map { lot -> com.example.util.SdpSummary.Item(lot.use, lot.lotAreaSqM, activeSdpLotProgressMap[lot.id]?.physicalProgress ?: 0) }
-                                ).takeIf { isHousingProject && it.saleable.count > 0 }
+                            construction = remember(isHousingProject, allSitesSdpItems) {
+                                com.example.util.SdpSummary.of(allSitesSdpItems).takeIf { isHousingProject && it.saleable.count > 0 }
                             }
                         )
                     }
@@ -284,6 +284,14 @@ fun ProjectDetailScreen(
                                 onUploadSdpPlan = { planName: String, pdfUrl: String, desc: String ->
                                     viewModel.addSdpPlan(currentProject.id, planName, pdfUrl, desc)
                                 },
+                                onAddSite = { newSite, currentSiteName, planName, pdfUrl, desc ->
+                                    viewModel.addSdpPlan(currentProject.id, planName, pdfUrl, desc, newSite, currentSiteName)
+                                },
+                                onSelectSite = { site -> viewModel.selectSdpSite(currentProject.id, site) },
+                                onMoveToNewSite = viewModel::moveSdpPlanToNewSite,
+                                onUndoMoveToNewSite = viewModel::undoMoveSdpPlanToNewSite,
+                                allSitesLots = allSitesSdpLots.first,
+                                allSitesProgress = allSitesSdpLots.second,
                                 onDetectLots = viewModel::detectSdpLots,
                                 onAddDetectedLots = viewModel::addDetectedSdpLots,
                                 onTraceLot = viewModel::traceSdpLot,
@@ -294,10 +302,11 @@ fun ProjectDetailScreen(
                                 onSetLotUse = viewModel::setSdpLotUse,
                                 onRenameLot = viewModel::renameSdpLot,
                                 onSetPlanFrame = viewModel::setSdpPlanFrame,
-                                onPrintPlan = {
+                                onPrintPlan = { allSites, landscape ->
                                     activeSdpPlan?.let { plan ->
+                                        val plans = if (allSites) com.example.data.model.SdpSites.current(sdpPlans) else listOf(plan)
                                         printForm("SDP Progress - ${currentProject.name}") {
-                                            viewModel.sdpPlanForm(currentProject, plan, activeSdpLots, activeSdpLotProgressMap)
+                                            viewModel.sdpPlanForm(currentProject, plans, landscape)
                                         }
                                     }
                                 },

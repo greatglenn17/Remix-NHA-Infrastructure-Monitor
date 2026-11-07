@@ -13,6 +13,7 @@ import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.data.model.ProjectIssue
 import com.example.data.model.ProjectPayment
+import com.example.data.model.SdpSites
 import com.example.data.model.WeatherCondition
 import com.example.data.model.WeeklyIssue
 import com.example.data.model.WeeklyReport
@@ -328,25 +329,51 @@ object BlueBookForms {
         return page("Monthly Project Engineer's Report", b.toString(), banner)
     }
 
+    /** One site's plan for [sdpPlan]: [image] is the framed plan as a data URI. */
+    class SdpSheet(val site: String, val image: String, val summary: SdpSummary.Summary)
+
+    const val LANDSCAPE_PAGE = "size: A4 landscape"
+
     /**
-     * The subdivision plan coloured by lot progress, filling a portrait A4 page, with a legend of saleable
-     * units per band over its bottom-left corner. [planImage] is the framed plan as a data URI;
-     * [bandHex] the colour of each band of [SdpSummary.BANDS]; road lots take its red, yellow and green.
+     * The subdivision plan coloured by lot progress, filling one A4 page, with a legend of saleable
+     * units per band over its bottom-left corner. With several [sheets] (sites) the plans sit side by
+     * side on a [landscape] page, or one above the other on a portrait one, and the legend counts each
+     * site and the total. [bandHex] the colour of each band of [SdpSummary.BANDS]; road lots take its red, yellow and green.
      */
-    fun sdpPlan(project: Project, summary: SdpSummary.Summary, planImage: String, bandHex: List<String>, asOf: LocalDate, banner: String = ""): String {
-        val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th></tr><tr><th class='sub'>Progress</th><th class='sub'>Units</th></tr>")
+    fun sdpPlan(project: Project, sheets: List<SdpSheet>, bandHex: List<String>, asOf: LocalDate, banner: String = "", landscape: Boolean = false): String {
+        val multi = sheets.size > 1
+        // Columns after "Progress": each site, then the total; one site has just its units.
+        val span = if (multi) sheets.size + 2 else 2
+        fun counts(of: (SdpSummary.Summary) -> Int) =
+            (if (multi) sheets.joinToString("") { "<td class='n'>${of(it.summary)}</td>" } else "") + "<td class='n'>${sheets.sumOf { of(it.summary) }}</td>"
+        val legend = StringBuilder("<table class='lg'><tr><th class='sec' colspan='$span'>LEGEND</th></tr><tr><th class='sub'>Progress</th>")
+        if (multi) sheets.forEach { legend.append("<th class='sub'>${esc(SdpSites.label(it.site))}</th>") }
+        legend.append("<th class='sub'>${if (multi) "Total" else "Units"}</th></tr>")
         SdpSummary.BANDS.forEachIndexed { i, band ->
-            legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td><td class='n'>${summary.saleableBands[i]}</td></tr>")
+            legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td>${counts { it.saleableBands[i] }}</tr>")
         }
-        legend.append("<tr class='tot'><td>Total units</td><td class='n'>${summary.saleable.count}</td></tr>")
-        if (summary.roadLots.sum() > 0) {
-            legend.append("<tr><th class='sub' colspan='2'>Road lot</th></tr>")
-            SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
-                legend.append("<tr><td colspan='2'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
-            }
+        legend.append("<tr class='tot'><td>Total units</td>${counts { it.saleable.count }}</tr>")
+        // Road lot colours always show, so the key is the same on every print.
+        legend.append("<tr><th class='sub' colspan='$span'>Road lot</th></tr>")
+        SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
+            legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
         }
         legend.append("</table>")
-        val plan = "<div class='plan'><img src='$planImage'>$legend</div>"
+        // Height left for plans under the banner and title: 244mm portrait, 157mm landscape; a site name takes 6mm.
+        // One plan has the legend over its corner; several plans would lose lots under it, so it sits beside
+        // them (landscape) or below them (portrait, about 6mm a row).
+        val room = if (landscape) 157 else 244
+        val legendHeight = 12 * 6
+        val maxHeight = when {
+            !multi -> room
+            landscape -> room - 6
+            else -> (room - legendHeight - sheets.size * 9) / sheets.size
+        }
+        val style = if (multi || landscape) " style='max-height:${maxHeight}mm'" else ""
+        val plan = if (!multi) "<div class='plan'><img src='${sheets.single().image}'$style>$legend</div>"
+        else "<div class='plan multi${if (landscape) " row" else ""}'>" +
+            sheets.joinToString("") { "<figure><figcaption>${esc(SdpSites.label(it.site))}</figcaption><img src='${it.image}'$style></figure>" } +
+            "$legend</div>"
         return page(
             "Subdivision Plan Progress",
             """
@@ -355,7 +382,8 @@ object BlueBookForms {
             $plan
             """,
             banner,
-            fullPage = true
+            fullPage = true,
+            landscape = landscape
         )
     }
 
@@ -526,12 +554,12 @@ object BlueBookForms {
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
-    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false) = """
+    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false, landscape: Boolean = false) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
-        @page { size: A4; margin: ${if (fullPage) "6mm" else "12mm"}; }
+        @page { ${if (landscape) LANDSCAPE_PAGE else "size: A4"}; margin: ${if (fullPage) "6mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         /* On screen (the app's print preview) the form sits on an A4-wide sheet; printing ignores this. */
-        @media screen { html { background: #9e9e9e; } body { width: ${if (fullPage) "198mm" else "186mm"}; padding: ${if (fullPage) "6mm" else "12mm"}; margin: 6mm auto; } }
+        @media screen { html { background: #9e9e9e; } body { width: ${if (landscape) "285mm" else if (fullPage) "198mm" else "186mm"}; padding: ${if (fullPage) "6mm" else "12mm"}; margin: 6mm auto; } }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
         /* A title or column-header row never ends a page: it moves on with the rows below it. */
@@ -577,7 +605,13 @@ object BlueBookForms {
         body.full .period { font-size: 10pt; margin-bottom: 2mm; }
         div.plan { position: relative; text-align: center; }
         div.plan img { max-width: 100%; max-height: 244mm; }
+        div.plan figure { margin: 0 0 3mm; }
+        div.plan figcaption { font-weight: bold; font-size: 11pt; margin-bottom: 1mm; }
+        div.plan.row { display: flex; gap: 3mm; justify-content: center; align-items: flex-start; }
+        div.plan.row figure { flex: 1 1 0; min-width: 0; }
         table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 10pt; margin: 0; }
+        div.plan.multi table.lg { position: static; }
+        div.plan.row table.lg { flex: none; align-self: flex-end; }
         table.lg th, table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
         i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
         </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>

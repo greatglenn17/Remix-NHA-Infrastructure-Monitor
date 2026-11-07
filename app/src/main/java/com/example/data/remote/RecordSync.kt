@@ -139,6 +139,15 @@ class RecordSync(private val db: AppDatabase) {
             put("updatedAt", remoteUpdatedAt)
         }
 
+        // An app before plan sites (database 37) sends its plan rows without siteName. This phone keeps
+        // its own (the column is left out of the update) and sends the row back below, so the cloud
+        // copy, and phones installed later, don't lose the site.
+        val keptSite = if (table == "sdp_plans" && local != null && !data.has("siteName")) {
+            sql.query("SELECT siteName FROM sdp_plans WHERE id = ?", arrayOf(local.first)).use { c ->
+                if (c.moveToFirst()) c.getString(0).takeIf { it.isNotBlank() } else null
+            }
+        } else null
+
         writeRemote { w ->
             val rowId = if (local == null) {
                 w.insert("`$table`", SQLiteDatabase.CONFLICT_ABORT, values)
@@ -158,6 +167,8 @@ class RecordSync(private val db: AppDatabase) {
                 }
             }
         }
+        // A local write: the sync trigger raises the revision and queues the upload.
+        if (keptSite != null) sql.execSQL("UPDATE sdp_plans SET siteName = ? WHERE id = ?", arrayOf<Any>(keptSite, local!!.first))
         return true
     }
 

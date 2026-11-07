@@ -371,6 +371,7 @@ class GoogleDriveSyncManager(
                     put("uploadedDate", sp.uploadedDate)
                     put("uploadedBy", sp.uploadedBy)
                     put("description", sp.description)
+                    put("siteName", sp.siteName)
                 })
             }
 
@@ -948,7 +949,8 @@ class GoogleDriveSyncManager(
                     isActive = sp.optBoolean("isActive", true),
                     uploadedDate = sp.optString("uploadedDate", ""),
                     uploadedBy = sp.optString("uploadedBy", "Engr. Admin"),
-                    description = sp.optString("description", "")
+                    description = sp.optString("description", ""),
+                    siteName = sp.optString("siteName", "")
                 )
                 projectDao.insertSdpPlan(plan)
             }

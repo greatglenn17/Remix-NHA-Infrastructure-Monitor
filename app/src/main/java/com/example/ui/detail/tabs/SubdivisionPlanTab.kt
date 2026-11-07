@@ -12,11 +12,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.BasicTextField
@@ -325,9 +330,25 @@ fun SubdivisionPlanTab(
     onRenameLot: (SdpLot, block: String, lot: String) -> Unit = { _, _, _ -> },
     // Null: the whole page.
     onSetPlanFrame: (SdpPlan, List<Float>?) -> Unit = { _, _ -> },
-    onPrintPlan: () -> Unit = {}
+    onPrintPlan: (allSites: Boolean, landscape: Boolean) -> Unit = { _, _ -> },
+    // Another site under the same contract, with its first plan; currentSiteName names the site on screen when it has no name.
+    onAddSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> },
+    onSelectSite: (String) -> Unit = {},
+    // A plan uploaded as a revision that is really another site; currentSiteName as in onAddSite.
+    onMoveToNewSite: (plan: SdpPlan, newSite: String, currentSiteName: String) -> Unit = { _, _, _ -> },
+    onUndoMoveToNewSite: (before: SdpPlan, newSite: String, currentSiteName: String) -> Unit = { _, _, _ -> },
+    // In-use plans' lots of every site and their progress, for the all-sites table.
+    allSitesLots: List<SdpLot> = activeLots,
+    allSitesProgress: Map<Long, SdpLotProgress> = lotProgressMap
 ) {
     var showScaleDialog by remember { mutableStateOf(false) }
+    var showMoveSiteDialog by remember { mutableStateOf(false) }
+    var showPrintDialog by remember { mutableStateOf(false) }
+    // The last move, (plan before, new site, first site's new name), until undone or closed.
+    var lastMove by remember { mutableStateOf<Triple<SdpPlan, String, String>?>(null) }
+    val sites = remember(sdpPlans) { com.example.data.model.SdpSites.current(sdpPlans).map { it.siteName } }
+    // Versions of the site on screen; other sites keep their own.
+    val sitePlans = sdpPlans.filter { it.siteName == activeSdpPlan?.siteName }
     // Area worked out from the plan scale for the lot being added; null until known.
     var draftArea by remember { mutableStateOf<Double?>(null) }
     val context = LocalContext.current
@@ -434,16 +455,19 @@ fun SubdivisionPlanTab(
     val textMeasurer = rememberTextMeasurer()
 
     // --- REACTIVE KPI COMPUTATIONS ---
-    // Counted over saleable lots: open spaces, road lots and the like are not housing units.
-    val saleableLots = activeLots.filter { it.isSaleable }
-    val totalLots = saleableLots.size
-    val m1BilledCount = saleableLots.count { lotProgressMap[it.id].m1Billed }
-    val m2BilledCount = saleableLots.count { lotProgressMap[it.id].m2Billed }
-    val notBilledLotsCount = saleableLots.count { !lotProgressMap[it.id].anyBilled }
-    val completedLotsCount = saleableLots.count { (lotProgressMap[it.id]?.physicalProgress ?: 0) >= 100 }
-    val avgPhysicalProgress = if (totalLots > 0) {
-        saleableLots.sumOf { lotProgressMap[it.id]?.physicalProgress ?: 0 }.toDouble() / totalLots
-    } else 0.0
+    val stats = LotStats(activeLots, lotProgressMap)
+    val totalLots = stats.total
+    val m1BilledCount = stats.m1
+    val m2BilledCount = stats.m2
+    val notBilledLotsCount = stats.notBilled
+    val completedLotsCount = stats.completed
+    val avgPhysicalProgress = stats.avgProgress
+    // Each site's plan in use with its counts, then the total; only shown with more than one site.
+    val siteStats = remember(sdpPlans, allSitesLots, allSitesProgress) {
+        val current = com.example.data.model.SdpSites.current(sdpPlans)
+        current.map { plan -> plan.siteName to LotStats(allSitesLots.filter { it.sdpPlanId == plan.id }, allSitesProgress) } +
+            (null to LotStats(allSitesLots.filter { lot -> current.any { it.id == lot.sdpPlanId } }, allSitesProgress))
+    }
     val planFrame = remember(activeSdpPlan?.frame, activeLots) {
         com.example.util.SdpSummary.parseFrame(activeSdpPlan?.frame ?: "")
             ?: com.example.util.SdpSummary.frameAround(activeLots.map { l -> jsonToNormalized(l.polygonNormalizedJson).map { it.x to it.y } })
@@ -617,7 +641,7 @@ fun SubdivisionPlanTab(
                         )
                         Text(
                             text = if (activeSdpPlan != null) {
-                                "${project.name} • v${activeSdpPlan.version}"
+                                "${project.name} • " + (if (sites.size > 1) com.example.data.model.SdpSites.label(activeSdpPlan.siteName) + " • " else "") + "v${activeSdpPlan.version}"
                             } else {
                                 "No Approved Site Development Plan Uploaded"
                             },
@@ -657,7 +681,7 @@ fun SubdivisionPlanTab(
                         }
                         if (activeSdpPlan != null && renderedBitmap != null && activeLots.isNotEmpty()) {
                             IconButton(
-                                onClick = onPrintPlan,
+                                onClick = { showPrintDialog = true },
                                 modifier = Modifier.size(32.dp).testTag("print_plan_button")
                             ) {
                                 Icon(Icons.Default.Print, contentDescription = "Print plan with progress", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -705,8 +729,32 @@ fun SubdivisionPlanTab(
                     }
                 }
 
-                // COMPACT KPI MONITORING ROW
-                if (activeSdpPlan != null) {
+                if (activeSdpPlan != null && sites.size > 1) {
+                    val labels = sites.map(com.example.data.model.SdpSites::label)
+                    com.example.ui.detail.sections.ChipRow(labels, com.example.data.model.SdpSites.label(activeSdpPlan.siteName), contentPadding = PaddingValues(0.dp)) { label ->
+                        onSelectSite(sites[labels.indexOf(label)])
+                    }
+                }
+
+                lastMove?.let { (before, newSite, currentSiteName) ->
+                    Snackbar(
+                        action = {
+                            TextButton(onClick = { onUndoMoveToNewSite(before, newSite, currentSiteName); lastMove = null }) { Text("Undo") }
+                        },
+                        dismissAction = {
+                            IconButton(onClick = { lastMove = null }) { Icon(Icons.Default.Close, contentDescription = "Close") }
+                        },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("v${before.version} is now $newSite.") }
+                }
+
+                if (activeSdpPlan != null && sites.size > 1) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AllSitesTable(siteStats, activeSdpPlan.siteName, onSelectSite)
+                }
+
+                // COMPACT KPI MONITORING ROW: the all-sites table above holds these counts when there are sites.
+                if (activeSdpPlan != null && sites.size <= 1) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -730,7 +778,7 @@ fun SubdivisionPlanTab(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         // Version Selector
-                        if (sdpPlans.size > 1) {
+                        if (sitePlans.size > 1) {
                             var dropdownExpanded by remember { mutableStateOf(false) }
                             Surface(
                                 color = MaterialTheme.colorScheme.surface,
@@ -756,7 +804,7 @@ fun SubdivisionPlanTab(
                                     onDismissRequest = { dropdownExpanded = false },
                                     modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
-                                    sdpPlans.forEach { plan ->
+                                    sitePlans.forEach { plan ->
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
@@ -768,6 +816,16 @@ fun SubdivisionPlanTab(
                                             },
                                             onClick = {
                                                 onSelectActiveVersion(plan.id)
+                                                dropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                    if (canManageSdp) {
+                                        HorizontalDivider()
+                                        DropdownMenuItem(
+                                            text = { Text("Make v${activeSdpPlan.version} its own site…", style = MaterialTheme.typography.bodySmall) },
+                                            onClick = {
+                                                showMoveSiteDialog = true
                                                 dropdownExpanded = false
                                             }
                                         )
@@ -2309,12 +2367,44 @@ fun SubdivisionPlanTab(
     // 10. UPLOAD SDP DIALOG
     if (showUploadDialog) {
         AddSdpPlanDialog(
-            currentVersion = sdpPlans.size + 1,
+            currentVersion = (sitePlans.maxOfOrNull { it.version } ?: 0) + 1,
             onDismiss = { showUploadDialog = false },
             onSubmit = { planName: String, pdfUriString: String, desc: String ->
                 detectAfterUpload = pdfUriString.isNotBlank()
                 onUploadSdpPlan(planName, pdfUriString, desc)
                 showUploadDialog = false
+            },
+            currentSite = activeSdpPlan?.siteName,
+            takenSites = sites,
+            onSubmitNewSite = { newSite, currentSiteName, planName, pdfUriString, desc ->
+                detectAfterUpload = true
+                onAddSite(newSite, currentSiteName, planName, pdfUriString, desc)
+                showUploadDialog = false
+            }
+        )
+    }
+
+    if (showPrintDialog && activeSdpPlan != null) {
+        PrintPlanDialog(
+            currentSite = activeSdpPlan.siteName,
+            siteCount = sites.size,
+            onDismiss = { showPrintDialog = false },
+            onPrint = { allSites, landscape ->
+                showPrintDialog = false
+                onPrintPlan(allSites, landscape)
+            }
+        )
+    }
+
+    if (showMoveSiteDialog && activeSdpPlan != null) {
+        MoveToSiteDialog(
+            plan = activeSdpPlan,
+            takenSites = sites,
+            onDismiss = { showMoveSiteDialog = false },
+            onConfirm = { newSite, currentSiteName ->
+                onMoveToNewSite(activeSdpPlan, newSite, currentSiteName)
+                lastMove = Triple(activeSdpPlan, newSite, currentSiteName)
+                showMoveSiteDialog = false
             }
         )
     }
@@ -2916,8 +3006,18 @@ fun AddRoadDialog(
 fun AddSdpPlanDialog(
     currentVersion: Int,
     onDismiss: () -> Unit,
-    onSubmit: (planName: String, pdfUrl: String, description: String) -> Unit
+    onSubmit: (planName: String, pdfUrl: String, description: String) -> Unit,
+    // The site on screen; null on the project's first plan, when there is nothing to revise.
+    currentSite: String? = null,
+    takenSites: List<String> = emptyList(),
+    onSubmitNewSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> }
 ) {
+    var addingSite by remember { mutableStateOf(false) }
+    var newSiteName by remember { mutableStateOf("Phase ${takenSites.size + 1}") }
+    // Only asked when the site already uploaded has no name, so the two can be told apart.
+    val namingCurrent = currentSite?.isBlank() == true
+    var currentSiteName by remember { mutableStateOf("Phase 1") }
+    val siteError = if (addingSite) siteNameError(newSiteName, namingCurrent, currentSiteName, takenSites) else null
     var planName by remember { mutableStateOf("Approved Subdivision Plan Layout") }
     var description by remember { mutableStateOf("Official Approved SDP PDF Reference Document") }
     // The pick is copied into the app and uploaded like any attachment, so every phone can open it.
@@ -2934,7 +3034,7 @@ fun AddSdpPlanDialog(
                 Icon(Icons.Default.PictureAsPdf, contentDescription = "SDP", tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Upload Approved SDP (Version $currentVersion)",
+                    text = "Upload Approved SDP (Version ${if (addingSite) 1 else currentVersion})",
                     style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 )
             }
@@ -2942,8 +3042,44 @@ fun AddSdpPlanDialog(
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             ) {
+                if (currentSite != null) {
+                    Column(Modifier.selectableGroup()) {
+                        listOf(false to "Revised plan for ${com.example.data.model.SdpSites.label(currentSite)}", true to "Another site under this contract").forEach { (site, text) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                                    .selectable(selected = addingSite == site, onClick = { addingSite = site }, role = Role.RadioButton)
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                RadioButton(selected = addingSite == site, onClick = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                    if (addingSite) {
+                        if (namingCurrent) {
+                            OutlinedTextField(
+                                value = currentSiteName,
+                                onValueChange = { currentSiteName = it },
+                                label = { Text("Name of the site already uploaded") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("current_site_name")
+                            )
+                        }
+                        OutlinedTextField(
+                            value = newSiteName,
+                            onValueChange = { newSiteName = it },
+                            label = { Text("Name of the new site") },
+                            singleLine = true,
+                            isError = siteError != null,
+                            supportingText = { Text(siteError ?: "Each site keeps its own lots, progress and revisions.") },
+                            modifier = Modifier.fillMaxWidth().testTag("new_site_name")
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = planName,
                     onValueChange = { planName = it },
@@ -3006,9 +3142,12 @@ fun AddSdpPlanDialog(
         confirmButton = {
             Button(shape = MaterialTheme.shapes.small, 
                 onClick = {
-                    pdfRef?.let { onSubmit(planName, it, description) }
+                    pdfRef?.let {
+                        if (addingSite) onSubmitNewSite(newSiteName.trim(), if (namingCurrent) currentSiteName.trim() else "", planName, it, description)
+                        else onSubmit(planName, it, description)
+                    }
                 },
-                enabled = pdfRef != null,
+                enabled = pdfRef != null && siteError == null,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
             ) {
                 Text("Save SDP Plan", fontWeight = FontWeight.Bold)
@@ -3020,6 +3159,173 @@ fun AddSdpPlanDialog(
             }
         }
     )
+}
+
+private fun siteNameError(newSite: String, namingCurrent: Boolean, currentSiteName: String, takenSites: List<String>) = when {
+    newSite.isBlank() -> "Name the new site"
+    namingCurrent && currentSiteName.isBlank() -> "Name the site already uploaded"
+    namingCurrent && newSite.trim().equals(currentSiteName.trim(), ignoreCase = true) -> "The two sites need different names"
+    takenSites.any { it.equals(newSite.trim(), ignoreCase = true) } -> "${newSite.trim()} is already a site of this project"
+    else -> null
+}
+
+/** Moves one version of a site, with its lots and progress, into a site of its own. */
+@Composable
+fun MoveToSiteDialog(
+    plan: SdpPlan,
+    takenSites: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (newSite: String, currentSiteName: String) -> Unit
+) {
+    var newSiteName by remember { mutableStateOf("Phase ${takenSites.size + 1}") }
+    val namingCurrent = plan.siteName.isBlank()
+    var currentSiteName by remember { mutableStateOf("Phase 1") }
+    val siteError = siteNameError(newSiteName, namingCurrent, currentSiteName, takenSites)
+    val oldSite = com.example.data.model.SdpSites.label(plan.siteName)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Make v${plan.version} its own site", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    "Use this when v${plan.version} (${plan.planName}) is another site under this contract, not a revision of $oldSite. " +
+                        "Its lots, progress and inspections move with it. The other versions stay in ${if (namingCurrent) "the first site" else oldSite}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (namingCurrent) {
+                    OutlinedTextField(
+                        value = currentSiteName,
+                        onValueChange = { currentSiteName = it },
+                        label = { Text("Name of the first site") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("current_site_name")
+                    )
+                }
+                OutlinedTextField(
+                    value = newSiteName,
+                    onValueChange = { newSiteName = it },
+                    label = { Text("Name of the new site") },
+                    singleLine = true,
+                    isError = siteError != null,
+                    supportingText = { Text(siteError ?: "v${plan.version} becomes version 1 of this site.") },
+                    modifier = Modifier.fillMaxWidth().testTag("new_site_name")
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                shape = MaterialTheme.shapes.small,
+                onClick = { onConfirm(newSiteName.trim(), if (namingCurrent) currentSiteName.trim() else "") },
+                enabled = siteError == null
+            ) { Text("Make site", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+    )
+}
+
+/** Which sites go on the SDP print, and which way the page turns. All sites start on landscape, so the plans sit side by side. */
+@Composable
+fun PrintPlanDialog(currentSite: String, siteCount: Int, onDismiss: () -> Unit, onPrint: (allSites: Boolean, landscape: Boolean) -> Unit) {
+    var allSites by remember { mutableStateOf(siteCount > 1) }
+    var landscape by remember { mutableStateOf(siteCount > 1) }
+    @Composable
+    fun Choice(text: String, selected: Boolean, onClick: () -> Unit) = Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().selectable(selected = selected, onClick = onClick, role = Role.RadioButton).padding(vertical = 4.dp)
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        title = { Text("Print SDP", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                if (siteCount > 1) {
+                    Text("Sites", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.selectableGroup()) {
+                        Choice("All $siteCount sites on one page", allSites) { allSites = true; landscape = true }
+                        Choice("${com.example.data.model.SdpSites.label(currentSite)} only", !allSites) { allSites = false }
+                    }
+                }
+                Text("Page", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.selectableGroup()) {
+                    Choice(if (allSites && siteCount > 1) "Landscape: sites side by side" else "Landscape", landscape) { landscape = true }
+                    Choice(if (allSites && siteCount > 1) "Portrait: sites one above the other" else "Portrait", !landscape) { landscape = false }
+                }
+            }
+        },
+        confirmButton = {
+            Button(shape = MaterialTheme.shapes.small, onClick = { onPrint(allSites && siteCount > 1, landscape) }) { Text("Preview", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+    )
+}
+
+/** The KPI counts, over saleable lots: open spaces, road lots and the like are not housing units. */
+class LotStats(lots: List<SdpLot>, progress: Map<Long, SdpLotProgress>) {
+    private val saleable = lots.filter { it.isSaleable }
+    val total = saleable.size
+    val m1 = saleable.count { progress[it.id].m1Billed }
+    val m2 = saleable.count { progress[it.id].m2Billed }
+    val notBilled = saleable.count { !progress[it.id].anyBilled }
+    val completed = saleable.count { (progress[it.id]?.physicalProgress ?: 0) >= 100 }
+    val avgProgress = if (total > 0) saleable.sumOf { progress[it.id]?.physicalProgress ?: 0 }.toDouble() / total else 0.0
+}
+
+/** One row per site, the one on screen in bold, then the total of all sites. A site row picks that site. */
+@Composable
+fun AllSitesTable(rows: List<Pair<String?, LotStats>>, currentSite: String, onSelectSite: (String) -> Unit) {
+    val nha = LocalNHAColors.current
+    val columns = listOf(
+        "LOTS" to MaterialTheme.colorScheme.onSurface, "M1" to MaterialTheme.colorScheme.primary, "M2" to MaterialTheme.colorScheme.primary,
+        "NOT BILLED" to nha.neutral, "DONE" to nha.onTrack, "AVG" to nha.watch
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(vertical = 4.dp)) {
+            @Composable
+            fun Line(name: String, cells: List<String>, header: Boolean, bold: Boolean, modifier: Modifier = Modifier) {
+                Row(modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val style = if (header) MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal)
+                    Text(name, style = style.copy(color = if (header) style.color else MaterialTheme.colorScheme.onSurface), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1.6f))
+                    cells.forEachIndexed { i, cell ->
+                        Text(
+                            cell, maxLines = 1, textAlign = TextAlign.End,
+                            style = if (header) style else style.copy(color = columns[i].second),
+                            modifier = Modifier.weight(if (i == 3) 1.3f else 1f)
+                        )
+                    }
+                }
+            }
+            Line("SITE", columns.map { it.first }, header = true, bold = false)
+            rows.forEach { (site, s) ->
+                val cells = listOf("${s.total}", "${s.m1}", "${s.m2}", "${s.notBilled}", "${s.completed}", String.format("%.0f%%", s.avgProgress))
+                if (site == null) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Line("All sites", cells, header = false, bold = true)
+                } else {
+                    Line(
+                        com.example.data.model.SdpSites.label(site), cells, header = false, bold = site == currentSite,
+                        modifier = Modifier.clickable { onSelectSite(site) }
+                            .then(if (site == currentSite) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)) else Modifier)
+                    )
+                }
+            }
+        }
+    }
 }
 
 // --- KPI CHIP COMPOSABLE ---
