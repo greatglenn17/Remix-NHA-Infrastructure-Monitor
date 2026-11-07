@@ -22,9 +22,12 @@ fun isEmailName(name: String?, email: String): Boolean =
     name.isNullOrBlank() || name.filter(Char::isLetterOrDigit).equals(email.substringBefore("@").filter(Char::isLetterOrDigit), ignoreCase = true)
 
 /** [account] with what the server has, so every phone shows the same; a missing or email-made server value keeps the phone's. */
-fun refreshedAccount(account: UserAccount, email: String, role: UserRole?, name: String?, position: String?, office: String?): UserAccount =
+fun refreshedAccount(
+    account: UserAccount, email: String, role: UserRole?, name: String?, position: String?, office: String?, seesAllProjects: Boolean? = null
+): UserAccount =
     account.copy(
         role = role ?: account.role,
+        seesAllProjects = seesAllProjects ?: account.seesAllProjects,
         name = name.takeUnless { isEmailName(it, email) } ?: account.name,
         title = position ?: account.title,
         office = office ?: account.office
@@ -270,6 +273,7 @@ class AuthManager(private val context: Context) {
             .putString("user_office", userAccount.office)
             .putString("user_role", userAccount.role.name)
             .putLong("assigned_project_id", userAccount.assignedProjectId ?: -1L)
+            .putBoolean("user_sees_all", userAccount.seesAllProjects)
             .putString("user_email", email)
             .apply()
     }
@@ -293,7 +297,8 @@ class AuthManager(private val context: Context) {
             title = title,
             office = office,
             role = role,
-            assignedProjectId = projId
+            assignedProjectId = projId,
+            seesAllProjects = prefs.getBoolean("user_sees_all", false)
         )
     }
 
@@ -353,6 +358,7 @@ class AuthManager(private val context: Context) {
             UserRole.ENGINEER_ADMIN -> "Supervising Engineer"
             UserRole.FIELD_ENGINEER -> "Senior Engineer A"
             UserRole.VIEWER -> "Contractor"
+            UserRole.SUPER_VIEWER -> "Management"
         }
         val userTitle = if (!position.isNullOrBlank()) position else defaultTitle
         val userOffice = if (!office.isNullOrBlank()) office else "Bulacan District Office"

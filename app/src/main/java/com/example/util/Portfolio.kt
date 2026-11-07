@@ -10,7 +10,8 @@ data class PortfolioItem(
     val billedTotal: Double,
     val contractCost: Double,
     val pendingDocsCount: Int,       // this project's orders waiting approval
-    val lastFieldUpdate: LocalDate?
+    val lastFieldUpdate: LocalDate?,
+    val viewOnly: Boolean = false     // not assigned to this account: opens read-only
 )
 
 data class PortfolioSummary(val behind: Int, val billingAhead: Int, val waitingApproval: Int, val dueSoon: Int)

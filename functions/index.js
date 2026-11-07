@@ -13,7 +13,9 @@ const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 // taken from the client-written profile: only the account whose Firebase Auth
 // email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
 // writable by the user, so it is never trusted for that decision.
-const SELF_ASSIGNABLE_ROLES = ["ENGINEER_ADMIN", "FIELD_ENGINEER", "VIEWER"];
+const SELF_ASSIGNABLE_ROLES = ["ENGINEER_ADMIN", "FIELD_ENGINEER", "VIEWER", "SUPER_VIEWER"];
+// The Firestore rules let a user sign up only as FIELD_ENGINEER or VIEWER, and let only the
+// Super Admin set ENGINEER_ADMIN, SUPER_VIEWER or seesAllProjects on someone's profile.
 
 /**
  * Triggered whenever a user profile is created or updated in Firestore users/{uid}.
@@ -47,8 +49,10 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
     }
 
     try {
-      await getAuth().setCustomUserClaims(uid, { role: requestedRole });
-      console.log(`Assigned claim { role: "${requestedRole}" } to ${uid} (${email})`);
+      // allProjects: the Super Admin's "See all projects" switch; other projects open view-only.
+      const allProjects = data.seesAllProjects === true;
+      await getAuth().setCustomUserClaims(uid, { role: requestedRole, allProjects });
+      console.log(`Assigned claims { role: "${requestedRole}", allProjects: ${allProjects} } to ${uid} (${email})`);
     } catch (err) {
       console.error(`Failed to assign custom claim to ${uid}:`, err);
     }

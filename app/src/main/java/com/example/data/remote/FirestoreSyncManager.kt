@@ -104,8 +104,9 @@ class FirestoreSyncManager(
 
     /**
      * Start real-time Firestore synchronization listeners for cross-device updates.
-     * The Super Admin listens to every project and record; everyone else only to those
-     * assigned to their account, so the role is read before the listeners are attached.
+     * The Super Admin, a Super Viewer and anyone the Super Admin let see all projects listen
+     * to every project and record; everyone else only to those assigned to their account,
+     * so the claims are read before the listeners are attached.
      */
     fun startRealtimeSync() {
         val currentUser = auth.currentUser
@@ -125,9 +126,13 @@ class FirestoreSyncManager(
     private suspend fun CoroutineScope.listenFor(currentUser: FirebaseUser) {
         var wait = 2_000L
         var superAdmin: Boolean? = null
+        var seesAll = false
         while (superAdmin == null) {
             try {
-                superAdmin = AssignmentPolicy.isSuperAdmin(roleOf(currentUser))
+                val claims = currentUser.getIdToken(false).await().claims
+                val role = claims["role"] as? String
+                seesAll = AssignmentPolicy.seesAll(role, claims["allProjects"] == true)
+                superAdmin = AssignmentPolicy.isSuperAdmin(role)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -139,7 +144,7 @@ class FirestoreSyncManager(
         }
         synchronized(listenerLock) {
             if (!isActive) return
-            attachListeners(currentUser.uid, superAdmin == true)
+            attachListeners(currentUser.uid, superAdmin == true, seesAll)
         }
     }
 
@@ -147,12 +152,12 @@ class FirestoreSyncManager(
     private suspend fun roleOf(user: FirebaseUser): String? =
         user.getIdToken(false).await().claims["role"] as? String
 
-    private fun attachListeners(uid: String, superAdmin: Boolean) {
+    private fun attachListeners(uid: String, superAdmin: Boolean, seesAll: Boolean) {
         fun scoped(collection: String): Query = firestore.collection(collection).let {
-            if (superAdmin) it else it.whereArrayContains("assignedUids", uid)
+            if (seesAll) it else it.whereArrayContains("assignedUids", uid)
         }
 
-        Log.d(tag, "Starting Firestore realtime listener for projects (User: $uid, all projects: $superAdmin)...")
+        Log.d(tag, "Starting Firestore realtime listener for projects (User: $uid, all projects: $seesAll)...")
         hasServerSnapshot = false
         projectListener = scoped("projects")
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshots, e ->
@@ -301,7 +306,9 @@ class FirestoreSyncManager(
                     )
                     projectDao.insertProject(newProj)
                     Log.d(tag, "Ingested new remote project: $name ($projectUuid)")
-                    if (hasServerSnapshot && newProj.createdByUid != myUid) {
+                    // Only for projects this account works on, as before every phone saw every project.
+                    if (hasServerSnapshot && newProj.createdByUid != myUid &&
+                        (isSuperAdmin || AssignedUids.contains(newProj.assignedUids, myUid))) {
                         AppNotificationManager.sendProjectNotification(
                             context = context,
                             projectUuid = projectUuid,

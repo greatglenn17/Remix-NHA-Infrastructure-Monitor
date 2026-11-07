@@ -337,6 +337,7 @@ fun TopAppBarHeader(
                                 UserRole.ENGINEER_ADMIN -> Icons.Default.VerifiedUser
                                 UserRole.FIELD_ENGINEER -> Icons.Default.Engineering
                                 UserRole.VIEWER -> Icons.Default.Visibility
+                                UserRole.SUPER_VIEWER -> Icons.Default.Visibility
                             },
                             contentDescription = "Role Icon",
                             tint = MaterialTheme.colorScheme.primary,
@@ -349,6 +350,7 @@ fun TopAppBarHeader(
                                 UserRole.ENGINEER_ADMIN -> "EA"
                                 UserRole.FIELD_ENGINEER -> "FE"
                                 UserRole.VIEWER -> "VW"
+                                UserRole.SUPER_VIEWER -> "SV"
                             },
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,

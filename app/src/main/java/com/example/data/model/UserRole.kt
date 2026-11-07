@@ -16,6 +16,11 @@ enum class UserRole(val label: String, val description: String) {
     VIEWER(
         label = "Viewer",
         description = "Read-Only Access: View project dashboards, reports, weather logs, issues, and payments."
+    ),
+    // Heads and management: every project, read-only. Only the Super Admin gives it.
+    SUPER_VIEWER(
+        label = "Super Viewer",
+        description = "View every project, read-only: dashboards, reports, documents, photos and payments."
     )
 }
 
@@ -55,7 +60,7 @@ fun UserRole.hasPermission(permission: Permission): Boolean {
             Permission.APPROVE_ORDER -> false
             else -> true
         }
-        UserRole.VIEWER -> false
+        UserRole.VIEWER, UserRole.SUPER_VIEWER -> false
     }
 }
 
@@ -66,8 +71,19 @@ data class UserAccount(
     val role: UserRole,
     val office: String = "National Housing Authority",
     val assignedProjectId: Long? = null,
-    val isDemoAccount: Boolean = false
+    val isDemoAccount: Boolean = false,
+    // The Super Admin's "See all projects" switch: other projects open view-only.
+    val seesAllProjects: Boolean = false
 )
+
+/** Opens every project: the Super Admin and Super Viewer always, anyone else when the Super Admin allowed it. */
+val UserAccount.seesAll: Boolean
+    get() = role == UserRole.SUPER_ADMIN || role == UserRole.SUPER_VIEWER || seesAllProjects
+
+/** This account on [project]: a project not assigned to it shows as for a Viewer. */
+fun UserAccount.forProject(project: Project?, myUid: String?): UserAccount =
+    if (project == null || com.example.data.remote.AssignmentPolicy.isVisible(role == UserRole.SUPER_ADMIN, myUid, project.assignedUids, project.createdByUid)) this
+    else copy(role = UserRole.VIEWER)
 
 val DefaultUserAccount = UserAccount(
     id = "nha_officer",

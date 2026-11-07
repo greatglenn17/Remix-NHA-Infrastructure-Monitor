@@ -101,7 +101,10 @@ fun PortfolioContent(
             } else {
                 items(state.rows, key = { it.project.id }) { item ->
                     // Rows fade and slide into place when a filter or search changes the list.
-                    PortfolioRow(item, wide, onOpen, onEdit, onDelete, Modifier.animateItem(Motion.medium(), Motion.medium(), Motion.fast()))
+                    PortfolioRow(
+                        item, wide, onOpen, onEdit.takeUnless { item.viewOnly }, onDelete.takeUnless { item.viewOnly },
+                        Modifier.animateItem(Motion.medium(), Motion.medium(), Motion.fast())
+                    )
                 }
             }
 

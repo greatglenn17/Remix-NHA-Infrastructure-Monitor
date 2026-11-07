@@ -104,16 +104,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _currentUserAccount = MutableStateFlow(DefaultUserAccount)
     val currentUserAccount: StateFlow<UserAccount> = _currentUserAccount.asStateFlow()
 
-    /** The signed-in user's role from the server: the token claim, else users/{uid}.role; null when offline. */
-    private suspend fun serverRole(): UserRole? {
-        val user = authManager.currentFirebaseUser ?: return null
-        val name = runCatching { user.getIdToken(true).await().claims["role"] as? String }.getOrNull()
-            ?: runCatching {
-                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    .collection("users").document(user.uid).get().await().getString("role")
-            }.getOrNull()
-            ?: return null
-        return runCatching { UserRole.valueOf(name.uppercase()) }.getOrNull()
+    /**
+     * The signed-in user's role and "See all projects" switch from the server: the token
+     * claims, else users/{uid}; nulls when offline.
+     */
+    private suspend fun serverClaims(): Pair<UserRole?, Boolean?> {
+        val user = authManager.currentFirebaseUser ?: return null to null
+        val claims = runCatching { user.getIdToken(true).await().claims }.getOrNull()
+        val doc = if (claims?.get("role") is String) null else runCatching {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(user.uid).get().await()
+        }.getOrNull()
+        val name = claims?.get("role") as? String ?: doc?.getString("role")
+        val seesAll = if (claims != null) claims["allProjects"] == true else doc?.getBoolean("seesAllProjects")
+        return name?.let { runCatching { UserRole.valueOf(it.uppercase()) }.getOrNull() } to seesAll
     }
 
     /** The name, position and office saved on the server, for a phone the account was not registered on. */
@@ -129,13 +132,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun refreshAccountFromServer(email: String) {
         val profile = serverProfile()
         val account = _currentUserAccount.value
-        val updated = com.example.data.auth.refreshedAccount(account, email, serverRole(), profile?.first, profile?.second, profile?.third)
+        val (role, seesAll) = serverClaims()
+        val updated = com.example.data.auth.refreshedAccount(account, email, role, profile?.first, profile?.second, profile?.third, seesAll)
         // The server has no real name yet: this phone's goes up so the other phones get it too.
         if (profile != null && isEmailName(profile.first, email) && !isEmailName(account.name, email)) {
             authManager.currentFirebaseUser?.let { firestoreSyncManager.syncUserProfile(it.uid, email, account.name, null, null, null) }
         }
         if (updated == account) return
         _currentUserAccount.value = updated
+        // The listeners were set up for the old claims; a changed switch or role re-attaches them.
+        if (updated.seesAll != account.seesAll) firestoreSyncManager.startRealtimeSync()
         authManager.saveUserSession(updated, email)
         authManager.saveRegisteredRole(email, updated.role)
     }
@@ -157,6 +163,31 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
             } catch (e: Exception) {
                 onDone("Could not change the role: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    /** Super Admin: lets [user] open every project view-only; syncUserCustomClaims mints the claim. */
+    fun setUserSeesAll(user: RegisteredUser, on: Boolean, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                // The rules want a role on every Super Admin edit; a profile without one counts as Field Engineer.
+                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                    .update(mapOf("seesAllProjects" to on, "role" to user.role.ifBlank { UserRole.FIELD_ENGINEER.name })).await()
+                _registeredUsers.value = _registeredUsers.value.map { if (it.uid == user.uid) it.copy(seesAllProjects = on) else it }
+                onDone(
+                    if (on) "${user.name} can now open every project, view only. It applies the next time they open the app."
+                    else "${user.name} now sees only their own projects. It applies the next time they open the app."
+                )
+                logAuditAction(
+                    projectId = null,
+                    actionType = "Role Change",
+                    details = "${if (on) "Allowed" else "Removed"} all projects (view only) for ${user.name}",
+                    oldValue = (!on).toString(),
+                    newValue = on.toString()
+                )
+            } catch (e: Exception) {
+                onDone("Could not change it: ${e.localizedMessage}")
             }
         }
     }
@@ -226,6 +257,19 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     // User-scoped projects based on role/assignment
     val userScopedProjects: StateFlow<List<Project>>
+
+    // The dashboard's My projects / All projects switch, for an account that sees all projects.
+    private val _showAllProjects = MutableStateFlow(false)
+    val showAllProjects: StateFlow<Boolean> = _showAllProjects.asStateFlow()
+    fun setShowAllProjects(show: Boolean) { _showAllProjects.value = show }
+
+    /** Whether [project] is one this account works on; other projects open view-only. */
+    fun isMine(project: Project): Boolean = AssignmentPolicy.isVisible(
+        currentUserAccount.value.role == UserRole.SUPER_ADMIN, authManager.currentFirebaseUser?.uid, project.assignedUids, project.createdByUid
+    )
+
+    /** The signed-in account as it acts on [project]: a Viewer on a project not assigned to it. */
+    fun accountFor(project: Project?, account: UserAccount): UserAccount = account.forProject(project, authManager.currentFirebaseUser?.uid)
 
     // Accounts a project can be assigned to (Super Admin only). The list is trusted for
     // editing only once it has loaded; a failed load leaves it empty and not loaded.
@@ -342,12 +386,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             initialValue = emptyList()
         )
 
-        userScopedProjects = combine(rawProjects, currentUserAccount) { projects, user ->
-            // Super Admin sees everything; everyone else only the projects naming their account.
+        userScopedProjects = combine(rawProjects, currentUserAccount, _showAllProjects) { projects, user, showAll ->
+            // Super Admin and Super Viewer see everything; everyone else the projects naming their
+            // account, and with the Super Admin's switch, all of them while All projects is on.
             val isSuperAdmin = user.role == UserRole.SUPER_ADMIN
+            val all = user.role == UserRole.SUPER_VIEWER || (user.seesAll && showAll)
             val myUid = authManager.currentFirebaseUser?.uid
             projects
-                .filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids, it.createdByUid) }
+                .filter { AssignmentPolicy.isVisible(isSuperAdmin, myUid, it.assignedUids, it.createdByUid, all) }
                 .distinctBy { project ->
                     "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
                 }
@@ -361,13 +407,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         // unassigned), so its screen can't keep writing into a row that is gone.
         viewModelScope.launch {
             combine(_selectedProjectId, repository.allProjects, currentUserAccount) { id, projects, user ->
-                Triple(id, projects.firstOrNull { it.id == id }, user.role == UserRole.SUPER_ADMIN)
-            }.collect { (id, project, isSuperAdmin) ->
+                Triple(id, projects.firstOrNull { it.id == id }, user)
+            }.collect { (id, project, user) ->
                 if (id == null) return@collect
                 // The list may predate a project selected right after it was saved; ask the database.
                 val current = project ?: database.projectDao().getProjectByIdOnce(id)
                 val visible = current != null && AssignmentPolicy.isVisible(
-                    isSuperAdmin, authManager.currentFirebaseUser?.uid, current.assignedUids, current.createdByUid
+                    user.role == UserRole.SUPER_ADMIN, authManager.currentFirebaseUser?.uid, current.assignedUids, current.createdByUid, user.seesAll
                 )
                 if (!visible) _selectedProjectId.compareAndSet(id, null)
             }
@@ -506,7 +552,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         office = server?.third ?: office
                     )
                     // The role is the server's; the on-device copy only covers being offline.
-                    val userAcc = serverRole()?.let { localAcc.copy(role = it) } ?: localAcc
+                    val (role, seesAll) = serverClaims()
+                    val userAcc = localAcc.copy(role = role ?: localAcc.role, seesAllProjects = seesAll ?: localAcc.seesAllProjects)
                     authManager.saveRegisteredRole(cleanEmail, userAcc.role)
                     _currentUserAccount.value = userAcc
                     _isLoggedIn.value = true
@@ -690,7 +737,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 billedTotal = billedTotal,
                 contractCost = cost,
                 pendingDocsCount = ProjectAttention.waitingApproval(projectDocs),
-                lastFieldUpdate = lastUpdate
+                lastFieldUpdate = lastUpdate,
+                // userScopedProjects re-emits when the account changes, so reading it here stays current.
+                viewOnly = !isMine(project)
             )
         }
     }
@@ -1715,7 +1764,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     val name = doc.getString("displayName")?.takeIf { it.isNotBlank() }
                         ?: doc.getString("email")?.takeIf { it.isNotBlank() }
                         ?: doc.id
-                    RegisteredUser(uid = doc.id, name = name, email = doc.getString("email").orEmpty(), role = doc.getString("role").orEmpty())
+                    RegisteredUser(
+                        uid = doc.id, name = name, email = doc.getString("email").orEmpty(), role = doc.getString("role").orEmpty(),
+                        seesAllProjects = doc.getBoolean("seesAllProjects") == true
+                    )
                 }.sortedBy { it.name.lowercase() }
                 _registeredUsersLoaded.value = true
             } catch (e: Exception) {

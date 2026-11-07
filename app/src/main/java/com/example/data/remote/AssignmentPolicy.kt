@@ -10,8 +10,13 @@ import com.example.data.model.AssignedUids
 object AssignmentPolicy {
     const val SUPER_ADMIN = "SUPER_ADMIN"
     const val VIEWER = "VIEWER"
+    const val SUPER_VIEWER = "SUPER_VIEWER"
 
     fun isSuperAdmin(role: String?): Boolean = role == SUPER_ADMIN
+
+    /** Listens to every project: the role, or the `allProjects` claim the Super Admin's switch mints. */
+    fun seesAll(role: String?, allProjectsClaim: Boolean): Boolean =
+        role == SUPER_ADMIN || role == SUPER_VIEWER || allProjectsClaim
 
     /**
      * Whether a local project missing from the cloud should be removed from this phone
@@ -52,12 +57,12 @@ object AssignmentPolicy {
      * uid. While the list is unknown on this phone ("", e.g. offline right after the 22 -> 23
      * upgrade) the project's creator still sees it; a known list always decides.
      */
-    fun isVisible(isSuperAdmin: Boolean, myUid: String?, assignedUids: String, createdByUid: String): Boolean =
-        isSuperAdmin || (!myUid.isNullOrBlank() &&
+    fun isVisible(isSuperAdmin: Boolean, myUid: String?, assignedUids: String, createdByUid: String, seesAll: Boolean = false): Boolean =
+        isSuperAdmin || seesAll || (!myUid.isNullOrBlank() &&
             (AssignedUids.contains(assignedUids, myUid) || (assignedUids.isBlank() && createdByUid == myUid)))
 
     /** A missing role claim counts as a writer, as in the cloud rules. */
-    fun canWrite(role: String?): Boolean = role != VIEWER
+    fun canWrite(role: String?): Boolean = role != VIEWER && role != SUPER_VIEWER
 
     /**
      * The `assignedUids` to send with a project upload, or null to leave the field out.
