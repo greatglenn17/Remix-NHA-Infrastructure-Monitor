@@ -353,7 +353,8 @@ object BlueBookForms {
             legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td>${counts { it.saleableBands[i] }}</tr>")
         }
         legend.append("<tr class='tot'><td>Total units</td>${counts { it.saleable.count }}</tr>")
-        if (sheets.any { it.summary.roadLots.sum() > 0 }) {
+        val roads = sheets.any { it.summary.roadLots.sum() > 0 }
+        if (roads) {
             legend.append("<tr><th class='sub' colspan='$span'>Road lot</th></tr>")
             SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
                 legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
@@ -361,15 +362,18 @@ object BlueBookForms {
         }
         legend.append("</table>")
         // Height left for plans under the banner and title: 244mm portrait, 157mm landscape; a site name takes 6mm.
+        // One plan has the legend over its corner; several plans would lose lots under it, so it sits beside
+        // them (landscape) or below them (portrait, about 6mm a row).
         val room = if (landscape) 157 else 244
+        val legendHeight = (8 + if (roads) 4 else 0) * 6
         val maxHeight = when {
             !multi -> room
             landscape -> room - 6
-            else -> (room - sheets.size * 9) / sheets.size
+            else -> (room - legendHeight - sheets.size * 9) / sheets.size
         }
         val style = if (multi || landscape) " style='max-height:${maxHeight}mm'" else ""
         val plan = if (!multi) "<div class='plan'><img src='${sheets.single().image}'$style>$legend</div>"
-        else "<div class='plan${if (landscape) " row" else ""}'>" +
+        else "<div class='plan multi${if (landscape) " row" else ""}'>" +
             sheets.joinToString("") { "<figure><figcaption>${esc(SdpSites.label(it.site))}</figcaption><img src='${it.image}'$style></figure>" } +
             "$legend</div>"
         return page(
@@ -608,6 +612,8 @@ object BlueBookForms {
         div.plan.row { display: flex; gap: 3mm; justify-content: center; align-items: flex-start; }
         div.plan.row figure { flex: 1 1 0; min-width: 0; }
         table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 10pt; margin: 0; }
+        div.plan.multi table.lg { position: static; }
+        div.plan.row table.lg { flex: none; align-self: flex-end; }
         table.lg th, table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
         i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
         </style></head><body${if (fullPage) " class='full'" else ""}>${if (banner.isEmpty()) "" else "<img class='banner' src='$banner'>"}$body</body></html>

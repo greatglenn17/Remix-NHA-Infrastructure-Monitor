@@ -92,13 +92,13 @@ class SdpSummaryTest {
         )
         val html = BlueBookForms.sdpPlan(project, sheets, bands, LocalDate.of(2026, 11, 7), landscape = true)
         assertTrue(html.contains("size: A4 landscape; margin: 6mm;"))
-        assertTrue(html.contains("<div class='plan row'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:151mm'></figure>"))
+        assertTrue(html.contains("<div class='plan multi row'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:151mm'></figure>"))
         assertTrue(html.contains("<th class='sub'>Progress</th><th class='sub'>Phase 1</th><th class='sub'>Phase 2</th><th class='sub'>Total</th>"))
         assertTrue(html.contains("0–25%</td><td class='n'>2</td><td class='n'>0</td><td class='n'>2</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td><td class='n'>1</td><td class='n'>3</td>"))
-        // Portrait: one above the other, each half the height.
+        // Portrait: one above the other, sharing the height left under the legend.
         val portrait = BlueBookForms.sdpPlan(project, sheets, bands, LocalDate.of(2026, 11, 7))
         assertTrue(portrait.contains("size: A4; margin: 6mm;"))
-        assertTrue(portrait.contains("<div class='plan'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:113mm'>"))
+        assertTrue(portrait.contains("<div class='plan multi'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:89mm'>"))
     }
 }
