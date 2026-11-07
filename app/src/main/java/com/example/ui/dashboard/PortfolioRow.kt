@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Update
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -98,6 +99,10 @@ fun PortfolioRow(
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(8.dp))
+                        if (item.viewOnly) {
+                            ViewOnlyBadge()
+                            Spacer(Modifier.width(6.dp))
+                        }
                         StatusBadge(project, colors)
                     }
                 }
@@ -174,6 +179,22 @@ fun SitePhoto(url: String, modifier: Modifier = Modifier) {
         Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = scheme.onSurfaceVariant)
         if (url.isNotBlank()) {
             AsyncImage(model = url, contentDescription = "Latest site photo", contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        }
+    }
+}
+
+/** A project not assigned to this account: it opens read-only. */
+@Composable
+fun ViewOnlyBadge(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.testTag("view_only_badge")
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
+            Icon(Icons.Default.Visibility, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
+            Spacer(Modifier.width(3.dp))
+            Text("View only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

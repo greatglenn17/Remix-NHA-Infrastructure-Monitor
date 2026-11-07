@@ -6,7 +6,14 @@ service firebase.storage {
     }
 
     function isWriter() {
-      return request.auth != null && request.auth.token.get('role', '') != 'VIEWER';
+      return request.auth != null && !(request.auth.token.get('role', '') in ['VIEWER', 'SUPER_VIEWER']);
+    }
+
+    // Same as seesAll() in firestore.rules: reads every project's files.
+    function seesAll() {
+      return isSuperAdmin()
+        || (request.auth != null && (request.auth.token.get('role', '') == 'SUPER_VIEWER'
+                                     || request.auth.token.get('allProjects', false) == true));
     }
 
     // The project's assignedUids list lives in Firestore. A missing project makes
@@ -19,7 +26,7 @@ service firebase.storage {
     // Photos and scans attached to records, one file per attachment:
     //   attachments/{projectUuid}/{fileId}.jpg|.pdf  (see Attachments.kt)
     match /attachments/{projectUuid}/{fileName} {
-      allow read: if isSuperAdmin() || inProject(projectUuid);
+      allow read: if seesAll() || inProject(projectUuid);
       allow create, update: if (isSuperAdmin() || (isWriter() && inProject(projectUuid)))
         && request.resource.size < 20 * 1024 * 1024
         && (request.resource.contentType.matches('image/.*')

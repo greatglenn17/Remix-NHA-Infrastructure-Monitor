@@ -16,15 +16,19 @@ import com.example.data.model.RegisteredUser
 import com.example.data.model.UserRole
 
 /** Roles the Super Admin can give; Super Admin itself stays with the designated account. */
-private val ASSIGNABLE_ROLES = listOf(UserRole.ENGINEER_ADMIN, UserRole.FIELD_ENGINEER, UserRole.VIEWER)
+private val ASSIGNABLE_ROLES = listOf(UserRole.ENGINEER_ADMIN, UserRole.FIELD_ENGINEER, UserRole.VIEWER, UserRole.SUPER_VIEWER)
 
-/** Super Admin: every registered user with their role; tapping a role changes it. */
+/**
+ * Super Admin: every registered user with their role; tapping a role changes it. "See all
+ * projects" lets someone open the projects not assigned to them, view only.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ManageUsersDialog(
     users: List<RegisteredUser>,
     loaded: Boolean,
     onSetRole: (RegisteredUser, UserRole, (String) -> Unit) -> Unit,
+    onSetSeesAll: (RegisteredUser, Boolean, (String) -> Unit) -> Unit,
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
@@ -64,6 +68,26 @@ fun ManageUsersDialog(
                                             selected = current,
                                             onClick = { if (!current) onSetRole(user, role) { message = it } },
                                             label = { Text(role.label) }
+                                        )
+                                    }
+                                }
+                                // A Super Viewer already sees every project.
+                                if (user.role != UserRole.SUPER_VIEWER.name) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth().testTag("sees_all_${user.uid}")
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("See all projects", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            Text(
+                                                "Others' projects open view only",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = user.seesAllProjects,
+                                            onCheckedChange = { on -> onSetSeesAll(user, on) { message = it } }
                                         )
                                     }
                                 }

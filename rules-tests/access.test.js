@@ -21,6 +21,9 @@ const asOther = () => testEnv.authenticatedContext('other', { role: 'FIELD_ENGIN
 const asViewer = () => testEnv.authenticatedContext('viewer', { role: 'VIEWER' });
 const asAdmin = () => testEnv.authenticatedContext('admin', { role: 'SUPER_ADMIN' });
 const asNoRole = () => testEnv.authenticatedContext('eng');
+// Not assigned to P: a Super Viewer, and a field engineer the Super Admin let see all projects.
+const asSuperViewer = () => testEnv.authenticatedContext('boss', { role: 'SUPER_VIEWER' });
+const asSeesAll = () => testEnv.authenticatedContext('other', { role: 'FIELD_ENGINEER', allProjects: true });
 
 const rec = (uids) => ({ uuid: 'R', projectUuid: 'P', revision: 2, assignedUids: uids });
 
@@ -75,6 +78,27 @@ describe('outsider', () => {
   it('cannot write record for a missing project', () =>
     assertFails(setDoc(doc(asOther().firestore(), 'records/R2'), { uuid: 'R2', projectUuid: 'NOPE', revision: 1, assignedUids: ['other'] })));
   it('cannot read file of a missing project', () => assertFails(getBytes(ref(asOther().storage(), 'attachments/NOPE/f.jpg'))));
+});
+
+for (const [name, ctx] of [['super viewer', asSuperViewer], ['see-all engineer', asSeesAll]]) {
+  describe(`${name}, not assigned`, () => {
+    it('gets the project', () => assertSucceeds(getDoc(doc(ctx().firestore(), 'projects/P'))));
+    it('lists every project', () => assertSucceeds(getDocs(collection(ctx().firestore(), 'projects'))));
+    it('lists every record', () => assertSucceeds(getDocs(collection(ctx().firestore(), 'records'))));
+    it('reads a file', () => assertSucceeds(getBytes(ref(ctx().storage(), 'attachments/P/f.jpg'))));
+    it('cannot update the project', () => assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { name: 'Z' })));
+    it('cannot write a record', () => assertFails(setDoc(doc(ctx().firestore(), 'records/R'), rec(['eng', 'viewer']))));
+    it('cannot upload a file', () => assertFails(uploadBytes(ref(ctx().storage(), 'attachments/P/o.jpg'), bytes(10), jpeg)));
+    it('cannot delete a file', () => assertFails(deleteObject(ref(ctx().storage(), 'attachments/P/f.jpg'))));
+  });
+}
+
+describe('super viewer, assigned', () => {
+  beforeEach(() => testEnv.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'projects/Q'), { assignedUids: ['boss'], name: 'Q' })));
+  it('still cannot write a record', () =>
+    assertFails(setDoc(doc(asSuperViewer().firestore(), 'records/RQ'), { uuid: 'RQ', projectUuid: 'Q', revision: 1, assignedUids: ['boss'] })));
+  it('still cannot create a project', () =>
+    assertFails(setDoc(doc(asSuperViewer().firestore(), 'projects/N'), { assignedUids: ['boss'], name: 'N' })));
 });
 
 describe('assigned field engineer', () => {
@@ -171,6 +195,13 @@ describe('user roles', () => {
   it('cannot change another user', () => assertFails(updateDoc(doc(asOther().firestore(), 'users/eng'), { role: 'VIEWER' })));
   it('super admin promotes a user', () => assertSucceeds(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { role: 'ENGINEER_ADMIN' })));
   it('super admin cannot make another super admin', () => assertFails(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { role: 'SUPER_ADMIN' })));
+  it('cannot sign up as super viewer', () => assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'SUPER_VIEWER' })));
+  it('cannot sign up seeing all projects', () =>
+    assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'FIELD_ENGINEER', seesAllProjects: true })));
+  it('cannot turn on own see-all switch', () => assertFails(updateDoc(doc(asEng().firestore(), 'users/eng'), { seesAllProjects: true })));
+  it('super admin makes a super viewer', () => assertSucceeds(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { role: 'SUPER_VIEWER' })));
+  it('super admin turns on see-all', () =>
+    assertSucceeds(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { seesAllProjects: true, role: 'FIELD_ENGINEER' })));
   it('super admin lists users', () => assertSucceeds(getDocs(collection(asAdmin().firestore(), 'users'))));
   it('engineer cannot list users', () => assertFails(getDocs(collection(asEng().firestore(), 'users'))));
 });

@@ -36,6 +36,7 @@ fun DashboardScreen(
     val lastSyncedAt by viewModel.lastSyncedAt.collectAsState()
     val projects by viewModel.filteredProjects.collectAsState()
     val scopedProjects by viewModel.userScopedProjects.collectAsState()
+    val showAllProjects by viewModel.showAllProjects.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
     val typeFilter by viewModel.typeFilter.collectAsState()
@@ -53,12 +54,18 @@ fun DashboardScreen(
     var showNotificationsDialog by remember { mutableStateOf(false) }
 
     val isSuperAdmin = currentUser.role == UserRole.SUPER_ADMIN
+    val isSuperViewer = currentUser.role == UserRole.SUPER_VIEWER
+    // The Super Admin's "See all projects" switch gives a My projects / All projects choice.
+    val canShowAll = currentUser.seesAllProjects && !isSuperAdmin && !isSuperViewer
+    val seesEverything = isSuperAdmin || isSuperViewer || (canShowAll && showAllProjects)
     val emptyMessage = when {
         portfolio.totalProjects == 0 && isSuperAdmin ->
             "Database is Empty" to "No projects exist yet. Create a new project or sync from cloud."
+        portfolio.totalProjects == 0 && seesEverything ->
+            "No projects yet" to "Projects appear here once they sync from the cloud."
         portfolio.totalProjects == 0 ->
             "No projects assigned to you yet" to "Ask the Super Admin to assign you a project, or create a new one."
-        isSuperAdmin -> "No projects match the selected filters" to "Try clearing search or changing status/type filters"
+        seesEverything -> "No projects match the selected filters" to "Try clearing search or changing status/type filters"
         else -> "No assigned projects found for ${currentUser.name}" to
             "Contact your Principal Engineer / Super Admin to assign a project to your account"
     }
@@ -78,7 +85,27 @@ fun DashboardScreen(
     }
     val portfolioList: @Composable (Modifier) -> Unit = { listModifier ->
         Column(modifier = listModifier) {
-            if (currentUser.role == UserRole.FIELD_ENGINEER) {
+            if (canShowAll) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                ) {
+                    FilterChip(
+                        selected = !showAllProjects,
+                        onClick = { viewModel.setShowAllProjects(false) },
+                        label = { Text("My projects") },
+                        leadingIcon = { Icon(Icons.Default.PersonPin, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.testTag("show_my_projects")
+                    )
+                    FilterChip(
+                        selected = showAllProjects,
+                        onClick = { viewModel.setShowAllProjects(true) },
+                        label = { Text("All projects") },
+                        leadingIcon = { Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.testTag("show_all_projects")
+                    )
+                }
+            } else if (currentUser.role == UserRole.FIELD_ENGINEER) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
@@ -249,6 +276,7 @@ fun DashboardScreen(
             users = registeredUsers,
             loaded = registeredUsersLoaded,
             onSetRole = { user, role, onDone -> viewModel.setUserRole(user, role, onDone) },
+            onSetSeesAll = { user, on, onDone -> viewModel.setUserSeesAll(user, on, onDone) },
             onDismiss = { showManageUsers = false }
         )
     }

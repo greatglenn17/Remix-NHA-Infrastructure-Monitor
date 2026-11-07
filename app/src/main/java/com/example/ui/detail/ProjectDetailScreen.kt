@@ -3,6 +3,8 @@ package com.example.ui.detail
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -13,6 +15,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.example.data.model.Permission
 import com.example.data.model.use
 import com.example.data.model.Project
@@ -49,7 +52,7 @@ fun ProjectDetailScreen(
     // Two panes: the portfolio top bar spans both panes, so this screen shows none.
     embedded: Boolean = false
 ) {
-    val currentUser by viewModel.currentUserAccount.collectAsState()
+    val account by viewModel.currentUserAccount.collectAsState()
     val registeredUsers by viewModel.registeredUsers.collectAsState()
     val registeredUsersLoaded by viewModel.registeredUsersLoaded.collectAsState()
     val syncChip by viewModel.syncChip.collectAsState()
@@ -59,6 +62,10 @@ fun ProjectDetailScreen(
     // After Back the project clears at once; keep the last one on screen while the detail animates away.
     val kept = remember { arrayOfNulls<Project>(1) }
     val project = (liveProject ?: kept[0]?.takeIf { selectedId == null }).also { kept[0] = it }
+    // On a project not assigned to this account every tab shows as for a Viewer.
+    val currentUser = viewModel.accountFor(project, account)
+    // A Super Viewer is read-only everywhere, so "not assigned to you" would only be noise for them.
+    val viewOnly = currentUser.role != account.role && account.role != com.example.data.model.UserRole.SUPER_VIEWER
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
     val contractorLetters by viewModel.contractorLetters.collectAsState()
@@ -158,7 +165,7 @@ fun ProjectDetailScreen(
     Scaffold(
         topBar = {
             if (!embedded) TopAppBarHeader(
-                currentUser = currentUser,
+                currentUser = account,
                 onSwitchUser = { viewModel.switchUserAccount(it) },
                 onBackClick = onBackClick,
                 sync = syncChip,
@@ -189,6 +196,19 @@ fun ProjectDetailScreen(
                 // Two panes have no top bar back arrow.
                 onClose = if (embedded) onBackClick else null
             )
+            if (viewOnly) {
+                Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth().testTag("view_only_banner")) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        Icon(Icons.Default.Visibility, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "View only: this project is not assigned to you.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             // Four fixed sections; no sideways scrolling.
             TabRow(selectedTabIndex = section.ordinal, containerColor = MaterialTheme.colorScheme.surface) {
@@ -499,7 +519,7 @@ fun ProjectDetailScreen(
 
     if (showEditProfileDialog) {
         com.example.ui.dialogs.EditProfileDialog(
-            currentUser = currentUser,
+            currentUser = account,
             onDismiss = { showEditProfileDialog = false },
             onSave = { name, position, office ->
                 viewModel.updateUserProfile(name, position, office)

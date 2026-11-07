@@ -94,6 +94,13 @@ class PortfolioScreenshotTest {
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun field_engineer_phone_light() = capture(sample, AppThemeMode.LIGHT, projectsFirst = true)
 
+    // All projects on: other teams' projects say View only and have no edit menu.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun all_projects_view_only_phone_light() {
+        val mixed = items.mapIndexed { i, it -> it.copy(viewOnly = i % 2 == 1) }
+        capture(sample.copy(rows = Portfolio.sortByAttention(mixed)), AppThemeMode.LIGHT, projectsFirst = true)
+    }
+
     // Nothing flagged: no zero tiles, no attention card, no "0 orders" lines.
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun quiet_phone_light() {

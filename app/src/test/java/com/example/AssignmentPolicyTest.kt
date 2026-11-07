@@ -1,5 +1,7 @@
 package com.example
 
+import com.example.data.model.forProject
+import com.example.data.model.hasPermission
 import com.example.data.remote.AssignmentPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -113,5 +115,32 @@ class AssignmentPolicyTest {
         val merged = AssignmentPolicy.mergeAssignment(project("[\"old\"]", "Old"), project("[\"old\"]", "Old"), users)
         assertEquals("[\"u1\",\"u2\"]", merged.assignedUids)
         assertEquals("One, Two", merged.assignedStaff)
+    }
+
+    @Test
+    fun superViewerAndSeeAllSwitch_listenToEveryProject_butOnlyTheSuperViewerNeverWrites() {
+        assertTrue(AssignmentPolicy.seesAll("SUPER_ADMIN", false))
+        assertTrue(AssignmentPolicy.seesAll("SUPER_VIEWER", false))
+        assertTrue(AssignmentPolicy.seesAll("FIELD_ENGINEER", true))
+        assertFalse(AssignmentPolicy.seesAll("FIELD_ENGINEER", false))
+        assertFalse(AssignmentPolicy.seesAll(null, false))
+        assertFalse(AssignmentPolicy.canWrite("SUPER_VIEWER"))
+        assertTrue(AssignmentPolicy.canWrite("FIELD_ENGINEER"))
+        assertTrue(AssignmentPolicy.isVisible(false, "u", "[\"x\"]", "x", seesAll = true))
+        assertFalse(AssignmentPolicy.isVisible(false, "u", "[\"x\"]", "x"))
+    }
+
+    @Test
+    fun anotherTeamsProject_opensAsViewer_ownProjectKeepsTheRole() {
+        val account = com.example.data.model.UserAccount("u", "U", "T", com.example.data.model.UserRole.FIELD_ENGINEER, seesAllProjects = true)
+        val theirs = project("[\"x\"]", "X")
+        val mine = project("[\"u\"]", "U")
+        assertEquals(com.example.data.model.UserRole.VIEWER, account.forProject(theirs, "u").role)
+        assertEquals(com.example.data.model.UserRole.FIELD_ENGINEER, account.forProject(mine, "u").role)
+        val admin = account.copy(role = com.example.data.model.UserRole.SUPER_ADMIN)
+        assertEquals(com.example.data.model.UserRole.SUPER_ADMIN, admin.forProject(theirs, "u").role)
+        // Assigned to a Super Viewer still writes nothing: the role itself has no permissions.
+        val boss = account.copy(role = com.example.data.model.UserRole.SUPER_VIEWER)
+        assertFalse(com.example.data.model.Permission.entries.any { boss.forProject(mine, "u").role.hasPermission(it) })
     }
 }
