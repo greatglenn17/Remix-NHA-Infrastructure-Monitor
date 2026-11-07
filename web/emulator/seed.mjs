@@ -95,4 +95,23 @@ await record(rid(6), 'project_issues', B, ['someone-else'], {
   date: '2026-08-01', description: 'Closed sample', actionTaken: 'Done', remarks: '', loggedBy: 'x', timestamp: now, status: 'Resolved',
   isCritical: 0, targetDate: '', actionBy: '',
 });
-console.log('Seeded demo-nha: 3 accounts, 2 projects, 6 records.');
+// C: far behind and billed ahead of work (critical + billing flags). D: due within 30 days.
+const C = '33333333-3333-4333-8333-333333333333';
+const D = '44444444-4444-4444-8444-444444444444';
+await put(`projects/${C}`, {
+  ...base, projectUuid: C, name: 'Sample Medium-Rise Building', location: 'Baliwag, Bulacan', contractor: 'DEF Builders',
+  projectType: 'Housing', landArea: '1.2 ha', numberOfUnits: '120', scopeOfWork: 'Medium-rise building', contractCostOriginal: 84200000,
+  contractDurationDays: 600, dateStarted: '2026-02-01', completionDateOriginal: '2027-09-23', completionDateRevised: '-',
+  status: 'Behind Schedule', targetAccomplishment: 38, actualAccomplishment: 21.4, assignedUids: [engineer],
+});
+await put(`projects/${D}`, {
+  ...base, projectUuid: D, name: 'Sample Drainage Improvement', location: 'Bocaue, Bulacan', contractor: 'GHI Construction',
+  projectType: 'Infrastructure', scopeOfWork: 'Drainage', contractCostOriginal: 9650000, contractDurationDays: 240,
+  dateStarted: '2026-04-01', completionDateOriginal: new Date(now + 20 * 86400000).toLocaleDateString('en-CA'), completionDateRevised: '-',
+  status: 'On-going', targetAccomplishment: 88, actualAccomplishment: 86.5, assignedUids: ['someone-else'],
+});
+await record(rid(7), 'project_payments', C, [engineer], {
+  name: '1st partial billing', date: '2026-08-15', periodCovered: 'Feb - Jul 2026', grossAmount: 30000000,
+  percentage: 35.63, balanceAmount: 54200000, balancePercentage: 64.37, retentionPct: 10,
+});
+console.log('Seeded demo-nha: 3 accounts, 4 projects, 7 records.');

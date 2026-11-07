@@ -5,12 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NHA Monitor</title>
   <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2C2C2C" media="(prefers-color-scheme: dark)">
+  <link rel="preload" href="fonts/Inter.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&icon_names=apartment,arrow_back,assignment,description,event,hourglass_top,info,location_on,logout,notification_important,payments,person_pin,photo_camera,receipt_long,search,trending_down,visibility&display=block">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="bar">
-    <a class="brand" href="#/">NHA Monitor <span class="muted">Web · view only</span></a>
-    <div id="who"></div>
+  <header class="appbar">
+    <div class="appbar-in">
+      <a class="brand" href="#/"><b>NHA Monitoring Application</b><span>BULACAN DISTRICT OFFICE</span></a>
+      <div id="who"></div>
+    </div>
   </header>
   <main id="app" aria-live="polite"><p class="muted">Loading…</p></main>
   <script type="module" src="app.js"></script>

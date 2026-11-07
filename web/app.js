@@ -1,5 +1,5 @@
 // Read-only web viewer. It never imports a Firestore or Storage write function, so it cannot
-// change what the phones sync.
+// change what the phones sync. Screens mirror the Android app (ui/dashboard, ui/detail).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
@@ -30,38 +30,85 @@ const ROLE_LABELS = {
   VIEWER: 'Viewer', SUPER_VIEWER: 'Super Viewer',
 };
 const SCHEDULE_ORDER = /time extension|work suspension|work resumption/i;
+// PortfolioCounts: icon and colour per count.
+const COUNTS = [
+  { kind: 'behind', label: 'Behind schedule', icon: 'trending_down', tone: 'behind' },
+  { kind: 'billingAhead', label: 'Billing ahead of work', icon: 'payments', tone: 'watch' },
+  { kind: 'waiting', label: 'Waiting approval', icon: 'hourglass_top', tone: 'watch' },
+  { kind: 'dueSoon', label: 'Due in 30 days', icon: 'event', tone: 'watch' },
+];
+// PortfolioCounts.TERM_HELP, from the same thresholds as ProjectAttention (the phone's sync chip terms are left out).
+const TERM_HELP = [
+  ['Behind schedule', 'Work done is 10% or more behind the plan, or the project is marked Behind Schedule. Shown in red from 15% behind.'],
+  ['Billing ahead of work', 'Billed is more than 10% ahead of work done, for example billed 65%, work done 38.50%.'],
+  ['Waiting approval', 'Variation orders, time extensions, suspensions and resumptions not yet approved.'],
+  ['Due in 30 days', 'Unfinished projects whose completion date (the revised one, if any) is 30 days away or less.'],
+];
 
 const main = document.getElementById('app');
 const who = document.getElementById('who');
-const s = { user: null, claims: {}, projects: [], projectsError: null, unsubProjects: null, unsubPage: [] };
+const s = {
+  user: null, claims: {}, projects: null, projectsError: null,
+  payments: new Map(), docs: new Map(), unsub: [], unsubPage: [],
+  filter: null, mineOnly: false, q: '',
+};
 
 /** Escapes text for HTML; every value from Firestore goes through it. */
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icon = (name, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${name}</span>`;
 const today = () => new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd in the viewer's time zone
 const pct = n => `${(Number(n) || 0).toFixed(2)}%`;
+const pesoWhole = n => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(n);
+const clamp = f => Math.max(0, Math.min(1, f || 0));
 
-/** Live projects of this account. Non-seesAll accounts must filter by assignedUids or the rules reject the query. */
+/** Every bar on a freshly opened screen fills in once; later redraws (typing in search) stay still. */
+function freshScreen() {
+  main.dataset.fresh = '';
+  clearTimeout(freshScreen.t);
+  freshScreen.t = setTimeout(() => delete main.dataset.fresh, 900);
+}
+
+/** A Firestore query this account may run: non-seesAll accounts must filter by assignedUids or the rules reject it. */
 function scoped(name, ...filters) {
   const base = collection(db, name);
   return L.seesAll(s.claims) ? query(base, ...filters) : query(base, ...filters, where('assignedUids', 'array-contains', s.user.uid));
 }
 
+/** Live records of one type grouped by project, for the dashboard. */
+function listenRecords(type, into) {
+  return onSnapshot(scoped('records', where('type', '==', type)), snap => {
+    into.clear();
+    for (const d of snap.docs) {
+      const r = L.parseRecord({ ...d.data(), uuid: d.id });
+      if (r.isDeleted) continue;
+      const pid = d.data().projectUuid;
+      if (!into.has(pid)) into.set(pid, []);
+      into.get(pid).push(r);
+    }
+    redrawDashboard();
+  }, e => console.warn(`records ${type}:`, e.message));
+}
+
 onAuthStateChanged(auth, async user => {
-  s.unsubProjects?.(); s.unsubProjects = null;
+  s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  s.user = user;
+  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear();
+  document.body.classList.toggle('signed-out', !user);
   if (!user) { who.innerHTML = ''; return renderSignIn(); }
   // Fresh token: the role claim may have changed since this browser last signed in.
   s.claims = (await user.getIdTokenResult(true)).claims;
-  who.innerHTML = `<span>${esc(user.email)} · ${esc(ROLE_LABELS[s.claims.role] || 'No role yet')}</span> <button id="out" class="link">Sign out</button>`;
+  who.innerHTML = `
+    <span class="email">${esc(user.email)}</span>
+    <span class="badge view">${icon('visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · read only</span>
+    <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
   document.getElementById('out').onclick = () => signOut(auth);
-  s.unsubProjects = onSnapshot(scoped('projects'), snap => {
+  s.unsub.push(onSnapshot(scoped('projects'), snap => {
     s.projectsError = null;
     s.projects = snap.docs.map(d => ({ ...d.data(), projectUuid: d.id }))
-      .filter(p => p.isDeleted !== true && p.name)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    if (!location.hash.startsWith('#/p/')) renderDashboard();
-  }, e => { s.projectsError = e.message; renderDashboard(); });
+      .filter(p => p.isDeleted !== true && p.name);
+    redrawDashboard();
+  }, e => { s.projectsError = e.message; redrawDashboard(); }));
+  s.unsub.push(listenRecords('project_payments', s.payments), listenRecords('pending_documents', s.docs));
   route();
 });
 
@@ -70,95 +117,213 @@ window.addEventListener('hashchange', () => s.user && route());
 function route() {
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
   const m = /^#\/p\/([\w-]+)$/.exec(location.hash);
+  window.scrollTo(0, 0);
   if (m) renderProject(m[1]); else renderDashboard();
 }
 
-function renderSignIn(message = '') {
+/* ---------- Sign in (LoginScreen: brand gradient hero beside the form) ---------- */
+
+function renderSignIn(message = '', note = '') {
   main.innerHTML = `
-    <form id="signin" class="card narrow">
-      <h1>Sign in</h1>
-      <p class="muted">Use the same account as the NHA Monitor app.${emulator ? ' <b>Local emulator.</b>' : ''}</p>
-      <label>Email <input name="email" type="email" autocomplete="username" required></label>
-      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-      <p class="error" role="alert">${esc(message)}</p>
-      <button type="submit">Sign in</button>
-      <button type="button" id="reset" class="link">Forgot password?</button>
-    </form>`;
+    <div class="signin">
+      <section class="hero">
+        <h1>National Housing Authority</h1>
+        <p>Infrastructure Monitoring System</p>
+        <small>REGION III • BULACAN DISTRICT OFFICE</small>
+      </section>
+      <form id="signin" class="signin-form" novalidate>
+        <h2>Sign in</h2>
+        <p class="muted">Use the same email and password as the NHA Monitor app.${emulator ? ' <b>Local emulator.</b>' : ''}</p>
+        <label class="field">Email address <input name="email" type="email" autocomplete="username" required></label>
+        <label class="field">Password <input name="password" type="password" autocomplete="current-password" required></label>
+        <p class="error" role="alert">${esc(message)}</p>
+        ${note ? `<p class="note" role="status">${esc(note)}</p>` : ''}
+        <button type="submit" class="btn">Sign in</button>
+        <div class="row"><button type="button" id="reset" class="text-btn">Forgot password?</button><span class="muted">View only. Edits stay in the app.</span></div>
+      </form>
+    </div>`;
   const form = document.getElementById('signin');
   form.onsubmit = async e => {
     e.preventDefault();
+    const email = form.email.value.trim();
+    if (!email || !form.password.value) return renderSignIn('Enter your email and password.');
+    form.querySelector('[type=submit]').disabled = true;
     try {
-      await signInWithEmailAndPassword(auth, form.email.value.trim(), form.password.value);
+      await signInWithEmailAndPassword(auth, email, form.password.value);
     } catch (err) {
-      renderSignIn(err.code === 'auth/invalid-credential' ? 'Wrong email or password.' : err.message);
+      renderSignIn(err.code === 'auth/invalid-credential' ? 'Wrong email or password. Try again, or reset your password.'
+        : err.code === 'auth/too-many-requests' ? 'Too many tries. Wait a few minutes, then sign in again.'
+        : err.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.' : err.message);
+      document.querySelector('#signin [name=email]').value = email;
     }
   };
   document.getElementById('reset').onclick = async () => {
     const email = form.email.value.trim();
-    if (!email) return renderSignIn('Type your email first, then tap Forgot password.');
-    try { await sendPasswordResetEmail(auth, email); renderSignIn('A password reset link was sent to your email.'); } catch (err) { renderSignIn(err.message); }
+    if (!email) return renderSignIn('Type your email first, then choose Forgot password.');
+    try { await sendPasswordResetEmail(auth, email); renderSignIn('', 'A password reset link was sent to your email.'); } catch (err) { renderSignIn(err.message); }
   };
 }
 
-function renderDashboard() {
-  if (!s.user || location.hash.startsWith('#/p/')) return;
-  const filter = (document.getElementById('q')?.value || '').toLowerCase();
-  const list = s.projects.filter(p => [p.name, p.location, p.contractor].join(' ').toLowerCase().includes(filter));
-  const done = s.projects.filter(p => (Number(p.actualAccomplishment) || 0) >= 100).length;
-  const behind = s.projects.filter(p => (Number(p.actualAccomplishment) || 0) < 100 && p.actualAccomplishment < p.targetAccomplishment).length;
-  const viewOnlyTag = p => L.seesAll(s.claims) && s.claims.role !== 'SUPER_ADMIN' && !(p.assignedUids || []).includes(s.user.uid);
-  main.innerHTML = `
-    <section class="counts">
-      <div class="count"><b>${s.projects.length}</b><span>Projects</span></div>
-      <div class="count"><b>${s.projects.length - done}</b><span>Ongoing</span></div>
-      <div class="count behind"><b>${behind}</b><span>Behind schedule</span></div>
-      <div class="count ok"><b>${done}</b><span>Completed</span></div>
-    </section>
-    <input id="q" type="search" placeholder="Search name, location or contractor" value="${esc(filter)}" aria-label="Search projects">
-    ${s.projectsError ? `<p class="error">Could not load projects: ${esc(s.projectsError)}</p>` : ''}
-    ${list.length === 0 ? `<p class="muted">${s.projects.length ? 'No project matches.' : 'No projects for this account yet.'}</p>` : ''}
-    <ul class="projects">${list.map(p => `
-      <li><a class="card row" href="#/p/${esc(p.projectUuid)}">
-        <div class="grow">
-          <h2>${esc(p.name)}</h2>
-          <p class="muted">${esc(p.location || '-')} · ${esc(p.contractor || '-')}</p>
-          <div class="bar-track" role="img" aria-label="${pct(p.actualAccomplishment)} done"><div class="bar-fill ${slipClass(p)}" style="width:${Math.min(100, Number(p.actualAccomplishment) || 0)}%"></div></div>
-          <p><b>${pct(p.actualAccomplishment)}</b> · ${esc(L.scheduleText(p))}</p>
-        </div>
-        <div class="side">
-          <span class="pill">${esc(p.status || '-')}</span>
-          ${viewOnlyTag(p) ? '<span class="pill">View only</span>' : ''}
-          <span class="money">${esc(L.formatPhp(L.originalCost(p)))}</span>
-        </div>
-      </a></li>`).join('')}
-    </ul>`;
-  const q = document.getElementById('q');
-  q.oninput = () => { renderDashboard(); const n = document.getElementById('q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
+/* ---------- Dashboard (DashboardScreen + PortfolioCounts + PortfolioRow) ---------- */
+
+/** One project as the dashboard sees it (ProjectViewModel's PortfolioItem). */
+function itemOf(p) {
+  const docs = s.docs.get(p.projectUuid) || [];
+  const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
+  const cost = L.currentCost(p, docs);
+  return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today()), waiting: L.waitingApproval(docs) };
 }
 
-function slipClass(p) {
-  if ((Number(p.actualAccomplishment) || 0) >= 100) return 'ok';
-  return p.actualAccomplishment < p.targetAccomplishment ? 'behind' : 'ok';
+function progressLine(label, value, fraction, tone, big = false) {
+  const [head, rest] = value.split(' · ');
+  return `<div class="pl${big ? ' big' : ''}">
+    <div class="pl-head"><span>${esc(label)}</span><b>${esc(big ? head : value)}${big && rest ? `<small>${esc(rest)}</small>` : ''}</b></div>
+    <div class="bar ${tone}" role="img" aria-label="${esc(label)} ${esc(value)}"><i style="width:${(clamp(fraction) * 100).toFixed(1)}%"></i></div>
+  </div>`;
 }
+
+const workDone = (p, big) => progressLine('Work done', `${pct(p.actualAccomplishment)} · ${L.scheduleText(p)}`,
+  (Number(p.actualAccomplishment) || 0) / 100, L.varianceLevel(L.slippage(p)), big);
+const billedLine = (it, big) => progressLine('Billed',
+  it.billed <= 0 ? 'No billings yet' : `${L.billedLabel(it.billed, it.cost)} · ${pesoWhole(it.billed)}`,
+  it.cost > 0 ? it.billed / it.cost : 0, 'primary', big);
+const statusBadge = p => `<span class="badge lv-${L.statusLevel(p)}">${esc(L.displayStatus(p))}</span>`;
+
+function renderDashboard() {
+  freshScreen();
+  main.innerHTML = `
+    <section class="card portfolio" id="portfolio"></section>
+    <div class="chips counts" id="counts"></div>
+    <div class="toolbar">
+      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"></label>
+      <div class="chips" id="scope"></div>
+      <span class="count" id="shown"></span>
+    </div>
+    <ul class="grid" id="grid"></ul>`;
+  document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
+  redrawDashboard();
+}
+
+function redrawDashboard() {
+  const grid = document.getElementById('grid');
+  if (!grid || !s.user) return;
+  if (s.projectsError) { grid.outerHTML = `<p class="error">Could not load projects: ${esc(s.projectsError)}</p>`; return; }
+  if (s.projects === null) { grid.innerHTML = '<li class="empty">Loading projects…</li>'; return; }
+
+  const mineAvailable = L.seesAll(s.claims) && s.claims.role !== 'SUPER_VIEWER';
+  const all = s.projects.map(itemOf);
+  const inScope = mineAvailable && s.mineOnly ? all.filter(it => L.isMine(it.p, s.user.uid, s.claims)) : all;
+
+  // Portfolio totals over the projects in scope.
+  const totalCost = inScope.reduce((t, it) => t + it.cost, 0);
+  const totalBilled = inScope.reduce((t, it) => t + it.billed, 0);
+  const avg = inScope.length ? inScope.reduce((t, it) => t + (Number(it.p.actualAccomplishment) || 0), 0) / inScope.length : 0;
+  const done = inScope.filter(it => L.isCompleted(it.p)).length;
+  document.getElementById('portfolio').innerHTML = `
+    <div>
+      <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
+      <p>${esc(pesoWhole(totalCost))} total contract cost · <span class="nw">${done} completed</span></p>
+    </div>
+    <div class="bars">
+      ${progressLine('Average work done', pct(avg), avg / 100, 'primary', true)}
+      ${progressLine('Billed of total cost', totalBilled <= 0 ? 'No billings yet' : `${L.billedLabel(totalBilled, totalCost)} · ${pesoWhole(totalBilled)}`, totalCost > 0 ? totalBilled / totalCost : 0, 'primary', true)}
+    </div>`;
+
+  // PortfolioCounts: only non-zero counts, each a filter; pressing the active one clears it.
+  const counts = COUNTS.map(c => ({ ...c, n: c.kind === 'waiting' ? inScope.reduce((t, it) => t + it.waiting, 0) : inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length }))
+    .filter(c => c.n > 0);
+  if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
+  const countsEl = document.getElementById('counts');
+  countsEl.innerHTML = counts.map(c => `<button class="chip ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')
+    + (counts.length ? `<button class="text-btn help-btn" id="help">${icon('info', 'sm')}What these mean</button>` : '');
+  document.getElementById('help')?.addEventListener('click', showTermHelp);
+  countsEl.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
+
+  const scopeEl = document.getElementById('scope');
+  scopeEl.innerHTML = mineAvailable ? `
+    <button class="chip" data-mine="1" aria-pressed="${s.mineOnly}">${icon('person_pin', 'sm')}My projects</button>
+    <button class="chip" data-mine="0" aria-pressed="${!s.mineOnly}">${icon('visibility', 'sm')}All projects</button>` : '';
+  scopeEl.querySelectorAll('[data-mine]').forEach(b => { b.onclick = () => { s.mineOnly = b.dataset.mine === '1'; redrawDashboard(); }; });
+
+  const q = s.q.trim().toLowerCase();
+  const shown = inScope
+    .filter(it => !s.filter || it.flags.some(f => f.kind === s.filter))
+    .filter(it => !q || [it.p.name, it.p.location, it.p.contractor].join(' ').toLowerCase().includes(q))
+    // Needs attention first (Portfolio.NEEDS_ATTENTION_SORT), then by name.
+    .sort((a, b) => rank(a) - rank(b) || a.p.name.localeCompare(b.p.name));
+  document.getElementById('shown').textContent = shown.length === inScope.length ? '' : `Showing ${shown.length} of ${inScope.length}`;
+
+  if (shown.length === 0) {
+    grid.innerHTML = `<li class="empty">${inScope.length
+      ? `No project matches.<button class="text-btn" id="clear">Clear search and filters</button>`
+      : 'No projects for this account yet. Projects appear here once the Super Admin assigns them in the app.'}</li>`;
+    document.getElementById('clear')?.addEventListener('click', () => { s.q = ''; s.filter = null; renderDashboard(); });
+    return;
+  }
+  grid.innerHTML = shown.map(tile).join('');
+  loadPhotos(grid);
+}
+
+function showTermHelp() {
+  const d = document.createElement('dialog');
+  d.className = 'help';
+  d.innerHTML = `<h2>What these mean</h2><dl>${TERM_HELP.map(([t, m]) => `<div><dt>${esc(t)}</dt><dd>${esc(m)}</dd></div>`).join('')}</dl>
+    <form method="dialog"><button class="text-btn">Close</button></form>`;
+  d.addEventListener('close', () => d.remove());
+  document.body.append(d);
+  d.showModal();
+}
+
+const rank = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.length ? 1 : 2);
+
+function tile(it) {
+  const { p } = it;
+  const flags = it.flags.filter(f => f.kind !== 'behind' && f.kind !== 'waiting');
+  const completion = L.displayDate(L.effectiveCompletion(p));
+  return `<li><a class="card tile" href="#/p/${esc(p.projectUuid)}">
+    <div class="tile-top">
+      <div class="photo" data-ref="${esc(p.latestUpdatePhotoUrl || '')}">${icon('photo_camera')}</div>
+      <div style="min-width:0;flex:1">
+        <h2>${esc(p.name)}</h2>
+        <div class="tile-sub"><span class="loc">${esc(p.location || '-')}</span>
+          ${L.isViewOnly(p, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}
+          ${statusBadge(p)}</div>
+      </div>
+    </div>
+    <div class="tile-bars">${workDone(p)}${billedLine(it)}</div>
+    ${flags[0] ? `<p class="flag t-${flags[0].level}">${esc(flags[0].message)}${flags.length > 1 ? `  +${flags.length - 1} more` : ''}</p>` : ''}
+    <div class="meta">
+      <span>${icon('event', 'sm')}Completion ${esc(completion)}</span>
+      ${it.waiting ? `<span>${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
+    </div>
+  </a></li>`;
+}
+
+/* ---------- Project Summary (ProjectHeader + SummarySection) ---------- */
 
 function renderProject(projectUuid) {
   const page = { project: undefined, records: [], error: null };
-  const draw = () => drawProject(page);
   main.innerHTML = '<p class="muted">Loading project…</p>';
+  freshScreen();
+  const draw = () => drawProject(page);
   s.unsubPage.push(onSnapshot(doc(db, 'projects', projectUuid), d => {
     page.project = d.exists() && d.data().isDeleted !== true ? { ...d.data(), projectUuid: d.id } : null;
     draw();
-  }, e => { page.error = e.code === 'permission-denied' ? 'This account cannot open this project.' : e.message; draw(); }));
+  }, e => { page.error = e.code === 'permission-denied' ? 'This account cannot open this project. Ask the Super Admin to assign it to you.' : e.message; draw(); }));
   s.unsubPage.push(onSnapshot(scoped('records', where('projectUuid', '==', projectUuid)), snap => {
     page.records = snap.docs.map(d => L.parseRecord({ ...d.data(), uuid: d.id })).filter(r => !r.isDeleted);
     draw();
   }, e => { page.error = e.message; draw(); }));
 }
 
+const backLink = `<a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>`;
+const kv = (k, v) => `<div class="kv"><span>${esc(k)}</span><b>${esc(v === '' || v == null ? '-' : v)}</b></div>`;
+const section = (title, ic, body, cls = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2></div>${body}</section>`;
+
 function drawProject({ project, records, error }) {
-  if (error) { main.innerHTML = `<a href="#/">← All projects</a><p class="error">${esc(error)}</p>`; return; }
+  if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
   if (project === undefined) return;
-  if (project === null) { main.innerHTML = '<a href="#/">← All projects</a><p class="muted">This project was deleted or does not exist.</p>'; return; }
+  if (project === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
   const of = type => records.filter(r => r.type === type);
   const documents = of('pending_documents');
   // Room lists billings by local id (creation order); the cloud has no id, so date then last edit.
@@ -167,80 +332,88 @@ function drawProject({ project, records, error }) {
   const openIssues = of('project_issues').filter(L.isOpenIssue).length;
   const orders = documents.filter(d => SCHEDULE_ORDER.test(d.documentName || ''));
   const cost = L.currentCost(project, documents);
+  const billed = L.billedTotal(payments);
+  const it = { billed, cost };
+  const flags = L.attentionFlags(project, documents, billed, today());
   const housing = /housing/i.test(project.projectType || '');
-  const field = (k, v) => `<div class="field"><span>${esc(k)}</span><b>${esc(v === '' || v == null ? '-' : v)}</b></div>`;
-  const grossTotal = payments.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
+  const revised = (project.completionDateRevised || '').trim();
+
+  const attention = flags.length ? section('Needs attention', 'notification_important',
+    flags.map(f => `<p class="att t-${f.level}">${esc(f.message)}</p>`).join('')) : '';
+  const profile = section('Project profile', 'apartment', `
+    <div class="site-photo" id="site-photo">${icon('photo_camera')}</div>
+    ${kv('Implementing office', project.implementingOffice)}
+    ${kv('Contractor', project.contractor)}
+    ${kv('Project type', project.projectType)}
+    ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
+    ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', L.formatPhp(x.amount))}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`);
+  const dates = section('Key dates', 'event', `
+    ${kv('Date started', L.displayDate(project.dateStarted))}
+    ${kv('Original completion', L.displayDate(project.completionDateOriginal))}
+    ${kv('Revised completion', revised && revised !== '-' ? L.displayDate(revised) : '-')}
+    ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
+    ${kv('Days left', L.daysLeftText(project, today()))}
+    <p class="sub">Time extensions &amp; suspensions</p>
+    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(d.remarks)}` : ''}</span></div>`).join('')
+      : '<p class="muted" style="font-size:13px">No time extension or suspension orders.</p>'}`);
+  const costCard = section('Contract cost', 'payments', `${kv('Original', L.formatPhp(L.originalCost(project)))}${kv('Current', L.formatPhp(cost))}`);
+  const report = section('Latest weekly report', 'assignment', `
+    ${latest ? `<p style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(latest.reportingWeek)}</p>
+      ${kv('Target', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+      : '<p class="muted" style="font-size:13px">No weekly reports yet</p>'}
+    ${kv('Open issues', String(openIssues))}`);
+  const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? '<p class="muted" style="font-size:13px">No billings yet</p>' : `
+    <div class="scroll"><table class="pay">
+      <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
+      <tbody>${payments.map(p => `<tr>
+        <td>${esc(p.name || '-')}${p.periodCovered ? `<br><span class="muted">${esc(p.periodCovered)}</span>` : ''}<span class="pdate"><br>${esc(L.displayDate(p.date))}</span></td>
+        <td>${esc(L.displayDate(p.date))}</td>
+        <td class="num">${L.formatDecimal(L.netAmount(p))}</td>
+        <td class="num">${pct(p.percentage)}</td>
+        <td class="num">${L.formatDecimal(Number(p.balanceAmount) || 0)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr><th>Total</th><th></th>
+        <th class="num">${L.formatDecimal(payments.reduce((t, p) => t + L.netAmount(p), 0))}</th>
+        <th class="num">${cost > 0 ? pct(billed / cost * 100) : '-'}</th>
+        <th class="num">${L.formatDecimal(cost - billed)}</th></tr></tfoot>
+    </table></div>`, 'wide');
 
   main.innerHTML = `
-    <a href="#/">← All projects</a>
-    <header class="project-head">
-      <h1>${esc(project.name)}</h1>
-      <p class="muted">${esc(project.location || '-')} · <span class="pill">${esc(project.status || '-')}</span></p>
-      <p><b>${pct(project.actualAccomplishment)}</b> done against ${pct(project.targetAccomplishment)} target · ${esc(L.scheduleText(project))}</p>
+    ${backLink}
+    <header class="card project-head">
+      <div class="ph-top"><h1>${esc(project.name)}</h1>
+        ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}${statusBadge(project)}</div>
+      <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p>
+      <div class="ph-bars">${workDone(project, true)}${billedLine(it, true)}</div>
     </header>
-    <div class="grid">
-      <section class="card">
-        <h2>Project profile</h2>
-        <img id="site-photo" alt="Latest site photo" hidden>
-        ${field('Implementing office', project.implementingOffice)}
-        ${field('Contractor', project.contractor)}
-        ${field('Project type', project.projectType)}
-        ${housing ? field('Land area', project.landArea) + field('No. of units', project.numberOfUnits) : ''}
-        ${L.scopeItems(project.scopeOfWork).map((it, i) => `
-          <div class="scope"><b>${i + 1}. ${esc(it.name)}</b><span class="muted">${esc(L.formatPhp(it.amount))} · ${it.weightPct.toFixed(2)}%</span></div>`).join('')}
-      </section>
-      <section class="card">
-        <h2>Key dates</h2>
-        ${field('Date started', L.displayDate(project.dateStarted))}
-        ${field('Original completion', L.displayDate(project.completionDateOriginal))}
-        ${field('Revised completion', L.displayDate((project.completionDateRevised || '').trim() === '-' ? '' : project.completionDateRevised))}
-        ${field('Contract duration', `${project.contractDurationDays ?? 0} days`)}
-        ${field('Days left', L.daysLeftText(project, today()))}
-        <h3>Time extensions &amp; suspensions</h3>
-        ${orders.length ? orders.map(d => `<p>${esc(d.documentName)} <span class="muted">· ${esc(d.status)}${d.remarks ? ` · ${esc(d.remarks)}` : ''}</span></p>`).join('') : '<p class="muted">No time extension or suspension orders.</p>'}
-      </section>
-      <section class="card">
-        <h2>Contract cost</h2>
-        ${field('Original', L.formatPhp(L.originalCost(project)))}
-        ${field('Current', L.formatPhp(cost))}
-      </section>
-      <section class="card">
-        <h2>Latest weekly report</h2>
-        ${latest ? `<p><b>${esc(latest.reportingWeek)}</b></p>
-          ${field('Target', pct(latest.targetAccomplishmentPct))}
-          ${field('Actual', pct(latest.actualAccomplishmentPct))}
-          ${field('Submitted by', latest.submittedByStaff)}` : '<p class="muted">No weekly reports yet</p>'}
-        ${field('Open issues', String(openIssues))}
-      </section>
-      <section class="card wide">
-        <h2>Status of payment</h2>
-        ${payments.length === 0 ? '<p class="muted">No billings yet</p>' : `
-        <div class="scroll"><table>
-          <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
-          <tbody>${payments.map(p => `<tr>
-            <td>${esc(p.name || '-')}${p.periodCovered ? `<br><span class="muted">${esc(p.periodCovered)}</span>` : ''}</td>
-            <td>${esc(L.displayDate(p.date))}</td>
-            <td class="num">${L.formatDecimal(L.netAmount(p))}</td>
-            <td class="num">${pct(p.percentage)}</td>
-            <td class="num">${L.formatDecimal(Number(p.balanceAmount) || 0)}</td></tr>`).join('')}
-          </tbody>
-          <tfoot><tr><th>Total</th><th></th>
-            <th class="num">${L.formatDecimal(payments.reduce((t, p) => t + L.netAmount(p), 0))}</th>
-            <th class="num">${cost > 0 ? pct(grossTotal / cost * 100) : '-'}</th>
-            <th class="num">${L.formatDecimal(cost - grossTotal)}</th></tr></tfoot>
-        </table></div>`}
-      </section>
+    <div class="summary">
+      <div class="col">${attention}${profile}</div>
+      <div class="col">${dates}${costCard}${report}</div>
+      ${paymentCard}
     </div>`;
-  showPhoto(project.latestUpdatePhotoUrl);
+  showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
 }
 
-/** Loads the site photo from Storage; a missing file or no read access just leaves it hidden. */
-async function showPhoto(refText) {
+/* ---------- Site photos from Storage ---------- */
+
+const photoUrls = new Map();
+/** Resolves an `nhafile:` ref to a download URL once; a missing file or no read access gives null. */
+function photoUrl(refText) {
   const path = L.storagePathOf(refText);
-  if (!path) return;
-  try {
-    const url = await getDownloadURL(ref(storage, path));
-    const img = document.getElementById('site-photo');
-    if (img) { img.src = url; img.hidden = false; }
-  } catch { /* not uploaded yet, or a legacy file only the Super Admin can read */ }
+  if (!path) return Promise.resolve(null);
+  if (!photoUrls.has(path)) photoUrls.set(path, getDownloadURL(ref(storage, path)).catch(() => null));
+  return photoUrls.get(path);
+}
+
+async function showPhoto(refText, box) {
+  const url = await photoUrl(refText);
+  if (url && box?.isConnected) { box.classList.add('has'); box.innerHTML = `<img src="${esc(url)}" alt="Latest site photo">`; }
+}
+
+function loadPhotos(root) {
+  root.querySelectorAll('.photo[data-ref]').forEach(async box => {
+    const url = await photoUrl(box.dataset.ref);
+    if (url && box.isConnected) box.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
+  });
 }

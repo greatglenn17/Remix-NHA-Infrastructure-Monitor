@@ -36,6 +36,33 @@ test('scope items: JSON list or plain text', () => {
   assert.equal(L.scopeItems('[{"name":"A","amount":1,"weightPct":100},{"name":" "}]').length, 1);
 });
 
+test('status levels, view-only tag and attention flags follow the app', () => {
+  assert.equal(L.varianceLevel(0), 'ok');
+  assert.equal(L.varianceLevel(-9.99), 'neutral');
+  assert.equal(L.varianceLevel(-10), 'watch');
+  assert.equal(L.varianceLevel(-15), 'behind');
+  assert.equal(L.statusLevel({ status: 'Behind Schedule', actualAccomplishment: 50, targetAccomplishment: 52 }), 'watch');
+  assert.equal(L.statusLevel({ status: 'Suspended', actualAccomplishment: 10, targetAccomplishment: 40 }), 'neutral');
+  assert.equal(L.statusLevel({ status: 'On-going', actualAccomplishment: 100, targetAccomplishment: 100 }), 'ok');
+  assert.equal(L.displayStatus({ status: 'On-going', actualAccomplishment: 100 }), 'Completed');
+
+  const p = { assignedUids: ['me'] };
+  assert.equal(L.isViewOnly(p, 'other', { role: 'FIELD_ENGINEER', allProjects: true }), true);
+  assert.equal(L.isViewOnly(p, 'other', { role: 'SUPER_VIEWER' }), false);
+  assert.equal(L.isViewOnly(p, 'me', { role: 'FIELD_ENGINEER' }), false);
+  assert.equal(L.isViewOnly({ assignedUids: [], createdByUid: 'me' }, 'me', {}), false);
+
+  const docs = [{ documentName: 'Time Extension No. 1', status: 'Pending' }, { documentName: 'Variation Order No. 1 - PHP 0', status: 'Approved' }];
+  assert.equal(L.waitingApproval(docs), 1);
+  const project = { status: 'On-going', actualAccomplishment: 20, targetAccomplishment: 36, contractCostOriginal: 1000, completionDateOriginal: '2026-11-20' };
+  const kinds = L.attentionFlags(project, docs, 400, '2026-11-08').map(f => `${f.kind}:${f.level}`);
+  assert.deepEqual(kinds, ['behind:critical', 'billingAhead:warning', 'waiting:warning', 'dueSoon:warning']);
+  assert.equal(L.attentionFlags({ ...project, completionDateOriginal: '2026-11-01' }, [], 0, '2026-11-08')[1].message, 'Overdue by 7 days');
+  assert.deepEqual(L.attentionFlags({ ...project, actualAccomplishment: 100, targetAccomplishment: 100 }, [], 0, '2026-11-08'), []);
+  assert.equal(L.billedLabel(0, 100), 'No billings yet');
+  assert.equal(L.billedLabel(25, 100), '25.00%');
+});
+
 test('days left, schedule words, dates, money, attachment paths', () => {
   const p = { completionDateOriginal: '2026-11-10', completionDateRevised: '-', actualAccomplishment: 40, targetAccomplishment: 45.5 };
   assert.equal(L.daysLeftText(p, '2026-11-07'), '3 days');

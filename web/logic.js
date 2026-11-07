@@ -79,9 +79,88 @@ function isoDay(s) {
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
 }
 
+/** ProjectViewModel.isMine (AssignmentPolicy.isVisible without seesAll): assigned, or the creator of a list-less project. */
+export function isMine(project, uid, claims) {
+  const list = project.assignedUids || [];
+  return claims.role === 'SUPER_ADMIN' || list.includes(uid) || (list.length === 0 && project.createdByUid === uid);
+}
+
+/** PortfolioItem.viewOnly: a Super Viewer reads everything, so the tag would only mark assignments. */
+export const isViewOnly = (project, uid, claims) => !isMine(project, uid, claims) && claims.role !== 'SUPER_VIEWER';
+
+/** ProjectAttention.slippage: variance rounded to 2 decimals so the -10 / -15 boundaries hold. */
+export const slippage = p => Math.round(((Number(p.actualAccomplishment) || 0) - (Number(p.targetAccomplishment) || 0)) * 100) / 100;
+export const isCompleted = p => (Number(p.actualAccomplishment) || 0) >= 100;
+export const displayStatus = p => (isCompleted(p) ? 'Completed' : p.status || '-');
+
+/** PortfolioRow.varianceColor as a level: ok (on or ahead), watch (10-15% behind), behind (15%+), neutral (small slips). */
+export function varianceLevel(slip) {
+  if (slip >= 0) return 'ok';
+  if (slip <= -15) return 'behind';
+  if (slip <= -10) return 'watch';
+  return 'neutral';
+}
+
+/** PortfolioRow.statusColor: the status chip never reads green on a project that is behind. */
+export function statusLevel(p) {
+  if (isCompleted(p)) return 'ok';
+  if (p.status === 'Suspended') return 'neutral';
+  const s = varianceLevel(slippage(p));
+  return p.status === 'Behind Schedule' && (s === 'ok' || s === 'neutral') ? 'watch' : s;
+}
+
+const ORDER_TYPES = ['variation order', 'time extension', 'work suspension', 'work resumption'];
+/** ProjectAttention.waitingApproval: orders not yet Approved. */
+export const waitingApproval = docs => docs.filter(d =>
+  !/^approved$/i.test((d.status || '').trim()) && ORDER_TYPES.some(t => (d.documentName || '').toLowerCase().includes(t))).length;
+
+export const billedTotal = payments => payments.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
+
+/** BillingProgress.label. */
+export function billedLabel(billed, cost) {
+  if (billed <= 0) return 'No billings yet';
+  if (cost <= 0) return 'No contract cost';
+  return `${(billed / cost * 100).toFixed(2)}%`;
+}
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * ProjectAttention.flags, critical first. `today` is yyyy-MM-dd.
+ * shortcut: leaves out "developer requests not packaged" and "no field update in N days", which need
+ * every project's requests and weekly reports; add them when the dashboard reads those records.
+ */
+export function attentionFlags(project, docs, billed, today) {
+  const flags = [];
+  const finished = isCompleted(project);
+  const slip = slippage(project);
+  if (!finished && (slip <= -10 || project.status === 'Behind Schedule')) {
+    flags.push({ kind: 'behind', level: slip <= -15 ? 'critical' : 'warning',
+      message: slip < 0 ? `${(-slip).toFixed(2)}% behind schedule` : 'Marked behind schedule' });
+  }
+  const cost = currentCost(project, docs);
+  if (cost > 0) {
+    const billedPct = billed / cost * 100;
+    if (billedPct - (Number(project.actualAccomplishment) || 0) > 10) {
+      flags.push({ kind: 'billingAhead', level: 'warning',
+        message: `Billed ${billedPct.toFixed(2)}%, work done ${(Number(project.actualAccomplishment) || 0).toFixed(2)}%` });
+    }
+  }
+  const waiting = waitingApproval(docs);
+  if (waiting > 0) flags.push({ kind: 'waiting', level: 'warning', message: `${plural(waiting, 'order', 'orders')} waiting approval` });
+  const due = isoDay(effectiveCompletion(project));
+  const now = isoDay(today);
+  if (!finished && due != null && now != null) {
+    const days = Math.round((due - now) / 86400000);
+    if (days < 0) flags.push({ kind: 'overdue', level: 'critical', message: `Overdue by ${plural(-days, 'day', 'days')}` });
+    else if (days <= 30) flags.push({ kind: 'dueSoon', level: 'warning', message: `Due in ${plural(days, 'day', 'days')}` });
+  }
+  return flags.sort((a, b) => (a.level === b.level ? 0 : a.level === 'critical' ? -1 : 1));
+}
+
 /** ProjectAttention.slippage in words (PortfolioRow.scheduleText). */
 export function scheduleText(project) {
-  const s = Math.round(((Number(project.actualAccomplishment) || 0) - (Number(project.targetAccomplishment) || 0)) * 100) / 100;
+  const s = slippage(project);
   if (s > 0) return `${s.toFixed(2)}% ahead`;
   if (s < 0) return `${(-s).toFixed(2)}% behind`;
   return 'on schedule';
