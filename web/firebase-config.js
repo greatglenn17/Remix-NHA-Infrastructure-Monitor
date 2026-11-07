@@ -1,10 +1,11 @@
 // Web app config of the live project nha-monitor-bulacan-2026. These values are public by design
-// (the security rules protect the data); copy them from Firebase console > Project settings >
-// Your apps > the Web app (README: "One-time setup"). Until then only `?emulator` mode works.
+// (the security rules protect the data). From the "NHA Monitor Web" app:
+// firebase apps:sdkconfig WEB 1:1091951535339:web:9f23ffea71ebca0f868aae
 export const firebaseConfig = {
-  apiKey: 'PASTE_WEB_API_KEY',
+  apiKey: 'AIzaSyDKhRERL2ClvmmYwbaZyQeiJXvksNL756M',
   authDomain: 'nha-monitor-bulacan-2026.firebaseapp.com',
   projectId: 'nha-monitor-bulacan-2026',
   storageBucket: 'nha-monitor-bulacan-2026.firebasestorage.app',
-  appId: 'PASTE_WEB_APP_ID',
+  messagingSenderId: '1091951535339',
+  appId: '1:1091951535339:web:9f23ffea71ebca0f868aae',
 };

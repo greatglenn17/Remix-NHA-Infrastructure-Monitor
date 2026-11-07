@@ -41,9 +41,10 @@ node --test web/logic.test.mjs
 
 ## One-time setup for the live project
 
-1. Firebase console > nha-monitor-bulacan-2026 > Project settings > Your apps > **Add app > Web**
-   (no Hosting checkbox needed). Copy `apiKey` and `appId` into `web/firebase-config.js`. These
-   values are public by design, and the security rules protect the data.
+1. Done on 2026-11-07: the Web app "NHA Monitor Web" is registered and its config is in
+   `web/firebase-config.js`. These values are public by design, and the security rules protect
+   the data. To print the config again:
+   `firebase apps:sdkconfig WEB 1:1091951535339:web:9f23ffea71ebca0f868aae`.
 2. Authentication > Settings > **Authorized domains**: `nha-monitor-bulacan-2026.web.app` and
    `localhost` are there by default. Add any custom domain you use.
 
