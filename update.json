@@ -1,8 +1,8 @@
 {
-  "versionCode": 240,
-  "versionName": "2.4.0",
-  "releaseNotes": "v2.4.0: One project can now hold several SDP sites, with an all-sites summary and printing of every site on one page.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.4.0/NHA_Monitor_v2.4.0_Build240.apk",
-  "apkSha256": "2991f3830416e08317f8b7bf0ef7d1ab0a6cd8ed5e2235e12089758d8e700caa",
+  "versionCode": 250,
+  "versionName": "2.5.0",
+  "releaseNotes": "v2.5.0: See other projects in view-only mode, and a new Super Viewer role for heads and management.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.5.0/NHA_Monitor_v2.5.0_Build250.apk",
+  "apkSha256": "409f57217d0d968256e772b0209bcd74739af72c956fdcea901d83d1c73e51c5",
   "isMandatory": true
 }
