@@ -46,3 +46,6 @@ rules-tests/*-debug.log
 
 # Firebase deploy cache
 .firebase/
+
+# design-taste-frontend working files
+.taste-skill/

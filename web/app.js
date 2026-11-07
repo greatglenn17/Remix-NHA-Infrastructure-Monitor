@@ -223,6 +223,7 @@ function redrawDashboard() {
     <div>
       <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
       <p>${esc(pesoWhole(totalCost))} total contract cost · <span class="nw">${done} completed</span></p>
+      ${finding(inScope)}
     </div>
     <div class="bars">
       ${progressLine('Average work done', pct(avg), avg / 100, 'primary', true)}
@@ -272,6 +273,15 @@ function showTermHelp() {
   d.addEventListener('close', () => d.remove());
   document.body.append(d);
   d.showModal();
+}
+
+// The screen's one finding: the project the sort puts first, with its worst flag.
+function finding(items) {
+  const flagged = items.filter(it => it.flags.length).sort((a, b) => rank(a) - rank(b) || a.p.name.localeCompare(b.p.name));
+  if (!flagged.length) return items.length ? '<p class="finding">No project needs attention.</p>' : '';
+  const [first] = flagged, f = first.flags[0], more = flagged.length - 1;
+  return `<p class="finding">First to look at: <a href="#/p/${esc(first.p.projectUuid)}">${esc(first.p.name)}</a>,
+    <span class="t-${f.level}">${esc(f.message.charAt(0).toLowerCase() + f.message.slice(1))}</span>${more ? `<span class="nw"> · ${more} more flagged</span>` : ''}</p>`;
 }
 
 const rank = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.length ? 1 : 2);
@@ -347,7 +357,7 @@ function drawProject({ project, records, error }) {
     ${kv('Project type', project.projectType)}
     ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
-      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', L.formatPhp(x.amount))}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`);
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`);
   const dates = section('Key dates', 'event', `
     ${kv('Date started', L.displayDate(project.dateStarted))}
     ${kv('Original completion', L.displayDate(project.completionDateOriginal))}
