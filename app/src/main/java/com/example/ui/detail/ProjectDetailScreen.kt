@@ -64,7 +64,8 @@ fun ProjectDetailScreen(
     val project = (liveProject ?: kept[0]?.takeIf { selectedId == null }).also { kept[0] = it }
     // On a project not assigned to this account every tab shows as for a Viewer.
     val currentUser = viewModel.accountFor(project, account)
-    val viewOnly = currentUser.role != account.role
+    // A Super Viewer is read-only everywhere, so "not assigned to you" would only be noise for them.
+    val viewOnly = currentUser.role != account.role && account.role != com.example.data.model.UserRole.SUPER_VIEWER
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
     val contractorLetters by viewModel.contractorLetters.collectAsState()
