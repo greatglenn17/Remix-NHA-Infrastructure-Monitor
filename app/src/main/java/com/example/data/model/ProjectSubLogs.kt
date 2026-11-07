@@ -178,5 +178,8 @@ data class ContractorLetter(
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Blank until the contractor receives the letter; NHA's receiving copy (signed or stamped) is an attachment reference.
+    val dateReceived: String = "",
+    val receivedFileUrl: String = ""
 )

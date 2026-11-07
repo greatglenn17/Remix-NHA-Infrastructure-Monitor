@@ -506,7 +506,7 @@ object BlueBookForms {
      * Section VIII rows for [report]'s week as (document, date, implementing office, contractor/developer):
      * developer requests NHA received that week and letters the contractor received that week, by date.
      */
-    fun weekDocuments(report: WeeklyReport, documents: List<PendingDocument>, requests: List<DeveloperRequest>): List<List<String>> {
+    fun weekDocuments(report: WeeklyReport, letters: List<com.example.data.model.ContractorLetter>, requests: List<DeveloperRequest>): List<List<String>> {
         val start = weekStart(report.reportingWeek) ?: return emptyList()
         fun inWeek(day: String) = parseDate(day)?.let { !it.isBefore(start) && !it.isAfter(start.plusDays(6)) } == true
         val fromDeveloper = requests.filter { inWeek(it.dateReceived) }.map { r ->
@@ -517,11 +517,10 @@ object BlueBookForms {
                 r.dateRequested.takeIf { it.isNotBlank() }?.let { "Requested ${date(it)}" }.orEmpty()
             )
         }
-        val letters = documents.filter { ContractorLetters.isLetter(it) && inWeek(ContractorLetters.received(it)) }.map { d ->
-            val received = ContractorLetters.received(d)
-            listOf(d.documentName + ContractorLetters.reason(d).takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(), received, "Letter issued", "Received ${date(received)}")
+        val received = letters.filter { inWeek(it.dateReceived) }.map { l ->
+            listOf(l.subject, l.dateReceived, "Letter issued", "Received ${date(l.dateReceived)}")
         }
-        return (fromDeveloper + letters).sortedBy { it[1] }.map { row -> row.toMutableList().also { it[1] = date(it[1]) } }
+        return (fromDeveloper + received).sortedBy { it[1] }.map { row -> row.toMutableList().also { it[1] = date(it[1]) } }
     }
 
     fun weekIssues(report: WeeklyReport, reportIssues: List<WeeklyIssue>, logged: List<ProjectIssue>): List<WeeklyIssue> {

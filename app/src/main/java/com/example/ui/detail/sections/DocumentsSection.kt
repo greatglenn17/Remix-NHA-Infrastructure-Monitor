@@ -308,12 +308,17 @@ fun OrdersList(
     onAddOrder: (type: String) -> Unit,
     onAddDocument: (name: String, remarks: String) -> Unit,
     onUpdateStatus: (PendingDocument, String, String) -> Unit,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    // The same letters as Summary › Letters to contractor.
+    projectId: Long = 0,
+    letters: List<com.example.data.model.ContractorLetter> = emptyList(),
+    onSaveLetter: (com.example.data.model.ContractorLetter) -> Unit = {},
+    onDeleteLetter: (com.example.data.model.ContractorLetter) -> Unit = {}
 ) {
     val canEdit = currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)
     var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
-    var openLetter by remember { mutableStateOf<PendingDocument?>(null) }
-    var newLetter by remember { mutableStateOf(false) }
+    var letterDialog by remember { mutableStateOf(false) }
+    var openLetter by remember { mutableStateOf<com.example.data.model.ContractorLetter?>(null) }
     val open: ((PendingDocument) -> Unit)? = if (canEdit) { doc -> openOrder = doc } else null
     fun add(type: String): (() -> Unit)? = if (canEdit) { { onAddOrder(type) } } else null
     fun named(text: String) = documents.filter { it.documentName.contains(text, ignoreCase = true) }
@@ -351,36 +356,21 @@ fun OrdersList(
                 VariationOrdersLog(documents, canEdit, { onAddOrder("Variation Order") }, currentUserRole, onUpdateStatus, onDelete)
             }
             SectionChips.LETTERS -> item {
-                val letters = documents.filter(ContractorLetters::isLetter)
-                OrdersCard("Letters to contractor", Icons.Default.Mail, letters.isEmpty(), "No letters to the contractor.", { newLetter = true }.takeIf { canEdit }) {
-                    letters.forEach { letter ->
-                        val received = ContractorLetters.received(letter)
-                        LogEntry(
-                            letter.documentName,
-                            MaterialTheme.colorScheme.onSurface,
-                            listOf(
-                                "Reason: ${ContractorLetters.reason(letter).ifBlank { "-" }}",
-                                if (received.isBlank()) "Not yet received by the contractor" else "Received by the contractor: $received"
-                            ),
-                            onClick = { openLetter = letter }.takeIf { canEdit }
-                        )
-                    }
-                }
+                ContractorLettersCard(
+                    letters, { openLetter = null; letterDialog = true }.takeIf { canEdit },
+                    if (canEdit) { l: com.example.data.model.ContractorLetter -> openLetter = l; letterDialog = true } else null, Modifier
+                )
             }
         }
     }
 
     OrderDialogs(openOrder, documents, currentUserRole, onUpdateStatus, onDelete, onAddDocument) { openOrder = null }
-    if (newLetter || openLetter != null) {
-        LetterDialog(
-            existing = openLetter,
-            nextNo = ContractorLetters.nextNo(documents),
-            onDismiss = { newLetter = false; openLetter = null },
-            onSave = { name, remarks ->
-                openLetter?.let { onUpdateStatus(it, it.status, remarks) } ?: onAddDocument(name, remarks)
-                newLetter = false; openLetter = null
-            },
-            onDelete = { onDelete(it.id); openLetter = null }
+    if (letterDialog) {
+        ContractorLetterDialog(
+            projectId = projectId, existing = openLetter,
+            onDismiss = { letterDialog = false },
+            onSave = { onSaveLetter(it); letterDialog = false },
+            onDelete = { onDeleteLetter(it); letterDialog = false }
         )
     }
 }
@@ -414,41 +404,6 @@ private fun OrdersCard(
 @Composable
 private fun OrderEntry(doc: PendingDocument, onOpen: ((PendingDocument) -> Unit)?) {
     LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
-}
-
-/** Adds or edits a letter to the contractor: its reason and the day the contractor received it. */
-@Composable
-private fun LetterDialog(
-    existing: PendingDocument?,
-    nextNo: Int,
-    onDismiss: () -> Unit,
-    onSave: (name: String, remarks: String) -> Unit,
-    onDelete: (PendingDocument) -> Unit
-) {
-    var no by remember { mutableStateOf(existing?.documentName?.substringAfter("No. ", "") ?: nextNo.toString()) }
-    var reason by remember { mutableStateOf(existing?.let(ContractorLetters::reason).orEmpty()) }
-    var received by remember { mutableStateOf(existing?.let(ContractorLetters::received).orEmpty()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (existing == null) "New letter to contractor" else existing.documentName) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (existing == null) OutlinedTextField(value = no, onValueChange = { no = it.filter(Char::isDigit) }, label = { Text("Letter No.") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = reason, onValueChange = { reason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth().testTag("letter_reason"))
-                com.example.ui.components.DateField(label = "Date received by the contractor", value = received, onValueChange = { received = it }, clearable = true)
-                Text("Shows on the weekly report for the week the contractor received it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (existing != null) TextButton(onClick = { onDelete(existing) }) { Text("Delete letter", color = LocalNHAColors.current.behind) }
-            }
-        },
-        confirmButton = {
-            Button(shape = MaterialTheme.shapes.small, 
-                onClick = { onSave(ContractorLetters.name(no), ContractorLetters.remarks(reason, received)) },
-                enabled = no.isNotBlank(),
-                modifier = Modifier.testTag("save_letter_button")
-            ) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
 }
 
 /** Documents › Variation orders: every order, pending too, so a new one shows; only approved ones change the cost. */

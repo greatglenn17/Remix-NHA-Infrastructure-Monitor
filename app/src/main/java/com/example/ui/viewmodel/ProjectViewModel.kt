@@ -766,7 +766,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val contractorLetters: StateFlow<List<com.example.data.model.ContractorLetter>> = _selectedProjectId.flatMapLatest { id ->
-        if (id == null) flowOf(emptyList()) else projectDao.getContractorLettersForProject(id)
+        // Letters the Documents tab kept as documents before v2.6 show here too.
+        if (id == null) flowOf(emptyList())
+        else combine(projectDao.getContractorLettersForProject(id), repository.getPendingDocuments(id), com.example.util.ContractorLetters::merged)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -1903,7 +1905,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             contractLogs(project),
             signatories,
             blueBookBanner,
-            com.example.util.BlueBookForms.weekDocuments(report, repository.getPendingDocuments(project.id).first(), projectDao.getDeveloperRequestsForProject(project.id).first())
+            com.example.util.BlueBookForms.weekDocuments(
+                report,
+                com.example.util.ContractorLetters.merged(projectDao.getContractorLettersForProject(project.id).first(), repository.getPendingDocuments(project.id).first()),
+                projectDao.getDeveloperRequestsForProject(project.id).first()
+            )
         )
     }
 
@@ -2581,7 +2587,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun saveContractorLetter(letter: com.example.data.model.ContractorLetter) {
         viewModelScope.launch(missingProjectGuard) {
-            if (letter.id == 0L) projectDao.insertContractorLetter(letter) else projectDao.updateContractorLetter(letter)
+            val oldDocument = oldDocumentLetter(letter)
+            if (letter.id != 0L) projectDao.updateContractorLetter(letter)
+            // An edited old document letter becomes a letter under a new identity, so the document's deletion can't remove it.
+            else if (oldDocument != null) projectDao.insertContractorLetter(letter.copy(uuid = java.util.UUID.randomUUID().toString()))
+            else projectDao.insertContractorLetter(letter)
+            oldDocument?.let { repository.deletePendingDocument(it.id) }
             logAuditAction(
                 projectId = letter.projectId,
                 actionType = "Letter to Contractor",
@@ -2594,7 +2605,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteContractorLetter(letter: com.example.data.model.ContractorLetter) {
         viewModelScope.launch(missingProjectGuard) {
-            projectDao.deleteContractorLetter(letter.id)
+            val oldDocument = oldDocumentLetter(letter)
+            if (oldDocument != null) repository.deletePendingDocument(oldDocument.id) else projectDao.deleteContractorLetter(letter.id)
             logAuditAction(
                 projectId = letter.projectId,
                 actionType = "Letter to Contractor",
@@ -2604,6 +2616,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
         }
     }
+
+    /** The document a letter from [com.example.util.ContractorLetters.asLetter] came from, or null for a real letter. */
+    private suspend fun oldDocumentLetter(letter: com.example.data.model.ContractorLetter): PendingDocument? =
+        if (letter.id != 0L) null
+        else repository.getPendingDocuments(letter.projectId).first().find { it.uuid == letter.uuid && com.example.util.ContractorLetters.isLetter(it) }
 
     fun deleteDeveloperRequest(request: com.example.data.model.DeveloperRequest) {
         viewModelScope.launch(missingProjectGuard) {
