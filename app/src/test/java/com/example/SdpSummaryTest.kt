@@ -73,9 +73,9 @@ class SdpSummaryTest {
         assertTrue(html.contains("<td colspan='2'><i class='sw' style='background:#333333'></i>Concreting</td></tr>"))
         assertTrue(html.contains("<td colspan='2'><i class='sw' style='background:#555555'></i>Completed</td></tr>"))
         for (gone in listOf("NON-SALEABLE", "ROAD LOTS", "Drainage", "Area (sq.m.)")) assertTrue(gone, !html.contains(gone))
-        // No road lots, no road rows.
+        // No road lots yet: the road lot key still shows.
         val noRoads = BlueBookForms.sdpPlan(project, listOf(BlueBookForms.SdpSheet("", "data:image/png;base64,AA", SdpSummary.of(listOf(Item("Saleable", 40.0, 10))))), bands, LocalDate.of(2026, 10, 30))
-        assertTrue(!noRoads.contains("Road lot"))
+        for (state in listOf("Road lot", "Not completed", "Concreting", "Completed")) assertTrue(state, noRoads.contains(state))
     }
 
     @Test
@@ -99,6 +99,7 @@ class SdpSummaryTest {
         // Portrait: one above the other, sharing the height left under the legend.
         val portrait = BlueBookForms.sdpPlan(project, sheets, bands, LocalDate.of(2026, 11, 7))
         assertTrue(portrait.contains("size: A4; margin: 6mm;"))
-        assertTrue(portrait.contains("<div class='plan multi'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:89mm'>"))
+        assertTrue(portrait.contains("<div class='plan multi'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:77mm'>"))
+        assertTrue(html.contains("<tr><th class='sub' colspan='4'>Road lot</th></tr>"))
     }
 }

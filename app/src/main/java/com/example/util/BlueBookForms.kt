@@ -353,19 +353,17 @@ object BlueBookForms {
             legend.append("<tr><td><i class='sw' style='background:${bandHex[i]}'></i>${esc(band)}</td>${counts { it.saleableBands[i] }}</tr>")
         }
         legend.append("<tr class='tot'><td>Total units</td>${counts { it.saleable.count }}</tr>")
-        val roads = sheets.any { it.summary.roadLots.sum() > 0 }
-        if (roads) {
-            legend.append("<tr><th class='sub' colspan='$span'>Road lot</th></tr>")
-            SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
-                legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
-            }
+        // Road lot colours always show, so the key is the same on every print.
+        legend.append("<tr><th class='sub' colspan='$span'>Road lot</th></tr>")
+        SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
+            legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
         }
         legend.append("</table>")
         // Height left for plans under the banner and title: 244mm portrait, 157mm landscape; a site name takes 6mm.
         // One plan has the legend over its corner; several plans would lose lots under it, so it sits beside
         // them (landscape) or below them (portrait, about 6mm a row).
         val room = if (landscape) 157 else 244
-        val legendHeight = (8 + if (roads) 4 else 0) * 6
+        val legendHeight = 12 * 6
         val maxHeight = when {
             !multi -> room
             landscape -> room - 6
