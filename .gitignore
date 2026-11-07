@@ -37,3 +37,6 @@ rules-tests/*-debug.log
 
 # Release signing key
 *.jks
+
+# Firebase emulator logs
+*-debug.log

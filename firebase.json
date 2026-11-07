@@ -9,11 +9,14 @@
     "source": "functions"
   },
   "hosting": {
-    "public": "public",
+    "public": "web",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "emulator/**",
+      "**/*.test.mjs",
+      "README.md"
     ],
     "rewrites": [
       {
@@ -23,11 +26,17 @@
     ]
   },
   "emulators": {
+    "auth": {
+      "port": 9099
+    },
     "firestore": {
       "port": 8080
     },
     "storage": {
       "port": 9199
+    },
+    "hosting": {
+      "port": 5000
     }
   }
 }
