@@ -7,9 +7,15 @@ version keep working.
 - Sign-in uses the same email and password as the app.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
-  Unassigned projects are tagged **View only**.
-- Screens: the dashboard (counts, search, project list) and the project **Summary** (profile,
+  Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
+- Screens: the dashboard (portfolio totals, attention filters, search, project cards) and the project **Summary** (profile,
   key dates, contract cost, latest weekly report, open issues, status of payment).
+
+The look follows the Android app's theme (`app/src/main/java/com/example/ui/theme/`): the same
+greys, one blue accent, the app's on-track / watch / behind status colours, and light and dark
+modes that follow the device. The dashboard's attention counts use the app's ProjectAttention
+thresholds. Inter is bundled in `web/fonts/` (SIL Open Font License, see `licenses/Inter-OFL.txt`).
+The icons are Material Symbols from Google Fonts. See `DESIGN.md` at the repo root for the tokens.
 
 Plain HTML and JavaScript modules. There is no build step. The Firebase JS SDK 10.12.2 loads from
 Google's CDN. `logic.js` holds the rules copied from the Android app (contract cost, days left,

@@ -40,3 +40,9 @@ rules-tests/*-debug.log
 
 # Firebase emulator logs
 *-debug.log
+
+# Impeccable design working files (never committed)
+.impeccable/
+
+# Firebase deploy cache
+.firebase/
