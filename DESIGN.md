@@ -240,7 +240,7 @@ The content column is centred at 1320px max width, with 24px side padding (16px 
 - **Sign-in:** a full-bleed two-column grid (hero 5fr, form 6fr) with no app bar. Under 900px it stacks, hero first. The form is at most 400px wide and centred.
 - **Dashboard:** the command banner (count and total cost on the left, status pills on the right, the priority callout across the bottom; stacked under 900px), then one control row (search with a Cmd/Ctrl+K hint, the My / All projects segmented control, the attention filter chips, an icon-only help button), then a project grid of `auto-fill, minmax(min(380px, 100%), 1fr)`, which gives two or three columns on desktop.
 - **Project card:** a header row (48px photo, name and town, status badge on the right), Work done over Billed, an optional flag line, and a footer under a hairline with the completion date and the waiting-approval badge. Under 600px the badges drop under the name.
-- **Project Summary:** a two-column card grid (one column under 900px). Wide sections span both columns.
+- **Project Summary:** a header card (36px name, 30px under 640px; town; glowing status badge top right; Work done and Billed as two side-by-side modules), then a bento grid: column 1 Needs attention and Project profile, column 2 Key dates, column 3 Contract cost and Latest weekly report, with Status of payment across all three. From 1100px down it is two columns (profile left, the rest stacked right); under 900px, one.
 - **Phone widths:** status pills and attention chips form 2-up grids under 600px; the help button shows its words. The payments table moves the date under the billing name under 560px.
 
 ## Elevation & Depth
@@ -294,8 +294,16 @@ My projects | All projects, for accounts that see every project (not Super Viewe
 ### Status Badge
 A small pill in 700 11px, with status colour text on its container. On project cards an overdue project's badge reads "Overdue by N days" in rose. The **view-only** variant is quieter: 4px radius, 500 weight, Soft Panel with `text-2` and an eye icon.
 
+### Project Summary cards
+- **Needs attention:** one alert box per flag (12px radius, 1px outline). Critical flags (overdue, 15%+ behind) are rose with a pulsing dot (still under reduced motion); warnings are amber with a warning icon.
+- **Project profile:** a 2:1 blueprint placeholder (16px blue grid on deep navy, compass icon, "No site photo yet") until a photo loads, then 16:9. Attribute values are monospace; the contractor is Link Blue; empty values show a faded dash.
+- **Key dates:** a vertical timeline. Filled blue dot = date passed (the line after it turns blue), hollow = ahead, rose dot with a halo = a completion date passed on an unfinished project, dashed = not set. Days left is a badge: amber with a glow when overdue. "No time extension or suspension orders" carries a faded amber warning icon.
+- **Contract cost:** Original cost and Current cost as Field modules, each with a 16px icon label and the amount in bold monospace (22px to 28px).
+- **Latest weekly report:** week, target, actual and submitter, with the open-issues count as a badge (quiet green at 0, amber above). Empty: a faded grid tile, "No weekly reports yet", and the badge.
+- **Status of payment:** the billing table; with no billings, a ledger box (receipt icon, centred "No billings yet", faint placeholder rows on the right, hidden on phones).
+
 ### Progress Line (signature)
-The label (13px/500 `text-2`) on the left; the value (600, tabular) and a 12px note on the right; an 8px bar on the track with 4px corners beneath. **Work done** is emerald when finished, Progress Blue on or ahead of plan, amber when behind, rose from 15% behind; its note is the schedule variance ("on schedule" or "3.75% behind" with a warning icon) in the matching colour. **Billed** is always Billed Violet, with the peso amount as its note. The two always appear as a pair on every project card and header, never as portfolio averages. In headers the value is 22px/600. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
+The label (13px/500 `text-2`) on the left; the value (600, tabular) and a 12px note on the right; an 8px bar on the track with 4px corners beneath. **Work done** is emerald when finished, Progress Blue on or ahead of plan, amber when behind, rose from 15% behind; its note is the schedule variance ("on schedule" or "3.75% behind" with a warning icon) in the matching colour. **Billed** is always Billed Violet, with the peso amount as its note. The two always appear as a pair on every project card and header, never as portfolio averages. In the project header the value is 26px/700, each line sits in its own Field module, and the 10px track shows a faint tick every 10%. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
 
 ## Do's and Don'ts
 
@@ -313,4 +321,4 @@ The label (13px/500 `text-2`) on the left; the value (600, tabular) and a 12px n
 - **Don't** imitate official NHA or government branding.
 - **Don't** use the brand gradient outside the sign-in hero.
 - **Don't** use tracked uppercase lines as section labels or eyebrows. The office line and the banner count are the only uppercase text.
-- **Don't** add motion beyond the bar fill and the card hover lift, and never animate when reduced motion is requested.
+- **Don't** add motion beyond the bar fill, the card hover lift, the back link's colour fade and the critical-alert pulse, and never animate when reduced motion is requested.

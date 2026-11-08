@@ -348,8 +348,12 @@ function renderProject(projectUuid) {
 }
 
 const backLink = `<a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>`;
-const kv = (k, v) => `<div class="kv"><span>${esc(k)}</span><b>${esc(v === '' || v == null ? '-' : v)}</b></div>`;
+const kv = (k, v, cls = '') => {
+  const nil = v === '' || v == null || v === '-';
+  return `<div class="kv"><span>${esc(k)}</span><b class="${nil ? 'nil' : cls}">${nil ? '-' : esc(v)}</b></div>`;
+};
 const section = (title, ic, body, cls = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2></div>${body}</section>`;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 function drawProject({ project, records, error }) {
   if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
@@ -365,36 +369,54 @@ function drawProject({ project, records, error }) {
   const cost = L.currentCost(project, documents);
   const billed = L.billedTotal(payments);
   const it = { billed, cost };
-  const flags = L.attentionFlags(project, documents, billed, today());
+  const now = today();
+  const flags = L.attentionFlags(project, documents, billed, now);
   const housing = /housing/i.test(project.projectType || '');
   const revised = (project.completionDateRevised || '').trim();
+  const finished = L.isCompleted(project);
 
-  const attention = flags.length ? section('Needs attention', 'notification_important',
-    flags.map(f => `<p class="att t-${f.level}">${esc(f.message)}</p>`).join('')) : '';
+  // Needs attention: one alert box per flag; critical ones (overdue, 15%+ behind) carry a pulsing dot.
+  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => `
+    <p class="alert ${f.level}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon('warning', 'sm')}<b>${esc(f.message)}</b></p>`).join('')}</div>`) : '';
   const profile = section('Project profile', 'apartment', `
-    <div class="site-photo" id="site-photo">${icon('photo_camera')}</div>
-    ${kv('Implementing office', project.implementingOffice)}
-    ${kv('Contractor', project.contractor)}
-    ${kv('Project type', project.projectType)}
-    ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
+    <div class="site-photo" id="site-photo">${icon('architecture')}<span>No site photo yet</span></div>
+    <div class="attrs">
+      ${kv('Implementing office', project.implementingOffice)}
+      ${kv('Contractor', project.contractor, 'hl')}
+      ${kv('Project type', project.projectType)}
+      ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
+    </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
       <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`);
+
+  // Key dates as a timeline: filled = passed, hollow = ahead, red (late) = a completion date passed on an unfinished project.
+  const step = (label, date, completion) => {
+    const has = ISO.test(date || '');
+    const state = !has ? 'none' : date > now ? 'next' : completion && !finished ? 'late' : 'done';
+    return `<li class="step ${state}"><span>${esc(label)}</span><b>${has ? esc(L.displayDate(date)) : '-'}</b></li>`;
+  };
+  const daysLeft = L.daysLeftText(project, now);
   const dates = section('Key dates', 'event', `
-    ${kv('Date started', L.displayDate(project.dateStarted))}
-    ${kv('Original completion', L.displayDate(project.completionDateOriginal))}
-    ${kv('Revised completion', revised && revised !== '-' ? L.displayDate(revised) : '-')}
+    <ol class="timeline">
+      ${step('Date started', project.dateStarted, false)}
+      ${step('Original completion', project.completionDateOriginal, true)}
+      ${step('Revised completion', revised !== '-' ? revised : '', true)}
+    </ol>
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
-    ${kv('Days left', L.daysLeftText(project, today()))}
+    <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-watch glow' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
     ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(d.remarks)}` : ''}</span></div>`).join('')
-      : '<p class="muted" style="font-size:13px">No time extension or suspension orders.</p>'}`);
-  const costCard = section('Contract cost', 'payments', `${kv('Original', L.formatPhp(L.originalCost(project)))}${kv('Current', L.formatPhp(cost))}`);
-  const report = section('Latest weekly report', 'assignment', `
-    ${latest ? `<p style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(latest.reportingWeek)}</p>
-      ${kv('Target', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
-      : '<p class="muted" style="font-size:13px">No weekly reports yet</p>'}
-    ${kv('Open issues', String(openIssues))}`);
-  const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? '<p class="muted" style="font-size:13px">No billings yet</p>' : `
+      : `<p class="none-note">${icon('warning', 'sm')}No time extension or suspension orders.</p>`}`);
+  const costCard = section('Contract cost', 'payments', `<div class="money">
+    <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
+    <div><span>${icon('receipt_long', 'sm')}Current cost</span><b>${esc(L.formatPhp(cost))}</b></div></div>`);
+  const issues = `<span class="badge ${openIssues ? 'lv-watch' : 'lv-ok quiet'}">${openIssues} open ${openIssues === 1 ? 'issue' : 'issues'}</span>`;
+  const report = section('Latest weekly report', 'assignment', latest ? `
+    <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
+    ${kv('Target', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
+  const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
+    <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
       <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
       <tbody>${payments.map(p => `<tr>
@@ -413,14 +435,18 @@ function drawProject({ project, records, error }) {
   main.innerHTML = `
     ${backLink}
     <header class="card project-head">
-      <div class="ph-top"><h1>${esc(project.name)}</h1>
-        ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}${statusBadge(project)}</div>
-      <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p>
+      <div class="ph-top">
+        <div class="ph-title"><h1>${esc(project.name)}</h1>
+          <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p></div>
+        <div class="ph-badges">${statusBadge(project)}
+          ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
+      </div>
       <div class="ph-bars">${workDone(project, true)}${billedLine(it, true)}</div>
     </header>
-    <div class="summary">
-      <div class="col">${attention}${profile}</div>
-      <div class="col">${dates}${costCard}${report}</div>
+    <div class="bento">
+      <div class="col c1">${attention}${profile}</div>
+      <div class="col c2">${dates}</div>
+      <div class="col c3">${costCard}${report}</div>
       ${paymentCard}
     </div>`;
   showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));

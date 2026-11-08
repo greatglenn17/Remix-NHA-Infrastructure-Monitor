@@ -114,4 +114,12 @@ await record(rid(7), 'project_payments', C, [engineer], {
   name: '1st partial billing', date: '2026-08-15', periodCovered: 'Feb - Jul 2026', grossAmount: 30000000,
   percentage: 35.63, balanceAmount: 54200000, balancePercentage: 64.37, retentionPct: 10,
 });
-console.log('Seeded demo-nha: 3 accounts, 4 projects, 7 records.');
+// E: overdue by 5 days with no work done, no billings, no reports (the empty and alarm states).
+const E = '55555555-5555-4555-8555-555555555555';
+await put(`projects/${E}`, {
+  ...base, projectUuid: E, name: 'Sample Site Development', location: 'Sapang Palay, San Jose del Monte, Bulacan', contractor: 'JKL Realty and Construction',
+  projectType: 'Housing', landArea: '', numberOfUnits: '', scopeOfWork: 'Site development', contractCostOriginal: 15000000, contractDurationDays: 120,
+  dateStarted: '2026-07-01', completionDateOriginal: new Date(now - 5 * 86400000).toLocaleDateString('en-CA'), completionDateRevised: '-',
+  status: 'On-going', targetAccomplishment: 0, actualAccomplishment: 0, assignedUids: [engineer],
+});
+console.log('Seeded demo-nha: 3 accounts, 5 projects, 7 records.');
