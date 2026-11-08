@@ -642,7 +642,7 @@ fun TopAppBarHeader(
                                 )
                             )
                             Text(
-                                text = "National Housing Authority (NHA) • Region III",
+                                text = "Made for NHA Bulacan District Office • Region III",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
