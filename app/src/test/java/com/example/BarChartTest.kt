@@ -84,6 +84,24 @@ class BarChartTest {
     }
 
     @Test
+    fun partialSuspension_pausesOnlyTheItemsItNames_andItsContinuancesFollow() {
+        val p = project(listOf(sanIldefonso))
+        val partial = approved(
+            "Partial Work Suspension Order No. 1",
+            "Duration: 10 Days | Effectivity: 2026-01-21 | End: 2026-01-31 | Reason: ROW" + BarChart.itemsRemark(listOf("Land Acquisition"))
+        )
+        val feb9 = LocalDate.of(2026, 2, 9) // calendar day 40
+        val items = BarChart.itemTargetsOn(p, listOf(partial), feb9)!!
+        assertEquals(50.0, items["Land Acquisition"]!!, 1e-9) // paused 10 days: day 30 of 60
+        assertEquals(83.33, items["Permits/Licenses"]!!, 1e-9) // goes on: day 40 is its 25th of 30
+        val continuance = approved("1st Partial Continuance of Work Suspension Order No. 1", "Duration: 5 Days | Effectivity: 2026-01-31 | End: 2026-02-05")
+        assertEquals(41.67, BarChart.itemTargetsOn(p, listOf(partial, continuance), feb9)!!["Land Acquisition"]!!, 1e-9)
+        // The overall target loses only the paused item's share.
+        val expected = BarChart.targetOn(p, emptyList(), feb9)!! - 26235612.20 * (10.0 / 60) / sanIldefonso.total * 100
+        assertEquals(expected, BarChart.targetOn(p, listOf(partial), feb9)!!, 1e-9)
+    }
+
+    @Test
     fun openSuspension_endsOnItsResumptionOrder() {
         val p = project(listOf(sanIldefonso))
         val open = approved("Work Suspension Order No. 1", "Duration: 0 Days | Effectivity: 2026-01-21")

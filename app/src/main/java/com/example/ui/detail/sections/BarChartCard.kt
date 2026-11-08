@@ -1,5 +1,7 @@
 package com.example.ui.detail.sections
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -12,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,9 +26,15 @@ import com.example.ui.components.DateField
 import com.example.ui.components.LongForm
 import com.example.ui.theme.TabularNumbers
 import com.example.util.BarChart
+import com.example.util.BarChartExcel
+import com.example.util.ContractCost
 import com.example.util.ProjectSchedule
 import com.example.utils.CurrencyFormatter
 import java.time.LocalDate
+import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The approved bar chart: the chart in force, today's planned %, and its S-curve by month; [onEdit] null hides editing. */
 @Composable
@@ -50,10 +59,11 @@ internal fun BarChartCard(project: Project, documents: List<PendingDocument>, to
             )
             return@SectionCard
         }
-        val (version, day) = plan
+        val version = plan.version
+        val day = plan.day
         val (month, cell) = BarChart.cellOf(day.coerceIn(1, version.lastDay.coerceAtLeast(1)))
         Field("In force", "${version.label} · from ${ProjectSchedule.displayDate(version.effective)}")
-        Field("Planned as of today", "%.2f%%".format(version.plannedPct(day)) + if (day in 1..version.lastDay) " · Month $month, cell $cell" else "")
+        Field("Planned as of today", "%.2f%%".format(plan.plannedPct) + if (day in 1..version.lastDay) " · Month $month, cell $cell" else "")
         Field("Chart length", "${version.lastDay} calendar days")
         versions.filter { it != version }.forEach { Field("Also on file", "${it.label} · from ${ProjectSchedule.displayDate(it.effective)}") }
         MonthTable(version)
@@ -109,30 +119,31 @@ private class ItemDraft(val name: String, val amount: Double, bars: List<BarChar
     fun valid() = bars.all { it.bar() != null }
 }
 
-private class VersionDraft(label: String, effective: String, val items: List<ItemDraft>) {
+private class VersionDraft(label: String, effective: String, items: List<ItemDraft>) {
     var label by mutableStateOf(label)
     var effective by mutableStateOf(effective)
+    var items by mutableStateOf(items)
     fun version() = BarChart.Version(label.trim(), effective, items.map { it.item() })
 }
 
-/** Items from the Scope of Works, with the bars [like] already has for the same item. */
-private fun scopeDrafts(project: Project, like: BarChart.Version?) = scopeItems(project.scopeOfWork).map { (name, amount, _) ->
-    ItemDraft(name, amount, like?.items?.firstOrNull { it.name == name }?.bars.orEmpty())
-}
+/** Items from the Scope of Works, with no bars yet. */
+private fun scopeDrafts(project: Project) = scopeItems(project.scopeOfWork).map { (name, amount, _) -> ItemDraft(name, amount, emptyList()) }
+
+private fun itemDrafts(items: List<BarChart.Item>) = items.map { ItemDraft(it.name, it.amount, it.bars) }
+
+private const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 /**
  * Enter the approved bar chart: per Scope of Works item, the bar(s) from month and cell to month and cell,
  * as drawn on the chart. A revised chart is added with the date it takes effect; the earlier ones stay.
  */
 @Composable
-internal fun BarChartDialog(project: Project, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val drafts = remember {
         mutableStateListOf<VersionDraft>().apply {
-            BarChart.parse(project.barChartJson).forEach { v ->
-                add(VersionDraft(v.label, v.effective, v.items.map { ItemDraft(it.name, it.amount, it.bars) }))
-            }
-            if (isEmpty()) add(VersionDraft("Original", project.dateStarted, scopeDrafts(project, null)))
+            BarChart.parse(project.barChartJson).forEach { v -> add(VersionDraft(v.label, v.effective, itemDrafts(v.items))) }
+            if (isEmpty()) add(VersionDraft("Original", project.dateStarted, scopeDrafts(project)))
             // The first chart always runs from the start date, even after the date is corrected.
             first().effective = project.dateStarted
         }
@@ -141,10 +152,18 @@ internal fun BarChartDialog(project: Project, onDismiss: () -> Unit, onSave: (St
     val initial = remember { BarChart.toJson(drafts.map { it.version() }) }
     val json = BarChart.toJson(drafts.map { it.version() })
     val start = runCatching { LocalDate.parse(project.dateStarted.trim()) }.getOrNull()
+    val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
+    val current = ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)
+    // The original chart must total the original contract amount; a revised one the original or the current (after Variation Orders).
+    // shortcut: any approved VO counts, not only those before the chart's date; match VOs by date if a project needs it.
+    fun totalMatches(i: Int, total: Double) = abs(total - original) < 0.015 || i > 0 && abs(total - current) < 0.015
     val errors = drafts.flatMapIndexed { i, d ->
         val date = runCatching { LocalDate.parse(d.effective) }.getOrNull()
+        val total = d.items.sumOf { it.amount }
         listOfNotNull(
             "${d.label}: enter a name".takeIf { d.label.isBlank() },
+            ("${d.label}: the chart totals ${CurrencyFormatter.formatPhp(total)} but the contract amount is " +
+                CurrencyFormatter.formatPhp(if (i > 0) current else original)).takeIf { d.items.isNotEmpty() && !totalMatches(i, total) },
             "${d.label}: pick the date it takes effect".takeIf { i > 0 && date == null },
             "${d.label}: takes effect before the start date".takeIf { i > 0 && date != null && start != null && date.isBefore(start) },
             "${d.label}: takes effect on or before the previous chart".takeIf {
@@ -152,6 +171,55 @@ internal fun BarChartDialog(project: Project, onDismiss: () -> Unit, onSave: (St
             },
             d.items.filter { !it.valid() }.takeIf { it.isNotEmpty() }
                 ?.let { bad -> "${d.label}: check the bars of ${bad.joinToString { it.name }} (month 1+, cell 5, 10 … 30)" }
+        )
+    }
+    // Reading an Excel file: its sheets laid out as a bar chart, to pick from when more than one.
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sheets by remember { mutableStateOf<List<BarChartExcel.Sheet>>(emptyList()) }
+    var importNotes by remember { mutableStateOf<List<String>>(emptyList()) }
+    fun useSheet(sheet: BarChartExcel.Sheet) {
+        drafts.getOrNull(selected)?.items = itemDrafts(sheet.items)
+        importNotes = listOf("Read ${sheet.items.size} items from the sheet \"${sheet.name}\".") + sheet.items.mapNotNull { item ->
+            val days = item.bars.sumOf { it.days }
+            sheet.durations[item.name]?.takeIf { it != days }?.let { "${item.name}: the bar covers $days days but its Duration says $it." }
+        }
+        sheets = emptyList()
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val read = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.use { BarChartExcel.read(it) }.orEmpty() }
+            }
+            val found = read.getOrNull().orEmpty()
+            when {
+                read.isFailure -> importNotes = listOf("That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).")
+                found.isEmpty() -> importNotes = listOf("No sheet in that file has the ITEM NO. / DESCRIPTION / Amount header with a Month 1 row.")
+                found.size == 1 -> useSheet(found.single())
+                else -> sheets = found
+            }
+        }
+    }
+    if (sheets.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { sheets = emptyList() },
+            confirmButton = { TextButton(onClick = { sheets = emptyList() }) { Text("Cancel") } },
+            title = { Text("Which sheet?") },
+            text = {
+                Column {
+                    sheets.forEach { sheet ->
+                        val total = sheet.items.sumOf { it.amount }
+                        TextButton(onClick = { useSheet(sheet) }, modifier = Modifier.fillMaxWidth().testTag("import_sheet_${sheet.name}")) {
+                            Text(
+                                "${sheet.name} · ${sheet.items.size} items · ${CurrencyFormatter.formatPhp(total)}" +
+                                    if (totalMatches(selected, total)) " · matches the contract" else "",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
         )
     }
     if (start == null) {
@@ -168,24 +236,33 @@ internal fun BarChartDialog(project: Project, onDismiss: () -> Unit, onSave: (St
         onSave = { onSave(if (drafts.isEmpty()) "" else json) },
         topContent = {
             ScrollableTabRow(selectedTabIndex = selected.coerceIn(0, (drafts.size - 1).coerceAtLeast(0)), edgePadding = 16.dp) {
-                drafts.forEachIndexed { i, d -> Tab(selected = i == selected, onClick = { selected = i }, text = { Text(d.label.ifBlank { "Chart ${i + 1}" }) }) }
+                drafts.forEachIndexed { i, d -> Tab(selected = i == selected, onClick = { selected = i; importNotes = emptyList() }, text = { Text(d.label.ifBlank { "Chart ${i + 1}" }) }) }
                 Tab(selected = false, modifier = Modifier.testTag("add_revised_chart"), onClick = {
                     drafts.add(
-                        if (drafts.isEmpty()) VersionDraft("Original", project.dateStarted, scopeDrafts(project, null))
-                        else VersionDraft("Revised No. ${drafts.size}", "", scopeDrafts(project, drafts.last().version()))
+                        if (drafts.isEmpty()) VersionDraft("Original", project.dateStarted, scopeDrafts(project))
+                        else VersionDraft("Revised No. ${drafts.size}", "", itemDrafts(drafts.last().version().items))
                     )
                     selected = drafts.lastIndex
+                    importNotes = emptyList()
                 }, text = { Text("+ Revised chart") })
             }
         }
     ) {
         Text(
-            "Enter each item's bar as drawn: From month and cell, To month and cell. A month is 30 days; its cells are 5, 10, 15, 20, 25 and 30. " +
-                "Amounts come from the Scope of Works. The target % then follows this chart every day.",
+            "Import the contractor's Excel file, or enter each item's bar as drawn: From month and cell, To month and cell. " +
+                "A month is 30 days; its cells are 5, 10, 15, 20, 25 and 30, counted from the start date. " +
+                "The chart must total the contract amount. The target % then follows this chart every day.",
             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
         )
         errors.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = scheme.error) }
         val draft = drafts.getOrNull(selected) ?: return@LongForm
+        OutlinedButton(
+            onClick = { picker.launch(arrayOf(XLSX)) },
+            modifier = Modifier.fillMaxWidth().testTag("import_bar_chart")
+        ) { Text("Import from Excel (.xlsx)") }
+        importNotes.forEach { note ->
+            Text(note, style = MaterialTheme.typography.bodySmall, color = if (note.startsWith("Read ")) scheme.onSurfaceVariant else scheme.error)
+        }
         OutlinedTextField(draft.label, { draft.label = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         if (selected == 0) {
             Field("Takes effect", "Start date · ${ProjectSchedule.displayDate(project.dateStarted)}")
@@ -196,7 +273,7 @@ internal fun BarChartDialog(project: Project, onDismiss: () -> Unit, onSave: (St
                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
             )
         }
-        if (draft.items.isEmpty()) Text("Add the Scope of Works items to the project first.", style = MaterialTheme.typography.bodySmall, color = scheme.error)
+        if (draft.items.isEmpty()) Text("Import the Excel file, or add the Scope of Works items to the project first.", style = MaterialTheme.typography.bodySmall, color = scheme.error)
         draft.items.forEach { item -> ItemBars(item, draft.items.sumOf { it.amount }) }
         MonthTable(draft.version())
         TextButton(

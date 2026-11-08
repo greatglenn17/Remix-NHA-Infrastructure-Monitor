@@ -128,7 +128,8 @@ fun SummarySection(
                 showRequestDialog = false
             },
             onDelete = { onDeleteRequest(it); showRequestDialog = false },
-            documents = documents
+            documents = documents,
+            workItems = remember(project.barChartJson) { com.example.util.BarChart.itemNames(project) }
         )
     }
     if (showLetterDialog) {
@@ -142,7 +143,7 @@ fun SummarySection(
     }
     OrderDialogs(openOrder, documents, currentUserRole, onUpdateOrderStatus, onDeleteOrder, onAddContinuance) { openOrder = null }
     if (showBarChart && onSaveBarChart != null) {
-        BarChartDialog(project, onDismiss = { showBarChart = false }, onSave = { onSaveBarChart(it); showBarChart = false })
+        BarChartDialog(project, documents, onDismiss = { showBarChart = false }, onSave = { onSaveBarChart(it); showBarChart = false })
     }
 }
 

@@ -172,8 +172,21 @@ private fun WeeklyReportForm(
     }
 
             
+    // With an approved bar chart the rows are the chart's own items, weighted by amount, and their targets its plan;
+    // a report saved earlier with rows the chart does not have keeps its Scope of Works rows and typed targets.
+    // shortcut: the chart in force on the week's last day when the form opens sets the rows; a week that crosses a revision keeps them.
+    val chartVersion = remember {
+        val asOf = daysOfWeekWithDates.lastOrNull()?.third?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+        val saved = seed?.let { s ->
+            runCatching { JSONArray(s.accomplishmentItemsJson).let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("itemDescription") } } }.getOrNull()
+        }
+        project?.let { p -> asOf?.let { BarChart.planOn(p, documents, it)?.version } }
+            ?.takeIf { v -> v.total > 0 && (saved == null || v.items.map { it.name }.containsAll(saved)) }
+    }
     val scopeItems = remember { mutableStateListOf<com.example.data.model.ScopeItem>().apply {
-        if (project != null && project.scopeOfWork.isNotBlank()) {
+        if (chartVersion != null) {
+            chartVersion.items.forEach { add(com.example.data.model.ScopeItem(it.name, it.amount, it.amount / chartVersion.total * 100)) }
+        } else if (project != null && project.scopeOfWork.isNotBlank()) {
             try {
                 val arr = JSONArray(project.scopeOfWork)
                 for (i in 0 until arr.length()) {
@@ -206,7 +219,7 @@ private fun WeeklyReportForm(
     // With an approved bar chart the targets are its plan as of the week's last day, not typed.
     val chartAsOf = daysOfWeekWithDates.lastOrNull()?.third
     val chartTargets = remember(chartAsOf, project?.barChartJson, documents) {
-        project?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
+        project?.takeIf { chartVersion != null }?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
     }
     fun targetText(name: String) = chartTargets?.let { (it[name] ?: 0.0).toString() } ?: accomplishmentMap[name]?.first ?: "0.0"
     val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }

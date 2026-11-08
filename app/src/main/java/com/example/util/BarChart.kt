@@ -92,19 +92,20 @@ object BarChart {
         versions.lastOrNull { isoDate(it.effective)?.let { e -> !e.isAfter(date) } ?: true } ?: versions.firstOrNull()
 
     /**
-     * Contract day of [date] (the start date is day 1), less the days of approved Full suspensions
-     * that took effect on or after [effective]: a revised chart already draws earlier ones as idle months.
+     * Contract day of [date] for [item] (the start date is day 1), less the days of approved suspensions that
+     * pause it and took effect on or after [effective]: a revised chart already draws earlier ones as idle months.
+     * A Full suspension pauses every item; a Partial one only the items it names. A null [item] counts Full ones only.
      */
-    fun contractDay(start: LocalDate, effective: LocalDate, documents: List<PendingDocument>, date: LocalDate): Int =
-        (ChronoUnit.DAYS.between(start, date) + 1 - suspendedDays(documents, effective, date)).toInt()
+    fun contractDay(start: LocalDate, effective: LocalDate, documents: List<PendingDocument>, date: LocalDate, item: String? = null): Int =
+        (ChronoUnit.DAYS.between(start, date) + 1 - suspendedDays(documents, effective, date, item)).toInt()
 
-    /** Days from [from] through [until] covered by approved Full suspensions and their continuances. */
-    fun suspendedDays(documents: List<PendingDocument>, from: LocalDate, until: LocalDate): Long {
+    /** Days from [from] through [until] that approved suspensions (and their continuances) pause [item]; null: Full ones only. */
+    fun suspendedDays(documents: List<PendingDocument>, from: LocalDate, until: LocalDate, item: String? = null): Long {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
         val resumptions = approved.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }
         return approved
             .filter { it.documentName.contains("Work Suspension", ignoreCase = true) }
-            .filterNot { ProjectSchedule.orderLabel(it.documentName).contains("Partial", ignoreCase = true) }
+            .filter { doc -> pausedItems(doc, documents)?.let { item != null && item in it } ?: true }
             .sumOf { doc ->
                 val begin = field(doc.remarks, "Effectivity") ?: return@sumOf 0L
                 if (begin.isBefore(from)) return@sumOf 0L
@@ -116,23 +117,57 @@ object BarChart {
             }
     }
 
-    /** The chart in force on [date] and the contract day it is read at; null without a chart or start date. */
-    fun planOn(project: Project, documents: List<PendingDocument>, date: LocalDate): Pair<Version, Int>? {
+    /**
+     * The work items a Partial suspension pauses ("Items: A; B" in its remarks; a continuance without its own list
+     * takes its suspension's), or null for a Full one, which pauses everything.
+     */
+    fun pausedItems(doc: PendingDocument, documents: List<PendingDocument>): Set<String>? {
+        if (!ProjectSchedule.orderLabel(doc.documentName).contains("Partial", ignoreCase = true)) return null
+        val own = itemsOf(doc.remarks)
+        if (own != null || !doc.documentName.contains("Continuance", ignoreCase = true)) return own.orEmpty()
+        return documents.firstOrNull {
+            !it.documentName.contains("Continuance", ignoreCase = true) && ProjectSchedule.isSuspension(it) &&
+                orderNo(it.documentName) == orderNo(doc.documentName)
+        }?.let { itemsOf(it.remarks) }.orEmpty()
+    }
+
+    /** The work items of the latest chart, for picking what a Partial suspension pauses; empty without a chart. */
+    fun itemNames(project: Project): List<String> = parse(project.barChartJson).lastOrNull()?.items?.map { it.name }.orEmpty()
+
+    /** " | Items: A; B" for a Partial suspension's remarks; empty when none are picked. */
+    fun itemsRemark(items: Collection<String>): String = if (items.isEmpty()) "" else " | Items: " + items.joinToString("; ")
+
+    private fun itemsOf(remarks: String): Set<String>? =
+        Regex("Items: ([^|]*)").find(remarks)?.groupValues?.get(1)?.split(";")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
+
+    /** The chart in force on a date, its contract day (Full suspensions out) and each item's own contract day. */
+    data class Plan(val version: Version, val day: Int, val itemDays: List<Int>) {
+        val plannedPct: Double
+            get() = if (version.total <= 0) 0.0
+            else version.items.zip(itemDays).sumOf { (item, d) -> item.amount * item.plannedShare(d) } / version.total * 100
+        /** Each item's planned accomplishment (% of the item, 2 decimals). */
+        val itemTargets: Map<String, Double>
+            get() = version.items.zip(itemDays).associate { (item, d) -> item.name to Math.round(item.plannedShare(d) * 10000) / 100.0 }
+    }
+
+    /** The plan on [date]; null without a chart or start date. */
+    fun planOn(project: Project, documents: List<PendingDocument>, date: LocalDate): Plan? {
         val version = versionOn(parse(project.barChartJson), date) ?: return null
         val start = isoDate(project.dateStarted) ?: return null
         val effective = isoDate(version.effective)?.takeIf { it.isAfter(start) } ?: start
-        return version to contractDay(start, effective, documents, date)
+        return Plan(
+            version, contractDay(start, effective, documents, date),
+            version.items.map { contractDay(start, effective, documents, date, it.name) }
+        )
     }
 
     /** Planned accomplishment (%) on [date], or null when the project has no chart. */
     fun targetOn(project: Project, documents: List<PendingDocument>, date: LocalDate): Double? =
-        planOn(project, documents, date)?.let { (v, day) -> v.plannedPct(day) }
+        planOn(project, documents, date)?.plannedPct
 
     /** Each item's planned accomplishment (% of the item, 2 decimals) on [date], or null without a chart. */
     fun itemTargetsOn(project: Project, documents: List<PendingDocument>, date: LocalDate): Map<String, Double>? =
-        planOn(project, documents, date)?.let { (v, day) ->
-            v.items.associate { it.name to Math.round(it.plannedShare(day) * 10000) / 100.0 }
-        }
+        planOn(project, documents, date)?.itemTargets
 
     /** [project] with today's target from its chart; unchanged without a chart, or once completed. */
     fun withPlannedTarget(project: Project, documents: List<PendingDocument>, date: LocalDate): Project {

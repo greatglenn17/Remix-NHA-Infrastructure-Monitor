@@ -355,6 +355,7 @@ class MainActivity : ComponentActivity() {
                             AddCustomDocumentDialog(
                                 initialType = addDocumentInitialType,
                                 onDismiss = { showAddDocumentDialog = false },
+                                workItems = viewModel.selectedProject.value?.let(com.example.util.BarChart::itemNames).orEmpty(),
                                 onSubmit = { docName, remarks ->
                                     viewModel.addPendingDocument(pId, docName, remarks)
                                     showAddDocumentDialog = false

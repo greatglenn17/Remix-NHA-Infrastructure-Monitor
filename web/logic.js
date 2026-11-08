@@ -95,7 +95,8 @@ const DAY = 86400000;
 /**
  * BarChart.targetOn: the approved bar chart's planned accomplishment (%) on `today` (yyyy-MM-dd), or null without
  * a chart. Each item's amount is spread evenly over its bars' contract days (the start date is day 1); a revised
- * chart applies from its effective date; approved Full suspensions taking effect on or after it stop the clock.
+ * chart applies from its effective date; approved suspensions taking effect on or after it stop the clock, a Partial
+ * one only for the items it names.
  */
 export function plannedTarget(project, docs, today) {
   let versions;
@@ -105,13 +106,14 @@ export function plannedTarget(project, docs, today) {
   if (start == null || now == null) return null;
   versions = [...versions].sort((a, b) => String(a.effective).localeCompare(String(b.effective)));
   const v = [...versions].reverse().find(x => { const e = isoDay(x.effective); return e == null || e <= now; }) || versions[0];
-  const day = (now - start) / DAY + 1 - suspendedDays(docs, Math.max(isoDay(v.effective) ?? start, start), now);
+  const from = Math.max(isoDay(v.effective) ?? start, start);
+  const dayOf = item => (now - start) / DAY + 1 - suspendedDays(docs, from, now, item);
   const items = v.items || [];
   const total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0);
   if (total <= 0) return 0;
   const len = ([a, b]) => Math.max(0, b - a + 1);
   const planned = items.reduce((t, i) => {
-    const bars = i.bars || [];
+    const bars = i.bars || [], day = dayOf(i.name);
     const days = bars.reduce((n, bar) => n + len(bar), 0);
     const done = bars.reduce((n, [a, b]) => n + Math.min(Math.max(Math.min(day, b) - a + 1, 0), len([a, b])), 0);
     return t + (days ? (Number(i.amount) || 0) * done / days : 0);
@@ -129,19 +131,32 @@ export function withPlannedTarget(project, docs, today) {
 // "2nd Partial Continuance of …", "Partial Work Suspension Order No. 1"; an old "(Full) of …" continuance says so itself.
 const isPartialOrder = name => { const m = /\((full|partial)\)\s+of/i.exec(name); return m ? /partial/i.test(m[1]) : /partial/i.test(name); };
 
-/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved Full suspensions. */
-function suspendedDays(docs, from, until) {
+const orderNo = name => (/No\. ?(\S+?)(?:\s|$|\))/.exec(name || '') || [])[1];
+const itemsOf = remarks => { const m = /Items: ([^|]*)/.exec(remarks || ''); return m ? m[1].split(';').map(x => x.trim()).filter(Boolean) : null; };
+
+/** BarChart.pausedItems: the items a Partial suspension names (a continuance without a list takes its suspension's), or null for a Full one. */
+function pausedItems(d, docs) {
+  const name = d.documentName || '';
+  if (!isPartialOrder(name)) return null;
+  const own = itemsOf(d.remarks);
+  if (own || !/continuance/i.test(name)) return own || [];
+  const s = (docs || []).find(x => !/continuance/i.test(x.documentName || '') && /work suspension/i.test(x.documentName || '') && orderNo(x.documentName) === orderNo(name));
+  return (s && itemsOf(s.remarks)) || [];
+}
+
+/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved suspensions that pause `item`. */
+function suspendedDays(docs, from, until, item) {
   const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
   const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''));
   const field = (remarks, key) => isoDay((new RegExp(`${key}: (\\d{4}-\\d{2}-\\d{2})`).exec(remarks || '') || [])[1]);
-  const no = name => (/No\. ?(\S+?)(?:\s|$|\))/.exec(name || '') || [])[1];
   return approved
-    .filter(d => /work suspension/i.test(d.documentName || '') && !isPartialOrder(d.documentName || ''))
+    .filter(d => /work suspension/i.test(d.documentName || ''))
+    .filter(d => { const p = pausedItems(d, docs); return p == null || p.includes(item); })
     .reduce((t, d) => {
       const begin = field(d.remarks, 'Effectivity');
       if (begin == null || begin < from) return t;
       // Work resumes on the End date; without one, on its resumption order, else it is still suspended.
-      const r = resumptions.find(x => no(x.documentName) === no(d.documentName));
+      const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
       const end = field(d.remarks, 'End') ?? (r ? field(r.remarks, 'Effectivity') : null) ?? until + DAY;
       return t + Math.max(0, (Math.min(end, until + DAY) - begin) / DAY);
     }, 0);

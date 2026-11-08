@@ -47,4 +47,25 @@ class WeeklyBarChartTargetTest {
         rule.onNodeWithTag("weekly_target_Drainage").assert(hasText(expected.toString()))
         rule.onNodeWithText("Target % is from the approved bar chart", substring = true).assertExists()
     }
+
+    // The rows are the chart's items, even when the Scope of Works names them differently.
+    @Test fun rows_areTheChartItems() {
+        val imported = project.copy(barChartJson = BarChart.toJson(listOf(
+            BarChart.Version("Original", "2026-01-05", listOf(
+                BarChart.Item("Earthworks", 250.0, listOf(BarChart.Bar(1, 300))),
+                BarChart.Item("Housing", 750.0, listOf(BarChart.Bar(1, 600)))
+            ))
+        )))
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                AddWeeklyReportDialog(project = imported, projectId = 1, onDismiss = {}, onSubmit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    today = LocalDate.of(2026, 10, 27))
+            }
+        }
+        val expected = BarChart.itemTargetsOn(imported, emptyList(), LocalDate.of(2026, 10, 30))!!
+        rule.onNodeWithTag("weekly_target_Earthworks").assert(hasText(expected.getValue("Earthworks").toString()))
+        rule.onNodeWithTag("weekly_target_Housing").assert(hasText(expected.getValue("Housing").toString()))
+        rule.onNodeWithTag("weekly_target_Drainage").assertDoesNotExist()
+        rule.onNodeWithText("Wt: 25.00%").assertExists()
+    }
 }

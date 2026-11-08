@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -158,6 +160,7 @@ fun AddWorkResumptionDialog(
 fun AddCustomDocumentDialog(
     initialType: String = "Custom Document",
     onDismiss: () -> Unit,
+    workItems: List<String> = emptyList(),
     onSubmit: (docName: String, remarks: String) -> Unit
 ) {
     val docTypes = listOf("Custom Document", "Time Extension", "Variation Order", "Work Suspension Order", "Work Resumption Order")
@@ -217,7 +220,7 @@ fun AddCustomDocumentDialog(
                     OutlinedTextField(value = docName, onValueChange = { docName = it }, label = { Text("Document Name") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                 } else {
-                    OrderFieldInputs(selectedType, order)
+                    OrderFieldInputs(selectedType, order, workItems = workItems)
                 }
             }
         },
@@ -256,6 +259,8 @@ class OrderFields {
     var wsDays by mutableStateOf("")
     var wsEffectivity by mutableStateOf("")
     var wsReason by mutableStateOf("")
+    // The bar chart items a Partial suspension pauses.
+    val wsItems = androidx.compose.runtime.mutableStateListOf<String>()
 
     // Continuance of the latest work suspension (see [continued])
     var coType by mutableStateOf("Full")
@@ -270,7 +275,7 @@ class OrderFields {
 
     fun snapshot() = listOf(
         teNo, teDays, teReason, voNo, voType, voAmount, voReason, voDateApproved, wsNo, wsType, wsDays, wsEffectivity, wsReason,
-        coType, coDays, coEffectivity, wrNo, wrType, wrEffectivity, wrRemarks
+        wsItems.toList(), coType, coDays, coEffectivity, wrNo, wrType, wrEffectivity, wrRemarks
     )
 
     // Optional while the order is still pending; when filled it must be a real date.
@@ -298,7 +303,8 @@ class OrderFields {
         "Time Extension" -> "Reason: $teReason"
         "Variation Order" -> "Reason: $voReason" + if (voDateApproved.isNotBlank()) " | Date Approved: ${voDateApproved.trim()}" else ""
         "Work Suspension Order" ->
-            com.example.util.ProjectSchedule.suspensionRemarks(wsDays.trim().toInt(), wsEffectivity) + if (wsReason.isNotBlank()) " | Reason: ${wsReason.trim()}" else ""
+            com.example.util.ProjectSchedule.suspensionRemarks(wsDays.trim().toInt(), wsEffectivity) + (if (wsReason.isNotBlank()) " | Reason: ${wsReason.trim()}" else "") +
+                (if (wsType == "Partial") com.example.util.BarChart.itemsRemark(wsItems) else "")
         CONTINUANCE -> com.example.util.ProjectSchedule.suspensionRemarks(coDays.trim().toInt(), coEffectivity)
         "Work Resumption Order" -> "Effectivity: $wrEffectivity | Remarks: $wrRemarks"
         else -> ""
@@ -317,7 +323,11 @@ class OrderFields {
 /** The inputs for one kind of order; [documents] are the project's, for a continuance. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OrderFieldInputs(type: String, f: OrderFields, documents: List<com.example.data.model.PendingDocument> = emptyList()) {
+fun OrderFieldInputs(
+    type: String, f: OrderFields, documents: List<com.example.data.model.PendingDocument> = emptyList(),
+    // The bar chart's work items; a Partial suspension picks the ones it pauses.
+    workItems: List<String> = emptyList()
+) {
     when (type) {
         "Time Extension" -> {
             OutlinedTextField(value = f.teNo, onValueChange = { f.teNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -379,6 +389,15 @@ fun OrderFieldInputs(type: String, f: OrderFields, documents: List<com.example.d
             OutlinedTextField(value = f.wsDays, onValueChange = { f.wsDays = it }, label = { Text("No. of Days") }, isError = daysError(f.wsDays) != null, supportingText = daysError(f.wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
             DateField(label = "Effectivity Date", value = f.wsEffectivity, onValueChange = { f.wsEffectivity = it }, clearable = true)
             OutlinedTextField(value = f.wsReason, onValueChange = { f.wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
+            if (f.wsType == "Partial" && workItems.isNotEmpty()) {
+                Text("Work items suspended (their target pauses; the rest go on)", style = MaterialTheme.typography.labelMedium)
+                workItems.forEach { item ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().testTag("suspended_item_$item")) {
+                        Checkbox(checked = item in f.wsItems, onCheckedChange = { if (it) f.wsItems.add(item) else f.wsItems.remove(item) })
+                        Text(item, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
         }
         OrderFields.CONTINUANCE -> {
             val suspension = OrderFields.continued(documents)
