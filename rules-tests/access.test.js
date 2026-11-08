@@ -177,7 +177,9 @@ describe('deletion', () => {
 });
 
 describe('user roles', () => {
-  const asOwner = () => testEnv.authenticatedContext('owner', { role: 'SUPER_ADMIN', email: 'great.glenn17@gmail.com' });
+  const asOwner = () => testEnv.authenticatedContext('owner', { role: 'SUPER_ADMIN', email: 'great.glenn17@gmail.com', email_verified: true });
+  // Someone who registered the Super Admin's address without proving they own it.
+  const asUnverifiedOwner = () => testEnv.authenticatedContext('fake', { email: 'great.glenn17@gmail.com', email_verified: false });
   const asNew = () => testEnv.authenticatedContext('new', { email: 'new@x.com' });
   beforeEach(() => testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
@@ -190,6 +192,9 @@ describe('user roles', () => {
   it('cannot sign up as engineer admin', () => assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'ENGINEER_ADMIN' })));
   it('cannot sign up as super admin', () => assertFails(setDoc(doc(asNew().firestore(), 'users/new'), { role: 'SUPER_ADMIN' })));
   it('super admin email creates its profile', () => assertSucceeds(setDoc(doc(asOwner().firestore(), 'users/owner'), { role: 'SUPER_ADMIN' })));
+  it('unverified super admin email cannot', () => assertFails(setDoc(doc(asUnverifiedOwner().firestore(), 'users/fake'), { role: 'SUPER_ADMIN' })));
+  it('nobody writes audit_logs', () => assertFails(setDoc(doc(asOwner().firestore(), 'audit_logs/x'), { action: 'fake' })));
+  it('super admin reads audit_logs', () => assertSucceeds(getDocs(collection(asAdmin().firestore(), 'audit_logs'))));
   it('edits own profile without the role', () => assertSucceeds(setDoc(doc(asEng().firestore(), 'users/eng'), { office: 'O' }, { merge: true })));
   it('cannot change own role', () => assertFails(updateDoc(doc(asEng().firestore(), 'users/eng'), { role: 'ENGINEER_ADMIN' })));
   it('cannot change another user', () => assertFails(updateDoc(doc(asOther().firestore(), 'users/eng'), { role: 'VIEWER' })));
