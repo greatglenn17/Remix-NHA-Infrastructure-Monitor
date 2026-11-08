@@ -15,6 +15,7 @@ import com.example.util.Portfolio
 import com.example.util.PortfolioFilter
 import com.example.util.PortfolioItem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,10 +47,16 @@ class PortfolioTest {
             item("B", BEHIND to CRITICAL, DUE_SOON to WARNING, pendingDocs = 3),
             item("C", OVERDUE to CRITICAL)
         ))
+        assertEquals(1, s.overdue)
         assertEquals(2, s.behind)
         assertEquals(5, s.waitingApproval)
         assertEquals(1, s.dueSoon)
         assertEquals(0, s.billingAhead)
+    }
+
+    @Test fun matches_overdue_usesTheOverdueFlag() {
+        assertTrue(Portfolio.matches(item("C", OVERDUE to CRITICAL), PortfolioFilter.OVERDUE))
+        assertFalse(Portfolio.matches(item("A", DUE_SOON to WARNING), PortfolioFilter.OVERDUE))
     }
 
     @Test fun matches_nullFilter_matchesAll() {

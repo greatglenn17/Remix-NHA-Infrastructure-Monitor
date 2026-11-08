@@ -53,9 +53,12 @@ h1, h2, h3, p { margin: 0; }
 /* Top app bar (TopAppBarHeader) */
 .appbar { position: sticky; top: 0; z-index: 2; background: var(--bar-bg); color: var(--bar-text); border-bottom: 1px solid var(--border); }
 .appbar-in { max-width: 1320px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.brand { text-decoration: none; color: var(--bar-text); display: grid; margin-right: auto; }
+/* The app's logo beside the title, as in TopAppBarHeader. */
+.brand { text-decoration: none; color: var(--bar-text); display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand img { flex: none; }
+.brand-text { display: grid; }
 .brand b { font-size: 16px; font-weight: 600; letter-spacing: -0.1px; }
-.brand span { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; color: var(--bar-text-2); }
+.brand-text > span { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; color: var(--bar-text-2); }
 #who { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--bar-text-2); }
 #who .badge.view { background: var(--bar-chip); color: var(--bar-text-2); }
 #who .text-btn { color: var(--bar-link); }
@@ -126,6 +129,7 @@ body.signed-out .appbar { display: none; }
 body.signed-out main { max-width: none; padding: 0; }
 .signin { display: grid; grid-template-columns: minmax(320px, 5fr) 6fr; min-height: 100vh; }
 .hero { /* taste-skill-ignore: the app's LoginScreen hero gradient */ background: linear-gradient(135deg, var(--hero-start), var(--hero-end)); color: #fff; padding: 56px 48px; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; border-right: 1px solid var(--border); }
+.hero-logo { margin-bottom: 12px; }
 .hero h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.6px; line-height: 1.15; max-width: 14ch; }
 .hero p { font-size: 18px; color: rgb(255 255 255 / 0.9); }
 .hero small { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: rgb(255 255 255 / 0.85); margin-top: 16px; }
@@ -141,9 +145,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .portfolio h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; text-transform: uppercase; }
 .portfolio .pf-total p { color: var(--text-2); font-size: 14px; }
 /* The total is a headline figure, not a footnote. */
-.pf-cost { margin-top: 6px; }
-.pf-cost b { color: var(--text); font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.pf-stats { margin-top: 2px; }
+.pf-stats { margin-top: 6px; }
 /* PortfolioCounts: the banner's filters. Red only for overdue and behind; the rest stay quiet with a coloured icon. */
 .pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
 .pill { font: 500 14px Inter, sans-serif; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;

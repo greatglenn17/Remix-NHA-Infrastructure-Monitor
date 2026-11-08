@@ -143,6 +143,7 @@ function renderSignIn(message = '', note = '') {
   main.innerHTML = `
     <div class="signin">
       <section class="hero">
+        <img class="hero-logo" src="logo.svg" alt="" width="72" height="72">
         <h1>National Housing Authority</h1>
         <p>Infrastructure Monitoring System</p>
         <small>REGION III • BULACAN DISTRICT OFFICE</small>
@@ -248,9 +249,8 @@ function redrawDashboard() {
   const all = s.projects.map(itemOf);
   const inScope = mineAvailable && s.mineOnly ? all.filter(it => L.isMine(it.p, s.user.uid, s.claims)) : all;
 
-  // Portfolio banner: count, total cost and a status breakdown. Work done and billed are never averaged
+  // Portfolio banner: count and a status breakdown (no total contract cost: user's rule, 2026-11-08). Work done and billed are never averaged
   // across projects (user's rule, 2026-11-08); each card shows its own.
-  const totalCost = inScope.reduce((t, it) => t + it.cost, 0);
   const done = inScope.filter(it => L.isCompleted(it.p)).length;
   // PortfolioCounts: one row of filters, each counting projects; only non-zero ones; pressing the active one clears it.
   const counts = COUNTS.map(c => ({ ...c, n: inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length })).filter(c => c.n > 0);
@@ -260,7 +260,6 @@ function redrawDashboard() {
   banner.innerHTML = `
     <div class="pf-total">
       <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
-      <p class="pf-cost"><b>${esc(pesoWhole(totalCost))}</b> total contract cost</p>
       <p class="pf-stats">${inScope.length - done} on-going · ${done} completed</p>
     </div>
     ${counts.length ? `<div class="pills" role="group" aria-label="Show only projects that are">
