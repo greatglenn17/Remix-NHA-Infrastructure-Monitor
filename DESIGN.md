@@ -319,6 +319,7 @@ The label (14px `text-2`) on the left; the value (Card Figure) and a 13px note o
 - **Don't** use the status colours for anything other than project state.
 - **Don't** introduce a side menu or KPI tiles, and don't put average work done or portfolio billed back on the dashboard.
 - **Don't** imitate official NHA or government branding; the app's own logo is the one exception.
+- **Do** keep the unofficial notice on the sign-in panel ("Unofficial app. Not issued or endorsed by the National Housing Authority."), in 13px white at 80%, under the office line. The app says the same on its login hero and in About NHA Monitor (user's wording, 2026-11-08).
 - **Don't** use the brand gradient outside the sign-in hero.
 - **Don't** use tracked uppercase lines as section labels or eyebrows. The office line and the banner count are the only uppercase text.
 - **Don't** add motion beyond the bar fill, the card hover lift, the back link's colour fade and the critical-alert pulse, and never animate when reduced motion is requested.

@@ -134,6 +134,8 @@ body.signed-out main { max-width: none; padding: 0; }
 .hero-logo { margin-bottom: 12px; }
 .hero h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.6px; line-height: 1.15; max-width: 14ch; }
 .hero p { font-size: 18px; color: rgb(255 255 255 / 0.9); }
+/* The name and logo must not read as an official NHA site (user's wording, 2026-11-08). */
+.hero p.unofficial { font-size: 13px; line-height: 1.5; color: rgb(255 255 255 / 0.8); max-width: 44ch; margin-top: 6px; }
 .hero small { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: rgb(255 255 255 / 0.85); margin-top: 16px; }
 .signin-form { align-self: center; justify-self: center; width: min(400px, calc(100% - 32px)); margin: 32px 0; padding: 32px 28px; display: grid; gap: 16px;
   background: color-mix(in srgb, var(--bg) 90%, transparent); border: 1px solid var(--border); border-radius: 12px; }

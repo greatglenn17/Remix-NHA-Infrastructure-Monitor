@@ -180,6 +180,13 @@ fun LoginScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
                 }
+                // Said up front: the name and emblem must not read as an official NHA app (user's wording, 2026-11-08).
+                Text(
+                    text = "Unofficial app. Not issued or endorsed by the National Housing Authority.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.8f)),
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.rise(appear, 2).padding(top = 10.dp).testTag("unofficial_notice")
+                )
             }
 
             // The form sheet slides up over the hero's bottom edge, with large rounded top corners.

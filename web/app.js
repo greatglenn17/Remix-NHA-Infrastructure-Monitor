@@ -147,6 +147,7 @@ function renderSignIn(message = '', note = '') {
         <h1>National Housing Authority</h1>
         <p>Infrastructure Monitoring System</p>
         <small>REGION III • BULACAN DISTRICT OFFICE</small>
+        <p class="unofficial">Unofficial app. Not issued or endorsed by the National Housing Authority. Made for the Bulacan District Office; other district offices are welcome to try it.</p>
       </section>
       <form id="signin" class="signin-form" novalidate>
         <h2>Sign in</h2>
