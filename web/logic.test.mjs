@@ -68,7 +68,18 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.daysLeftText(p, '2026-11-07'), '3 days');
   assert.equal(L.daysLeftText({ ...p, completionDateRevised: '2026-11-01' }, '2026-11-07'), 'Overdue by 6 days');
   assert.equal(L.daysLeftText({ ...p, actualAccomplishment: 100 }, '2026-11-07'), 'Completed');
-  assert.equal(L.scheduleText(p), '5.50% behind');
+  assert.equal(L.scheduleText(p), '5.50% slipping');
+  assert.equal(L.scheduleText({ ...p, actualAccomplishment: 30 }), '15.50% behind');
+  // Overdue: 0% done against a 0% plan used to read "on schedule" in green.
+  const late = { status: 'On-going', completionDateOriginal: '2026-11-03', actualAccomplishment: 0, targetAccomplishment: 0 };
+  assert.equal(L.daysOverdue(late, '2026-11-08'), 5);
+  assert.equal(L.daysOverdue(late, '2026-11-03'), 0);
+  assert.equal(L.daysOverdue({ ...late, actualAccomplishment: 100 }, '2026-11-08'), 0);
+  assert.equal(L.daysOverdue({ ...late, completionDateRevised: '2026-12-01' }, '2026-11-08'), 0);
+  assert.equal(L.scheduleText(late, '2026-11-08'), 'past completion date');
+  assert.equal(L.statusLevel(late, '2026-11-08'), 'behind');
+  assert.equal(L.statusLevel(late), 'ok');
+  assert.equal(L.statusLevel({ ...late, status: 'Suspended' }, '2026-11-08'), 'neutral');
   assert.equal(L.displayDate('2026-10-20'), 'Oct 20, 2026');
   assert.equal(L.displayDate('TBA'), 'TBA');
   assert.equal(L.formatPhp(-1234.5), '-₱1,234.50');

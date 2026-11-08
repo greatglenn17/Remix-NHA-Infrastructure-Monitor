@@ -13,11 +13,11 @@
   --primary: #2563EB; --on-primary: #FFFFFF; --link: #60A5FA;
   --primary-container: rgb(59 130 246 / 0.16); --on-primary-container: #93C5FD;
   --accent: #3B82F6; /* Work done bar when on or ahead of plan */
-  --billed: #A78BFA; /* Billed bar: money, kept apart from the work colours */
+  --billed: #C4B5FD; /* Billed bar: money, kept apart from the work colours; lighter than the blue so the two read apart on a projector */
   --ok: #34D399; --watch: #FBBF24; --behind: #FB7185; --neutral: #94A3B8;
   --ok-c: rgb(16 185 129 / 0.14); --watch-c: rgb(245 158 11 / 0.14); --behind-c: rgb(244 63 94 / 0.14); --neutral-c: rgb(148 163 184 / 0.14);
   --ok-line: rgb(16 185 129 / 0.3); --watch-line: rgb(245 158 11 / 0.3); --behind-line: rgb(244 63 94 / 0.3); --primary-line: rgb(59 130 246 / 0.4);
-  --track: rgb(255 255 255 / 0.08);
+  --track: rgb(255 255 255 / 0.16); /* an empty bar still shows on a projector */
   --hero-start: #1E3A8A; --hero-end: #0B0F17;
   --bar-bg: #0B0F17; --bar-text: #F1F5F9; --bar-text-2: #94A3B8; --bar-chip: #1F2937; --bar-link: #93C5FD;
   --dots: rgb(148 163 184 / 0.13);
@@ -43,7 +43,6 @@ body {
 a { color: var(--link); text-underline-offset: 3px; }
 h1, h2, h3, p { margin: 0; }
 .muted { color: var(--text-2); }
-.mono { font-family: var(--mono); }
 .icon {
   font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1;
   display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-smoothing: antialiased; flex: none;
@@ -95,34 +94,26 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--surface-variant); color: var(--text); }
 
-/* Chips (FilterChip / PortfolioCounts) */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { font: 500 13px Inter, sans-serif; display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 4px 11px;
-  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
-.chip:hover { border-color: var(--outline); }
-.chip[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--primary-line); }
-.chip b { font-weight: 700; }
-.chip.behind .icon { color: var(--behind); } .chip.watch .icon { color: var(--watch); }
-
 /* Cards: dark panel, 8% hairline */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
 
 /* Badges */
-.badge { flex: none; display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.badge { flex: none; display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .badge.view { border-radius: 4px; padding: 2px 6px; font-weight: 500; background: var(--surface-variant); color: var(--text-2); }
 .lv-ok { color: var(--ok); background: var(--ok-c); } .lv-watch { color: var(--watch); background: var(--watch-c); }
 .lv-behind { color: var(--behind); background: var(--behind-c); } .lv-neutral { color: var(--neutral); background: var(--neutral-c); }
 .t-critical { color: var(--behind); } .t-warning { color: var(--watch); }
 
 /* Progress line: label left; value and note right; an 8px bar beneath. The one motion: bars fill in on arrival. */
-.pl-head { display: flex; gap: 8px; align-items: baseline; font-size: 13px; min-width: 0; }
+.pl-head { display: flex; gap: 8px; align-items: baseline; font-size: 14px; min-width: 0; }
 .pl-head span { color: var(--text-2); font-weight: 500; margin-right: auto; white-space: nowrap; }
-.pl-head b { font-weight: 600; white-space: nowrap; }
-.pl-head small { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
+/* Card figures carry the card: sized to read from the back of a meeting room. */
+.pl-head b { font-size: clamp(17px, 1.25vw, 20px); font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.pl-head small { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .n-ok { color: var(--ok); } .n-watch { color: var(--watch); } .n-behind { color: var(--behind); } .n-muted { color: var(--text-2); }
 .pl.big .pl-head b { font-size: 22px; letter-spacing: -0.2px; }
-.bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin-top: 6px; }
-.bar i { display: block; height: 100%; border-radius: 4px; transform-origin: left; }
+.bar { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; border-radius: 5px; transform-origin: left; }
 .bar.ok i { background: var(--ok); } .bar.watch i { background: var(--watch); } .bar.behind i { background: var(--behind); }
 .bar.neutral i { background: var(--neutral); } .bar.primary i { background: var(--accent); } .bar.billed i { background: var(--billed); }
 main[data-fresh] .bar i { animation: fill 700ms cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -148,26 +139,34 @@ body.signed-out main { max-width: none; padding: 0; }
 /* Dashboard: District Portfolio Command Banner */
 .portfolio { padding: 20px 24px; display: grid; grid-template-columns: auto 1fr; gap: 16px 32px; align-items: center; }
 .portfolio h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; text-transform: uppercase; }
-.portfolio .pf-total p { color: var(--text-2); margin-top: 4px; font-size: 14px; }
-.portfolio .pf-total .mono { color: var(--text); font-size: 15px; }
-.pills { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; border: 1px solid; }
-.pill b { font-size: 15px; font-weight: 700; }
-.pill.ongoing { color: var(--on-primary-container); background: var(--primary-container); border-color: var(--primary-line); }
-.pill.ok { color: var(--ok); background: var(--ok-c); border-color: var(--ok-line); }
-.pill.behind { color: var(--behind); background: var(--behind-c); border-color: var(--behind-line); }
-.pill.watch { color: var(--watch); background: var(--watch-c); border-color: var(--watch-line); }
+.portfolio .pf-total p { color: var(--text-2); font-size: 14px; }
+/* The total is a headline figure, not a footnote. */
+.pf-cost { margin-top: 6px; }
+.pf-cost b { color: var(--text); font-size: 24px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.pf-stats { margin-top: 2px; }
+/* PortfolioCounts: the banner's filters. Red only for overdue and behind; the rest stay quiet with a coloured icon. */
+.pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.pill { font: 500 14px Inter, sans-serif; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--outline); background: var(--field); color: var(--text); cursor: pointer; transition: border-color 150ms ease-out; }
+.pill:hover { border-color: var(--text-2); }
+.pill b { font-size: 16px; font-weight: 700; }
+.pill .icon { color: var(--text-2); }
+.pill.watch .icon { color: var(--watch); }
+.pill.behind { color: var(--behind-text); background: var(--behind-c); border-color: var(--behind-line); }
+.pill.behind .icon { color: var(--behind); }
+.pill[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
+.pill[aria-pressed="true"] .icon { color: inherit; }
 /* Priority callout: the screen's one finding */
 .finding { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; font-size: 14px;
   color: var(--watch-text); background: var(--watch-c); border: 1px solid var(--watch-line); }
 .finding a { color: inherit; font-weight: 700; }
 .finding.calm { color: var(--ok); background: var(--ok-c); border-color: var(--ok-line); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 12px; }
-.toolbar .count { margin-left: auto; font-size: 13px; color: var(--text-2); }
+/* Right end of the toolbar: the help, then "Showing x of y" when a filter or search narrows the list. */
+.toolbar .help-btn { margin-left: auto; order: 1; }
+.toolbar .count { order: 2; font-size: 13px; color: var(--text-2); }
 .toolbar .count:empty { display: none; }
 .nw { white-space: nowrap; }
-/* Desktop: the help is an icon at the end of the chips (its name stays for screen readers); phones show the words. */
-@media (min-width: 601px) { .help-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } }
 /* PortfolioCounts "What these mean" help */
 .help { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-solid); color: var(--text); padding: 20px; max-width: min(440px, calc(100vw - 32px)); }
 .help::backdrop { background: rgb(0 0 0 / 0.6); }
@@ -188,11 +187,11 @@ body.signed-out main { max-width: none; padding: 0; }
 .photo img { width: 100%; height: 100%; object-fit: cover; }
 .tile-name { min-width: 0; flex: 1; display: grid; gap: 2px; }
 .tile h2 { font-size: 16px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.tile .loc { font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .loc { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-badges { display: grid; gap: 4px; justify-items: end; flex: none; max-width: 45%; }
 .tile-bars { display: grid; gap: 10px; }
-.flag { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: 12px; color: var(--text-2);
+.flag { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: 13px; color: var(--text-2);
   border-top: 1px solid var(--border); padding-top: 10px; margin-top: auto; }
 .meta > span { display: inline-flex; align-items: center; gap: 4px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--text-2); display: grid; gap: 8px; justify-items: center; }
@@ -207,9 +206,10 @@ body.signed-out main { max-width: none; padding: 0; }
 @media (min-width: 640px) { .ph-top h1 { font-size: 36px; } }
 .ph-loc { display: flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 14px; margin: 6px 0 18px; }
 .ph-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
-/* Status badges that should catch the eye get a hairline in their own colour and a soft glow. */
-.ph-badges .badge:not(.view), .badge.glow { border: 1px solid color-mix(in srgb, currentColor 35%, transparent); box-shadow: 0 0 14px -4px currentColor; }
-.ph-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* The header's status badge is larger and carries a hairline in its own colour. */
+.ph-badges .badge:not(.view) { font-size: 13px; padding: 4px 11px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
+/* Side by side while both figures fit, stacked below that. */
+.ph-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
 .ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 10px; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 /* Header bars: taller, with a tick every 10% so an empty bar still reads as a scale. */
@@ -230,7 +230,6 @@ body.signed-out main { max-width: none; padding: 0; }
 .kv b { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .kv b.nil { color: var(--text-2); font-weight: 400; opacity: 0.5; }
 .kv b.hl { color: var(--link); }
-.attrs .kv b { font: 500 12.5px/1.5 var(--mono); }
 .sub { font-size: 12px; font-weight: 500; color: var(--text-2); margin: 10px 0 4px; }
 .scope { background: var(--surface-variant); border-radius: 6px; padding: 8px; margin-top: 4px; }
 .scope b { font-size: 14px; font-weight: 600; display: block; }
@@ -271,7 +270,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .step.none::before { border: 2px dashed var(--outline); }
 .step.none b { color: var(--text-2); font-weight: 400; opacity: 0.5; }
 .none-note { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
-.none-note .icon { color: var(--watch); opacity: 0.7; }
+.none-note .icon { color: var(--text-2); }
 
 /* Contract cost modules */
 .money { display: grid; gap: 10px; }
@@ -304,7 +303,7 @@ th { color: var(--text-2); font-weight: 600; }
 tfoot th { color: var(--text); font-weight: 700; border-bottom: 0; }
 .num { text-align: right; white-space: nowrap; }
 /* Tabular figures only where numbers line up (Type.kt TabularNumbers), so words keep normal hyphens. */
-.num, .pl-head b, .chip b, .pill b, .portfolio h1 { font-variant-numeric: tabular-nums; }
+.num, .pl-head b, .pill b, .portfolio h1 { font-variant-numeric: tabular-nums; }
 .pay .pdate { display: none; }
 
 @media (max-width: 1100px) {
@@ -327,7 +326,7 @@ tfoot th { color: var(--text); font-weight: 700; border-bottom: 0; }
   .appbar-in, main { padding-left: 16px; padding-right: 16px; }
   .portfolio { padding: 16px; }
   .portfolio h1 { font-size: 26px; }
-  .ph-bars { grid-template-columns: 1fr; gap: 10px; }
+  .ph-bars { gap: 10px; }
   .project-head { padding: 16px; }
   .ph-top { flex-direction: column; gap: 0; }
   .ph-badges { flex-direction: row; flex-wrap: wrap; margin-bottom: 16px; }
@@ -335,11 +334,9 @@ tfoot th { color: var(--text); font-weight: 700; border-bottom: 0; }
   .ghost-rows { display: none; }
   #who .email { display: none; }
   .search { max-width: none; }
-  /* Status pills and filter chips on a phone: two equal tiles per row, an odd one keeps half width. */
-  .pills, .counts { display: grid; grid-template-columns: 1fr 1fr; }
-  .counts .chip { min-width: 0; text-align: left; border-radius: 8px; }
-  .pill { border-radius: 8px; }
-  .counts .help-btn { grid-column: 1 / -1; justify-self: start; }
+  /* Filters on a phone: one per row, so each label stays on one line. */
+  .pills { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .pill { min-width: 0; text-align: left; border-radius: 8px; }
   /* Badges drop under the name so long names keep both lines. */
   .tile-top { flex-wrap: wrap; }
   .tile-badges { order: 3; flex-basis: calc(100% - 60px); max-width: none; display: flex; flex-wrap: wrap; gap: 4px; margin-left: 60px; }
