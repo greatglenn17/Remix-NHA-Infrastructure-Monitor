@@ -48,7 +48,7 @@ fun AddMonthlyReportDialog(
         weeklyReports.filter { 
             (it.reportingWeek.contains(monthStr, ignoreCase = true) || it.reportingWeek.contains(shortMonth, ignoreCase = true)) && 
             it.reportingWeek.contains(yearStr, ignoreCase = true)
-        }.sortedBy { it.id }
+        }.sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
     }
 
     // Weekly figures are cumulative (as of the week), so the month stands at its last week, not their sum.

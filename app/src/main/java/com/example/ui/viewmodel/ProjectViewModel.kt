@@ -1958,7 +1958,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     /** [month] is the Monthly tab's selection, e.g. "July 2026"; null when it can't be read. */
     suspend fun monthlyReportForm(project: Project, month: String, monthWeeklyReports: List<WeeklyReport>, signatories: com.example.util.Signatories): String? {
         val ym = com.example.util.BlueBookForms.parseMonth(month) ?: return null
-        val lastWeekly = monthWeeklyReports.maxByOrNull { it.id }
+        val lastWeekly = monthWeeklyReports.maxWithOrNull(com.example.ui.dialogs.WeekRange.byWeek)
         return com.example.util.BlueBookForms.monthlyReport(
             project, ym, lastWeekly,
             lastWeekly?.let { com.example.ui.detail.tabs.parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty(),

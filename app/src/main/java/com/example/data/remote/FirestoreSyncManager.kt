@@ -575,7 +575,6 @@ class FirestoreSyncManager(
                             "notedByOffice" to project.notedByOffice,
                             "weeklyCheckedByOffice" to project.weeklyCheckedByOffice,
                             "weeklyNotedByOffice" to project.weeklyNotedByOffice,
-                            "barChartJson" to project.barChartJson,
                             "contractCostOriginal" to project.contractCostOriginal,
                             "contractCostRevised" to project.contractCostRevised,
                             "contractDurationDays" to project.contractDurationDays,
@@ -595,6 +594,9 @@ class FirestoreSyncManager(
                             "isDeleted" to (event.operation == "DELETE" || project.isDeleted)
                         )
 
+                        // Only the chart's editors send it (firestore.rules refuses anyone else's change), so a stale copy on a
+                        // Field Engineer's phone never blocks their project updates.
+                        if (superAdmin || role == "ENGINEER_ADMIN") data["barChartJson"] = project.barChartJson
                         uploadProject(project, data, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)

@@ -34,6 +34,9 @@ class OrderFixesTest {
         val vo = "Reason: Added culvert | Date Approved: 2026-06-02"
         assertEquals("Date Approved: 2026-06-02 | Reason: Bigger culvert", keepOrderFields(vo, "Reason: Bigger culvert"))
         assertEquals("Note", keepOrderFields("Reason: Rain", "Note"))
+        // A Partial suspension's work items stay when its remarks are cleared.
+        val partial = "$ws | Reason: ROW | Items: Land Acquisition; Roadworks"
+        assertEquals("$ws | Items: Land Acquisition; Roadworks", keepOrderFields(partial, ""))
     }
 
     private fun report(at: Long, photos: String) = WeeklyReport(
