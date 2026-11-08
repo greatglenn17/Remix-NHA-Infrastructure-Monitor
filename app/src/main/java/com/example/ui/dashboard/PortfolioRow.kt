@@ -59,7 +59,8 @@ fun PortfolioRow(
     val project = item.project
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
-    val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
+    val overdue = item.flags.firstOrNull { it.kind == AttentionKind.OVERDUE }?.message
+    val workColor = workDoneColor(project, overdue != null, colors)
 
     val press = remember { MutableInteractionSource() }
     val scale = Motion.pressScale(press)
@@ -103,7 +104,7 @@ fun PortfolioRow(
                             ViewOnlyBadge()
                             Spacer(Modifier.width(6.dp))
                         }
-                        StatusBadge(project, colors)
+                        StatusBadge(project, colors, overdue)
                     }
                 }
             }
@@ -113,9 +114,9 @@ fun PortfolioRow(
             val workDone: @Composable (Modifier) -> Unit = { m ->
                 ProgressLine(
                     label = "Work done",
-                    value = workDoneText(project),
+                    value = workDoneText(project, overdue != null),
                     fraction = (project.actualAccomplishment / 100).toFloat(),
-                    color = varianceColor,
+                    color = workColor,
                     modifier = m
                 )
             }
@@ -141,8 +142,8 @@ fun PortfolioRow(
                 }
             }
 
-            // Slippage already shows on the Work done line, bar and status chip; waiting orders on the meta line below.
-            val flags = item.flags.filter { it.kind != AttentionKind.BEHIND && it.kind != AttentionKind.WAITING_APPROVAL }
+            // Slippage and overdue already show on the Work done line, bar and status chip; waiting orders on the meta line below.
+            val flags = item.flags.filter { it.kind !in setOf(AttentionKind.BEHIND, AttentionKind.OVERDUE, AttentionKind.WAITING_APPROVAL) }
             flags.firstOrNull()?.let { flag ->
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -293,15 +294,19 @@ private fun MetaItem(icon: ImageVector, text: String) {
     }
 }
 
-/** The recorded status, coloured by slippage so the chip never reads green on a project that is behind. */
+/**
+ * The recorded status, coloured by slippage so the chip never reads green on a project that is behind.
+ * [overdue] ("Overdue by N days", from [ProjectAttention.overdue]) replaces it: past the completion date is the bigger news.
+ */
 @Composable
-internal fun StatusBadge(project: Project, colors: NHAColors) {
-    val color = statusColor(project, colors)
-    Badge(project.displayStatus, color, containerOf(color, colors))
+internal fun StatusBadge(project: Project, colors: NHAColors, overdue: String? = null) {
+    val color = statusColor(project, colors, overdue != null)
+    Badge(overdue ?: project.displayStatus, color, containerOf(color, colors))
 }
 
-internal fun statusColor(project: Project, colors: NHAColors): Color {
+internal fun statusColor(project: Project, colors: NHAColors, overdue: Boolean = false): Color {
     if (project.isCompleted) return colors.onTrack
+    if (overdue) return colors.behind
     if (project.status == ProjectStatus.SUSPENDED.label) return colors.neutral
     val slip = varianceColor(ProjectAttention.slippage(project), colors)
     // Marked behind by the engineer but the numbers are close: still not green.
@@ -349,8 +354,12 @@ internal fun scheduleText(slippage: Double) = when {
     else -> "on schedule"
 }
 
-internal fun workDoneText(project: Project) =
-    "%.2f%% · %s".format(project.actualAccomplishment, scheduleText(ProjectAttention.slippage(project)))
+/** Past the completion date the bar is red, whatever the percentages say; otherwise it follows slippage. */
+internal fun workDoneColor(project: Project, overdue: Boolean, colors: NHAColors) =
+    if (overdue && !project.isCompleted) colors.behind else varianceColor(ProjectAttention.slippage(project), colors)
+
+internal fun workDoneText(project: Project, overdue: Boolean = false) =
+    "%.2f%% · %s".format(project.actualAccomplishment, if (overdue && !project.isCompleted) "past completion date" else scheduleText(ProjectAttention.slippage(project)))
 
 /** Whole pesos: centavos on a multi-million contract are noise at card size. */
 internal fun peso(amount: Double): String =

@@ -78,11 +78,11 @@ object ProjectAttention {
         }
 
         if (!finished) {
-            parse(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised))?.let { due ->
+            val late = overdue(project, today)
+            if (late != null) flags += AttentionFlag(AttentionKind.OVERDUE, AttentionLevel.CRITICAL, late)
+            else parse(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised))?.let { due ->
                 val days = ChronoUnit.DAYS.between(today, due)
-                if (days < 0) {
-                    flags += AttentionFlag(AttentionKind.OVERDUE, AttentionLevel.CRITICAL, "Overdue by ${days(-days)}")
-                } else if (days <= DUE_SOON_DAYS) {
+                if (days in 0..DUE_SOON_DAYS) {
                     flags += AttentionFlag(AttentionKind.DUE_SOON, AttentionLevel.WARNING, "Due in ${days(days)}")
                 }
             }
@@ -98,6 +98,14 @@ object ProjectAttention {
         }
 
         return flags.sortedBy { it.level }
+    }
+
+    /** "Overdue by N days" for an unfinished project past its completion date (revised, else original); null otherwise. */
+    fun overdue(project: Project, today: LocalDate): String? {
+        if (project.isCompleted) return null
+        val due = parse(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)) ?: return null
+        val late = ChronoUnit.DAYS.between(due, today)
+        return if (late > 0) "Overdue by ${days(late)}" else null
     }
 
     /** Variance rounded to 2 decimals, so -10.0 / -15.0 boundaries are not missed by floating-point error. */

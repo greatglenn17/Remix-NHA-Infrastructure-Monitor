@@ -106,7 +106,7 @@ class ProjectDetailScreenshotTest {
             Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
                 Column {
                     // The current cost (with the approved VO), as ProjectDetailScreen passes it.
-                    ProjectHeader(project, billedTotal = 6_400_000.0, contractCost = 10_450_000.0, collapsed = collapsed, onClose = onClose)
+                    ProjectHeader(project, billedTotal = 6_400_000.0, contractCost = 10_450_000.0, collapsed = collapsed, onClose = onClose, today = LocalDate.of(2026, 10, 27))
                     Box(modifier = Modifier.weight(1f)) { content() }
                 }
             }

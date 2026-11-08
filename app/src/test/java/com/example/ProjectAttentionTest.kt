@@ -17,6 +17,8 @@ import com.example.ui.dashboard.peso
 import com.example.ui.dashboard.scheduleText
 import com.example.ui.dashboard.sortShort
 import com.example.ui.dashboard.statusColor
+import com.example.ui.dashboard.workDoneColor
+import com.example.ui.dashboard.workDoneText
 import com.example.ui.theme.LightNHAColors
 import com.example.util.ProjectAttention
 import java.time.LocalDate
@@ -150,6 +152,22 @@ class ProjectAttentionTest {
         val f = flags(project(actual = 80.0, completion = "2026-10-20")).of(OVERDUE).single()
         assertEquals(CRITICAL, f.level)
         assertEquals("Overdue by 6 days", f.message)
+    }
+
+    /** The bug: on schedule by the numbers but past its date read "On-going", green, "on schedule". */
+    @Test fun overdue_winsOverOnScheduleNumbers() {
+        val c = LightNHAColors
+        val late = project(target = 50.0, actual = 52.0, completion = "2026-10-20")
+        assertEquals("Overdue by 6 days", ProjectAttention.overdue(late, today))
+        assertEquals(null, ProjectAttention.overdue(late, LocalDate.of(2026, 10, 20)))   // due today is not late
+        assertEquals(null, ProjectAttention.overdue(project(actual = 100.0, completion = "2026-10-20"), today))
+        assertEquals(null, ProjectAttention.overdue(project(completion = "2026-10-20", revised = "2027-03-01"), today))
+        assertEquals(null, ProjectAttention.overdue(project(completion = "-"), today))
+        assertEquals(c.behind, statusColor(late, c, overdue = true))
+        assertEquals(c.behind, workDoneColor(late, overdue = true, c))
+        assertEquals("52.00% · past completion date", workDoneText(late, overdue = true))
+        assertEquals("52.00% · 2.00% ahead", workDoneText(late))
+        assertEquals(c.onTrack, statusColor(project(actual = 100.0), c, overdue = true))   // finished wins
     }
 
     @Test fun finishedProject_notOverdueNorStale() {
