@@ -32,8 +32,9 @@ const ROLE_LABELS = {
   VIEWER: 'Viewer', SUPER_VIEWER: 'Super Viewer',
 };
 const SCHEDULE_ORDER = /time extension|work suspension|work resumption/i;
-// PortfolioCounts: icon and colour per count.
+// PortfolioCounts: the banner's one row of filters, each a count of projects. Red for the critical two, quiet for the rest.
 const COUNTS = [
+  { kind: 'overdue', label: 'Overdue', icon: 'warning', tone: 'behind' },
   { kind: 'behind', label: 'Behind schedule', icon: 'trending_down', tone: 'behind' },
   { kind: 'billingAhead', label: 'Billing ahead of work', icon: 'payments', tone: 'watch' },
   { kind: 'waiting', label: 'Waiting approval', icon: 'hourglass_top', tone: 'watch' },
@@ -41,10 +42,12 @@ const COUNTS = [
 ];
 // PortfolioCounts.TERM_HELP, from the same thresholds as ProjectAttention (the phone's sync chip terms are left out).
 const TERM_HELP = [
-  ['Behind schedule', 'Work done is 10% or more behind the plan, or the project is marked Behind Schedule. Shown in red from 15% behind.'],
+  ['Overdue', 'Unfinished projects past their completion date (the revised one, if any).'],
+  ['Behind schedule', 'Work done is 10% or more behind the plan, or the project is marked Behind Schedule. A smaller gap reads "slipping" on the card.'],
   ['Billing ahead of work', 'Billed is more than 10% ahead of work done, for example billed 65%, work done 38.50%.'],
-  ['Waiting approval', 'Variation orders, time extensions, suspensions and resumptions not yet approved.'],
+  ['Waiting approval', 'Projects with a variation order, time extension, suspension or resumption not yet approved.'],
   ['Due in 30 days', 'Unfinished projects whose completion date (the revised one, if any) is 30 days away or less.'],
+  ['Bar colours', 'Work done is blue on plan or slipping, amber from 10% behind, red from 15% behind or once overdue, green when finished. Billed is violet.'],
 ];
 
 const main = document.getElementById('app');
@@ -201,17 +204,23 @@ function progressLine(label, value, note, noteTone, fraction, tone, big = false)
   </div>`;
 }
 
-// Bar: green when finished, blue on or ahead of plan, amber behind, red from 15% behind (PortfolioRow's threshold).
+// Bar: green when finished; blue on plan or slipping under 10%; amber from 10% behind; red from 15% behind or
+// once past the completion date (PortfolioRow.varianceColor's thresholds, plus the web's overdue rule).
 function workDone(p, big) {
-  const slip = L.slippage(p), done = L.isCompleted(p);
-  const tone = done ? 'ok' : slip >= 0 ? 'primary' : slip <= -15 ? 'behind' : 'watch';
-  const note = (tone === 'watch' || tone === 'behind' ? icon('warning', 'sm') : '') + esc(L.scheduleText(p));
-  return progressLine('Work done', pct(p.actualAccomplishment), note, tone === 'primary' ? 'ok' : tone,
-    (Number(p.actualAccomplishment) || 0) / 100, tone, big);
+  const now = today(), level = L.varianceLevel(L.slippage(p));
+  const tone = L.isCompleted(p) ? 'ok' : L.daysOverdue(p, now) > 0 ? 'behind' : level === 'ok' || level === 'neutral' ? 'primary' : level;
+  const note = (tone === 'watch' || tone === 'behind' ? icon('warning', 'sm') : '') + esc(L.scheduleText(p, now));
+  const noteTone = tone !== 'primary' ? tone : level === 'ok' ? 'ok' : 'muted';
+  return progressLine('Work done', pct(p.actualAccomplishment), note, noteTone, (Number(p.actualAccomplishment) || 0) / 100, tone, big);
 }
 const billedLine = (it, big) => progressLine('Billed', L.billedLabel(it.billed, it.cost),
   it.billed > 0 ? esc(pesoWhole(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big);
-const statusBadge = p => `<span class="badge lv-${L.statusLevel(p)}">${esc(L.displayStatus(p))}</span>`;
+/** The status badge on cards and the project header; an overdue project says so instead of "On-going". */
+function statusBadge(p) {
+  const late = L.daysOverdue(p, today());
+  return late ? `<span class="badge lv-behind">Overdue by ${late} ${late === 1 ? 'day' : 'days'}</span>`
+    : `<span class="badge lv-${L.statusLevel(p)}">${esc(L.displayStatus(p))}</span>`;
+}
 
 function renderDashboard() {
   freshScreen();
@@ -220,11 +229,12 @@ function renderDashboard() {
     <div class="toolbar">
       <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
       <div class="seg" id="scope" role="group" aria-label="Which projects"></div>
-      <div class="chips counts" id="counts"></div>
-      <span class="count" id="shown"></span>
+      <span class="count" id="shown" role="status"></span>
+      <button class="text-btn help-btn" id="help">${icon('info')}What these mean</button>
     </div>
     <ul class="grid" id="grid"></ul>`;
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
+  document.getElementById('help').onclick = showTermHelp;
   redrawDashboard();
 }
 
@@ -242,31 +252,24 @@ function redrawDashboard() {
   // across projects (user's rule, 2026-11-08); each card shows its own.
   const totalCost = inScope.reduce((t, it) => t + it.cost, 0);
   const done = inScope.filter(it => L.isCompleted(it.p)).length;
-  const late = inScope.filter(it => !L.isCompleted(it.p) && it.flags.some(f => f.kind === 'behind' || f.kind === 'overdue')).length;
-  const orders = inScope.reduce((t, it) => t + it.waiting, 0);
-  const pill = (tone, ic, n, label) => `<li class="pill ${tone}">${icon(ic, 'sm')}<b>${n}</b> ${label}</li>`;
-  document.getElementById('portfolio').innerHTML = `
+  // PortfolioCounts: one row of filters, each counting projects; only non-zero ones; pressing the active one clears it.
+  const counts = COUNTS.map(c => ({ ...c, n: inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length })).filter(c => c.n > 0);
+  if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
+  const banner = document.getElementById('portfolio');
+  const focused = document.activeElement?.closest?.('#portfolio [data-kind]')?.dataset.kind;
+  banner.innerHTML = `
     <div class="pf-total">
       <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
-      <p><span class="mono">${esc(pesoWhole(totalCost))}</span> total contract cost</p>
+      <p class="pf-cost"><b>${esc(pesoWhole(totalCost))}</b> total contract cost</p>
+      <p class="pf-stats">${inScope.length - done} on-going · ${done} completed</p>
     </div>
-    <ul class="pills" aria-label="Status breakdown">
-      ${pill('ongoing', 'construction', inScope.length - done - late, 'On-going')}
-      ${pill('ok', 'check_circle', done, 'Completed')}
-      ${pill('behind', 'warning', late, 'Overdue / behind')}
-      ${pill('watch', 'hourglass_top', orders, orders === 1 ? 'Order waiting approval' : 'Orders waiting approval')}
-    </ul>
+    ${counts.length ? `<div class="pills" role="group" aria-label="Show only projects that are">
+      ${counts.map(c => `<button class="pill ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')}
+    </div>` : ''}
     ${finding(inScope)}`;
-
-  // PortfolioCounts: only non-zero counts, each a filter; pressing the active one clears it.
-  const counts = COUNTS.map(c => ({ ...c, n: c.kind === 'waiting' ? inScope.reduce((t, it) => t + it.waiting, 0) : inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length }))
-    .filter(c => c.n > 0);
-  if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
-  const countsEl = document.getElementById('counts');
-  countsEl.innerHTML = counts.map(c => `<button class="chip ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')
-    + (counts.length ? `<button class="text-btn help-btn" id="help" title="What these mean">${icon('info')}<span class="help-label">What these mean</span></button>` : '');
-  document.getElementById('help')?.addEventListener('click', showTermHelp);
-  countsEl.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
+  banner.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
+  // The banner was rebuilt: keep keyboard focus on the filter just pressed.
+  if (focused) banner.querySelector(`[data-kind="${focused}"]`)?.focus();
 
   const scopeEl = document.getElementById('scope');
   scopeEl.hidden = !mineAvailable;
@@ -318,7 +321,6 @@ const rank = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.le
 function tile(it) {
   const { p } = it;
   // Overdue goes in the status badge; behind shows on the Work done line; waiting has its own footer badge.
-  const overdue = it.flags.find(f => f.kind === 'overdue');
   const flags = it.flags.filter(f => !['behind', 'waiting', 'overdue'].includes(f.kind));
   const completion = L.displayDate(L.effectiveCompletion(p));
   return `<li><a class="card tile" href="#/p/${esc(p.projectUuid)}">
@@ -329,7 +331,7 @@ function tile(it) {
         <span class="loc" title="${esc(p.location || '')}">${esc(p.location || '-')}</span>
       </div>
       <div class="tile-badges">
-        ${overdue ? `<span class="badge lv-behind">${esc(overdue.message)}</span>` : statusBadge(p)}
+        ${statusBadge(p)}
         ${L.isViewOnly(p, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}
       </div>
     </div>
@@ -415,10 +417,10 @@ function drawProject({ project, records, error }) {
       ${step('Revised completion', revised !== '-' ? revised : '', true)}
     </ol>
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
-    <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-watch glow' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
+    <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
     ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(d.remarks)}` : ''}</span></div>`).join('')
-      : `<p class="none-note">${icon('warning', 'sm')}No time extension or suspension orders.</p>`}`);
+      : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
     <div><span>${icon('receipt_long', 'sm')}Current cost</span><b>${esc(L.formatPhp(cost))}</b></div></div>`);

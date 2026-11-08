@@ -74,6 +74,17 @@ export function daysLeftText(project, today) {
   return days < 0 ? `Overdue by ${-days} days` : `${days} days`;
 }
 
+/**
+ * Days past the completion date (the revised one, if any) of an unfinished project, else 0. `today` is yyyy-MM-dd.
+ * Web only: the phone's status chip and schedule words don't look at the date yet, so an overdue project with
+ * no slippage read "on schedule" in green.
+ */
+export function daysOverdue(project, today) {
+  if (isCompleted(project)) return 0;
+  const end = isoDay(effectiveCompletion(project)), now = isoDay(today);
+  return end == null || now == null || end >= now ? 0 : Math.round((now - end) / 86400000);
+}
+
 function isoDay(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((s || '').trim());
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
@@ -101,10 +112,11 @@ export function varianceLevel(slip) {
   return 'neutral';
 }
 
-/** PortfolioRow.statusColor: the status chip never reads green on a project that is behind. */
-export function statusLevel(p) {
+/** PortfolioRow.statusColor: the status chip never reads green on a project that is behind, or (web) overdue. */
+export function statusLevel(p, today) {
   if (isCompleted(p)) return 'ok';
   if (p.status === 'Suspended') return 'neutral';
+  if (today && daysOverdue(p, today) > 0) return 'behind';
   const s = varianceLevel(slippage(p));
   return p.status === 'Behind Schedule' && (s === 'ok' || s === 'neutral') ? 'watch' : s;
 }
@@ -158,11 +170,16 @@ export function attentionFlags(project, docs, billed, today) {
   return flags.sort((a, b) => (a.level === b.level ? 0 : a.level === 'critical' ? -1 : 1));
 }
 
-/** ProjectAttention.slippage in words (PortfolioRow.scheduleText). */
-export function scheduleText(project) {
+/**
+ * ProjectAttention.slippage in words (PortfolioRow.scheduleText). Web wording: "behind" only from the
+ * Behind schedule threshold (10%), "slipping" below it, and "past completion date" once overdue.
+ */
+export function scheduleText(project, today) {
+  if (today && daysOverdue(project, today) > 0) return 'past completion date';
   const s = slippage(project);
   if (s > 0) return `${s.toFixed(2)}% ahead`;
-  if (s < 0) return `${(-s).toFixed(2)}% behind`;
+  if (s <= -10) return `${(-s).toFixed(2)}% behind`;
+  if (s < 0) return `${(-s).toFixed(2)}% slipping`;
   return 'on schedule';
 }
 
