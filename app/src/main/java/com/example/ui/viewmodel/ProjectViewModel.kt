@@ -2620,7 +2620,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val oldDocument = oldDocumentLetter(letter)
             if (letter.id != 0L) projectDao.updateContractorLetter(letter)
             // An edited old document letter becomes a letter under a new identity, so the document's deletion can't remove it.
-            else if (oldDocument != null) projectDao.insertContractorLetter(letter.copy(uuid = java.util.UUID.randomUUID().toString()))
+            else if (oldDocument != null) projectDao.insertContractorLetter(letter.copy(uuid = java.util.UUID.randomUUID().toString(), updatedAt = System.currentTimeMillis()))
             else projectDao.insertContractorLetter(letter)
             oldDocument?.let { repository.deletePendingDocument(it.id) }
             logAuditAction(
