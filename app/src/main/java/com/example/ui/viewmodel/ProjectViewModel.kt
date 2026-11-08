@@ -104,19 +104,27 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val _currentUserAccount = MutableStateFlow(DefaultUserAccount)
     val currentUserAccount: StateFlow<UserAccount> = _currentUserAccount.asStateFlow()
 
+    /** The server's view of the signed-in account; nulls when offline. */
+    private data class ServerClaims(val role: UserRole?, val seesAll: Boolean?, val approved: Boolean?) {
+        /** The role to work as: an account waiting for approval can only view, as the rules allow. */
+        val workingRole: UserRole? get() = if (approved == false) UserRole.VIEWER else role
+    }
+
     /**
-     * The signed-in user's role and "See all projects" switch from the server: the token
-     * claims, else users/{uid}; nulls when offline.
+     * The signed-in user's role, "See all projects" switch and approval from the server: the token
+     * claims, else users/{uid}.
      */
-    private suspend fun serverClaims(): Pair<UserRole?, Boolean?> {
-        val user = authManager.currentFirebaseUser ?: return null to null
+    private suspend fun serverClaims(): ServerClaims {
+        val user = authManager.currentFirebaseUser ?: return ServerClaims(null, null, null)
         val claims = runCatching { user.getIdToken(true).await().claims }.getOrNull()
         val doc = if (claims?.get("role") is String) null else runCatching {
             com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(user.uid).get().await()
         }.getOrNull()
         val name = claims?.get("role") as? String ?: doc?.getString("role")
         val seesAll = if (claims != null) claims["allProjects"] == true else doc?.getBoolean("seesAllProjects")
-        return name?.let { runCatching { UserRole.valueOf(it.uppercase()) }.getOrNull() } to seesAll
+        // Same rule as firestore.rules approved(): no approved claim means approved only when a role claim exists.
+        val approved = if (claims != null) claims["approved"] as? Boolean ?: (claims["role"] is String) else doc?.getBoolean("approved")
+        return ServerClaims(name?.let { runCatching { UserRole.valueOf(it.uppercase()) }.getOrNull() }, seesAll, approved)
     }
 
     /** The name, position and office saved on the server, for a phone the account was not registered on. */
@@ -132,8 +140,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun refreshAccountFromServer(email: String) {
         val profile = serverProfile()
         val account = _currentUserAccount.value
-        val (role, seesAll) = serverClaims()
-        val updated = com.example.data.auth.refreshedAccount(account, email, role, profile?.first, profile?.second, profile?.third, seesAll)
+        val server = serverClaims()
+        val updated = com.example.data.auth.refreshedAccount(account, email, server.workingRole, profile?.first, profile?.second, profile?.third, server.seesAll)
+            .let { acc -> server.approved?.let { acc.copy(awaitingApproval = !it) } ?: acc }
         // The server has no real name yet: this phone's goes up so the other phones get it too.
         if (profile != null && isEmailName(profile.first, email) && !isEmailName(account.name, email)) {
             authManager.currentFirebaseUser?.let { firestoreSyncManager.syncUserProfile(it.uid, email, account.name, null, null, null) }
@@ -163,6 +172,22 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
             } catch (e: Exception) {
                 onDone("Could not change the role: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    /** Super Admin: approves a new account so it can add and edit; syncUserCustomClaims mints the claim. */
+    fun approveUser(user: RegisteredUser, onDone: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                // The rules want a role on every Super Admin edit; a profile without one counts as Field Engineer.
+                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                    .update(mapOf("approved" to true, "role" to user.role.ifBlank { UserRole.FIELD_ENGINEER.name })).await()
+                _registeredUsers.value = _registeredUsers.value.map { if (it.uid == user.uid) it.copy(approved = true) else it }
+                onDone("${user.name} is approved. It applies the next time they open the app.")
+                logAuditAction(projectId = null, actionType = "Role Change", details = "Approved the account of ${user.name}", oldValue = "Waiting for approval", newValue = "Approved")
+            } catch (e: Exception) {
+                onDone("Could not approve: ${e.localizedMessage}")
             }
         }
     }
@@ -509,7 +534,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 val result = authManager.signUp(cleanEmail, cleanPass, displayName, role, position, office)
                 _authLoading.value = false
                 if (result.isSuccess) {
-                    _authSuccessMessage.value = "Registration Successful! Account created for $cleanEmail. Please type your password to sign in."
+                    _authSuccessMessage.value = "Registration Successful! Account created for $cleanEmail. Please type your password to sign in. You can view projects now; adding and editing start once the Super Admin approves your account."
                     val createdUser = result.getOrNull()
                     if (createdUser != null) {
                         firestoreSyncManager.syncUserProfile(
@@ -552,8 +577,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         office = server?.third ?: office
                     )
                     // The role is the server's; the on-device copy only covers being offline.
-                    val (role, seesAll) = serverClaims()
-                    val userAcc = localAcc.copy(role = role ?: localAcc.role, seesAllProjects = seesAll ?: localAcc.seesAllProjects)
+                    val claims = serverClaims()
+                    val userAcc = localAcc.copy(
+                        role = claims.workingRole ?: localAcc.role,
+                        seesAllProjects = claims.seesAll ?: localAcc.seesAllProjects,
+                        awaitingApproval = claims.approved?.not() ?: localAcc.awaitingApproval
+                    )
                     authManager.saveRegisteredRole(cleanEmail, userAcc.role)
                     _currentUserAccount.value = userAcc
                     _isLoggedIn.value = true
@@ -1769,7 +1798,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         ?: doc.id
                     RegisteredUser(
                         uid = doc.id, name = name, email = doc.getString("email").orEmpty(), role = doc.getString("role").orEmpty(),
-                        seesAllProjects = doc.getBoolean("seesAllProjects") == true
+                        seesAllProjects = doc.getBoolean("seesAllProjects") == true,
+                        approved = doc.getBoolean("approved") != false
                     )
                 }.sortedBy { it.name.lowercase() }
                 _registeredUsersLoaded.value = true
