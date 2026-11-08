@@ -28,7 +28,9 @@ object ContractorLetters {
         subject = doc.documentName + reason(doc).takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
         dateReceived = received(doc),
         receivedFileUrl = doc.fileUrl,
-        uuid = doc.uuid
+        uuid = doc.uuid,
+        // The document's own time, so the same document always gives the same letter.
+        updatedAt = doc.updatedAt
     )
 
     /** [letters] and the old document letters among [documents], newest first. */
