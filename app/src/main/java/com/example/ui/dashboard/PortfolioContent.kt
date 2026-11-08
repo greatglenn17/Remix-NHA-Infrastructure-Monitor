@@ -399,6 +399,7 @@ internal fun sortShort(sortOrder: String) = when (sortOrder) {
 }
 
 private fun filterLabel(filter: PortfolioFilter) = when (filter) {
+    PortfolioFilter.OVERDUE -> "Overdue"
     PortfolioFilter.BEHIND -> "Behind schedule"
     PortfolioFilter.BILLING_AHEAD -> "Billing ahead of work"
     PortfolioFilter.WAITING_APPROVAL -> "Waiting approval"

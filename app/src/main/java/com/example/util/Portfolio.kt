@@ -14,15 +14,16 @@ data class PortfolioItem(
     val viewOnly: Boolean = false     // not assigned to this account: opens read-only
 )
 
-data class PortfolioSummary(val behind: Int, val billingAhead: Int, val waitingApproval: Int, val dueSoon: Int)
+data class PortfolioSummary(val overdue: Int, val behind: Int, val billingAhead: Int, val waitingApproval: Int, val dueSoon: Int)
 
-enum class PortfolioFilter { BEHIND, BILLING_AHEAD, WAITING_APPROVAL, DUE_SOON }
+enum class PortfolioFilter { OVERDUE, BEHIND, BILLING_AHEAD, WAITING_APPROVAL, DUE_SOON }
 
 /** Counts, filters and ordering for the portfolio home. */
 object Portfolio {
     const val NEEDS_ATTENTION_SORT = "Needs attention first"
 
     fun summarize(items: List<PortfolioItem>) = PortfolioSummary(
+        overdue = items.count { it.has(AttentionKind.OVERDUE) },
         behind = items.count { it.has(AttentionKind.BEHIND) },
         billingAhead = items.count { it.has(AttentionKind.BILLING_AHEAD) },
         waitingApproval = items.sumOf { it.pendingDocsCount },
@@ -31,6 +32,7 @@ object Portfolio {
 
     fun matches(item: PortfolioItem, filter: PortfolioFilter?): Boolean = when (filter) {
         null -> true
+        PortfolioFilter.OVERDUE -> item.has(AttentionKind.OVERDUE)
         PortfolioFilter.BEHIND -> item.has(AttentionKind.BEHIND)
         PortfolioFilter.BILLING_AHEAD -> item.has(AttentionKind.BILLING_AHEAD)
         PortfolioFilter.WAITING_APPROVAL -> item.pendingDocsCount > 0

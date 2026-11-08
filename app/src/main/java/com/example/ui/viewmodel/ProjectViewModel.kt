@@ -51,7 +51,7 @@ data class PortfolioUiState(
     val totalProjects: Int
 ) {
     companion object {
-        val EMPTY = PortfolioUiState(PortfolioSummary(0, 0, 0, 0), emptyList(), emptyList(), null, 0)
+        val EMPTY = PortfolioUiState(PortfolioSummary(0, 0, 0, 0, 0), emptyList(), emptyList(), null, 0)
     }
 }
 

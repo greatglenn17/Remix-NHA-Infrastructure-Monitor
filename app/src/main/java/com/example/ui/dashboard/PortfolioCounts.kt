@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Info
@@ -61,6 +62,7 @@ fun PortfolioCounts(
 ) {
     val colors = LocalNHAColors.current
     val tiles = listOf(
+        CountTile(PortfolioFilter.OVERDUE, "Overdue", summary.overdue, Icons.Default.EventBusy, colors.behind),
         CountTile(PortfolioFilter.BEHIND, "Behind schedule", summary.behind, Icons.Default.TrendingDown, colors.behind),
         CountTile(PortfolioFilter.BILLING_AHEAD, "Billing ahead of work", summary.billingAhead, Icons.Default.Payments, colors.watch),
         CountTile(PortfolioFilter.WAITING_APPROVAL, "Waiting approval", summary.waitingApproval, Icons.Default.HourglassTop, colors.watch),
@@ -119,6 +121,7 @@ private const val SYNC_HELP_FIRST = "SYNCED"
 
 /** The count tiles and the top-bar sync chip in plain words, from the same thresholds ProjectAttention checks. */
 internal val TERM_HELP = listOf(
+    "Overdue" to "Unfinished projects whose completion date (the revised one, if any) has passed. Shown in red on the card, whatever the work done says.",
     "Behind schedule" to "Work done is ${pct(-ProjectAttention.WARNING_SLIPPAGE)} or more behind the plan, or the project is marked Behind Schedule. " +
         "Shown in red from ${pct(-ProjectAttention.CRITICAL_SLIPPAGE)} behind.",
     "Billing ahead of work" to "Billed is more than ${pct(ProjectAttention.BILLING_GAP_POINTS)} ahead of work done, " +
