@@ -6,7 +6,10 @@ service firebase.storage {
     }
 
     function isWriter() {
-      return request.auth != null && !(request.auth.token.get('role', '') in ['VIEWER', 'SUPER_VIEWER']);
+      // Approved by the Super Admin (same rule as firestore.rules approved()) and not read-only.
+      return request.auth != null
+        && request.auth.token.get('approved', request.auth.token.get('role', '') != '') == true
+        && !(request.auth.token.get('role', '') in ['VIEWER', 'SUPER_VIEWER']);
     }
 
     // Same as seesAll() in firestore.rules: reads every project's files.

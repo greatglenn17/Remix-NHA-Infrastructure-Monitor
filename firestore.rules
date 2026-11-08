@@ -11,9 +11,16 @@ service cloud.firestore {
       return signedIn() && request.auth.token.role == 'SUPER_ADMIN';
     }
 
-    // Signed in and not a read-only Viewer or Super Viewer. A missing role claim counts as a writer.
+    // The Super Admin approved this account (the approved claim, from syncUserCustomClaims). An account
+    // from before approvals has a role claim but no approved claim and stays approved; a brand-new
+    // account has neither until the function runs, so it starts unapproved.
+    function approved() {
+      return signedIn() && request.auth.token.get('approved', request.auth.token.get('role', '') != '') == true;
+    }
+
+    // Signed in, approved, and not a read-only Viewer or Super Viewer.
     function isWriter() {
-      return signedIn() && !(request.auth.token.get('role', '') in ['VIEWER', 'SUPER_VIEWER']);
+      return approved() && !(request.auth.token.get('role', '') in ['VIEWER', 'SUPER_VIEWER']);
     }
 
     // Reads every project: the Super Admin, a Super Viewer, and anyone the Super Admin
@@ -77,15 +84,17 @@ service cloud.firestore {
       // SUPER_ADMIN only for the designated super admin account.
       allow create: if signedIn() && request.auth.uid == userId
         && request.resource.data.get('seesAllProjects', false) == false
+        && request.resource.data.get('approved', false) == false
         && (request.resource.data.get('role', 'FIELD_ENGINEER') in ['FIELD_ENGINEER', 'VIEWER']
             || (request.resource.data.get('role', '') == 'SUPER_ADMIN'
                 && request.auth.token.email == 'great.glenn17@gmail.com'
                 && request.auth.token.email_verified == true));
       allow update: if signedIn() && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'seesAllProjects']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'seesAllProjects', 'approved']);
       allow update: if isSuperAdmin() && request.auth.uid != userId
         && request.resource.data.get('role', '') in ['ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER', 'SUPER_VIEWER']
-        && request.resource.data.get('seesAllProjects', false) is bool;
+        && request.resource.data.get('seesAllProjects', false) is bool
+        && request.resource.data.get('approved', false) is bool;
       allow delete: if isSuperAdmin();
 
       match /{subcollection}/{docId} {

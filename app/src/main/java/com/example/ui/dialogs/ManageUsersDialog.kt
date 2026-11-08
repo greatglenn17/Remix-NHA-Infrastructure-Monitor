@@ -29,10 +29,12 @@ fun ManageUsersDialog(
     loaded: Boolean,
     onSetRole: (RegisteredUser, UserRole, (String) -> Unit) -> Unit,
     onSetSeesAll: (RegisteredUser, Boolean, (String) -> Unit) -> Unit,
+    onApprove: (RegisteredUser, (String) -> Unit) -> Unit,
     onDismiss: () -> Unit
 ) {
     var message by remember { mutableStateOf<String?>(null) }
-    val others = users.filter { it.role != UserRole.SUPER_ADMIN.name }
+    // Accounts waiting for approval first.
+    val others = users.filter { it.role != UserRole.SUPER_ADMIN.name }.sortedBy { it.approved }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -59,6 +61,21 @@ fun ManageUsersDialog(
                                 Text(user.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                 if (user.email.isNotBlank() && user.email != user.name) {
                                     Text(user.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (!user.approved) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            "Waiting for approval: can only view",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Button(
+                                            onClick = { onApprove(user) { message = it } },
+                                            modifier = Modifier.testTag("approve_${user.uid}")
+                                        ) { Text("Approve") }
+                                    }
                                 }
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     ASSIGNABLE_ROLES.forEach { role ->

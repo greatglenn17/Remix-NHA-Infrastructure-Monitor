@@ -274,6 +274,7 @@ class AuthManager(private val context: Context) {
             .putString("user_role", userAccount.role.name)
             .putLong("assigned_project_id", userAccount.assignedProjectId ?: -1L)
             .putBoolean("user_sees_all", userAccount.seesAllProjects)
+            .putBoolean("user_awaiting_approval", userAccount.awaitingApproval)
             .putString("user_email", email)
             .apply()
     }
@@ -298,7 +299,8 @@ class AuthManager(private val context: Context) {
             office = office,
             role = role,
             assignedProjectId = projId,
-            seesAllProjects = prefs.getBoolean("user_sees_all", false)
+            seesAllProjects = prefs.getBoolean("user_sees_all", false),
+            awaitingApproval = prefs.getBoolean("user_awaiting_approval", false)
         )
     }
 

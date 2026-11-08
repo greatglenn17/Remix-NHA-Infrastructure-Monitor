@@ -85,6 +85,22 @@ fun DashboardScreen(
     }
     val portfolioList: @Composable (Modifier) -> Unit = { listModifier ->
         Column(modifier = listModifier) {
+            if (currentUser.awaitingApproval) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp).testTag("awaiting_approval")
+                ) {
+                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Your account is waiting for the Super Admin's approval. Until then you can view, but not add or edit.",
+                            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+                }
+            }
             if (canShowAll) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -277,6 +293,7 @@ fun DashboardScreen(
             loaded = registeredUsersLoaded,
             onSetRole = { user, role, onDone -> viewModel.setUserRole(user, role, onDone) },
             onSetSeesAll = { user, on, onDone -> viewModel.setUserSeesAll(user, on, onDone) },
+            onApprove = { user, onDone -> viewModel.approveUser(user, onDone) },
             onDismiss = { showManageUsers = false }
         )
     }

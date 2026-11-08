@@ -127,10 +127,30 @@ describe('assigned field engineer', () => {
   it('cannot upload legacy path', () => assertFails(uploadBytes(ref(asEng().storage(), 'attachments/n.jpg'), bytes(10), jpeg)));
   it('cannot delete project', () => assertFails(deleteDoc(doc(asEng().firestore(), 'projects/P'))));
   it('cannot delete record', () => assertFails(deleteDoc(doc(asEng().firestore(), 'records/R'))));
-  it('account without a role claim is treated as a writer', async () => {
+  // A brand-new account has no claims until syncUserCustomClaims runs, so it is not approved yet.
+  it('account without any claims reads but cannot write', async () => {
     await assertSucceeds(getDoc(doc(asNoRole().firestore(), 'projects/P')));
-    await assertSucceeds(updateDoc(doc(asNoRole().firestore(), 'projects/P'), { name: 'Y' }));
+    await assertFails(updateDoc(doc(asNoRole().firestore(), 'projects/P'), { name: 'Y' }));
   });
+});
+
+describe('approvals', () => {
+  const asPending = () => testEnv.authenticatedContext('eng', { role: 'FIELD_ENGINEER', approved: false });
+  const asApproved = () => testEnv.authenticatedContext('eng', { role: 'FIELD_ENGINEER', approved: true });
+  const create = (ctx) => setDoc(doc(ctx.firestore(), 'projects/N'), { name: 'N', assignedUids: ['eng'] });
+  beforeEach(() => testEnv.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'users/eng'), { name: 'E', role: 'FIELD_ENGINEER' })));
+  it('pending account cannot create a project', () => assertFails(create(asPending())));
+  it('pending account cannot edit its project', () => assertFails(updateDoc(doc(asPending().firestore(), 'projects/P'), { name: 'Y' })));
+  it('pending account cannot write a record', () => assertFails(setDoc(doc(asPending().firestore(), 'records/R'), rec(['eng', 'viewer']))));
+  it('pending account cannot upload', () => assertFails(uploadBytes(ref(asPending().storage(), 'attachments/P/g.jpg'), bytes(10), jpeg)));
+  it('pending account still reads its project', () => assertSucceeds(getDoc(doc(asPending().firestore(), 'projects/P'))));
+  it('approved account creates a project', () => assertSucceeds(create(asApproved())));
+  it('account from before approvals (role, no approved claim) still writes', () => assertSucceeds(create(asEng())));
+  it('cannot sign up approved', () =>
+    assertFails(setDoc(doc(testEnv.authenticatedContext('new', {}).firestore(), 'users/new'), { role: 'FIELD_ENGINEER', approved: true })));
+  it('cannot approve itself', () => assertFails(updateDoc(doc(asPending().firestore(), 'users/eng'), { approved: true })));
+  it('super admin approves', () => assertSucceeds(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { approved: true })));
+  it('approval must be true or false', () => assertFails(updateDoc(doc(asAdmin().firestore(), 'users/eng'), { approved: 'yes' })));
 });
 
 describe('creating projects', () => {

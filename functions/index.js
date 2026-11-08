@@ -9,6 +9,7 @@ initializeApp();
 // Same region as the Firestore database, so triggers do not cross regions.
 const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
+const { isApproved } = require("./approval");
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
 // taken from the client-written profile: only the account whose Firebase Auth
 // email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
@@ -56,13 +57,20 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
       }
     }
 
+    // approved: a new account can add or edit nothing until the Super Admin approves it.
+    const approved = isApproved(data, authUser.customClaims, requestedRole === "SUPER_ADMIN");
     try {
       // allProjects: the Super Admin's "See all projects" switch; other projects open view-only.
       const allProjects = data.seesAllProjects === true;
-      await getAuth().setCustomUserClaims(uid, { role: requestedRole, allProjects });
-      console.log(`Assigned claims { role: "${requestedRole}", allProjects: ${allProjects} } to ${uid} (${email})`);
+      await getAuth().setCustomUserClaims(uid, { role: requestedRole, allProjects, approved });
+      console.log(`Assigned claims { role: "${requestedRole}", allProjects: ${allProjects}, approved: ${approved} } to ${uid} (${email})`);
     } catch (err) {
       console.error(`Failed to assign custom claim to ${uid}:`, err);
+    }
+    // Record the decision on the profile so the Super Admin's user list shows who is waiting.
+    // The write re-runs this trigger once; it then finds the flag set and writes nothing.
+    if (data.approved !== approved) {
+      await change.after.ref.update({ approved }).catch((err) => console.error(`Could not record approval for ${uid}:`, err));
     }
 
     const isNewUser = !change.before.exists;
@@ -274,7 +282,7 @@ async function notifySuperAdminsOnRegistration(userData) {
       data: {
         type: "REGISTRATION_ALERT",
         title: "👤 New User Registration",
-        message: `${userData.displayName || userData.email} registered as ${userData.role || "FIELD_ENGINEER"}.`,
+        message: `${userData.displayName || userData.email} registered as ${userData.role || "FIELD_ENGINEER"} and is waiting for your approval in Manage users.`,
         userEmail: userData.email || "",
         displayName: userData.displayName || "",
       },

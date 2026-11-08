@@ -73,7 +73,9 @@ data class UserAccount(
     val assignedProjectId: Long? = null,
     val isDemoAccount: Boolean = false,
     // The Super Admin's "See all projects" switch: other projects open view-only.
-    val seesAllProjects: Boolean = false
+    val seesAllProjects: Boolean = false,
+    // A new account the Super Admin has not approved yet: it works as a Viewer until then.
+    val awaitingApproval: Boolean = false
 )
 
 /** Opens every project: the Super Admin and Super Viewer always, anyone else when the Super Admin allowed it. */
