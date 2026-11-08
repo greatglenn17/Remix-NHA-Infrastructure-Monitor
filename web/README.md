@@ -8,13 +8,14 @@ version keep working.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
-- Screens: the dashboard (portfolio totals, attention filters, search, project cards) and the project **Summary** (profile,
+- Screens: the dashboard (project count, total cost, status pills, attention filters, search, project cards with their own
+  Work done and Billed; portfolio averages are deliberately not shown) and the project **Summary** (profile,
   key dates, contract cost, latest weekly report, open issues, status of payment).
 
 The layouts, type and components follow the Android app (`app/src/main/java/com/example/ui/`).
-The colours are a navy and slate palette (navy #1E3A8A, slate #0F172A, blue #2563EB, light grey
-#F8FAFC) with the app's on-track / watch / behind status colours. The site is always light, even
-on a device set to dark mode. The dashboard's attention counts use the app's ProjectAttention
+The colours are a dark "command center" palette (a #0B0F17 canvas with a faint dot grid, #111827
+panels) with emerald / amber / rose status colours. The site is always dark, even on a device set
+to light mode. The dashboard's attention counts use the app's ProjectAttention
 thresholds. Inter is bundled in `web/fonts/` (SIL Open Font License, see `licenses/Inter-OFL.txt`).
 The icons are Material Symbols from Google Fonts. See `DESIGN.md` at the repo root for the tokens.
 

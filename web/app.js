@@ -60,6 +60,13 @@ const today = () => new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd in the
 const pct = n => `${(Number(n) || 0).toFixed(2)}%`;
 const pesoWhole = n => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(n);
 const clamp = f => Math.max(0, Math.min(1, f || 0));
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
+
+// Cmd+K (Ctrl+K elsewhere) jumps to the dashboard search.
+document.addEventListener('keydown', e => {
+  const q = document.getElementById('q');
+  if (q && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); q.focus(); q.select(); }
+});
 
 /** Every bar on a freshly opened screen fills in once; later redraws (typing in search) stay still. */
 function freshScreen() {
@@ -174,29 +181,34 @@ function itemOf(p) {
   return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today()), waiting: L.waitingApproval(docs) };
 }
 
-function progressLine(label, value, fraction, tone, big = false) {
-  const [head, rest] = value.split(' · ');
+/** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. */
+function progressLine(label, value, note, noteTone, fraction, tone, big = false) {
   return `<div class="pl${big ? ' big' : ''}">
-    <div class="pl-head"><span>${esc(label)}</span><b>${esc(big ? head : value)}${big && rest ? `<small>${esc(rest)}</small>` : ''}</b></div>
+    <div class="pl-head"><span>${esc(label)}</span><b>${esc(value)}</b>${note ? `<small class="n-${noteTone}">${note}</small>` : ''}</div>
     <div class="bar ${tone}" role="img" aria-label="${esc(label)} ${esc(value)}"><i style="width:${(clamp(fraction) * 100).toFixed(1)}%"></i></div>
   </div>`;
 }
 
-const workDone = (p, big) => progressLine('Work done', `${pct(p.actualAccomplishment)} · ${L.scheduleText(p)}`,
-  (Number(p.actualAccomplishment) || 0) / 100, L.varianceLevel(L.slippage(p)), big);
-const billedLine = (it, big) => progressLine('Billed',
-  it.billed <= 0 ? 'No billings yet' : `${L.billedLabel(it.billed, it.cost)} · ${pesoWhole(it.billed)}`,
-  it.cost > 0 ? it.billed / it.cost : 0, 'primary', big);
+// Bar: green when finished, blue on or ahead of plan, amber behind, red from 15% behind (PortfolioRow's threshold).
+function workDone(p, big) {
+  const slip = L.slippage(p), done = L.isCompleted(p);
+  const tone = done ? 'ok' : slip >= 0 ? 'primary' : slip <= -15 ? 'behind' : 'watch';
+  const note = (tone === 'watch' || tone === 'behind' ? icon('warning', 'sm') : '') + esc(L.scheduleText(p));
+  return progressLine('Work done', pct(p.actualAccomplishment), note, tone === 'primary' ? 'ok' : tone,
+    (Number(p.actualAccomplishment) || 0) / 100, tone, big);
+}
+const billedLine = (it, big) => progressLine('Billed', L.billedLabel(it.billed, it.cost),
+  it.billed > 0 ? esc(pesoWhole(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big);
 const statusBadge = p => `<span class="badge lv-${L.statusLevel(p)}">${esc(L.displayStatus(p))}</span>`;
 
 function renderDashboard() {
   freshScreen();
   main.innerHTML = `
     <section class="card portfolio" id="portfolio"></section>
-    <div class="chips counts" id="counts"></div>
     <div class="toolbar">
-      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"></label>
-      <div class="chips" id="scope"></div>
+      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
+      <div class="seg" id="scope" role="group" aria-label="Which projects"></div>
+      <div class="chips counts" id="counts"></div>
       <span class="count" id="shown"></span>
     </div>
     <ul class="grid" id="grid"></ul>`;
@@ -214,21 +226,25 @@ function redrawDashboard() {
   const all = s.projects.map(itemOf);
   const inScope = mineAvailable && s.mineOnly ? all.filter(it => L.isMine(it.p, s.user.uid, s.claims)) : all;
 
-  // Portfolio totals over the projects in scope.
+  // Portfolio banner: count, total cost and a status breakdown. Work done and billed are never averaged
+  // across projects (user's rule, 2026-11-08); each card shows its own.
   const totalCost = inScope.reduce((t, it) => t + it.cost, 0);
-  const totalBilled = inScope.reduce((t, it) => t + it.billed, 0);
-  const avg = inScope.length ? inScope.reduce((t, it) => t + (Number(it.p.actualAccomplishment) || 0), 0) / inScope.length : 0;
   const done = inScope.filter(it => L.isCompleted(it.p)).length;
+  const late = inScope.filter(it => !L.isCompleted(it.p) && it.flags.some(f => f.kind === 'behind' || f.kind === 'overdue')).length;
+  const orders = inScope.reduce((t, it) => t + it.waiting, 0);
+  const pill = (tone, ic, n, label) => `<li class="pill ${tone}">${icon(ic, 'sm')}<b>${n}</b> ${label}</li>`;
   document.getElementById('portfolio').innerHTML = `
-    <div>
+    <div class="pf-total">
       <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
-      <p>${esc(pesoWhole(totalCost))} total contract cost · <span class="nw">${done} completed</span></p>
-      ${finding(inScope)}
+      <p><span class="mono">${esc(pesoWhole(totalCost))}</span> total contract cost</p>
     </div>
-    <div class="bars">
-      ${progressLine('Average work done', pct(avg), avg / 100, 'primary', true)}
-      ${progressLine('Billed of total cost', totalBilled <= 0 ? 'No billings yet' : `${L.billedLabel(totalBilled, totalCost)} · ${pesoWhole(totalBilled)}`, totalCost > 0 ? totalBilled / totalCost : 0, 'primary', true)}
-    </div>`;
+    <ul class="pills" aria-label="Status breakdown">
+      ${pill('ongoing', 'construction', inScope.length - done - late, 'On-going')}
+      ${pill('ok', 'check_circle', done, 'Completed')}
+      ${pill('behind', 'warning', late, 'Overdue / behind')}
+      ${pill('watch', 'hourglass_top', orders, orders === 1 ? 'Order waiting approval' : 'Orders waiting approval')}
+    </ul>
+    ${finding(inScope)}`;
 
   // PortfolioCounts: only non-zero counts, each a filter; pressing the active one clears it.
   const counts = COUNTS.map(c => ({ ...c, n: c.kind === 'waiting' ? inScope.reduce((t, it) => t + it.waiting, 0) : inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length }))
@@ -236,14 +252,15 @@ function redrawDashboard() {
   if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
   const countsEl = document.getElementById('counts');
   countsEl.innerHTML = counts.map(c => `<button class="chip ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')
-    + (counts.length ? `<button class="text-btn help-btn" id="help">${icon('info', 'sm')}What these mean</button>` : '');
+    + (counts.length ? `<button class="text-btn help-btn" id="help" title="What these mean">${icon('info')}<span class="help-label">What these mean</span></button>` : '');
   document.getElementById('help')?.addEventListener('click', showTermHelp);
   countsEl.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
 
   const scopeEl = document.getElementById('scope');
+  scopeEl.hidden = !mineAvailable;
   scopeEl.innerHTML = mineAvailable ? `
-    <button class="chip" data-mine="1" aria-pressed="${s.mineOnly}">${icon('person_pin', 'sm')}My projects</button>
-    <button class="chip" data-mine="0" aria-pressed="${!s.mineOnly}">${icon('visibility', 'sm')}All projects</button>` : '';
+    <button data-mine="1" aria-pressed="${s.mineOnly}">My projects</button>
+    <button data-mine="0" aria-pressed="${!s.mineOnly}">All projects</button>` : '';
   scopeEl.querySelectorAll('[data-mine]').forEach(b => { b.onclick = () => { s.mineOnly = b.dataset.mine === '1'; redrawDashboard(); }; });
 
   const q = s.q.trim().toLowerCase();
@@ -278,33 +295,37 @@ function showTermHelp() {
 // The screen's one finding: the project the sort puts first, with its worst flag.
 function finding(items) {
   const flagged = items.filter(it => it.flags.length).sort((a, b) => rank(a) - rank(b) || a.p.name.localeCompare(b.p.name));
-  if (!flagged.length) return items.length ? '<p class="finding">No project needs attention.</p>' : '';
+  if (!flagged.length) return items.length ? `<p class="finding calm">${icon('check_circle', 'sm')}No project needs attention.</p>` : '';
   const [first] = flagged, f = first.flags[0], more = flagged.length - 1;
-  return `<p class="finding">First to look at: <a href="#/p/${esc(first.p.projectUuid)}">${esc(first.p.name)}</a>,
-    <span class="t-${f.level}">${esc(f.message.charAt(0).toLowerCase() + f.message.slice(1))}</span>${more ? `<span class="nw"> · ${more} more flagged</span>` : ''}</p>`;
+  return `<p class="finding">${icon('warning', 'sm')}<span>First to look at: <a href="#/p/${esc(first.p.projectUuid)}">${esc(first.p.name)}</a>,
+    ${esc(f.message.charAt(0).toLowerCase() + f.message.slice(1))}${more ? `<span class="nw"> · ${more} more flagged</span>` : ''}</span></p>`;
 }
 
 const rank = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.length ? 1 : 2);
 
 function tile(it) {
   const { p } = it;
-  const flags = it.flags.filter(f => f.kind !== 'behind' && f.kind !== 'waiting');
+  // Overdue goes in the status badge; behind shows on the Work done line; waiting has its own footer badge.
+  const overdue = it.flags.find(f => f.kind === 'overdue');
+  const flags = it.flags.filter(f => !['behind', 'waiting', 'overdue'].includes(f.kind));
   const completion = L.displayDate(L.effectiveCompletion(p));
   return `<li><a class="card tile" href="#/p/${esc(p.projectUuid)}">
     <div class="tile-top">
       <div class="photo" data-ref="${esc(p.latestUpdatePhotoUrl || '')}">${icon('photo_camera')}</div>
-      <div style="min-width:0;flex:1">
+      <div class="tile-name">
         <h2>${esc(p.name)}</h2>
-        <div class="tile-sub"><span class="loc" title="${esc(p.location || '')}">${esc(p.location || '-')}</span>
-          ${L.isViewOnly(p, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}
-          ${statusBadge(p)}</div>
+        <span class="loc" title="${esc(p.location || '')}">${esc(p.location || '-')}</span>
+      </div>
+      <div class="tile-badges">
+        ${overdue ? `<span class="badge lv-behind">${esc(overdue.message)}</span>` : statusBadge(p)}
+        ${L.isViewOnly(p, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}
       </div>
     </div>
     <div class="tile-bars">${workDone(p)}${billedLine(it)}</div>
     ${flags[0] ? `<p class="flag t-${flags[0].level}">${esc(flags[0].message)}${flags.length > 1 ? `  +${flags.length - 1} more` : ''}</p>` : ''}
     <div class="meta">
       <span>${icon('event', 'sm')}Completion ${esc(completion)}</span>
-      ${it.waiting ? `<span>${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
+      ${it.waiting ? `<span class="badge lv-watch">${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
     </div>
   </a></li>`;
 }

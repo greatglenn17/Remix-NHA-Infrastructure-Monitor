@@ -21,7 +21,7 @@ Roles come from the app: Super Admin, Engineer Admin, Field Engineer, Viewer, Su
 
 A read-only web view of the same live data the NHA Monitor phones sync to Firestore. Field engineers record weekly and monthly reports, payments, documents and issues on their phones. The web lets anyone with an account see the result on a bigger screen without a phone.
 
-Success: opening the dashboard answers "how is the whole portfolio doing?" in a few seconds. That means project count, total contract cost and average progress, then which projects need a look.
+Success: opening the dashboard answers "how is the whole portfolio doing?" in a few seconds. That means project count, total contract cost and how many projects are on-going, completed or late, then which projects need a look. Work done and billed are read per project, never averaged.
 
 ## Positioning
 
@@ -42,7 +42,7 @@ It is not a separate system. It shows exactly what the phones recorded, with the
 
 ## Brand Commitments
 
-The web keeps the Android app's type, components and screen layouts (`app/src/main/java/com/example/ui/`), adapted to a wide screen (user's decision, 2026-11-08). Its colours come from a reference design the user chose later the same day: primary navy #1E3A8A, secondary slate #0F172A, tertiary blue #2563EB, neutral #F8FAFC, always light. No official NHA logo is supplied. Do not imitate official NHA or government branding.
+The web keeps the Android app's type, components and screen layouts (`app/src/main/java/com/example/ui/`), adapted to a wide screen (user's decision, 2026-11-08). Its colours follow the user's later "Architectural Command Center" brief the same day: a #0B0F17 canvas with a blueprint dot grid, #111827 panels with white 8% hairlines, always dark. No official NHA logo is supplied. Do not imitate official NHA or government branding.
 
 ## Evidence on Hand
 
