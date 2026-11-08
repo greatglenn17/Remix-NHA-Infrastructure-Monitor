@@ -79,7 +79,8 @@ service cloud.firestore {
         && request.resource.data.get('seesAllProjects', false) == false
         && (request.resource.data.get('role', 'FIELD_ENGINEER') in ['FIELD_ENGINEER', 'VIEWER']
             || (request.resource.data.get('role', '') == 'SUPER_ADMIN'
-                && request.auth.token.email == 'great.glenn17@gmail.com'));
+                && request.auth.token.email == 'great.glenn17@gmail.com'
+                && request.auth.token.email_verified == true));
       allow update: if signedIn() && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'seesAllProjects']);
       allow update: if isSuperAdmin() && request.auth.uid != userId
@@ -103,9 +104,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Nothing writes this collection (the app syncs its audit log as records), so it is closed:
+    // no one can add fake entries.
     match /audit_logs/{logId} {
       allow read: if isSuperAdmin();
-      allow create: if signedIn();
+      allow create: if false;
       allow update, delete: if false;
     }
 

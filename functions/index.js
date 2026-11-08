@@ -34,8 +34,9 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
 
     // Read the real email from Firebase Auth, not from the client-written profile.
     let email;
+    let authUser;
     try {
-      const authUser = await getAuth().getUser(uid);
+      authUser = await getAuth().getUser(uid);
       email = (authUser.email || "").trim().toLowerCase();
     } catch (err) {
       console.error(`Could not read Auth user ${uid}; claims not set:`, err);
@@ -45,7 +46,14 @@ exports.syncUserCustomClaims = functions.region(REGION).firestore
     let requestedRole = SELF_ASSIGNABLE_ROLES.includes(profileRole) ? profileRole : "FIELD_ENGINEER";
 
     if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
-      requestedRole = "SUPER_ADMIN";
+      // A verified email proves the account owns the address. An account that already holds the
+      // claim keeps it, so the current Super Admin is never locked out by this check.
+      const current = (authUser.customClaims || {}).role;
+      if (authUser.emailVerified || current === "SUPER_ADMIN") {
+        requestedRole = "SUPER_ADMIN";
+      } else {
+        console.warn(`Super Admin email on unverified account ${uid}; SUPER_ADMIN not granted.`);
+      }
     }
 
     try {
