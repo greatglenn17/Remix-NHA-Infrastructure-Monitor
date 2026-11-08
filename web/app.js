@@ -295,7 +295,7 @@ function tile(it) {
       <div class="photo" data-ref="${esc(p.latestUpdatePhotoUrl || '')}">${icon('photo_camera')}</div>
       <div style="min-width:0;flex:1">
         <h2>${esc(p.name)}</h2>
-        <div class="tile-sub"><span class="loc">${esc(p.location || '-')}</span>
+        <div class="tile-sub"><span class="loc" title="${esc(p.location || '')}">${esc(p.location || '-')}</span>
           ${L.isViewOnly(p, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}
           ${statusBadge(p)}</div>
       </div>
