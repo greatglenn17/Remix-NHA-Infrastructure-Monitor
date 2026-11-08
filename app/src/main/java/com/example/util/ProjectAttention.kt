@@ -44,12 +44,11 @@ object ProjectAttention {
         val finished = project.actualAccomplishment >= 100.0
 
         val slip = slippage(project)
-        val markedBehind = project.status == ProjectStatus.BEHIND_SCHEDULE.label
         // A finished project can't be behind; billing, orders and requests still flag, as they are real open items.
-        if (!finished && (slip <= WARNING_SLIPPAGE || markedBehind)) {
+        // Any negative slippage reads "Behind Schedule" (BarChart.withScheduleStatus); only 10% or more is flagged.
+        if (!finished && slip <= WARNING_SLIPPAGE) {
             val level = if (slip <= CRITICAL_SLIPPAGE) AttentionLevel.CRITICAL else AttentionLevel.WARNING
-            val message = if (slip < 0) "%.2f%% behind schedule".format(-slip) else "Marked behind schedule"
-            flags += AttentionFlag(AttentionKind.BEHIND, level, message)
+            flags += AttentionFlag(AttentionKind.BEHIND, level, "%.2f%% behind schedule".format(-slip))
         }
 
         val cost = ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)

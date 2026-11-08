@@ -137,6 +137,22 @@ test('bar chart target: Full suspensions freeze it, Partial and pending ones do 
   assert.ok(Math.abs(L.plannedTarget(p, [open, resumed], '2026-02-09') - 5.129) < 0.001);
 });
 
+test('status: Suspended during an approved Full suspension, back when it ends or work resumes', () => {
+  const p = { ...chartProject([sih]), status: 'On-going', actualAccomplishment: 50 };
+  const full = approvedDoc('Work Suspension Order No. 1', 'Duration: 30 Days | Effectivity: 2026-01-21 | End: 2026-02-20');
+  const resumed = approvedDoc('Work Resumption Order No. 1', 'Effectivity: 2026-02-10');
+  assert.equal(L.withSchedule(p, [full], '2026-01-20').status, 'On-going');
+  assert.equal(L.withSchedule(p, [full], '2026-02-10').status, 'Suspended');
+  assert.equal(L.withSchedule(p, [full, resumed], '2026-02-10').status, 'On-going');
+  assert.equal(L.plannedTarget(p, [full, resumed], '2026-02-09'), L.plannedTarget(p, [], '2026-01-20'));
+  assert.equal(L.withSchedule(p, [{ ...full, documentName: 'Partial Work Suspension Order No. 1' }], '2026-02-01').status, 'On-going');
+  // Jan 30 target is 5.13%: any shortfall is Behind Schedule, but only 10% or more is flagged.
+  const at = (actual, status) => L.withSchedule({ ...p, actualAccomplishment: actual, status }, [], '2026-01-30');
+  assert.equal(at(5.12, 'Suspended').status, 'Behind Schedule');
+  assert.equal(at(5.13, 'Behind Schedule').status, 'On-going');
+  assert.equal(L.attentionFlags(at(5.12, 'On-going'), [], 0, '2026-01-30').filter(f => f.kind === 'behind').length, 0);
+});
+
 test('bar chart target: a revised chart applies from its effective date', () => {
   const revised = { label: 'Revised No. 1', effective: '2026-03-01', items: [{ name: 'All works', amount: 100, bars: [[1, 100]] }] };
   const p = chartProject([revised, sih]);

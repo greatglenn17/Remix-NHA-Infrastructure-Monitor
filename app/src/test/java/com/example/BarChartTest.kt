@@ -150,4 +150,36 @@ class BarChartTest {
         assertEquals(typed, BarChart.withPlannedTarget(typed, emptyList(), day))
         assertEquals(5.13, BarChart.withPlannedTarget(project(listOf(sanIldefonso)), emptyList(), day).targetAccomplishment, 1e-9)
     }
+
+    @Test
+    fun status_isSuspendedDuringAFullSuspension_andResumesOnItsResumptionOrder() {
+        val p = project(listOf(sanIldefonso)).copy(actualAccomplishment = 50.0) // ahead, so not behind once it resumes
+        val full = approved("Work Suspension Order No. 1", "Duration: 30 Days | Effectivity: 2026-01-21 | End: 2026-02-20")
+        val resumed = approved("Work Resumption Order No. 1", "Effectivity: 2026-02-10")
+        fun status(docs: List<PendingDocument>, date: LocalDate) = BarChart.withSchedule(p, docs, date).status
+        assertEquals("On-going", status(listOf(full), LocalDate.of(2026, 1, 20)))
+        assertEquals("Suspended", status(listOf(full), LocalDate.of(2026, 1, 21)))
+        assertEquals("Suspended", status(listOf(full), LocalDate.of(2026, 2, 10)))
+        // The resumption order ends it before its End date, and the target picks up again from then.
+        assertEquals("On-going", status(listOf(full, resumed), LocalDate.of(2026, 2, 10)))
+        assertEquals(BarChart.targetOn(p, emptyList(), LocalDate.of(2026, 1, 20)), BarChart.targetOn(p, listOf(full, resumed), LocalDate.of(2026, 2, 9)))
+        assertEquals("On-going", status(listOf(full), LocalDate.of(2026, 2, 20)))
+        // Pending and Partial suspensions leave it going.
+        assertEquals("On-going", status(listOf(full.copy(status = "Pending")), LocalDate.of(2026, 2, 1)))
+        assertEquals("On-going", status(listOf(full.copy(documentName = "Partial Work Suspension Order No. 1")), LocalDate.of(2026, 2, 1)))
+    }
+
+    @Test
+    fun status_anyNegativeSlippageIsBehind_elseOnGoing() {
+        val stored = project(listOf(sanIldefonso)).copy(status = "Suspended")
+        // The target on Jan 30 is 5.13%.
+        fun status(actual: Double, was: String = "Suspended") =
+            BarChart.withSchedule(stored.copy(actualAccomplishment = actual, status = was), emptyList(), LocalDate.of(2026, 1, 30)).status
+        assertEquals("Behind Schedule", status(5.01))
+        assertEquals("On-going", status(5.13))
+        assertEquals("On-going", status(6.0, was = "Behind Schedule"))
+        assertEquals("Behind Schedule", status(5.12, was = "On-going"))
+        val done = stored.copy(actualAccomplishment = 100.0, targetAccomplishment = 100.0)
+        assertEquals(done, BarChart.withSchedule(done, emptyList(), LocalDate.of(2026, 3, 1)))
+    }
 }

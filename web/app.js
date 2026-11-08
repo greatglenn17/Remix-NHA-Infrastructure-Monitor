@@ -193,7 +193,7 @@ function renderSignIn(message = '', note = '') {
 /** One project as the dashboard sees it (ProjectViewModel's PortfolioItem). */
 function itemOf(project) {
   const docs = s.docs.get(project.projectUuid) || [];
-  const p = L.withPlannedTarget(project, docs, today());
+  const p = L.withSchedule(project, docs, today());
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
   return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today()), waiting: L.waitingApproval(docs) };
@@ -376,7 +376,7 @@ function drawProject({ project: stored, records, error }) {
   if (stored === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
   const of = type => records.filter(r => r.type === type);
   const documents = of('pending_documents');
-  const project = L.withPlannedTarget(stored, documents, today());
+  const project = L.withSchedule(stored, documents, today());
   // Room lists billings by local id (creation order); the cloud has no id, so date then last edit.
   const payments = of('project_payments').sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.updatedAt - b.updatedAt);
   const latest = of('weekly_reports').sort((a, b) => b.createdAtTimestamp - a.createdAtTimestamp)[0];

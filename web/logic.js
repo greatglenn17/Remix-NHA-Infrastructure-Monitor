@@ -144,22 +144,41 @@ function pausedItems(d, docs) {
   return (s && itemsOf(s.remarks)) || [];
 }
 
-/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved suspensions that pause `item`. */
-function suspendedDays(docs, from, until, item) {
+/**
+ * BarChart.periods: each approved suspension (and continuance) with its Effectivity and when work resumes, the earlier
+ * of its resumption order's Effectivity and its End (UTC ms); a null end means it is still suspended.
+ */
+function periods(docs) {
   const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
   const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''));
   const field = (remarks, key) => isoDay((new RegExp(`${key}: (\\d{4}-\\d{2}-\\d{2})`).exec(remarks || '') || [])[1]);
-  return approved
-    .filter(d => /work suspension/i.test(d.documentName || ''))
-    .filter(d => { const p = pausedItems(d, docs); return p == null || p.includes(item); })
-    .reduce((t, d) => {
-      const begin = field(d.remarks, 'Effectivity');
-      if (begin == null || begin < from) return t;
-      // Work resumes on the End date; without one, on its resumption order, else it is still suspended.
-      const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
-      const end = field(d.remarks, 'End') ?? (r ? field(r.remarks, 'Effectivity') : null) ?? until + DAY;
-      return t + Math.max(0, (Math.min(end, until + DAY) - begin) / DAY);
-    }, 0);
+  return approved.filter(d => /work suspension/i.test(d.documentName || '')).flatMap(d => {
+    const begin = field(d.remarks, 'Effectivity');
+    if (begin == null) return [];
+    const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
+    const ends = [field(d.remarks, 'End'), r ? field(r.remarks, 'Effectivity') : null].filter(x => x != null);
+    return [{ d, begin, end: ends.length ? Math.min(...ends) : null }];
+  });
+}
+
+/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved suspensions that pause `item`. */
+function suspendedDays(docs, from, until, item) {
+  return periods(docs)
+    .filter(({ d }) => { const p = pausedItems(d, docs); return p == null || p.includes(item); })
+    .reduce((t, { begin, end }) => begin < from ? t : t + Math.max(0, (Math.min(end ?? until + DAY, until + DAY) - begin) / DAY), 0);
+}
+
+/** BarChart.isSuspendedOn: an approved Full suspension is in effect on `today` (yyyy-MM-dd); Partial ones leave it going. */
+export function isSuspendedOn(docs, today) {
+  const now = isoDay(today);
+  return now != null && periods(docs).some(({ d, begin, end }) => pausedItems(d, docs) == null && begin <= now && (end == null || now < end));
+}
+
+/** BarChart.withSchedule: today's target from the chart, then Suspended during a Full suspension, else Behind Schedule at any negative slippage, else On-going. */
+export function withSchedule(project, docs, today) {
+  const p = withPlannedTarget(project, docs, today);
+  if (isCompleted(p)) return p;
+  return { ...p, status: isSuspendedOn(docs, today) ? 'Suspended' : slippage(p) < 0 ? 'Behind Schedule' : 'On-going' };
 }
 
 /** ProjectViewModel.isMine (AssignmentPolicy.isVisible without seesAll): assigned, or the creator of a list-less project. */
@@ -218,9 +237,9 @@ export function attentionFlags(project, docs, billed, today) {
   const flags = [];
   const finished = isCompleted(project);
   const slip = slippage(project);
-  if (!finished && (slip <= -10 || project.status === 'Behind Schedule')) {
-    flags.push({ kind: 'behind', level: slip <= -15 ? 'critical' : 'warning',
-      message: slip < 0 ? `${(-slip).toFixed(2)}% behind schedule` : 'Marked behind schedule' });
+  // Any negative slippage reads "Behind Schedule" (withSchedule); only 10% or more is flagged.
+  if (!finished && slip <= -10) {
+    flags.push({ kind: 'behind', level: slip <= -15 ? 'critical' : 'warning', message: `${(-slip).toFixed(2)}% behind schedule` });
   }
   const cost = currentCost(project, docs);
   if (cost > 0) {

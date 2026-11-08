@@ -2,6 +2,7 @@ package com.example.util
 
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.ProjectStatus
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -100,22 +101,50 @@ object BarChart {
         (ChronoUnit.DAYS.between(start, date) + 1 - suspendedDays(documents, effective, date, item)).toInt()
 
     /** Days from [from] through [until] that approved suspensions (and their continuances) pause [item]; null: Full ones only. */
-    fun suspendedDays(documents: List<PendingDocument>, from: LocalDate, until: LocalDate, item: String? = null): Long {
+    fun suspendedDays(documents: List<PendingDocument>, from: LocalDate, until: LocalDate, item: String? = null): Long =
+        periods(documents)
+            .filter { (doc, _) -> pausedItems(doc, documents)?.let { item != null && item in it } ?: true }
+            .sumOf { (_, period) ->
+                val (begin, end) = period
+                if (begin.isBefore(from)) 0L
+                else ChronoUnit.DAYS.between(begin, minOf(end ?: until.plusDays(1), until.plusDays(1))).coerceAtLeast(0)
+            }
+
+    /**
+     * Each approved suspension (and continuance) with when it stops the clock: its Effectivity up to (not including)
+     * its resumption order's Effectivity or its End, whichever comes first; a null end means it is still suspended.
+     */
+    private fun periods(documents: List<PendingDocument>): List<Pair<PendingDocument, Pair<LocalDate, LocalDate?>>> {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
         val resumptions = approved.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }
-        return approved
-            .filter { it.documentName.contains("Work Suspension", ignoreCase = true) }
-            .filter { doc -> pausedItems(doc, documents)?.let { item != null && item in it } ?: true }
-            .sumOf { doc ->
-                val begin = field(doc.remarks, "Effectivity") ?: return@sumOf 0L
-                if (begin.isBefore(from)) return@sumOf 0L
-                // Work resumes on the End date; without one, on its resumption order, else it is still suspended.
-                val end = field(doc.remarks, "End")
-                    ?: resumptions.firstOrNull { orderNo(it.documentName) == orderNo(doc.documentName) }?.let { field(it.remarks, "Effectivity") }
-                    ?: until.plusDays(1)
-                ChronoUnit.DAYS.between(begin, minOf(end, until.plusDays(1))).coerceAtLeast(0)
-            }
+        return approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.mapNotNull { doc ->
+            val begin = field(doc.remarks, "Effectivity") ?: return@mapNotNull null
+            val resumed = resumptions.firstOrNull { orderNo(it.documentName) == orderNo(doc.documentName) }?.let { field(it.remarks, "Effectivity") }
+            doc to (begin to listOfNotNull(field(doc.remarks, "End"), resumed).minOrNull())
+        }
     }
+
+    /** True when an approved Full suspension (or continuance) is in effect on [date]; Partial ones leave the project going. */
+    fun isSuspendedOn(documents: List<PendingDocument>, date: LocalDate): Boolean = periods(documents).any { (doc, period) ->
+        val (begin, end) = period
+        pausedItems(doc, documents) == null && !date.isBefore(begin) && (end == null || date.isBefore(end))
+    }
+
+    /**
+     * [project]'s status on [date]: Suspended while an approved Full suspension is in effect (until its End date or its
+     * resumption order's Effectivity), else Behind Schedule at any negative slippage, else On-going.
+     * The behind-schedule flag still waits for [ProjectAttention.WARNING_SLIPPAGE].
+     */
+    fun withScheduleStatus(project: Project, documents: List<PendingDocument>, date: LocalDate): Project = when {
+        project.isCompleted -> project
+        isSuspendedOn(documents, date) -> project.copy(status = ProjectStatus.SUSPENDED.label)
+        ProjectAttention.slippage(project) < 0 -> project.copy(status = ProjectStatus.BEHIND_SCHEDULE.label)
+        else -> project.copy(status = ProjectStatus.ONGOING.label)
+    }
+
+    /** [project] as of [date]: its target from the chart, then its status from its suspension orders. */
+    fun withSchedule(project: Project, documents: List<PendingDocument>, date: LocalDate): Project =
+        withScheduleStatus(withPlannedTarget(project, documents, date), documents, date)
 
     /**
      * The work items a Partial suspension pauses ("Items: A; B" in its remarks; a continuance without its own list

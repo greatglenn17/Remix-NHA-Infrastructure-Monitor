@@ -423,7 +423,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 .distinctBy { project ->
                     "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
                 }
-                .withPlannedTargets(docs)
+                .withSchedule(docs)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -715,15 +715,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     val selectedProject: StateFlow<Project?> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(null)
         else combine(repository.getProjectById(id), repository.getPendingDocuments(id)) { project, docs ->
-            project?.let { BarChart.withPlannedTarget(it, docs, LocalDate.now()) }
+            project?.let { BarChart.withSchedule(it, docs, LocalDate.now()) }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // shortcut: read at each emission, so an app left open past midnight shows yesterday's target until data changes.
-    private fun List<Project>.withPlannedTargets(docs: List<PendingDocument>): List<Project> {
+    private fun List<Project>.withSchedule(docs: List<PendingDocument>): List<Project> {
         val today = LocalDate.now()
         val byProject = docs.groupBy { it.projectId }
-        return map { BarChart.withPlannedTarget(it, byProject[it.id].orEmpty(), today) }
+        return map { BarChart.withSchedule(it, byProject[it.id].orEmpty(), today) }
     }
 
     // Sub-logs for selected project
