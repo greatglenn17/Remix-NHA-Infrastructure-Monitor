@@ -262,7 +262,9 @@ fun ProjectDetailScreen(
                             onAddWeeklyReport = onAddWeeklyReportClick.takeIf { currentUser.role.hasPermission(Permission.SUBMIT_REPORT) },
                             construction = remember(isHousingProject, allSitesSdpItems) {
                                 com.example.util.SdpSummary.of(allSitesSdpItems).takeIf { isHousingProject && it.saleable.count > 0 }
-                            }
+                            },
+                            onSaveBarChart = { json: String -> viewModel.saveBarChart(currentProject.id, json) }
+                                .takeIf { currentUser.role.hasPermission(Permission.MANAGE_BAR_CHART) }
                         )
                     }
                     ProjectSection.PROGRESS -> Column {

@@ -90,6 +90,63 @@ function isoDay(s) {
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
 }
 
+const DAY = 86400000;
+
+/**
+ * BarChart.targetOn: the approved bar chart's planned accomplishment (%) on `today` (yyyy-MM-dd), or null without
+ * a chart. Each item's amount is spread evenly over its bars' contract days (the start date is day 1); a revised
+ * chart applies from its effective date; approved Full suspensions taking effect on or after it stop the clock.
+ */
+export function plannedTarget(project, docs, today) {
+  let versions;
+  try { versions = JSON.parse(project.barChartJson || '[]'); } catch { return null; }
+  if (!Array.isArray(versions) || !versions.length) return null;
+  const start = isoDay(project.dateStarted), now = isoDay(today);
+  if (start == null || now == null) return null;
+  versions = [...versions].sort((a, b) => String(a.effective).localeCompare(String(b.effective)));
+  const v = [...versions].reverse().find(x => { const e = isoDay(x.effective); return e == null || e <= now; }) || versions[0];
+  const day = (now - start) / DAY + 1 - suspendedDays(docs, Math.max(isoDay(v.effective) ?? start, start), now);
+  const items = v.items || [];
+  const total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0);
+  if (total <= 0) return 0;
+  const len = ([a, b]) => Math.max(0, b - a + 1);
+  const planned = items.reduce((t, i) => {
+    const bars = i.bars || [];
+    const days = bars.reduce((n, bar) => n + len(bar), 0);
+    const done = bars.reduce((n, [a, b]) => n + Math.min(Math.max(Math.min(day, b) - a + 1, 0), len([a, b])), 0);
+    return t + (days ? (Number(i.amount) || 0) * done / days : 0);
+  }, 0);
+  return planned / total * 100;
+}
+
+/** BarChart.withPlannedTarget: the project with today's target from its chart; unchanged without one, or once completed. */
+export function withPlannedTarget(project, docs, today) {
+  if (isCompleted(project)) return project;
+  const t = plannedTarget(project, docs, today);
+  return t == null ? project : { ...project, targetAccomplishment: Math.round(t * 100) / 100 };
+}
+
+// "2nd Partial Continuance of …", "Partial Work Suspension Order No. 1"; an old "(Full) of …" continuance says so itself.
+const isPartialOrder = name => { const m = /\((full|partial)\)\s+of/i.exec(name); return m ? /partial/i.test(m[1]) : /partial/i.test(name); };
+
+/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved Full suspensions. */
+function suspendedDays(docs, from, until) {
+  const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
+  const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''));
+  const field = (remarks, key) => isoDay((new RegExp(`${key}: (\\d{4}-\\d{2}-\\d{2})`).exec(remarks || '') || [])[1]);
+  const no = name => (/No\. ?(\S+?)(?:\s|$|\))/.exec(name || '') || [])[1];
+  return approved
+    .filter(d => /work suspension/i.test(d.documentName || '') && !isPartialOrder(d.documentName || ''))
+    .reduce((t, d) => {
+      const begin = field(d.remarks, 'Effectivity');
+      if (begin == null || begin < from) return t;
+      // Work resumes on the End date; without one, on its resumption order, else it is still suspended.
+      const r = resumptions.find(x => no(x.documentName) === no(d.documentName));
+      const end = field(d.remarks, 'End') ?? (r ? field(r.remarks, 'Effectivity') : null) ?? until + DAY;
+      return t + Math.max(0, (Math.min(end, until + DAY) - begin) / DAY);
+    }, 0);
+}
+
 /** ProjectViewModel.isMine (AssignmentPolicy.isVisible without seesAll): assigned, or the creator of a list-less project. */
 export function isMine(project, uid, claims) {
   const list = project.assignedUids || [];

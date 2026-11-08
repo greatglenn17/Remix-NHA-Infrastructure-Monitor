@@ -91,3 +91,48 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.storagePathOf(`nhafile:${id}.pdf`), `attachments/${id}.pdf`);
   assert.equal(L.storagePathOf('https://example.com/x.jpg'), null);
 });
+
+// San Ildefonso Heights Phase 1, approved bar chart (same data as BarChartTest).
+const sih = { label: 'Original', effective: '2026-01-01', items: [
+  ['Land Acquisition', 26235612.20, [[1, 60]]], ['Mobilization/Demobilization', 1650985.67, [[1, 15], [356, 360]]],
+  ['Permits/Licenses', 200000, [[16, 45]]], ['Temporary Facilities', 483840, [[16, 45]]], ['Safety and Health', 302400, [[16, 355]]],
+  ['Survey Works', 1669468.37, [[46, 90]]], ['Site Preparations', 6823711.50, [[46, 165]]], ['Roadworks', 10464952.20, [[61, 300]]],
+  ['Drainage Works', 6557196.92, [[166, 300]]], ['Water Supply System', 3251701.34, [[166, 300]]],
+  ['Electrical System', 415744, [[301, 355]]], ['Housing Construction', 228766486, [[76, 355]]],
+].map(([name, amount, bars]) => ({ name, amount, bars })) };
+const chartProject = (versions) => ({ dateStarted: '2026-01-01', barChartJson: JSON.stringify(versions), actualAccomplishment: 0 });
+const approvedDoc = (documentName, remarks) => ({ documentName, remarks, status: 'Approved' });
+
+test('bar chart target follows the approved chart per day', () => {
+  const p = chartProject([sih]);
+  assert.ok(Math.abs(L.plannedTarget(p, [], '2026-01-30') - 5.129) < 0.001);
+  assert.equal(L.plannedTarget(p, [], '2025-12-31'), 0);
+  assert.equal(L.plannedTarget(p, [], '2027-06-01'), 100);
+  assert.equal(L.plannedTarget({ dateStarted: '2026-01-01' }, [], '2026-01-30'), null);
+  assert.equal(L.plannedTarget({ dateStarted: '2026-01-01', barChartJson: 'oops' }, [], '2026-01-30'), null);
+  assert.equal(L.withPlannedTarget(p, [], '2026-01-30').targetAccomplishment, 5.13);
+  const done = { ...p, actualAccomplishment: 100, targetAccomplishment: 100 };
+  assert.equal(L.withPlannedTarget(done, [], '2026-01-30'), done);
+});
+
+test('bar chart target: Full suspensions freeze it, Partial and pending ones do not', () => {
+  const p = chartProject([sih]);
+  const full = approvedDoc('Work Suspension Order No. 1', 'Duration: 10 Days | Effectivity: 2026-01-21 | End: 2026-01-31');
+  assert.ok(Math.abs(L.plannedTarget(p, [full], '2026-02-09') - 5.129) < 0.001);
+  const plain = L.plannedTarget(p, [], '2026-02-09');
+  assert.equal(L.plannedTarget(p, [{ ...full, documentName: 'Partial Work Suspension Order No. 1' }], '2026-02-09'), plain);
+  assert.equal(L.plannedTarget(p, [{ ...full, status: 'Pending' }], '2026-02-09'), plain);
+  const open = approvedDoc('Work Suspension Order No. 1', 'Duration: 0 Days | Effectivity: 2026-01-21');
+  const resumed = approvedDoc('Work Resumption Order No. 1', 'Effectivity: 2026-01-31');
+  assert.ok(Math.abs(L.plannedTarget(p, [open, resumed], '2026-02-09') - 5.129) < 0.001);
+});
+
+test('bar chart target: a revised chart applies from its effective date', () => {
+  const revised = { label: 'Revised No. 1', effective: '2026-03-01', items: [{ name: 'All works', amount: 100, bars: [[1, 100]] }] };
+  const p = chartProject([revised, sih]);
+  const before = approvedDoc('Work Suspension Order No. 1', 'Duration: 10 Days | Effectivity: 2026-01-21 | End: 2026-01-31');
+  assert.ok(Math.abs(L.plannedTarget(p, [before], '2026-02-09') - 5.129) < 0.001);
+  assert.equal(L.plannedTarget(p, [before], '2026-03-01'), 60);
+  const later = approvedDoc('Work Suspension Order No. 2', 'Duration: 5 Days | Effectivity: 2026-03-02 | End: 2026-03-07');
+  assert.equal(L.plannedTarget(p, [before, later], '2026-03-07'), 61);
+});

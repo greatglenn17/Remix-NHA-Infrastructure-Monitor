@@ -42,7 +42,9 @@ enum class Permission {
     VIEW_AUDIT_LOGS,
     MANAGE_SDP_PLANS,
     // Approve or reject time extensions, suspensions, resumptions and variation orders.
-    APPROVE_ORDER
+    APPROVE_ORDER,
+    // Enter or revise the approved bar chart the target % follows.
+    MANAGE_BAR_CHART
 }
 
 fun UserRole.hasPermission(permission: Permission): Boolean {
@@ -57,7 +59,8 @@ fun UserRole.hasPermission(permission: Permission): Boolean {
             Permission.BACKUP_RESTORE,
             Permission.MANAGE_USERS,
             Permission.MANAGE_SDP_PLANS,
-            Permission.APPROVE_ORDER -> false
+            Permission.APPROVE_ORDER,
+            Permission.MANAGE_BAR_CHART -> false
             else -> true
         }
         UserRole.VIEWER, UserRole.SUPER_VIEWER -> false

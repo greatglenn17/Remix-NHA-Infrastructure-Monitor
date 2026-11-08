@@ -68,7 +68,9 @@ fun SummarySection(
     weeklyReports: List<WeeklyReport> = emptyList(),
     onAddWeeklyReport: (() -> Unit)? = null,
     // Housing units by stage from the subdivision plan; null hides the card.
-    construction: SdpSummary.Summary? = null
+    construction: SdpSummary.Summary? = null,
+    // Saves the approved bar chart; null when this account may not change it.
+    onSaveBarChart: ((String) -> Unit)? = null
 ) {
     val missingWeek = WeekRange.containing(today).takeIf { onAddWeeklyReport != null && needsThisWeeksReport(project, weeklyReports, today) }
     val revisedCompletion = remember(documents, project.dateStarted, project.contractDurationDays) {
@@ -81,11 +83,13 @@ fun SummarySection(
     var editRequest by remember { mutableStateOf<com.example.data.model.DeveloperRequest?>(null) }
     var showLetterDialog by remember { mutableStateOf(false) }
     var editLetter by remember { mutableStateOf<com.example.data.model.ContractorLetter?>(null) }
+    var showBarChart by remember { mutableStateOf(false) }
     // What the engineer does next comes first; the profile is reference, below.
     val cards = listOfNotNull<@Composable (Modifier) -> Unit>(
         { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
         construction?.let { c -> { m -> ConstructionCard(c, payments, today, m) } },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
+        { m -> BarChartCard(project, documents, today, onSaveBarChart?.let { { showBarChart = true } }, m) },
         { m ->
             KeyDatesCard(
                 project, revisedCompletion, addedDays, today, documents,
@@ -137,6 +141,9 @@ fun SummarySection(
         )
     }
     OrderDialogs(openOrder, documents, currentUserRole, onUpdateOrderStatus, onDeleteOrder, onAddContinuance) { openOrder = null }
+    if (showBarChart && onSaveBarChart != null) {
+        BarChartDialog(project, onDismiss = { showBarChart = false }, onSave = { onSaveBarChart(it); showBarChart = false })
+    }
 }
 
 private val SCHEDULE_ORDER_TYPES = listOf("Time Extension", "Work Suspension", "Work Resumption")
@@ -433,7 +440,7 @@ internal fun needsThisWeeksReport(project: Project, reports: List<WeeklyReport>,
 }
 
 /** Scope of works JSON as (name, amount, weight %); plain text becomes one item at 100%. */
-private fun scopeItems(json: String): List<Triple<String, Double, Double>> = try {
+internal fun scopeItems(json: String): List<Triple<String, Double, Double>> = try {
     val items = org.json.JSONArray(json)
     (0 until items.length()).map { i ->
         val obj = items.getJSONObject(i)

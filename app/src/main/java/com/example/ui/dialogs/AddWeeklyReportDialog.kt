@@ -53,6 +53,7 @@ import com.example.ui.theme.WeatherRainShowersCyan
 import com.example.ui.theme.WeatherRainyBlue
 import com.example.ui.theme.WeatherStormyRed
 import com.example.util.ActivityDays
+import com.example.util.BarChart
 import com.example.util.FormValidation
 import org.json.JSONArray
 import org.json.JSONObject
@@ -80,7 +81,9 @@ fun AddWeeklyReportDialog(
     existingReport: com.example.data.model.WeeklyReport? = null,
     onDismiss: () -> Unit,
     onSubmit: WeeklySubmit,
-    today: java.time.LocalDate = java.time.LocalDate.now()
+    today: java.time.LocalDate = java.time.LocalDate.now(),
+    // The project's orders, so a bar chart target skips Full suspensions.
+    documents: List<com.example.data.model.PendingDocument> = emptyList()
 ) {
     // Only new reports keep a draft; editing a saved report works as before.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -103,7 +106,7 @@ fun AddWeeklyReportDialog(
         )
         return
     }
-    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today)
+    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents)
 }
 
 @Composable
@@ -114,7 +117,8 @@ private fun WeeklyReportForm(
     draft: WeeklyDraft?,
     onDismiss: () -> Unit,
     onSubmit: WeeklySubmit,
-    today: java.time.LocalDate
+    today: java.time.LocalDate,
+    documents: List<com.example.data.model.PendingDocument>
 ) {
     // A draft fills the form the same way a saved report does when editing.
     val seed = existingReport ?: draft?.report
@@ -199,7 +203,13 @@ private fun WeeklyReportForm(
         }
     }
     
-    val overallTarget by remember { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (accomplishmentMap[it.name]?.first?.toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
+    // With an approved bar chart the targets are its plan as of the week's last day, not typed.
+    val chartAsOf = daysOfWeekWithDates.lastOrNull()?.third
+    val chartTargets = remember(chartAsOf, project?.barChartJson, documents) {
+        project?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
+    }
+    fun targetText(name: String) = chartTargets?.let { (it[name] ?: 0.0).toString() } ?: accomplishmentMap[name]?.first ?: "0.0"
+    val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallActual by remember { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (accomplishmentMap[it.name]?.second?.toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallVariance by remember { androidx.compose.runtime.derivedStateOf { overallActual - overallTarget } }
     
@@ -340,7 +350,7 @@ private fun WeeklyReportForm(
     fun accItemsJson() = JSONArray(scopeItems.map { item ->
         val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
         JSONObject().put("itemDescription", item.name)
-            .put("targetPct", vals.first.toDoubleOrNull() ?: 0.0)
+            .put("targetPct", targetText(item.name).toDoubleOrNull() ?: 0.0)
             .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
             .put("weightPct", item.weightPct)
     }).toString()
@@ -452,6 +462,10 @@ private fun WeeklyReportForm(
                     )
                 }
                 Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                if (chartTargets != null) Text(
+                    "Target % is from the approved bar chart as of ${com.example.util.ProjectSchedule.displayDate(chartAsOf.orEmpty())}.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
                 
                 // Header
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -474,11 +488,12 @@ private fun WeeklyReportForm(
                             Text("Wt: ${"%.2f".format(item.weightPct)}%", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                         OutlinedTextField(
-                            value = vals.first,
+                            value = targetText(item.name),
                             onValueChange = { accomplishmentMap[item.name] = Pair(it, vals.second) },
-                            modifier = Modifier.weight(1f),
-                            isError = FormValidation.percentError(vals.first) != null,
-                            supportingText = FormValidation.percentError(vals.first)?.let { { Text(it) } },
+                            modifier = Modifier.weight(1f).testTag("weekly_target_${item.name}"),
+                            readOnly = chartTargets != null,
+                            isError = FormValidation.percentError(targetText(item.name)) != null,
+                            supportingText = FormValidation.percentError(targetText(item.name))?.let { { Text(it) } },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
@@ -491,7 +506,7 @@ private fun WeeklyReportForm(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
-                        val targetVal = vals.first.toDoubleOrNull() ?: 0.0
+                        val targetVal = targetText(item.name).toDoubleOrNull() ?: 0.0
                         val actualVal = vals.second.toDoubleOrNull() ?: 0.0
                         val variance = actualVal - targetVal
                         val varColor = varianceColor(variance, LocalNHAColors.current)

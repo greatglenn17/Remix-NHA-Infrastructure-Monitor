@@ -1,0 +1,135 @@
+package com.example
+
+import com.example.data.model.PendingDocument
+import com.example.data.model.Project
+import com.example.util.BarChart
+import com.example.util.BarChart.Bar
+import com.example.util.BarChart.Item
+import com.example.util.BarChart.Version
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.time.LocalDate
+
+@RunWith(RobolectricTestRunner::class)
+class BarChartTest {
+
+    // San Ildefonso Heights Phase 1, approved bar chart with cash flow (360 c.d.).
+    private val sanIldefonso = Version("Original", "2026-01-01", listOf(
+        Item("Land Acquisition", 26235612.20, listOf(Bar(1, 60))),
+        Item("Mobilization/Demobilization", 1650985.67, listOf(Bar(1, 15), Bar(356, 360))),
+        Item("Permits/Licenses", 200000.0, listOf(Bar(16, 45))),
+        Item("Temporary Facilities", 483840.0, listOf(Bar(16, 45))),
+        Item("Safety and Health", 302400.0, listOf(Bar(16, 355))),
+        Item("Survey Works", 1669468.37, listOf(Bar(46, 90))),
+        Item("Site Preparations", 6823711.50, listOf(Bar(46, 165))),
+        Item("Roadworks", 10464952.20, listOf(Bar(61, 300))),
+        Item("Drainage Works", 6557196.92, listOf(Bar(166, 300))),
+        Item("Water Supply System", 3251701.34, listOf(Bar(166, 300))),
+        Item("Electrical System", 415744.0, listOf(Bar(301, 355))),
+        Item("Housing Construction", 228766486.0, listOf(Bar(76, 355)))
+    ))
+
+    private fun project(chart: List<Version>, start: String = "2026-01-01") = Project(
+        name = "SIH", location = "", implementingOffice = "", contractor = "", scopeOfWork = "",
+        contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 360,
+        dateStarted = start, completionDateOriginal = "", completionDateRevised = "",
+        barChartJson = BarChart.toJson(chart)
+    )
+
+    private fun approved(name: String, remarks: String) = PendingDocument(projectId = 1, documentName = name, status = "Approved", remarks = remarks)
+
+    @Test
+    fun months_matchTheApprovedChartsCumulativeCashFlow() {
+        val excel = listOf(14711306.53, 29607168.37, 46016224.00, 73567648.19, 101119072.38, 128907410.20,
+            156932661.68, 184957913.16, 212983164.64, 241008416.08, 265772562.81, 286822098.20)
+        val months = BarChart.months(sanIldefonso)
+        assertEquals(12, months.size)
+        months.zip(excel).forEach { (m, cash) -> assertEquals("Month ${m.no}", cash, m.cumulativeCash, 0.05) }
+        assertEquals(5.13, months[0].cumulativePct, 0.005)
+        assertEquals(100.0, months[11].cumulativePct, 1e-9)
+    }
+
+    @Test
+    fun target_onADate_spreadsEachBarPerDay() {
+        val p = project(listOf(sanIldefonso))
+        // Day 30 is the end of Month 1.
+        assertEquals(5.129, BarChart.targetOn(p, emptyList(), LocalDate.of(2026, 1, 30))!!, 0.001)
+        assertEquals(0.0, BarChart.targetOn(p, emptyList(), LocalDate.of(2025, 12, 31))!!, 1e-9)
+        assertEquals(100.0, BarChart.targetOn(p, emptyList(), LocalDate.of(2027, 6, 1))!!, 1e-9)
+        assertNull(BarChart.targetOn(project(emptyList()), emptyList(), LocalDate.of(2026, 1, 30)))
+    }
+
+    @Test
+    fun itemTargets_areEachItemsOwnShare() {
+        val targets = BarChart.itemTargetsOn(project(listOf(sanIldefonso)), emptyList(), LocalDate.of(2026, 1, 30))!!
+        assertEquals(50.0, targets["Land Acquisition"]!!, 1e-9)
+        assertEquals(75.0, targets["Mobilization/Demobilization"]!!, 1e-9)
+        assertEquals(0.0, targets["Housing Construction"]!!, 1e-9)
+    }
+
+    @Test
+    fun fullSuspension_freezesTheTarget_partialDoesNot() {
+        val p = project(listOf(sanIldefonso))
+        val full = approved("Work Suspension Order No. 1", "Duration: 10 Days | Effectivity: 2026-01-21 | End: 2026-01-31")
+        // Jan 21-30 suspended, so Feb 9 is read as contract day 30.
+        assertEquals(5.129, BarChart.targetOn(p, listOf(full), LocalDate.of(2026, 2, 9))!!, 0.001)
+        assertEquals(BarChart.targetOn(p, listOf(full), LocalDate.of(2026, 1, 20)), BarChart.targetOn(p, listOf(full), LocalDate.of(2026, 1, 30)))
+        val partial = approved("Partial Work Suspension Order No. 1", full.remarks)
+        assertEquals(BarChart.targetOn(p, emptyList(), LocalDate.of(2026, 2, 9)), BarChart.targetOn(p, listOf(partial), LocalDate.of(2026, 2, 9)))
+        val pending = full.copy(status = "Pending")
+        assertEquals(BarChart.targetOn(p, emptyList(), LocalDate.of(2026, 2, 9)), BarChart.targetOn(p, listOf(pending), LocalDate.of(2026, 2, 9)))
+    }
+
+    @Test
+    fun openSuspension_endsOnItsResumptionOrder() {
+        val p = project(listOf(sanIldefonso))
+        val open = approved("Work Suspension Order No. 1", "Duration: 0 Days | Effectivity: 2026-01-21")
+        val resumed = approved("Work Resumption Order No. 1", "Effectivity: 2026-01-31")
+        assertEquals(5.129, BarChart.targetOn(p, listOf(open, resumed), LocalDate.of(2026, 2, 9))!!, 0.001)
+        // Without a resumption it is still suspended: frozen at Jan 20.
+        assertEquals(BarChart.targetOn(p, emptyList(), LocalDate.of(2026, 1, 20)), BarChart.targetOn(p, listOf(open), LocalDate.of(2026, 3, 1)))
+    }
+
+    @Test
+    fun revisedChart_appliesFromItsEffectiveDate_andAlreadyDrawsEarlierSuspensions() {
+        val revised = Version("Revised No. 1", "2026-03-01", listOf(Item("All works", 100.0, listOf(Bar(1, 100)))))
+        val p = project(listOf(sanIldefonso, revised))
+        val suspension = approved("Work Suspension Order No. 1", "Duration: 10 Days | Effectivity: 2026-01-21 | End: 2026-01-31")
+        // Before Mar 1 the original chart, frozen 10 days.
+        assertEquals(5.129, BarChart.targetOn(p, listOf(suspension), LocalDate.of(2026, 2, 9))!!, 0.001)
+        // From Mar 1 (calendar day 60) the revised chart, which already shows the January idle days.
+        assertEquals(60.0, BarChart.targetOn(p, listOf(suspension), LocalDate.of(2026, 3, 1))!!, 1e-9)
+        // A suspension after the revision still freezes it.
+        val later = approved("Work Suspension Order No. 2", "Duration: 5 Days | Effectivity: 2026-03-02 | End: 2026-03-07")
+        assertEquals(61.0, BarChart.targetOn(p, listOf(suspension, later), LocalDate.of(2026, 3, 7))!!, 1e-9)
+    }
+
+    @Test
+    fun json_roundTrips_andJunkIsNoChart() {
+        assertEquals(listOf(sanIldefonso), BarChart.parse(BarChart.toJson(listOf(sanIldefonso))))
+        assertEquals(emptyList<Version>(), BarChart.parse(""))
+        assertEquals(emptyList<Version>(), BarChart.parse("not json"))
+    }
+
+    @Test
+    fun cells_mapToContractDays() {
+        assertEquals(16, BarChart.cellStart(1, 20))
+        assertEquals(45, BarChart.cellEnd(2, 15))
+        assertEquals(2 to 15, BarChart.cellOf(45))
+        assertEquals(1 to 5, BarChart.cellOf(1))
+        assertEquals(12 to 30, BarChart.cellOf(360))
+    }
+
+    @Test
+    fun withPlannedTarget_leavesCompletedAndChartlessProjectsAlone() {
+        val day = LocalDate.of(2026, 1, 30)
+        val done = project(listOf(sanIldefonso)).copy(targetAccomplishment = 100.0, actualAccomplishment = 100.0)
+        assertEquals(done, BarChart.withPlannedTarget(done, emptyList(), day))
+        val typed = project(emptyList()).copy(targetAccomplishment = 42.0)
+        assertEquals(typed, BarChart.withPlannedTarget(typed, emptyList(), day))
+        assertEquals(5.13, BarChart.withPlannedTarget(project(listOf(sanIldefonso)), emptyList(), day).targetAccomplishment, 1e-9)
+    }
+}

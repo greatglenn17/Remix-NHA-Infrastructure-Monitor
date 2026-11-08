@@ -191,8 +191,9 @@ function renderSignIn(message = '', note = '') {
 /* ---------- Dashboard (DashboardScreen + PortfolioCounts + PortfolioRow) ---------- */
 
 /** One project as the dashboard sees it (ProjectViewModel's PortfolioItem). */
-function itemOf(p) {
-  const docs = s.docs.get(p.projectUuid) || [];
+function itemOf(project) {
+  const docs = s.docs.get(project.projectUuid) || [];
+  const p = L.withPlannedTarget(project, docs, today());
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
   return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today()), waiting: L.waitingApproval(docs) };
@@ -369,12 +370,13 @@ const kv = (k, v, cls = '') => {
 const section = (title, ic, body, cls = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2></div>${body}</section>`;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
-function drawProject({ project, records, error }) {
+function drawProject({ project: stored, records, error }) {
   if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
-  if (project === undefined) return;
-  if (project === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
+  if (stored === undefined) return;
+  if (stored === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
   const of = type => records.filter(r => r.type === type);
   const documents = of('pending_documents');
+  const project = L.withPlannedTarget(stored, documents, today());
   // Room lists billings by local id (creation order); the cloud has no id, so date then last edit.
   const payments = of('project_payments').sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.updatedAt - b.updatedAt);
   const latest = of('weekly_reports').sort((a, b) => b.createdAtTimestamp - a.createdAtTimestamp)[0];

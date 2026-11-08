@@ -19,6 +19,7 @@ import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
 import com.example.util.AppNotificationManager
 import com.example.util.AttentionFlag
+import com.example.util.BarChart
 import com.example.util.BillingProgress
 import com.example.util.ContractCost
 import com.example.util.Portfolio
@@ -411,7 +412,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             initialValue = emptyList()
         )
 
-        userScopedProjects = combine(rawProjects, currentUserAccount, _showAllProjects) { projects, user, showAll ->
+        userScopedProjects = combine(rawProjects, currentUserAccount, _showAllProjects, repository.getAllPendingDocuments()) { projects, user, showAll, docs ->
             // Super Admin and Super Viewer see everything; everyone else the projects naming their
             // account, and with the Super Admin's switch, all of them while All projects is on.
             val isSuperAdmin = user.role == UserRole.SUPER_ADMIN
@@ -422,6 +423,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 .distinctBy { project ->
                     "${project.name.normalizeProjectKey()}|${project.location.normalizeProjectKey()}"
                 }
+                .withPlannedTargets(docs)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -711,8 +713,18 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     // Selected Project Flow
     @OptIn(ExperimentalCoroutinesApi::class)
     val selectedProject: StateFlow<Project?> = _selectedProjectId.flatMapLatest { id ->
-        if (id == null) flowOf(null) else repository.getProjectById(id)
+        if (id == null) flowOf(null)
+        else combine(repository.getProjectById(id), repository.getPendingDocuments(id)) { project, docs ->
+            project?.let { BarChart.withPlannedTarget(it, docs, LocalDate.now()) }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // shortcut: read at each emission, so an app left open past midnight shows yesterday's target until data changes.
+    private fun List<Project>.withPlannedTargets(docs: List<PendingDocument>): List<Project> {
+        val today = LocalDate.now()
+        val byProject = docs.groupBy { it.projectId }
+        return map { BarChart.withPlannedTarget(it, byProject[it.id].orEmpty(), today) }
+    }
 
     // Sub-logs for selected project
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -1959,6 +1971,17 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             signatories,
             blueBookBanner
         )
+    }
+
+    /** Saves the approved bar chart ([json] from BarChart.toJson; blank removes it). */
+    fun saveBarChart(projectId: Long, json: String) {
+        viewModelScope.launch(missingProjectGuard) {
+            if (!currentUserAccount.value.role.hasPermission(Permission.MANAGE_BAR_CHART)) return@launch
+            val current = projectDao.getProjectByIdOnce(projectId) ?: return@launch
+            if (current.barChartJson == json) return@launch
+            saveProjectChange(current.copy(barChartJson = json))
+            logAuditAction(projectId, "Bar Chart", if (json.isBlank()) "Removed the approved bar chart" else "Saved the approved bar chart")
+        }
     }
 
     fun updateProjectStatus(projectId: Long, newStatus: String) {

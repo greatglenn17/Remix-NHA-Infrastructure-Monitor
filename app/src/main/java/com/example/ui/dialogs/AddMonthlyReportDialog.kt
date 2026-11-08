@@ -51,8 +51,9 @@ fun AddMonthlyReportDialog(
         }.sortedBy { it.id }
     }
 
-    val sumTarget = remember(monthWeeklyReports) { monthWeeklyReports.sumOf { it.targetAccomplishmentPct } }
-    val sumActual = remember(monthWeeklyReports) { monthWeeklyReports.sumOf { it.actualAccomplishmentPct } }
+    // Weekly figures are cumulative (as of the week), so the month stands at its last week, not their sum.
+    val sumTarget = remember(monthWeeklyReports) { monthWeeklyReports.lastOrNull()?.targetAccomplishmentPct ?: 0.0 }
+    val sumActual = remember(monthWeeklyReports) { monthWeeklyReports.lastOrNull()?.actualAccomplishmentPct ?: 0.0 }
 
     var unworkableDays by remember { mutableStateOf(existingReport?.unworkableDaysCount?.toString() ?: "2") }
     var workableDays by remember { mutableStateOf(existingReport?.workableDaysCount?.toString() ?: "29") }
@@ -126,7 +127,7 @@ fun AddMonthlyReportDialog(
                 val varTotal = sumActual - sumTarget
                 HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("GRAND TOTAL", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
+                    Text("AS OF MONTH END", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(sumTarget)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(sumActual)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
                     Text("${"%.2f".format(varTotal)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = varianceColor(varTotal, nha), fontSize = 12.sp)
