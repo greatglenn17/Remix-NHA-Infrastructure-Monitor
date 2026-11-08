@@ -1,48 +1,34 @@
 ---
 name: NHA Monitor Web
-description: The NHA Monitor Android app on a wide screen; a read-only portfolio and project Summary viewer.
+description: A read-only portfolio and project Summary viewer for NHA Monitor, in a navy and slate palette.
 colors:
-  primary: "#0A6FD4"
+  primary: "#1E3A8A"
   on-primary: "#FFFFFF"
-  primary-container: "#E5F4FF"
-  on-primary-container: "#0757A8"
-  canvas: "#F5F5F5"
+  primary-container: "#DBEAFE"
+  on-primary-container: "#1E3A8A"
+  accent: "#2563EB"
+  canvas: "#F8FAFC"
   surface: "#FFFFFF"
-  surface-variant: "#F0F0F0"
-  text: "#1E1E1E"
-  text-2: "#666666"
-  border: "#E6E6E6"
-  outline: "#8C8C8C"
+  surface-variant: "#F1F5F9"
+  text: "#0F172A"
+  text-2: "#475569"
+  border: "#E2E8F0"
+  outline: "#94A3B8"
   ok: "#15803D"
   ok-container: "#DCFCE7"
-  watch: "#B45309"
-  watch-container: "#FEF3C7"
+  watch: "#C2410C"
+  watch-container: "#FFEDD5"
   behind: "#B91C1C"
   behind-container: "#FEE2E2"
-  neutral: "#6B6B6B"
-  neutral-container: "#F0F0F0"
-  hero-start: "#0A6FD4"
-  hero-end: "#06396E"
-  primary-dark: "#3DADFF"
-  on-primary-dark: "#1E1E1E"
-  primary-container-dark: "#1B3A57"
-  on-primary-container-dark: "#E5F4FF"
-  canvas-dark: "#1E1E1E"
-  surface-dark: "#2C2C2C"
-  surface-variant-dark: "#383838"
-  text-dark: "#F5F5F5"
-  text-2-dark: "#A3A3A3"
-  border-dark: "#444444"
-  outline-dark: "#8A8A8A"
-  ok-dark: "#4ADE80"
-  ok-container-dark: "#173322"
-  watch-dark: "#FBBF24"
-  watch-container-dark: "#3A2D10"
-  behind-dark: "#FCA5A5"
-  behind-container-dark: "#3F1E1E"
-  neutral-dark: "#A3A3A3"
-  hero-start-dark: "#15508F"
-  hero-end-dark: "#0A2440"
+  neutral: "#64748B"
+  neutral-container: "#F1F5F9"
+  hero-start: "#1E3A8A"
+  hero-end: "#0F172A"
+  bar-bg: "#0F172A"
+  bar-text: "#F8FAFC"
+  bar-text-2: "#CBD5E1"
+  bar-chip: "#1E293B"
+  bar-link: "#93C5FD"
 typography:
   display:
     fontFamily: "Inter, system-ui, sans-serif"
@@ -169,46 +155,50 @@ components:
 
 **Creative North Star: "The Phone, Opened Wide"**
 
-The web viewer is the NHA Monitor Android app shown on a laptop or a meeting-room projector. It is not a separate identity. The tokens in `web/style.css` mirror the app's theme (`app/src/main/java/com/example/ui/theme/Color.kt`, `Type.kt`, `Theme.kt`, `Motion.kt`), and the app is the source of truth: a token changes here only when it changes there. Someone who uses the app on a phone should find the same header, the same chips, and the same bars in the same places.
+The web viewer is the NHA Monitor Android app shown on a laptop or a meeting-room projector. It is not a separate identity. Its layouts, type, shapes and components follow the app (`app/src/main/java/com/example/ui/`). Its colours do not: on 2026-11-08 the user chose a navy and slate palette from a reference design (primary #1E3A8A, secondary #0F172A, tertiary #2563EB, neutral #F8FAFC), always light. Someone who uses the app on a phone should find the same header, the same chips, and the same bars in the same places.
 
-The look is a calm Figma-style system: a grey canvas, white panels with 1px hairlines and 8px corners, one blue, and four status colours that only ever describe a project's state. Density is moderate. Screens have to read on a projector, so the hierarchy comes from weight (600 titles over 400 body) and grey secondary text, not from big type. Everything is read-only and quiet. Colour appears where it carries meaning (progress, slippage, attention) and almost nowhere else.
+The look is calm: a cool grey canvas, white panels with 1px slate hairlines and 8px corners, a dark slate top bar, navy for actions, a brighter blue for progress, and four status colours that only ever describe a project's state. Density is moderate. Screens have to read on a projector, so the hierarchy comes from weight (600 titles over 400 body) and grey secondary text, not from big type. Everything is read-only and quiet. Colour appears where it carries meaning (progress, slippage, attention) and almost nowhere else.
 
 It rejects the generic admin template (side menu, KPI cards, blue-on-white data tables) and it does not imitate official NHA or government branding.
 
 **Key Characteristics:**
-- Mirrors the Android app's tokens exactly, in light and dark (follows `prefers-color-scheme`).
-- Grey canvas, white hairline panels, 8px card radius, a faint ambient lift.
-- One blue for interaction and the Billed bar. Status colours are for status only.
+- Always light (`color-scheme: light`), whatever the device's setting. There is no dark theme.
+- Cool grey canvas, white hairline panels, a dark slate top bar, 8px card radius, a faint ambient lift.
+- Navy for interaction, bright blue for the Billed and average bars. Status colours are for status only.
 - Inter throughout. Tabular figures only on numbers that line up.
 - Material Symbols Outlined icons at 20px (16px small), always next to a text label.
 - One motion: the progress bars fill in when data arrives.
 
 ## Colors
 
-A restrained grey-and-white base with a single Figma blue and a four-step status scale, each with a tinted container. Dark mode swaps in the `-dark` values. The roles stay the same.
+A cool slate base with navy for actions, one brighter blue for progress, and a four-step status scale, each with a tinted container. Light only.
 
 ### Primary
-- **Figma Blue** (`primary`, dark `primary-dark`): buttons, text buttons, links, focus rings, the caret, section-head icons, and the Billed progress bar. Selected chips and the "missing data" note use **Blue Mist** (`primary-container`) with **Deep Blue** text (`on-primary-container`).
-- **Brand Gradient** (`hero-start` to `hero-end`, 135deg): used only on the sign-in hero panel, which is the app's LoginScreen brand area. Text on it is white.
+- **Navy** (`primary`): buttons, text buttons, links, focus rings, the caret and section-head icons. Selected chips and the "missing data" note use **Blue Mist** (`primary-container`) with navy text.
+- **Progress Blue** (`accent`): the Billed bars and the portfolio's average work done bar.
+- **Brand Gradient** (`hero-start` navy to `hero-end` slate, 135deg): used only on the sign-in hero panel. Text on it is white.
+
+### Top bar
+- **Slate** (`bar-bg`) with **Snow** title text (`bar-text`), **Mist** secondary text (`bar-text-2`), a `bar-chip` fill for the read-only badge and **Sky** (`bar-link`) for Sign out.
 
 ### Status (semantic, from the app's onTrack / watch / behind / neutral)
 - **On Track Green** (`ok`) on `ok-container`: projects on schedule, the Work done bar when slippage is small, and success notes.
-- **Watch Amber** (`watch`) on `watch-container`: slippage to keep an eye on, warning-level attention flags.
+- **Watch Orange** (`watch`) on `watch-container`: slippage to keep an eye on, warning-level attention flags.
 - **Behind Red** (`behind`) on `behind-container`: projects behind schedule, critical flags, form errors.
-- **Neutral Grey** (`neutral`) on `neutral-container`: no status yet (not started, no data).
+- **Neutral Slate** (`neutral`) on `neutral-container`: no status yet (not started, no data).
 
 ### Neutral
-- **Canvas Grey** (`canvas`): the page background.
-- **Panel White** (`surface`): cards, the app bar, inputs, chips, dialogs.
-- **Soft Grey** (`surface-variant`): photo placeholders, scope blocks, the view-only badge.
-- **Ink** (`text`) and **Secondary Grey** (`text-2`): primary and secondary text. Every label, unit, and metadata line uses `text-2`.
+- **Canvas** (`canvas`): the page background.
+- **Panel White** (`surface`): cards, inputs, chips, dialogs.
+- **Soft Slate** (`surface-variant`): photo placeholders, scope blocks, the view-only badge.
+- **Ink** (`text`) and **Secondary Slate** (`text-2`): primary and secondary text. Every label, unit, and metadata line uses `text-2`.
 - **Hairline** (`border`): card borders, row dividers, the empty track of a progress bar.
 - **Outline** (`outline`): input strokes, and card or chip borders on hover.
 
 ### Named Rules
-**The Meaning-Only Colour Rule.** Green, amber, red, and neutral grey describe a project's state and nothing else. They are never decoration, section tints, or brand accents.
+**The Meaning-Only Colour Rule.** Green, orange, red, and neutral slate describe a project's state and nothing else. They are never decoration, section tints, or brand accents.
 
-**The App-Is-Truth Rule.** Every colour token has a counterpart in `Color.kt`. Don't add or adjust a web colour that the app doesn't also have.
+**The Palette-Is-Fixed Rule.** Every colour comes from the tokens above, set in `web/style.css` `:root`. Don't add a colour outside them.
 
 ## Typography
 
@@ -248,7 +238,7 @@ The content column is centred at 1320px max width, with 24px side padding (16px 
 Mostly flat, with tonal layering. Depth comes from white panels on the grey canvas plus a 1px hairline. Cards add one faint ambient lift. Nothing gets more lift on hover: hover changes the border to `outline`. Dialogs sit on a 40% black backdrop.
 
 ### Shadow Vocabulary
-- **Lift** (`box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 3px rgb(0 0 0 / 0.04)`; dark `0 1px 2px rgb(0 0 0 / 0.4)`): every card at rest.
+- **Lift** (`box-shadow: 0 1px 2px rgb(15 23 42 / 0.05)`): every card at rest.
 
 ### Named Rules
 **The Hairline-First Rule.** A panel is defined by its 1px border and its colour step from the canvas. The shadow is a whisper and never grows on interaction.
@@ -261,13 +251,13 @@ Small, consistent radii from the app's FigmaShapes: 4px (view badge, focus ring)
 
 ### Buttons
 - **Shape:** gently rounded (6px), at least 40px tall.
-- **Primary:** Figma Blue fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
+- **Primary:** Navy fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
 - **Hover / Focus:** hover brightens the fill (`filter: brightness(1.08)`). Focus is a 2px primary outline with a 2px offset. Disabled is 0.6 opacity.
 - **Text button:** blue 600 14px, 8px padding, Blue Mist background on hover. Used for Sign out, Back, Forgot password, and "What these mean". An icon leads the label.
 
 ### Chips
 - **Style:** white, 1px hairline, 8px radius, 500 14px, at least 36px tall. A 16px icon leads, and a bold tabular count goes before the label on attention chips.
-- **State:** selected (`aria-pressed="true"`) uses Blue Mist with Deep Blue text and no border. Hover darkens the border to `outline`. Attention chips tint only their icon (behind red, watch amber).
+- **State:** selected (`aria-pressed="true"`) uses Blue Mist with navy text and no border. Hover darkens the border to `outline`. Attention chips tint only their icon (behind red, watch orange).
 
 ### Cards / Containers
 - **Corner Style:** 8px.
@@ -282,27 +272,27 @@ Small, consistent radii from the app's FigmaShapes: 4px (view badge, focus ring)
 - **Error:** a 13px/500 Behind Red line under the fields, with `role="alert"`.
 
 ### Navigation
-- **App bar:** a white sticky bar. The brand title is 16px/600 with the office line under it. On the right: the user line (13px `text-2`; the email hides under 600px), a view-only badge, and the Sign out text button. Navigation between pages is a Back text button with no menu.
+- **App bar:** a dark slate sticky bar. The brand title is 16px/600 with the office line under it. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, and the Sign out text button. Navigation between pages is a Back text button with no menu.
 
 ### Status Badge
 A small 6px tag in 700 11px, with status colour text on its container. The **view-only** variant is quieter: 4px radius, 500 weight, Soft Grey with `text-2` and an eye icon.
 
 ### Progress Line (signature)
-A label (12px/500 `text-2`) and a value (600, tabular) over a 6px bar on the hairline track with 3px corners. **Work done** is coloured by slippage (ok, watch, behind, or neutral). **Billed** is always Figma Blue. The two always appear as a pair on every project card and header. In headers the value is 22px/600 and secondary text follows it. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
+A label (12px/500 `text-2`) and a value (600, tabular) over a 6px bar on the hairline track with 3px corners. **Work done** is coloured by slippage (ok, watch, behind, or neutral). **Billed** is always Progress Blue. The two always appear as a pair on every project card and header. In headers the value is 22px/600 and secondary text follows it. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** take every colour, radius, and type value from the app's theme files, and change the web tokens only together with the app.
+- **Do** take radius and type values from the app's theme files, and colours only from the navy and slate tokens above.
 - **Do** pair Work done (slippage colour) with Billed (blue) wherever a project's progress appears.
 - **Do** put a text label next to every Material Symbols icon, and keep icons at 20px or 16px.
 - **Do** apply tabular figures only to numbers that align (table cells, progress values, counts, totals).
 - **Do** define panels with a 1px hairline on the grey canvas and the single Lift shadow. Hover changes the border only.
-- **Do** keep the dark theme as a role-for-role swap through `prefers-color-scheme`.
+- **Do** keep the page light on every device.
 
 ### Don't:
 - **Don't** use the status colours for anything other than project state.
-- **Don't** introduce a side menu, KPI tiles, or a separate web identity. The web is the app on a wide screen.
+- **Don't** introduce a side menu or KPI tiles. The layouts stay the app's, on a wide screen.
 - **Don't** imitate official NHA or government branding.
 - **Don't** use the brand gradient outside the sign-in hero.
 - **Don't** use tracked uppercase lines as section labels or eyebrows. The office line under the brand is the only uppercase text.
