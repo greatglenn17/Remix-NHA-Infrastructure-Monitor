@@ -184,7 +184,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 - **Action Blue** (`primary`): the Sign in button. **Link Blue** (`link`): text buttons, links, focus rings, the caret and section-head icons. Selected filters and the "missing data" note use **Blue Haze** (`primary-container`) with `on-primary-container` text.
 - **Progress Blue** (`accent`): the Work done bar while a project is on or ahead of plan or slipping by less than 10%.
 - **Billed Violet** (`billed`, #C4B5FD): every Billed bar, so money never reads as a work colour. It is lighter than Progress Blue so the two bars read apart on a projector.
-- **Brand Gradient** (`hero-start` navy to `hero-end` canvas, 135deg): used only on the sign-in hero panel. Text on it is white.
+- **Brand Gradient** (`hero-start` navy to `hero-end` canvas, 135deg): used only on the sign-in hero panel, see-through (82% to 55%) so the background photo shows. Text on it is white.
 
 ### Top bar
 - **Canvas** (`bar-bg`) with a bottom hairline, `bar-text` title, `bar-text-2` secondary text, a `bar-chip` fill for the read-only badge and **Sky** (`bar-link`) for Sign out.
@@ -241,7 +241,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 The content column is centred at 1320px max width, with 24px side padding (16px under 600px) and 20px top / 48px bottom padding inside `main`. Spacing follows a 4px base (4, 8, 12, 16, 20, 24px). Gaps between cards are 12px, and gaps between paired bars are 16px to 24px.
 
 - **App bar:** sticky, canvas-coloured, with a bottom hairline. Brand block (40px logo, then the title and office line) on the left, user and Sign out pushed to the right.
-- **Sign-in:** a full-bleed two-column grid (hero 5fr, form 6fr) with no app bar. Under 900px it stacks, hero first. The form is at most 400px wide and centred.
+- **Sign-in:** a full-bleed two-column grid (hero 5fr, form 6fr) with no app bar, over a blurred photo of houses under construction (`web/signin-bg.webp`, supplied by the user, darkened 45%). Under 900px it stacks, hero first. The form is at most 400px wide, centred, on a 90% canvas card with a hairline and 12px corners.
 - **Dashboard:** the command banner (count and on-going/completed line on the left; the filter pills on the right; the priority callout across the bottom; stacked under 900px), then one control row (search with a Cmd/Ctrl+K hint, the My / All projects segmented control, then "What these mean" and "Showing N of M" on the right), then a project grid of `auto-fill, minmax(min(380px, 100%), 1fr)`, which gives two or three columns on desktop.
 - **Project card:** a header row (48px photo, name and town, status badge on the right), Work done over Billed, an optional flag line, and a footer under a hairline with the completion date and the waiting-approval badge. Under 600px the badges drop under the name.
 - **Project Summary:** a header card (36px name, 30px under 640px; town; status badge top right with a hairline in its own colour; Work done and Billed side by side while each has 300px, stacked below that), then a bento grid: column 1 Needs attention and Project profile, column 2 Key dates, column 3 Contract cost and Latest weekly report, with Status of payment across all three. From 1100px down it is two columns (profile left, the rest stacked right); under 900px, one.
