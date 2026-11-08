@@ -2,7 +2,7 @@
 // change what the phones sync. Screens mirror the Android app (ui/dashboard, ui/detail).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
-  getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
+  initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, query, where, onSnapshot,
@@ -16,7 +16,9 @@ const emulator = new URLSearchParams(location.search).has('emulator') && ['local
 const app = initializeApp(emulator
   ? { apiKey: 'demo', projectId: 'demo-nha', authDomain: 'localhost', storageBucket: 'demo-nha.appspot.com' }
   : firebaseConfig);
-const auth = getAuth(app);
+// getAuth() without its popup/redirect helper: email and password only, so no Google sign-in iframe or
+// script loads and the Content-Security-Policy in firebase.json can block frames and other script hosts.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
 const db = getFirestore(app);
 const storage = getStorage(app);
 if (emulator) {
@@ -130,6 +132,10 @@ function route() {
 
 /* ---------- Sign in (LoginScreen: brand gradient hero beside the form) ---------- */
 
+/** Messages for errors that say nothing about whether an account exists; null for the rest. */
+const authTrouble = err => (err.code === 'auth/too-many-requests' ? 'Too many tries. Wait a few minutes, then try again.'
+  : err.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.' : null);
+
 function renderSignIn(message = '', note = '') {
   main.innerHTML = `
     <div class="signin">
@@ -158,16 +164,22 @@ function renderSignIn(message = '', note = '') {
     try {
       await signInWithEmailAndPassword(auth, email, form.password.value);
     } catch (err) {
-      renderSignIn(err.code === 'auth/invalid-credential' ? 'Wrong email or password. Try again, or reset your password.'
-        : err.code === 'auth/too-many-requests' ? 'Too many tries. Wait a few minutes, then sign in again.'
-        : err.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.' : err.message);
+      // One message for unknown email and wrong password, so the page never says which emails have accounts.
+      renderSignIn(['auth/invalid-credential', 'auth/user-not-found', 'auth/wrong-password', 'auth/invalid-email', 'auth/user-disabled'].includes(err.code)
+        ? 'Wrong email or password. Try again, or reset your password.'
+        : authTrouble(err) || 'Could not sign in. Try again in a moment.');
       document.querySelector('#signin [name=email]').value = email;
     }
   };
   document.getElementById('reset').onclick = async () => {
     const email = form.email.value.trim();
     if (!email) return renderSignIn('Type your email first, then choose Forgot password.');
-    try { await sendPasswordResetEmail(auth, email); renderSignIn('', 'A password reset link was sent to your email.'); } catch (err) { renderSignIn(err.message); }
+    // The same note whether or not the email has an account.
+    const sent = 'If this email has an NHA Monitor account, a password reset link is on its way. Check your inbox and spam folder.';
+    try { await sendPasswordResetEmail(auth, email); renderSignIn('', sent); } catch (err) {
+      const trouble = authTrouble(err);
+      if (trouble) renderSignIn(trouble); else renderSignIn('', sent);
+    }
   };
 }
 

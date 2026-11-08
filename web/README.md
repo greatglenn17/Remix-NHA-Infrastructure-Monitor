@@ -56,6 +56,15 @@ node --test web/logic.test.mjs
 2. Authentication > Settings > **Authorized domains**: `nha-monitor-bulacan-2026.web.app` and
    `localhost` are there by default. Add any custom domain you use.
 
+## Security headers
+
+`firebase.json` sends a Content-Security-Policy (scripts only from this site and `www.gstatic.com`,
+data only from `*.googleapis.com`, no frames, and the site cannot be framed), plus
+`X-Frame-Options: DENY`, `nosniff`, a strict referrer policy and a Permissions-Policy. The
+`127.0.0.1` entries in the policy are only for the local emulators. If you add a script, font,
+image or API host, add it to the policy too or the browser will block it. Auth is started with
+`initializeAuth` and no popup/redirect helper, so no Google sign-in iframe is needed.
+
 ## Deploy
 
 `firebase.json` now serves `web/` (it used to serve the old `public/` prototype, which pointed
