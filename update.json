@@ -1,8 +1,8 @@
 {
-  "versionCode": 273,
-  "versionName": "2.7.3",
-  "releaseNotes": "v2.7.3: The login screen and About NHA Monitor now say this is an unofficial app, made for the Bulacan District Office.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.7.3/NHA_Monitor_v2.7.3_Build273.apk",
-  "apkSha256": "613dd0d3b4884872190231383aaae8f2ecbb251508f4639e1641907c3338e152",
+  "versionCode": 274,
+  "versionName": "2.7.4",
+  "releaseNotes": "v2.7.4: About NHA Monitor's build info now says \"Made for NHA Bulacan District Office\" instead of naming the National Housing Authority.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.7.4/NHA_Monitor_v2.7.4_Build274.apk",
+  "apkSha256": "bb56adeb4c3df1c4a75471a285aa9d0242d9985134dcf4ef84bec3b4757420b6",
   "isMandatory": true
 }
