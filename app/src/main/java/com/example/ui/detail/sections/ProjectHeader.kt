@@ -16,11 +16,12 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.Project
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.dashboard.StatusBadge
-import com.example.ui.dashboard.varianceColor
+import com.example.ui.dashboard.workDoneColor
 import com.example.ui.dashboard.workDoneText
 import com.example.ui.theme.LocalNHAColors
 import com.example.util.BillingProgress
 import com.example.util.ProjectAttention
+import java.time.LocalDate
 
 /** Name, location, status, variance and the two bars; [collapsed] keeps only one line; [onClose] shows an X (two panes). */
 @Composable
@@ -30,12 +31,14 @@ fun ProjectHeader(
     contractCost: Double,
     collapsed: Boolean,
     modifier: Modifier = Modifier,
-    onClose: (() -> Unit)? = null
+    onClose: (() -> Unit)? = null,
+    today: LocalDate = LocalDate.now()
 ) {
     val billedFraction = BillingProgress.billedFraction(billedTotal, contractCost)?.takeIf { billedTotal > 0 }
     val scheme = MaterialTheme.colorScheme
     val colors = LocalNHAColors.current
-    val varianceColor = varianceColor(ProjectAttention.slippage(project), colors)
+    val overdue = ProjectAttention.overdue(project, today)
+    val workColor = workDoneColor(project, overdue != null, colors)
     Surface(color = scheme.surface, modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = if (collapsed) 8.dp else 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -49,7 +52,7 @@ fun ProjectHeader(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                StatusBadge(project, colors)
+                StatusBadge(project, colors, overdue)
                 if (onClose != null) {
                     IconButton(onClick = onClose, modifier = Modifier.testTag("close_project_button")) {
                         Icon(Icons.Default.Close, contentDescription = "Close project", tint = scheme.onSurfaceVariant)
@@ -73,9 +76,9 @@ fun ProjectHeader(
                     val workDone: @Composable (Modifier) -> Unit = { m ->
                         ProgressLine(
                             label = "Work done",
-                            value = workDoneText(project),
+                            value = workDoneText(project, overdue != null),
                             fraction = (project.actualAccomplishment / 100).toFloat(),
-                            color = varianceColor,
+                            color = workColor,
                             modifier = m,
                             big = true
                         )
