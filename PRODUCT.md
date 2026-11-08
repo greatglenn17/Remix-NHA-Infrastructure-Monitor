@@ -42,7 +42,7 @@ It is not a separate system. It shows exactly what the phones recorded, with the
 
 ## Brand Commitments
 
-The web must look and feel like the Android app (user's decision, 2026-11-08, after seeing other directions): the same palette, type, components and screen layouts as `app/src/main/java/com/example/ui/`, adapted to a wide screen. The app's theme is the source of truth. No official NHA logo is supplied. Do not imitate official NHA or government branding.
+The web keeps the Android app's type, components and screen layouts (`app/src/main/java/com/example/ui/`), adapted to a wide screen (user's decision, 2026-11-08). Its colours come from a reference design the user chose later the same day: primary navy #1E3A8A, secondary slate #0F172A, tertiary blue #2563EB, neutral #F8FAFC, always light. No official NHA logo is supplied. Do not imitate official NHA or government branding.
 
 ## Evidence on Hand
 

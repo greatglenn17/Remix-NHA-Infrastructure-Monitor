@@ -11,9 +11,10 @@ version keep working.
 - Screens: the dashboard (portfolio totals, attention filters, search, project cards) and the project **Summary** (profile,
   key dates, contract cost, latest weekly report, open issues, status of payment).
 
-The look follows the Android app's theme (`app/src/main/java/com/example/ui/theme/`): the same
-greys, one blue accent, the app's on-track / watch / behind status colours, and light and dark
-modes that follow the device. The dashboard's attention counts use the app's ProjectAttention
+The layouts, type and components follow the Android app (`app/src/main/java/com/example/ui/`).
+The colours are a navy and slate palette (navy #1E3A8A, slate #0F172A, blue #2563EB, light grey
+#F8FAFC) with the app's on-track / watch / behind status colours. The site is always light, even
+on a device set to dark mode. The dashboard's attention counts use the app's ProjectAttention
 thresholds. Inter is bundled in `web/fonts/` (SIL Open Font License, see `licenses/Inter-OFL.txt`).
 The icons are Material Symbols from Google Fonts. See `DESIGN.md` at the repo root for the tokens.
 
