@@ -1,8 +1,8 @@
 {
-  "versionCode": 270,
-  "versionName": "2.7.0",
-  "releaseNotes": "v2.7.0: New accounts can view until the Super Admin approves them in Manage users.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.7.0/NHA_Monitor_v2.7.0_Build270.apk",
-  "apkSha256": "e1d0da96bf7a36fa2caecd73c64e2eebd4d29b9df236306d6d4244336503fcbf",
+  "versionCode": 271,
+  "versionName": "2.7.1",
+  "releaseNotes": "v2.7.1: A project past its completion date now shows Overdue by N days in red on its card and header.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.7.1/NHA_Monitor_v2.7.1_Build271.apk",
+  "apkSha256": "b37a11ccc17fc3e6689ea83ceadbc9c607d25daf5e330e3521594e79d68f3828",
   "isMandatory": true
 }
