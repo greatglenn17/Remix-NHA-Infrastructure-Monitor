@@ -1085,7 +1085,9 @@ async function planBytes(refText) {
     const url = await photoUrl(refText);
     if (!url) throw new Error('the PDF is not uploaded yet');
     // no-store: a copy cached when the PDF was opened from its link may lack the CORS header the browser needs here.
-    const res = await fetch(url, { cache: 'no-store' });
+    // Range: download managers such as IDM take over a plain PDF download (the page then gets "Failed to fetch"),
+    // but leave a partial (206) answer alone; bytes=0- is still the whole file.
+    const res = await fetch(url, { cache: 'no-store', headers: { Range: 'bytes=0-' } });
     if (!res.ok) throw new Error(`download failed, ${res.status}`);
     return await res.arrayBuffer();
   } catch (e) {
