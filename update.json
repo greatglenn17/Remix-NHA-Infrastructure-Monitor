@@ -1,8 +1,8 @@
 {
-  "versionCode": 280,
-  "versionName": "2.8.0",
-  "releaseNotes": "v2.8.0: Target % now follows each project's approved bar chart. Monthly reports use the month's last weekly report. On the Lots tab you can rotate an SDP plan that came in sideways, or delete a wrongly uploaded plan.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.0/NHA_Monitor_v2.8.0_Build280.apk",
-  "apkSha256": "e90ce140f385edab2b241f0dd99bf5a13f57eec065fbe268d57b9a2c7cc8b777",
+  "versionCode": 281,
+  "versionName": "2.8.1",
+  "releaseNotes": "v2.8.1: Suspension end dates count the effectivity date as day 1 (90 days from May 26 end Aug 23), and suspension forms have an End Date you can pick. A Time Extension for a suspension fills in its days. The revised completion date is no longer one day late.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.1/NHA_Monitor_v2.8.1_Build281.apk",
+  "apkSha256": "2975bd0e4df0bbcd9ae10a9a54ffc2d1bc43a3aa03b3be619efdf9ae34103fd2",
   "isMandatory": true
 }
