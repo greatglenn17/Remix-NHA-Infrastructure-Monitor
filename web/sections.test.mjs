@@ -220,3 +220,14 @@ test('print: the monthly form has every section and the month\'s figures', () =>
   assert.ok(!html.includes('Next') && !html.includes('Old'), 'October billing and August issue are left out');
   assert.ok(html.includes('<td>None</td>'), 'no variation or suspension orders');
 });
+
+test('print: extensions read either name style; one for approval does not move the schedule', () => {
+  const docs = [{ documentName: 'Time Extension No. 1 (30 days)', status: 'Pending' }, { documentName: 'Time Extension No. 2 - 30 Days', status: 'Approved' }];
+  assert.deepEqual(P.extensionsOf(docs).map(e => [e.no, e.days, e.status]), [['1', 30, '(for approval)'], ['2', 30, '']]);
+  const html = P.monthlyReportHtml({ project: { contractDurationDays: 540, dateStarted: '2026-01-05' }, month: '2026-09', weeks: [], payments: [], issues: [],
+    docs, weather: [], signatories: P.monthlySignatories({}, {}), banner: '' });
+  assert.ok(html.includes("<td class='c'>1</td><td class='n'>30</td><td class='n'></td><td></td><td></td><td></td><td>(for approval)</td>"));
+  assert.ok(html.includes("<td class='c'>2</td><td class='n'>30</td><td class='n'>570 c.d.</td>") && html.includes('July 28, 2027'));
+  assert.ok(!html.includes('No weather logged'));
+  assert.ok(html.includes("<td class='nw'>Php 0.00</td>"), 'contract costs stay on one line');
+});

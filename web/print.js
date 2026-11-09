@@ -101,8 +101,9 @@ export function weekDocuments(report, letters, requests) {
 
 /** ContractLogs.extensions: each Time Extension's number, days and "(for approval)" until approved. */
 export const extensionsOf = docs => docs.filter(d => /^time extension/i.test(d.documentName || '')).map(d => {
-  const m = /Time Extension No\. ?(\S*) - (\d+) Days/i.exec(d.documentName);
-  return { no: m?.[1] || '', days: Number(m?.[2]) || 0, reason: L.remarkField(d.remarks, 'Reason'), status: /^approved$/i.test(d.status || '') ? '' : '(for approval)' };
+  // "Time Extension No. 1 - 30 Days" as the phone names it; an older "Time Extension No. 1 (30 days)" reads too.
+  const no = /\bNo\.\s*([^\s(-]+)/i.exec(d.documentName), days = /(\d+)\s*Days/i.exec(d.documentName);
+  return { no: no?.[1] || '', days: Number(days?.[1]) || 0, reason: L.remarkField(d.remarks, 'Reason'), status: /^approved$/i.test(d.status || '') ? '' : '(for approval)' };
 });
 
 /** ProjectViewModel.signatoriesFor(weekly = true): saved names, else the signed-in user and the form's usual positions. */
@@ -200,8 +201,8 @@ function basicInfo(project, docs, label1, value1, label2, value2) {
     <tr><td class='lab'>IMPLEMENTING OFFICE</td><td colspan='3'>${esc(project.implementingOffice)}</td></tr>
     <tr><td class='lab'>CONTRACTOR</td><td colspan='3'>${esc(project.contractor)}</td></tr>
     <tr><td class='lab'>SCOPE OF WORK</td><td colspan='3'>${scopeText(project.scopeOfWork ?? '')}</td></tr>
-    <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td>${esc(peso(L.originalCost(project)))}</td><td class='lab'>${label1}</td><td>${value1}</td></tr>
-    <tr><td class='lab'>CONTRACT COST (REVISED)</td><td>${esc(peso(L.currentCost(project, docs)))}</td><td class='lab'>${label2}</td><td>${value2}</td></tr>
+    <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td class='nw'>${esc(peso(L.originalCost(project)))}</td><td class='lab'>${label1}</td><td>${value1}</td></tr>
+    <tr><td class='lab'>CONTRACT COST (REVISED)</td><td class='nw'>${esc(peso(L.currentCost(project, docs)))}</td><td class='lab'>${label2}</td><td>${value2}</td></tr>
     <tr><td class='lab'>CONTRACT DURATION</td><td colspan='3'>${esc(project.contractDurationDays ?? 0)} calendar days</td></tr>
     <tr><td class='lab'>DATE STARTED</td><td>${esc(longDate(project.dateStarted))}</td><td class='lab'>TIME EXTENSION/S</td><td>${te}</td></tr>
     <tr><td class='lab'>COMPLETION DATE (ORIGINAL)</td><td>${esc(longDate(project.completionDateOriginal))}</td><td class='lab'>REVISED COMPLETION DATE</td><td>${esc(longDate(revised))}</td></tr>
@@ -310,15 +311,16 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
       return `<tr><td>${i + 1}. ${esc(p?.name ?? '')}</td><td>${esc(p ? longDate(p.date) : '')}</td><td>${esc(p?.periodCovered ?? '')}</td><td class='n'>${p ? esc(peso(L.netAmount(p))) : ''}</td><td class='n'>${p ? pct(p.percentage) : ''}</td><td class='n'>${p ? esc(`${peso(p.balanceAmount)} (${pct(p.balancePercentage)})`) : ''}</td></tr>`;
     }).join('')}</table>`);
 
-  // Each extension adds its days to the running duration, as the Key Dates card does.
+  // Each approved extension adds its days to the running duration, as the Key Dates card does; one still for approval
+  // shows its days but no revised duration or date, so the last date matches section I.
   const extensions = extensionsOf(docs);
   let duration = Number(project.contractDurationDays) || 0;
   b.push(`<table><tr><th colspan='7' class='sec'>IV. CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>
     ${Array.from({ length: Math.max(4, extensions.length) }, (_, i) => {
-      const t = extensions[i];
-      if (t) duration += t.days;
-      const end = t ? longDate(L.lastDay(project.dateStarted, duration) || '') : '';
-      return `<tr><td class='c'>${esc(t ? t.no : i + 1)}</td><td class='n'>${t ? t.days : ''}</td><td class='n'>${t ? `${duration} c.d.` : ''}</td><td></td><td>${esc(t?.reason ?? '')}</td><td>${esc(end)}</td><td>${esc(t?.status ?? '')}</td></tr>`;
+      const t = extensions[i], counts = t && !t.status;
+      if (counts) duration += t.days;
+      const end = counts ? longDate(L.lastDay(project.dateStarted, duration) || '') : '';
+      return `<tr><td class='c'>${esc(t ? t.no : i + 1)}</td><td class='n'>${t ? t.days : ''}</td><td class='n'>${counts ? `${duration} c.d.` : ''}</td><td></td><td>${esc(t?.reason ?? '')}</td><td>${esc(end)}</td><td>${esc(t?.status ?? '')}</td></tr>`;
     }).join('')}</table>`);
 
   // Only months with weather logged, numbered by contract month when the start date is known.
@@ -326,7 +328,6 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
   const first = monthOf(project.dateStarted);
   const monthNo = (m, i) => (first ? (Number(m.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(m.slice(5)) - Number(first.slice(5)) + 1 : i + 1);
   b.push(`<table><tr><th colspan='4' class='sec'>V. SUMMARY OF UNWORKABLE DAYS DUE TO WEATHER CONDITION</th></tr><tr><th>MONTH NO.</th><th>PERIOD COVERED</th><th>NO. OF WORKABLE DAYS</th><th>NO. OF UNWORKABLE DAYS</th></tr>
-    ${logged.length ? '' : "<tr><td colspan='4' class='empty'>No weather logged yet.</td></tr>"}
     ${logged.map(([m, ok, bad], i) => `<tr><td class='c'>${monthNo(m, i)}</td><td>${esc(monthName(m))}</td><td class='n'>${ok}</td><td class='n'>${bad}</td></tr>`).join('')}
     <tr class='tot'><td colspan='2'>GRAND TOTAL</td><td class='n'>${logged.reduce((t, x) => t + x[1], 0)}</td><td class='n'>${logged.reduce((t, x) => t + x[2], 0)}</td></tr></table>`);
 
