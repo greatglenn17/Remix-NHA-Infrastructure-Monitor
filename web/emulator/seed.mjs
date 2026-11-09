@@ -85,6 +85,14 @@ await record(rid(3), 'project_issues', A, [engineer], {
   date: '2026-10-20', description: 'Right-of-way issue at Block 3', actionTaken: '', remarks: '', loggedBy: 'Engr. Sample',
   timestamp: now, status: 'Pending', isCritical: 0, targetDate: '', actionBy: '',
 });
+await record(rid(300), 'project_issues', A, [engineer], {
+  date: '2026-10-28', description: 'Delayed delivery of rebars for Block 5 footings. Supplier cites truck shortage.', actionTaken: 'Wrote the supplier and asked for a revised schedule.',
+  remarks: 'Follow up on Monday.', loggedBy: 'Engr. Sample', timestamp: now + 1, status: 'Pending', isCritical: 1, targetDate: '2026-11-03', actionBy: 'Contractor/Developer',
+});
+await record(rid(301), 'project_issues', A, [engineer], {
+  date: '2026-09-15', description: 'Water service connection', actionTaken: 'Coordinated with the water district.', remarks: '', loggedBy: 'Engr. Sample',
+  timestamp: now - 1, status: 'Resolved', isCritical: 0, targetDate: '2026-10-01', actionBy: 'Implementing Office',
+});
 await record(rid(4), 'pending_documents', A, [engineer], {
   documentName: 'Variation Order No. 1 - PHP 1,500,000.00', status: 'Approved', remarks: '', isCoreChecklist: 0, fileUrl: '',
 });

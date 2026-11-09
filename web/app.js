@@ -391,9 +391,9 @@ const fileLink = (refText, label) => (L.storagePathOf(refText)
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
 /** ProjectSection: the project screen's four sections. */
 const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
-/** SectionChips: the views inside Progress (Weather and Issues are not on the website yet; Lots only for housing) and Documents. */
+/** SectionChips: the views inside Progress (Weather is not on the website yet; Lots only for housing) and Documents. */
 const CHIPS = {
-  progress: ['Weekly', 'Monthly', 'Photos'],
+  progress: ['Weekly', 'Monthly', 'Photos', 'Issues'],
   documents: ['Suspension / Resumption', 'Time Extensions', 'Variation Orders', 'Letters to Contractor', 'Developer Requests', 'Related Files'],
 };
 
@@ -416,7 +416,7 @@ function drawProject(page) {
   if (page.section === 'print') return drawPrint(c);
 
   const housing = /housing/i.test(project.projectType || '');
-  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos'] : CHIPS[page.section];
+  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Issues'] : CHIPS[page.section];
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
@@ -442,6 +442,7 @@ function drawProject(page) {
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
+  if (document.getElementById('issue-results')) bindIssues(c);
   loadFiles(main);
 }
 
@@ -548,6 +549,7 @@ function progressBody(c, chip) {
   if (chip === 'Monthly') return monthlyView(c);
   if (chip === 'Lots') return lotsView(c);
   if (chip === 'Photos') return photosView(c);
+  if (chip === 'Issues') return issuesView(c);
   if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
   return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id)).join('')}</div>`;
 }
@@ -718,6 +720,55 @@ function bindLots(c) {
   document.getElementById('lot-q').oninput = e => { st.query = e.target.value; redraw(false); };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; redraw(false); }; });
   main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; drawProject(c.page); }; });
+}
+
+/* ---------- Issues (IssuesTab, IssueCard), read-only ---------- */
+
+const issueState = page => (page.issues ||= { query: '', filter: 'All' });
+
+function issuesView(c) {
+  const st = issueState(c.page);
+  return `<label class="field issue-q">Search<input type="search" id="issue-q" placeholder="Search issues or actions taken..." value="${esc(st.query)}" autocomplete="off"></label>
+    <div class="chips" role="group" aria-label="Filter issues">${L.ISSUE_FILTERS.map(f => `<button data-issue-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div>
+    <div id="issue-results">${issueResults(c, st)}</div>`;
+}
+
+function issueResults(c, st) {
+  // ProjectDao lists issues newest logged first.
+  const issues = c.of('project_issues').sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
+    .filter(i => L.issueMatches(i, st.query, st.filter, c.now));
+  if (!issues.length) return `<div class="card empty">${icon('warning')}<p>${st.query || st.filter !== 'All' ? 'No matching issues found' : 'No Issues Logged'}</p></div>`;
+  return `<ul class="issue-cards">${issues.map(i => issueCard(i, c.now)).join('')}</ul>`;
+}
+
+function issueCard(i, now) {
+  const overdue = L.isOverdueIssue(i, now), critical = L.isCriticalIssue(i), status = i.status || 'Pending';
+  const level = /resolved/i.test(status) ? 'ok' : /critical/i.test(status) ? 'behind' : 'watch';
+  const block = (label, text, cls = '') => (text?.trim() ? `<h4 class="${cls}">${esc(label)}</h4><p>${esc(text)}</p>` : '');
+  return `<li class="card issue-card${critical ? ' critical' : ''}">
+    <div class="ic-head"><p>${icon('event', 'sm')}<span>${esc(L.displayDate(i.date))}${i.targetDate?.trim()
+      ? `<span class="${overdue ? 'behind' : 'muted'}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (OVERDUE)' : ''}</span>` : ''}</span></p>
+      <div class="ic-badges">${critical ? '<span class="badge lv-behind">CRITICAL</span>' : ''}<span class="badge lv-${level}">${esc(status.toUpperCase())}</span></div></div>
+    ${block('Issue description', i.description || '-')}
+    ${block(`Action taken${i.actionBy?.trim() ? ` by ${i.actionBy.trim()}` : ''}`, i.actionTaken, 'link')}
+    ${block('Remarks / notes', i.remarks)}
+    ${i.loggedBy?.trim() ? `<p class="muted small logged">Logged by: ${esc(i.loggedBy)}</p>` : ''}
+  </li>`;
+}
+
+function bindIssues(c) {
+  const st = issueState(c.page);
+  const results = document.getElementById('issue-results');
+  // Only the results redraw while typing, so the search box keeps its focus.
+  const redraw = () => { results.innerHTML = issueResults(c, st); };
+  document.getElementById('issue-q').oninput = e => { st.query = e.target.value; redraw(); };
+  main.querySelectorAll('[data-issue-filter]').forEach(b => {
+    b.onclick = () => {
+      st.filter = b.dataset.issueFilter;
+      main.querySelectorAll('[data-issue-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
+      redraw();
+    };
+  });
 }
 
 /** PhotoGalleryTab: one album per reporting week, in report order. */
