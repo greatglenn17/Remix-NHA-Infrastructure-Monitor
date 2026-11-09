@@ -289,3 +289,14 @@ test('issues: overdue and the search and filter chips read like the phone', () =
   assert.deepEqual(ids('cruz', 'All'), ['R']);
   assert.deepEqual(ids('rain', 'Pending'), ['D']);
 });
+
+test('weather: the 7 days of a report, the logged months and month lengths read like the phone', () => {
+  assert.deepEqual(L.weekDays('Oct 31, 2026 - Nov 6, 2026'), ['2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06']);
+  assert.equal(L.weekDays('Week 30: July 20 - July 26, 2026')[0], '2026-07-20');
+  assert.deepEqual(L.weekDays('sometime'), []);
+  assert.deepEqual(L.weatherMonths([{ date: '2026-10-31' }, { date: '2026-11-02' }, { date: '2026-10-01' }, { date: '' }]), ['2026-11', '2026-10']);
+  assert.deepEqual(['2026-02', '2028-02', '2026-11', '2026-12'].map(L.daysInMonth), [28, 29, 30, 31]);
+  assert.match(P.weatherClock(null, 7), />7<\/text><\/svg>/); // a day with no log still shows its number
+  assert.doesNotMatch(P.weatherClock(null), /font-weight='bold'/);
+  assert.match(P.weatherClock({ date: '2026-11-05', hourlyConditionsCsv: '' }), />5<\/text><\/svg>/);
+});
