@@ -138,7 +138,7 @@ export function weeklyReportHtml({ project, report, docs, issues, letters, reque
   const accomplishment = L.accomplishmentOf(report.accomplishmentItemsJson);
   const weather = Array.isArray(report._weather) ? report._weather : [];
   const b = [header(banner, `For the Week of ${esc((report.reportingWeek || '').replace(/^Week \d+: /, ''))}`),
-    basicInfo(project, docs, 'DAYS ELAPSED:', esc(report.daysElapsed ?? 0), 'REMAINING DAYS:', esc(report.remainingDays ?? 0))];
+    basicInfo(project, docs, 'DAYS ELAPSED:', `${esc(report.daysElapsed ?? 0)} calendar days`, 'REMAINING DAYS:', `${esc(report.remainingDays ?? 0)} calendar days`)];
 
   b.push(`<table><tr><th class='sec'>II. DAILY WEATHER CHART</th></tr><tr><td><div class='legend'>LEGEND: ${WEATHER.map(([, label, hex]) => `<span><i style='background:${hex}'></i>${label}</span>`).join('')}</div>
     <table class='clocks'><tr>${WEEK_DAYS.map(d => `<th>${d.toUpperCase()}</th>`).join('')}</tr><tr>${WEEK_DAYS.map(day => {
