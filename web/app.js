@@ -616,9 +616,11 @@ function monthlyView({ page, weekly, of, now }) {
   const last = rows[rows.length - 1];
   const t = Number(last?.targetAccomplishmentPct) || 0, a = Number(last?.actualAccomplishmentPct) || 0, v = a - t;
   const level = L.varianceLevel(Math.round(v * 100) / 100);
+  const key = P.monthKey(month); // the phone prints only a month it can read ("September 2026")
   return `<section class="card section month">
     <div class="month-head">
       <label class="field">Month <select id="month">${months.map(m => `<option${m === month ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></label>
+      ${key ? `<a class="text-btn" href="#/p/${esc(page.id)}/print/${key}">${icon('print', 'sm')}Print</a>` : ''}
     </div>
     <h3>Monthly accomplishment report – ${esc(month)}</h3>
     <p><span class="badge lv-${level}">${v >= 0 ? `AHEAD (${signedPct(v)})` : `SLIPPAGE (${signedPct(v)})`}</span></p>
@@ -728,7 +730,9 @@ function relatedCard(files) {
 
 /* ---------- Weekly report print (BlueBookForms.weeklyReport on an A4 sheet) ---------- */
 
-async function drawPrint({ page, project, of, documents, weekly }) {
+async function drawPrint(c) {
+  if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
+  const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
   if (!report) { main.innerHTML = `${back}<p class="muted">This weekly report was deleted or does not exist.</p>`; return; }
@@ -748,6 +752,32 @@ async function drawPrint({ page, project, of, documents, weekly }) {
     project, report, docs: documents, issues: of('project_issues'), photos, banner: 'blue-book-header.png',
     letters: L.mergedLetters(of('contractor_letters'), documents), requests: of('developer_requests'),
     signatories: P.weeklySignatories(project, s.profile),
+  });
+  await Promise.all([...sheet.querySelectorAll('img')].map(img => img.decode().catch(() => {})));
+  if (page.printToken !== token) return;
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.innerHTML = `${icon('print', 'sm')}Print`;
+  btn.onclick = () => window.print();
+}
+
+/** The monthly form (BlueBookForms.monthlyReport) for `#/p/<id>/print/2026-09`. */
+async function drawMonthlyPrint({ page, project, of, documents, payments, weekly }) {
+  const month = P.monthName(page.sub);
+  page.month = month; page.chips.progress = 'Monthly'; // the back link returns to this month
+  document.title = `Monthly Report - ${month}`;
+  const token = page.printToken = {};
+  main.innerHTML = `<div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Monthly reports</a>
+      <button class="btn" id="do-print" disabled>${icon('print', 'sm')}Preparing…</button></div>
+    <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = P.monthlyReportHtml({
+    project, month: page.sub, weeks: L.monthReports(weekly, month), payments, issues: of('project_issues'), docs: documents,
+    // shortcut: weather comes only from the logs synced with weekly reports; the phone also counts days not in a report.
+    weather: weekly.flatMap(r => (Array.isArray(r._weather) ? r._weather : [])),
+    saved: of('monthly_reports').find(r => (r.reportingMonth || '').trim().toLowerCase() === month.toLowerCase()),
+    signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
   });
   await Promise.all([...sheet.querySelectorAll('img')].map(img => img.decode().catch(() => {})));
   if (page.printToken !== token) return;

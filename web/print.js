@@ -1,5 +1,6 @@
-// The weekly Project Engineer's Report (Blue Book form) as the phone prints it: BlueBookForms.weeklyReport and the
-// pieces it uses (ContractLogs, weekIssues, weekDocuments, weatherClock). Change both together. Pure: no Firebase.
+// The weekly and monthly Project Engineer's Reports (Blue Book forms) as the phone prints them: BlueBookForms.weeklyReport,
+// .monthlyReport and the pieces they use (ContractLogs, weekIssues, weekDocuments, weatherClock, workableDays). Change both
+// together. Pure: no Firebase.
 import * as L from './logic.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -100,8 +101,9 @@ export function weekDocuments(report, letters, requests) {
 
 /** ContractLogs.extensions: each Time Extension's number, days and "(for approval)" until approved. */
 export const extensionsOf = docs => docs.filter(d => /^time extension/i.test(d.documentName || '')).map(d => {
-  const m = /Time Extension No\. ?(\S*) - (\d+) Days/i.exec(d.documentName);
-  return { no: m?.[1] || '', days: Number(m?.[2]) || 0, status: /^approved$/i.test(d.status || '') ? '' : '(for approval)' };
+  // "Time Extension No. 1 - 30 Days" as the phone names it; an older "Time Extension No. 1 (30 days)" reads too.
+  const no = /\bNo\.\s*([^\s(-]+)/i.exec(d.documentName), days = /(\d+)\s*Days/i.exec(d.documentName);
+  return { no: no?.[1] || '', days: Number(days?.[1]) || 0, reason: L.remarkField(d.remarks, 'Reason'), status: /^approved$/i.test(d.status || '') ? '' : '(for approval)' };
 });
 
 /** ProjectViewModel.signatoriesFor(weekly = true): saved names, else the signed-in user and the form's usual positions. */
@@ -132,28 +134,11 @@ function scopeText(json) {
  * and `requests` are the project's records (letters already merged); `banner` is the NHA header image URL.
  */
 export function weeklyReportHtml({ project, report, docs, issues, letters, requests, photos, signatories: s, banner }) {
-  const extensions = extensionsOf(docs);
-  const te = extensions.map(e => esc(`No. ${e.no}: ${e.days} c.d.${e.status ? ` ${e.status}` : ''}`)).join('<br>') || 'None';
-  const revised = L.revisedCompletion(project, docs) ?? L.effectiveCompletion(project);
   const manpower = L.manpowerOf(report.manpowerJson), equipment = L.equipmentOf(report.equipmentJson);
   const accomplishment = L.accomplishmentOf(report.accomplishmentItemsJson);
   const weather = Array.isArray(report._weather) ? report._weather : [];
-  const b = [];
-  if (banner) b.push(`<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>`);
-  b.push(`<h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>For the Week of ${esc((report.reportingWeek || '').replace(/^Week \d+: /, ''))}</div>`);
-  b.push(`<table class='info'>
-    <tr><th colspan='4' class='sec'>I. BASIC INFORMATION</th></tr>
-    <tr><td class='lab'>PROJECT NAME</td><td colspan='3'>${esc(project.name)}</td></tr>
-    <tr><td class='lab'>LOCATION</td><td colspan='3'>${esc(project.location)}</td></tr>
-    <tr><td class='lab'>IMPLEMENTING OFFICE</td><td colspan='3'>${esc(project.implementingOffice)}</td></tr>
-    <tr><td class='lab'>CONTRACTOR</td><td colspan='3'>${esc(project.contractor)}</td></tr>
-    <tr><td class='lab'>SCOPE OF WORK</td><td colspan='3'>${scopeText(project.scopeOfWork ?? '')}</td></tr>
-    <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td>${esc(peso(L.originalCost(project)))}</td><td class='lab'>DAYS ELAPSED:</td><td>${esc(report.daysElapsed ?? 0)}</td></tr>
-    <tr><td class='lab'>CONTRACT COST (REVISED)</td><td>${esc(peso(L.currentCost(project, docs)))}</td><td class='lab'>REMAINING DAYS:</td><td>${esc(report.remainingDays ?? 0)}</td></tr>
-    <tr><td class='lab'>CONTRACT DURATION</td><td colspan='3'>${esc(project.contractDurationDays ?? 0)} calendar days</td></tr>
-    <tr><td class='lab'>DATE STARTED</td><td>${esc(longDate(project.dateStarted))}</td><td class='lab'>TIME EXTENSION/S</td><td>${te}</td></tr>
-    <tr><td class='lab'>COMPLETION DATE (ORIGINAL)</td><td>${esc(longDate(project.completionDateOriginal))}</td><td class='lab'>REVISED COMPLETION DATE</td><td>${esc(longDate(revised))}</td></tr>
-  </table>`);
+  const b = [header(banner, `For the Week of ${esc((report.reportingWeek || '').replace(/^Week \d+: /, ''))}`),
+    basicInfo(project, docs, 'DAYS ELAPSED:', esc(report.daysElapsed ?? 0), 'REMAINING DAYS:', esc(report.remainingDays ?? 0))];
 
   b.push(`<table><tr><th class='sec'>II. DAILY WEATHER CHART</th></tr><tr><td><div class='legend'>LEGEND: ${WEATHER.map(([, label, hex]) => `<span><i style='background:${hex}'></i>${label}</span>`).join('')}</div>
     <table class='clocks'><tr>${WEEK_DAYS.map(d => `<th>${d.toUpperCase()}</th>`).join('')}</tr><tr>${WEEK_DAYS.map(day => {
@@ -196,9 +181,173 @@ export function weeklyReportHtml({ project, report, docs, issues, letters, reque
     ${photos.length ? '' : "<tr><td colspan='2' class='empty'>No photos attached.</td></tr>"}
     ${pairs.map(pair => `<tr>${pair.map(([src, title]) => `<td><img src='${esc(src)}' alt='${esc(title || 'Site photo')}'>${title ? `<div>${esc(title)}</div>` : ''}</td>`).join('')}${pair.length === 1 ? '<td></td>' : ''}</tr>`).join('')}</table>`);
 
-  const office = name => (name.trim() ? `<br>${esc(name.trim())}` : '');
-  const sign = (title, name, position, off) => `<td>${title}:<br><br><br><b>${esc(name.toUpperCase())}</b><div class='line'></div>${esc(position)}${office(off)}</td>`;
   b.push(`<div class='keep'><p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>
-    <table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign('Checked and Reviewed by', s.checkedName, s.checkedPosition, s.checkedOffice)}${sign('Noted by', s.notedName, s.notedPosition, s.notedOffice)}</tr></table></div>`);
+    ${signatures(s, 'Checked and Reviewed by')}</div>`);
+  return b.join('\n');
+}
+
+/** BlueBookForms.header, with the banner on top. */
+const header = (banner, period) => `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
+  <h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>${period}</div>`;
+
+/** BlueBookForms.basicInfo: section I of both reports; the right-hand cells of the cost rows differ (values are HTML). */
+function basicInfo(project, docs, label1, value1, label2, value2) {
+  const te = extensionsOf(docs).map(e => esc(`No. ${e.no}: ${e.days} c.d.${e.status ? ` ${e.status}` : ''}`)).join('<br>') || 'None';
+  const revised = L.revisedCompletion(project, docs) ?? L.effectiveCompletion(project);
+  return `<table class='info'>
+    <tr><th colspan='4' class='sec'>I. BASIC INFORMATION</th></tr>
+    <tr><td class='lab'>PROJECT NAME</td><td colspan='3'>${esc(project.name)}</td></tr>
+    <tr><td class='lab'>LOCATION</td><td colspan='3'>${esc(project.location)}</td></tr>
+    <tr><td class='lab'>IMPLEMENTING OFFICE</td><td colspan='3'>${esc(project.implementingOffice)}</td></tr>
+    <tr><td class='lab'>CONTRACTOR</td><td colspan='3'>${esc(project.contractor)}</td></tr>
+    <tr><td class='lab'>SCOPE OF WORK</td><td colspan='3'>${scopeText(project.scopeOfWork ?? '')}</td></tr>
+    <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td class='nw'>${esc(peso(L.originalCost(project)))}</td><td class='lab'>${label1}</td><td>${value1}</td></tr>
+    <tr><td class='lab'>CONTRACT COST (REVISED)</td><td class='nw'>${esc(peso(L.currentCost(project, docs)))}</td><td class='lab'>${label2}</td><td>${value2}</td></tr>
+    <tr><td class='lab'>CONTRACT DURATION</td><td colspan='3'>${esc(project.contractDurationDays ?? 0)} calendar days</td></tr>
+    <tr><td class='lab'>DATE STARTED</td><td>${esc(longDate(project.dateStarted))}</td><td class='lab'>TIME EXTENSION/S</td><td>${te}</td></tr>
+    <tr><td class='lab'>COMPLETION DATE (ORIGINAL)</td><td>${esc(longDate(project.completionDateOriginal))}</td><td class='lab'>REVISED COMPLETION DATE</td><td>${esc(longDate(revised))}</td></tr>
+  </table>`;
+}
+
+/** BlueBookForms.signatures. */
+function signatures(s, checkedTitle) {
+  const office = name => ((name || '').trim() ? `<br>${esc(name.trim())}` : '');
+  const sign = (title, name, position, off) => `<td>${title}:<br><br><br><b>${esc((name || '').toUpperCase())}</b><div class='line'></div>${esc(position)}${office(off)}</td>`;
+  return `<table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign(checkedTitle, s.checkedName, s.checkedPosition, s.checkedOffice)}${sign('Noted by', s.notedName, s.notedPosition, s.notedOffice)}</tr></table>`;
+}
+
+/* ---------- The monthly form (BlueBookForms.monthlyReport) ---------- */
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** BlueBookForms.parseMonth: "September 2026" as "2026-09"; null when it is not a full month name and year. */
+export function monthKey(month) {
+  const m = /^([A-Za-z]+) (\d{4})$/.exec((month || '').trim());
+  const i = m ? MONTH_NAMES.findIndex(n => n.toLowerCase() === m[1].toLowerCase()) : -1;
+  return i < 0 ? null : `${m[2]}-${String(i + 1).padStart(2, '0')}`;
+}
+/** "2026-09" as "September 2026". */
+export const monthName = key => `${MONTH_NAMES[Number(key.slice(5)) - 1]} ${key.slice(0, 4)}`;
+const monthOf = s => (iso(s) ? s.trim().slice(0, 7) : null);
+
+/** ProjectViewModel.signatoriesFor(weekly = false): Prepared by as on the weekly form; District and Regional Manager after it. */
+export function monthlySignatories(project, user) {
+  const w = weeklySignatories(project, user);
+  return {
+    ...w,
+    checkedName: project.checkedByName || '', checkedPosition: project.checkedByPosition || 'District Manager',
+    checkedOffice: project.checkedByOffice || project.implementingOffice || 'Bulacan District Office',
+    notedName: project.notedByName || '', notedPosition: project.notedByPosition || 'Regional Manager',
+    notedOffice: project.notedByOffice || 'Region 3 Office',
+  };
+}
+
+/** ContractLogs.suspensions and .variations: each order as the monthly form lists it, "(for approval)" until approved. */
+export function ordersOf(docs) {
+  const mark = d => (/^approved$/i.test(d.status || '') ? '' : '(for approval)');
+  const suspensions = docs.filter(d => /work suspension/i.test(d.documentName || '')).map(d => {
+    const days = L.remarkField(d.remarks, 'Duration').split(' ')[0];
+    const from = longDate(L.remarkField(d.remarks, 'Effectivity'));
+    const to = L.remarkField(L.withEnd(d.remarks || ''), 'End');
+    return {
+      label: L.orderLabel(d.documentName), value: (days ? `${days} calendar days – ` : '') + (to ? `${from} to ${longDate(to)}` : from),
+      reason: L.isSuspension(d) ? L.remarkField(d.remarks, 'Reason') : '', status: mark(d),
+    };
+  });
+  const variations = docs.filter(d => /^variation order/i.test(d.documentName || '')).map(d => {
+    const name = d.documentName, cut = name.indexOf(' - ');
+    const amount = cut < 0 ? '' : name.slice(cut + 3);
+    const n = Number(amount.replace(/^PHP/, '').replace(/,/g, '').trim());
+    return {
+      label: (cut < 0 ? name : name.slice(0, cut)).split(' (')[0],
+      value: amount.trim() && Number.isFinite(n) ? peso(n) : amount.replace(/PHP/g, 'Php'),
+      reason: L.remarkField(d.remarks, 'Reason'), status: mark(d),
+    };
+  });
+  return { suspensions, variations };
+}
+
+/**
+ * BlueBookForms.workableDays: [month, workable, unworkable] per month of logged days, oldest first. A day is
+ * unworkable when more than 4 of its 8 AM–4 PM hours were Rainy or Stormy.
+ */
+export function workableDays(weather) {
+  const byDay = new Map();
+  for (const w of weather) if (iso(w.date) && !byDay.has(w.date.trim())) byDay.set(w.date.trim(), w);
+  const months = new Map();
+  for (const [day, w] of byDay) {
+    const hours = (w.hourlyConditionsCsv || '').split(',');
+    const bad = [8, 9, 10, 11, 12, 13, 14, 15, 16].filter(h => ['RAINY', 'STORMY'].includes((hours[h] || '').trim())).length > 4;
+    const m = months.get(day.slice(0, 7)) || [0, 0];
+    m[bad ? 1 : 0]++;
+    months.set(day.slice(0, 7), m);
+  }
+  return [...months].sort((a, b) => a[0].localeCompare(b[0])).map(([m, [ok, bad]]) => [m, ok, bad]);
+}
+
+/**
+ * The monthly form's HTML for `month` ("2026-09"), for a `.bb` sheet. `weeks` are the month's weekly reports in week
+ * order (the last one gives the progress); `weather` is every logged day; `saved` is the month's monthly report, if any.
+ */
+export function monthlyReportHtml({ project, month, weeks, payments, issues, docs, weather, saved, signatories, banner }) {
+  const last = weeks[weeks.length - 1];
+  const { suspensions, variations } = ordersOf(docs);
+  const list = items => items.map(o => esc(`${o.label}: ${o.value}${o.reason ? ` (${o.reason})` : ''}${o.status ? ` ${o.status}` : ''}`)).join('<br>') || 'None';
+  const b = [header(banner, `For the Month of ${esc(monthName(month))}`),
+    basicInfo(project, docs, 'VARIATION ORDER/S', list(variations), 'WORK SUSPENSION ORDER/S', list(suspensions))];
+
+  const acc = last ? L.accomplishmentOf(last.accomplishmentItemsJson) : [];
+  const items = acc.length ? acc : [{ itemDescription: 'Land Development', weightPct: 0, actualPct: 0, targetPct: 0 }, { itemDescription: 'Housing Construction', weightPct: 0, actualPct: 0, targetPct: 0 }];
+  const sum = f => items.reduce((t, a) => t + f(a), 0);
+  b.push(`<table><tr><th colspan='5' class='sec'>II. PROJECT STATUS</th></tr><tr><th colspan='5' class='sub'>STATUS OF ACCOMPLISHMENT</th></tr>
+    <tr><th>ITEM</th><th>% WEIGHT</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>TOTAL</th></tr>
+    ${items.map(a => `<tr><td>${esc(a.itemDescription)}</td><td class='n'>${pct(a.weightPct)}</td><td class='n'>${pct(a.targetPct)}</td><td class='n'>${pct(a.actualPct)}</td><td class='n'>${pct(a.weightPct * a.actualPct / 100)}</td></tr>`).join('')}
+    <tr class='tot'><td>TOTAL</td><td class='n'>${pct(sum(a => a.weightPct))}</td><td class='n'>${last ? pct(last.targetAccomplishmentPct) : ''}</td><td class='n'>${last ? pct(last.actualAccomplishmentPct) : ''}</td><td class='n'>${pct(sum(a => a.weightPct * a.actualPct / 100))}</td></tr></table>`);
+
+  // Billings up to month end; one with an unreadable date is kept, as on the phone.
+  const paid = payments.filter(p => { const m = monthOf(p.date); return m == null || m <= month; });
+  b.push(`<table><tr><th colspan='6' class='sec'>III. STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>NET AMOUNT</th><th>%</th></tr>
+    ${Array.from({ length: Math.max(3, paid.length) }, (_, i) => {
+      const p = paid[i];
+      return `<tr><td>${i + 1}. ${esc(p?.name ?? '')}</td><td>${esc(p ? longDate(p.date) : '')}</td><td>${esc(p?.periodCovered ?? '')}</td><td class='n'>${p ? esc(peso(L.netAmount(p))) : ''}</td><td class='n'>${p ? pct(p.percentage) : ''}</td><td class='n'>${p ? esc(`${peso(p.balanceAmount)} (${pct(p.balancePercentage)})`) : ''}</td></tr>`;
+    }).join('')}</table>`);
+
+  // Each approved extension adds its days to the running duration, as the Key Dates card does; one still for approval
+  // shows its days but no revised duration or date, so the last date matches section I.
+  const extensions = extensionsOf(docs);
+  let duration = Number(project.contractDurationDays) || 0;
+  b.push(`<table><tr><th colspan='7' class='sec'>IV. CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>
+    ${Array.from({ length: Math.max(4, extensions.length) }, (_, i) => {
+      const t = extensions[i], counts = t && !t.status;
+      if (counts) duration += t.days;
+      const end = counts ? longDate(L.lastDay(project.dateStarted, duration) || '') : '';
+      return `<tr><td class='c'>${esc(t ? t.no : i + 1)}</td><td class='n'>${t ? t.days : ''}</td><td class='n'>${counts ? `${duration} c.d.` : ''}</td><td></td><td>${esc(t?.reason ?? '')}</td><td>${esc(end)}</td><td>${esc(t?.status ?? '')}</td></tr>`;
+    }).join('')}</table>`);
+
+  // Only months with weather logged, numbered by contract month when the start date is known.
+  const logged = workableDays(weather).filter(([m]) => m <= month);
+  const first = monthOf(project.dateStarted);
+  const monthNo = (m, i) => (first ? (Number(m.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(m.slice(5)) - Number(first.slice(5)) + 1 : i + 1);
+  b.push(`<table><tr><th colspan='4' class='sec'>V. SUMMARY OF UNWORKABLE DAYS DUE TO WEATHER CONDITION</th></tr><tr><th>MONTH NO.</th><th>PERIOD COVERED</th><th>NO. OF WORKABLE DAYS</th><th>NO. OF UNWORKABLE DAYS</th></tr>
+    ${logged.map(([m, ok, bad], i) => `<tr><td class='c'>${monthNo(m, i)}</td><td>${esc(monthName(m))}</td><td class='n'>${ok}</td><td class='n'>${bad}</td></tr>`).join('')}
+    <tr class='tot'><td colspan='2'>GRAND TOTAL</td><td class='n'>${logged.reduce((t, x) => t + x[1], 0)}</td><td class='n'>${logged.reduce((t, x) => t + x[2], 0)}</td></tr></table>`);
+
+  b.push(`<table><tr><th colspan='3' class='sec'>VI. STATUS OF SUBMISSION OF DOCUMENTARY REQUIREMENTS</th></tr><tr><th>DOCUMENT</th><th>STATUS</th><th>REMARKS</th></tr>
+    ${numbered(Math.max(5, docs.length), i => [docs[i]?.documentName, docs[i]?.status, docs[i]?.remarks])}</table>`);
+
+  const monthIssues = issues.filter(x => monthOf(x.date) === month);
+  b.push(`<table><tr><th colspan='4' class='sec'>VII. ISSUES / CONCERNS / SITE INSTRUCTIONS</th></tr>
+    <tr><th rowspan='2'>ISSUES/CONCERNS/OBSERVATIONS (INCLUDING COMPLIANCE WITH CPES REQUIREMENTS, ETC.)</th><th colspan='3'>ACTION TAKEN</th></tr><tr><th>DATE</th><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th></tr>
+    ${numbered(Math.max(5, monthIssues.length), i => {
+      const x = monthIssues[i];
+      if (!x) return [null, null, null, null];
+      const action = [x.actionTaken, x.remarks].filter(v => (v || '').trim()).join('; ');
+      // An issue logged before "action taken by" existed keeps its action under the Implementing Office.
+      const byContractor = x.actionBy === 'Contractor/Developer';
+      return [x.description, longDate(x.date), byContractor ? null : action, byContractor ? action : null];
+    })}</table>`);
+
+  b.push(`<div class='keep'><table><tr><th class='sec'>VIII. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?? '').replace(/\n/g, '<br>')}</td></tr></table>
+    <p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on or before end of each month.</p>
+    ${signatures(signatories, 'Checked by')}</div>`);
   return b.join('\n');
 }
