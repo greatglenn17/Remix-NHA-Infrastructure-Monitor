@@ -324,6 +324,8 @@ fun ProjectDetailScreen(
                                 onSetLotUse = viewModel::setSdpLotUse,
                                 onRenameLot = viewModel::renameSdpLot,
                                 onSetPlanFrame = viewModel::setSdpPlanFrame,
+                                onRotatePlan = viewModel::rotateSdpPlan,
+                                onDeletePlan = viewModel::deleteSdpPlan,
                                 onPrintPlan = { allSites, landscape ->
                                     activeSdpPlan?.let { plan ->
                                         val plans = if (allSites) com.example.data.model.SdpSites.current(sdpPlans) else listOf(plan)

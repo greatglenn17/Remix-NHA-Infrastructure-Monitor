@@ -1493,6 +1493,28 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Turns the plan a quarter clockwise on screen; lots keep their page coordinates. */
+    fun rotateSdpPlan(plan: SdpPlan) {
+        viewModelScope.launch {
+            repository.setSdpPlanScale(plan.copy(rotation = com.example.util.PlanRotation.next(plan.rotation)), emptyList(), currentUserAccount.value.role)
+        }
+    }
+
+    /** Deletes the plan, its lots and their progress; the delete syncs, so other phones and the website drop it too. */
+    fun deleteSdpPlan(plan: SdpPlan) {
+        viewModelScope.launch(missingProjectGuard) {
+            repository.deleteSdpPlan(plan, currentUserAccount.value.role)
+            val siteNote = if (plan.siteName.isBlank()) "" else " (${plan.siteName})"
+            logAuditAction(
+                projectId = plan.projectId,
+                actionType = "Document Deletion",
+                details = "Deleted SDP Plan$siteNote Version ${plan.version}: ${plan.planName}, with its lots and progress",
+                oldValue = "Plan: ${plan.planName}, Version: ${plan.version}",
+                newValue = ""
+            )
+        }
+    }
+
     /**
      * The SDP print of [plans] (one per site): each plan's frame (saved, or around all lots) with each lot
      * coloured by progress, and the legend over it. Null when a plan PDF cannot be opened.
@@ -1559,9 +1581,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                                 paint.alpha = 255
                                 canvas.drawPath(path, paint)
                             }
+                            // Prints the way the plan is turned on screen.
+                            val turned = if (plan.rotation.mod(360) == 0) bitmap else android.graphics.Bitmap.createBitmap(
+                                bitmap, 0, 0, w, h, android.graphics.Matrix().apply { postRotate(plan.rotation.toFloat()) }, true
+                            ).also { bitmap.recycle() }
                             val out = java.io.ByteArrayOutputStream()
-                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                            bitmap.recycle()
+                            turned.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                            turned.recycle()
                             "data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
                         }
                     }

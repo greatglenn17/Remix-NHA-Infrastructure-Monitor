@@ -183,6 +183,12 @@ class ProjectRepository(
         return projectDao.insertSdpPlan(sdpPlan)
     }
 
+    /** Removes a plan with its lots and their progress, on every phone. */
+    suspend fun deleteSdpPlan(plan: SdpPlan, role: UserRole? = null) {
+        validatePermission(role, Permission.MANAGE_SDP_PLANS)
+        projectDao.deleteSdpPlan(plan.id)
+    }
+
     suspend fun renameSdpSite(projectId: Long, oldName: String, newName: String, role: UserRole? = null) {
         validatePermission(role, Permission.MANAGE_SDP_PLANS)
         projectDao.renameSdpSite(projectId, oldName, newName)

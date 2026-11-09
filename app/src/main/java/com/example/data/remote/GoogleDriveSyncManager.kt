@@ -373,6 +373,7 @@ class GoogleDriveSyncManager(
                     put("uploadedBy", sp.uploadedBy)
                     put("description", sp.description)
                     put("siteName", sp.siteName)
+                    put("rotation", sp.rotation)
                 })
             }
 
@@ -952,7 +953,8 @@ class GoogleDriveSyncManager(
                     uploadedDate = sp.optString("uploadedDate", ""),
                     uploadedBy = sp.optString("uploadedBy", "Engr. Admin"),
                     description = sp.optString("description", ""),
-                    siteName = sp.optString("siteName", "")
+                    siteName = sp.optString("siteName", ""),
+                    rotation = sp.optInt("rotation", 0)
                 )
                 projectDao.insertSdpPlan(plan)
             }
