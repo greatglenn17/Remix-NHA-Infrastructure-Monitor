@@ -568,3 +568,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; margin: 8px 0; font-size: 12px; font-weight: 700; }
 .wx-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .wx-legend i { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Audit log (AuditLogCard) */
+.audit-card { padding: 12px 14px; min-width: 0; }
+.ac-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.ac-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, currentColor 20%, transparent); }
+.ac-who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0 0; font-size: 13px; }
+.ac-who .icon:first-child { color: var(--link); }
+.ac-who .icon + b + .icon { margin-left: 8px; color: var(--text-2); }
+.ac-details { margin: 8px 0 0; font-size: 13px; white-space: pre-line; overflow-wrap: anywhere; }
+.ac-values { margin-top: 10px; padding: 10px; border-radius: 6px; background: var(--surface-variant); font-size: 12px; overflow-wrap: anywhere; }
+.ac-values p { margin: 0; } .ac-values p + p { margin-top: 4px; }
+.n-link { color: var(--link); } .n-neutral { color: var(--neutral); }

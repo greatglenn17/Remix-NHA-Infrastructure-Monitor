@@ -416,7 +416,8 @@ function drawProject(page) {
   if (page.section === 'print') return drawPrint(c);
 
   const housing = /housing/i.test(project.projectType || '');
-  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues'] : CHIPS[page.section];
+  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues']
+    : page.section === 'documents' && L.canViewAuditLogs(s.claims) ? [...CHIPS.documents, 'Audit log'] : CHIPS[page.section];
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
@@ -444,6 +445,7 @@ function drawProject(page) {
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  if (document.getElementById('audit-results')) bindAudit(c);
   loadFiles(main);
 }
 
@@ -766,6 +768,53 @@ function weatherView({ page, weekly }) {
   </section>`;
 }
 
+/* ---------- Audit log (AuditLogTab, AuditLogCard), read-only ---------- */
+
+const auditState = page => (page.audit ||= { query: '', filter: 'All' });
+
+function auditView(c) {
+  const st = auditState(c.page);
+  return `<label class="field issue-q">Search<input type="search" id="audit-q" placeholder="Search audit logs (user, action, details, device)..." value="${esc(st.query)}" autocomplete="off"></label>
+    <div class="chips" role="group" aria-label="Filter audit log">${L.AUDIT_FILTERS.map(f => `<button data-audit-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div>
+    <div id="audit-results">${auditResults(c, st)}</div>`;
+}
+
+function auditResults(c, st) {
+  // ProjectDao.getAuditLogsForProject: newest first.
+  const logs = c.of('audit_logs').sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0)).filter(l => L.auditMatches(l, st.query, st.filter));
+  if (!logs.length) return `<div class="card empty">${icon('history')}<p>No audit log records found</p></div>`;
+  return `<ul class="issue-cards">${logs.map(auditCard).join('')}</ul>`;
+}
+
+function auditCard(log) {
+  const [level, ic] = L.auditBadge(log.actionType);
+  const t = new Date(Number(log.timestamp) || 0);
+  const two = n => String(n).padStart(2, '0');
+  const when = `${t.getFullYear()}-${two(t.getMonth() + 1)}-${two(t.getDate())} ${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}`;
+  const value = (label, v, cls) => (v?.trim() ? `<p><b class="${cls}">${label}:</b> ${esc(v)}</p>` : '');
+  return `<li class="card audit-card">
+    <div class="ac-head"><span class="ac-badge n-${level}">${icon(ic, 'sm')}${esc(log.actionType || '-')}</span><time class="muted small">${when}</time></div>
+    <p class="ac-who">${icon('person', 'sm')}<b>${esc(log.user || '-')}</b>${icon('phone_android', 'sm')}<span class="muted">${esc(log.device?.trim() || 'Android Device')}</span></p>
+    ${log.details?.trim() ? `<p class="ac-details">${esc(log.details)}</p>` : ''}
+    ${log.oldValue?.trim() || log.newValue?.trim() ? `<div class="ac-values">${value('Old Value', log.oldValue, 'n-neutral')}${value('New Value', log.newValue, 'n-ok')}</div>` : ''}
+  </li>`;
+}
+
+function bindAudit(c) {
+  const st = auditState(c.page);
+  const results = document.getElementById('audit-results');
+  // Only the results redraw while typing, so the search box keeps its focus.
+  const redraw = () => { results.innerHTML = auditResults(c, st); };
+  document.getElementById('audit-q').oninput = e => { st.query = e.target.value; redraw(); };
+  main.querySelectorAll('[data-audit-filter]').forEach(b => {
+    b.onclick = () => {
+      st.filter = b.dataset.auditFilter;
+      main.querySelectorAll('[data-audit-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
+      redraw();
+    };
+  });
+}
+
 /* ---------- Issues (IssuesTab, IssueCard), read-only ---------- */
 
 const issueState = page => (page.issues ||= { query: '', filter: 'All' });
@@ -858,7 +907,9 @@ const entry = (title, lines, extra = '', cls = '') => `<div class="entry ${cls}"
 const orderEntry = (d, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.withEnd(d.remarks)], d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '', cls);
 const ordersCard = (title, ic, items, emptyText) => section(title, ic, items || emptyLine(emptyText));
 
-function documentsBody({ of, documents, now }, chip) {
+function documentsBody(c, chip) {
+  const { of, documents, now } = c;
+  if (chip === 'Audit log') return auditView(c);
   const named = text => documents.filter(d => (d.documentName || '').toLowerCase().includes(text));
   if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d)).join(''), 'No time extensions.');
   if (chip === 'Variation Orders') {

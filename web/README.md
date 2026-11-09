@@ -22,7 +22,9 @@ version keep working.
     its All / Critical / Pending / Overdue / Resolved chips.
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
-    the contractor, developer requests and related files, each with its scan.
+    the contractor, developer requests and related files, each with its scan. The **Audit log**
+    (who changed what, newest first, with the phone's search and filter chips) shows for the
+    Super Admin, Engineer Admins and Field Engineers, not for viewers (same as the app).
 - **Print** (from a weekly report, or a month on the Monthly view): the A4 weekly or monthly
   Project Engineer's Report laid out as the phone prints it (`BlueBookPrint.kt`,
   `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
@@ -94,4 +96,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing of any kind, the Status of Construction print, and the audit log.
+Editing of any kind, and the Status of Construction print.
