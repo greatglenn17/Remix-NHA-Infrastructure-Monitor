@@ -391,7 +391,7 @@ const fileLink = (refText, label) => (L.storagePathOf(refText)
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
 /** ProjectSection: the project screen's four sections. */
 const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
-/** SectionChips: the views inside Progress (Lots, Weather and Issues are not on the website yet) and Documents. */
+/** SectionChips: the views inside Progress (Weather and Issues are not on the website yet; Lots only for housing) and Documents. */
 const CHIPS = {
   progress: ['Weekly', 'Monthly', 'Photos'],
   documents: ['Suspension / Resumption', 'Time Extensions', 'Variation Orders', 'Letters to Contractor', 'Developer Requests', 'Related Files'],
@@ -415,7 +415,8 @@ function drawProject(page) {
   const c = { page, project, records, of, documents, payments, weekly, cost, billed, now: today() };
   if (page.section === 'print') return drawPrint(c);
 
-  const chips = CHIPS[page.section];
+  const housing = /housing/i.test(project.projectType || '');
+  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos'] : CHIPS[page.section];
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
@@ -440,6 +441,7 @@ function drawProject(page) {
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
+  if (document.getElementById('lot-results')) bindLots(c);
   loadFiles(main);
 }
 
@@ -544,6 +546,7 @@ function constructionCard(summary, payments, now) {
 
 function progressBody(c, chip) {
   if (chip === 'Monthly') return monthlyView(c);
+  if (chip === 'Lots') return lotsView(c);
   if (chip === 'Photos') return photosView(c);
   if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
   return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id)).join('')}</div>`;
@@ -630,6 +633,91 @@ function monthlyView({ page, weekly, of, now }) {
       `<tfoot><tr><th>As of month end</th><th class="num">${pct(t)}</th><th class="num">${pct(a)}</th><th class="num n-${noteLevel(v)}">${signedPct(v)}</th></tr></tfoot>`)
       : emptyLine(`No weekly reports found for ${month}.`)}
   </section>`;
+}
+
+/* ---------- Lots (SubdivisionPlanTab, read-only) ---------- */
+
+// shortcut: lots show as a block-by-block grid, not over the plan PDF (the site cannot draw the PDF or know its page shape);
+// the plan opens as a file instead. Roads drawn on the plan are not shown.
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null });
+const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
+
+function lotsView(c) {
+  const st = lotState(c.page);
+  const { sites, site } = lotSite(c, st);
+  if (!site) return `<div class="card empty">${icon('home_work')}<p>No subdivision plan uploaded yet</p></div>`;
+  const k = L.lotStats(site.lots);
+  const tile = (label, value, cls = '') => `<div class="kpi ${cls}"><span>${label}</span><b>${value}</b></div>`;
+  const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option${o === st[key] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+  return `<section class="card section lots">
+    ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
+    <div class="lots-head"><h3>${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span></h3>
+      ${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}</div>
+    <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
+    <div class="lot-filters">
+      <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
+      ${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}
+    </div>
+    <div id="lot-results">${lotResults(site, st)}</div>
+  </section>`;
+}
+
+function lotResults(site, st) {
+  if (!site.lots.length) return emptyLine('No lots drawn on this plan yet.');
+  const n = site.lots.filter(l => L.lotMatches(l, st)).length;
+  const sel = site.lots.find(l => l.uuid === st.sel);
+  return `<p class="muted lot-count">${n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`}</p>
+    <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span></div>
+    ${L.lotBlocks(site.lots).map(b => `<div class="lot-block"><h4>${esc(b.name)}</h4><div class="lot-grid">${b.lots.map(l => {
+      const p = L.lotProgress(l);
+      return `<button class="lot ${L.lotColour(l)}${L.lotMatches(l, st) ? '' : ' dim'}" data-lot="${esc(l.uuid)}" aria-pressed="${l.uuid === st.sel}"
+        aria-label="${esc(`${L.lotLabel(l)}, ${p}%`)}" title="${esc(`${L.lotLabel(l)} · ${p}%`)}">${esc(l.lotNumber || '?')}</button>`;
+    }).join('')}</div>${sel && b.lots.includes(sel) ? lotDetail(sel) : ''}</div>`).join('')}`;
+}
+
+/** LotInfoDialog's current status, read-only. */
+function lotDetail(l) {
+  const p = l.progress || {};
+  const road = L.lotUse(l) === 'Road Lot';
+  const photos = L.attachmentList(p.photosJson);
+  const bill = (status, date, ref) => (status === 'BILLED' ? ['Billed', date && L.displayDate(date), ref].filter(Boolean).join(' · ') : 'Not billed');
+  return `<div class="lot-detail" id="lot-detail">
+    <div class="ld-head"><h3>${esc(L.lotLabel(l))}</h3><span class="lot-pct ${L.lotColour(l)}">${L.lotProgress(l)}%</span>
+      <button class="text-btn" id="lot-close">${icon('close', 'sm')}Close</button></div>
+    ${kv('Use', L.lotUse(l))}
+    ${kv('Physical progress', `${L.lotProgress(l)}% (${p.constructionStatus || 'Not Started'})`)}
+    ${road ? kv('Drainage progress', `${Number(p.drainageProgress) || 0}%`) : ''}
+    ${kv('Developer billing', L.lotBillingLabel(l.progress))}
+    ${kv('M1 (80%)', bill(p.billingStatus, p.billingDate, p.billingReference))}
+    ${kv('M2 (20%)', bill(p.m2BillingStatus, p.m2BillingDate, p.m2BillingReference))}
+    ${kv('Housing unit', l.housingUnitNumber || 'N/A')}
+    ${kv('Area', Number(l.lotAreaSqM) > 0 ? `${Number(l.lotAreaSqM).toLocaleString('en-US', { maximumFractionDigits: 2 })} sq.m` : '-')}
+    ${kv('Current activity', p.currentActivity)}${kv('Contractor', p.contractor)}
+    ${kv('Start date', p.startDate && L.displayDate(p.startDate))}${kv('Target completion', p.targetCompletionDate && L.displayDate(p.targetCompletionDate))}
+    ${kv('Remarks', p.remarks)}
+    ${photos.length ? `<h4>Lot photos (${photos.length})</h4>${photoGrid(photos, {})}` : ''}
+  </div>`;
+}
+
+function bindLots(c) {
+  const st = lotState(c.page);
+  const results = document.getElementById('lot-results');
+  // Only the results redraw while typing, so the search box keeps its focus.
+  const redraw = scroll => {
+    results.innerHTML = lotResults(lotSite(c, st).site, st);
+    bindResults();
+    loadFiles(results);
+    if (scroll) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  const bindResults = () => {
+    results.querySelectorAll('[data-lot]').forEach(b => { b.onclick = () => { st.sel = st.sel === b.dataset.lot ? null : b.dataset.lot; redraw(true); }; });
+    const close = document.getElementById('lot-close');
+    if (close) close.onclick = () => { st.sel = null; redraw(false); };
+  };
+  bindResults();
+  document.getElementById('lot-q').oninput = e => { st.query = e.target.value; redraw(false); };
+  main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; redraw(false); }; });
+  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; drawProject(c.page); }; });
 }
 
 /** PhotoGalleryTab: one album per reporting week, in report order. */

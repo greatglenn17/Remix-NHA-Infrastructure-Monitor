@@ -13,8 +13,11 @@ version keep working.
   - **Summary**: profile, key dates with the revised completion from approved orders, contract
     cost, latest weekly report, open issues, status of payment, and the lots status card (the six
     `SdpSummary` bands) for housing projects.
-  - **Progress**: weekly reports (all sections and photos), monthly reports by month, and every
-    photo.
+  - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
+    photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
+    its search and filters, and each block's lots as squares in the band colours (tap one for
+    its status, billing and photos). The lots are not drawn over the plan PDF; the PDF opens
+    as a file.
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
     the contractor, developer requests and related files, each with its scan.

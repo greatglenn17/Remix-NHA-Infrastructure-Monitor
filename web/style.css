@@ -468,6 +468,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb tr { page-break-inside: avoid; }
 .bb tr:has(> th) { break-after: avoid; }
 .bb th, .bb td { border: 0.6pt solid #000; padding: 1.2mm 1.5mm; vertical-align: top; text-align: left; height: 4mm; color: #000; }
+/* An empty cell holds one blank line, so blank rows are as tall as filled ones. */
+.bb td:empty::after { content: '\00a0'; }
 .bb th { font-weight: bold; text-align: center; vertical-align: middle; }
 .bb th.sec { text-align: left; background: #d9d9d9; }
 .bb td.lab { font-weight: bold; width: 22%; }
@@ -504,3 +506,31 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .bb-scroll { overflow: visible; padding: 0; }
   .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }
 }
+
+/* Lots (SubdivisionPlanTab, read-only): KPIs, filters, and each block's lots as coloured squares. */
+.lot-n { background: #A3A3A3; }
+.lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.lots-head h3 { margin: 0; font-size: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+.kpi { background: var(--surface-variant); border-radius: 8px; padding: 8px 10px; }
+.kpi span { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
+.kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.kpi.link b { color: var(--link); } .kpi.muted b { color: var(--neutral); } .kpi.ok b { color: var(--ok); } .kpi.watch b { color: var(--watch); }
+.lot-filters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 16px 0 4px; }
+.lot-filters select { font: 500 14px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 8px; min-height: 44px; width: 100%; }
+@media (max-width: 700px) { .lot-filters { grid-template-columns: repeat(3, 1fr); } .lot-filters .grow { grid-column: 1 / -1; } }
+.lot-count { margin: 8px 0 4px; font-size: 13px; }
+.lot-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+.lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
+.lot-block { margin-top: 12px; }
+.lot-block h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+.lot-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.lot { min-width: 40px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; color: #0B0F17; font: 700 13px Inter, sans-serif; cursor: pointer; font-variant-numeric: tabular-nums; }
+.lot.dim { opacity: 0.18; }
+.lot[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+.lot-detail { background: var(--surface-variant); border-radius: 10px; padding: 12px 14px; margin: 8px 0 4px; scroll-margin: 80px; }
+.ld-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ld-head h3 { margin: 0; font-size: 16px; flex: 1; }
+.lot-pct { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 700; color: #0B0F17; }
+.lot-detail h4 { margin: 12px 0 6px; font-size: 13px; }
