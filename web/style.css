@@ -498,6 +498,25 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
 .bb .note { font-size: 8pt; font-style: italic; }
 .bb .keep { break-inside: avoid; }
+/* Status of Construction (BlueBookForms.sdpPlan): the plan as big as one page allows, the legend over its bottom-left corner. */
+.bb.land { width: 285mm; }
+.bb.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
+.bb.full h1 { font-size: 16pt; margin: 1mm 0 0; }
+.bb.full .period { font-size: 10pt; margin-bottom: 2mm; }
+.bb div.plan { position: relative; text-align: center; }
+.bb div.plan img { max-width: 100%; max-height: 244mm; }
+.bb div.plan figure { margin: 0 0 3mm; }
+.bb div.plan figcaption { font-weight: bold; font-size: 11pt; margin-bottom: 1mm; }
+.bb div.plan.row { display: flex; gap: 3mm; justify-content: center; align-items: flex-start; }
+.bb div.plan.row figure { flex: 1 1 0; min-width: 0; }
+.bb table.lg { position: absolute; left: 0; bottom: 0; width: auto; background: #fff; font-size: 10pt; margin: 0; }
+.bb div.plan.multi table.lg { position: static; }
+.bb div.plan.row table.lg { flex: none; align-self: flex-end; }
+.bb table.lg th, .bb table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
+.bb i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
+.print-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.print-opts select { font: 500 14px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 40px; }
+.lots-links { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 @page { size: A4; margin: 6mm; }  /* narrow, as the phone's full-page prints (BlueBookForms fullPage) */
 @media print {
   html, body { background: #fff; }

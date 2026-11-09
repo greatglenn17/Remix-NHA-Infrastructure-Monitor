@@ -322,3 +322,31 @@ test('audit log: who sees it, the search and filter chips, and the badges read l
   assert.deepEqual(logs.map(l => L.auditBadge(l.actionType)), [['ok', 'add_circle'], ['link', 'edit'], ['watch', 'cloud_upload'], ['neutral', 'login']]);
   assert.deepEqual(L.auditBadge('Something else'), ['link', 'info']);
 });
+
+test('status of construction: frames, polygons, colours, summary and the form read like the phone', () => {
+  assert.deepEqual(L.parseFrame('0.1, 0.2,0.9,0.8'), [0.1, 0.2, 0.9, 0.8]);
+  assert.equal(L.parseFrame(''), null);
+  assert.equal(L.parseFrame('0.5,0.2,0.4,0.8'), null); // not a box
+  assert.equal(L.parseFrame('0,0,1.2,1'), null); // off the page
+  assert.deepEqual(L.frameAround([[[0.5, 0.5], [0.6, 0.7]], [[0.01, 0.2]]]).map(x => +x.toFixed(2)), [0, 0.17, 0.63, 0.73]);
+  assert.equal(L.frameAround([]), null);
+  assert.deepEqual(L.lotPolygon({ polygonNormalizedJson: '[[0.1,0.2],[0.3,0.4]]' }), [[0.1, 0.2], [0.3, 0.4]]);
+  assert.deepEqual(L.lotPolygon({ polygonNormalizedJson: 'oops' }), []);
+  const lot = (use, p) => ({ lotUse: use, blockNumber: '1', lotNumber: '1', progress: { physicalProgress: p } });
+  const lots = [lot('Saleable', 0), lot('Saleable', 30), lot('Saleable', 100), lot('Road Lot', 50), lot('Road Lot', 100), lot('Open Space', 0)];
+  assert.deepEqual(lots.map(L.lotPrintHex), ['#B91C1C', '#EA580C', '#15803D', '#CA8A04', '#15803D', '#6B6B6B']);
+  const one = L.sdpSummary(lots);
+  assert.deepEqual(one, { bands: [1, 0, 1, 0, 0, 1], saleable: 3, roads: [0, 1, 1] });
+  const project = { name: 'Sample <Homes>', location: 'Malolos' };
+  const single = P.sdpPlanHtml({ project, sheets: [{ site: '', image: 'data:image/png;base64,AA', summary: one }], asOf: '2026-11-09', banner: 'b.png', landscape: false });
+  assert.match(single, /STATUS OF CONSTRUCTION/);
+  assert.match(single, /Sample &lt;Homes&gt;, Malolos &#183; as of November 9, 2026/);
+  assert.match(single, /<th class='sub'>Units<\/th>/);
+  assert.match(single, /Total units<\/td><td class='n'>3<\/td>/);
+  assert.doesNotMatch(single, /max-height/); // one portrait plan fills the page
+  const two = P.sdpPlanHtml({ project, sheets: [{ site: '', image: 'x', summary: one }, { site: 'Phase 2', image: 'y', summary: one }], asOf: '2026-11-09', landscape: true });
+  assert.match(two, /class='plan multi row'/);
+  assert.match(two, /<th class='sub'>Main site<\/th><th class='sub'>Phase 2<\/th><th class='sub'>Total<\/th>/);
+  assert.match(two, /Total units<\/td><td class='n'>3<\/td><td class='n'>3<\/td><td class='n'>6<\/td>/);
+  assert.match(two, /max-height:151mm/);
+});

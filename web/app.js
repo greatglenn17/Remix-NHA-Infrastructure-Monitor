@@ -658,7 +658,8 @@ function lotsView(c) {
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
     <div class="lots-head"><h3>${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span></h3>
-      ${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}</div>
+      <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
+        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}</span></div>
     <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
@@ -966,6 +967,7 @@ function relatedCard(files) {
 
 async function drawPrint(c) {
   if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
+  if (c.page.sub === 'sdp') return drawSdpPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -1019,6 +1021,107 @@ async function drawMonthlyPrint({ page, project, of, documents, payments, weekly
   btn.disabled = false;
   btn.innerHTML = `${icon('print', 'sm')}Print`;
   btn.onclick = () => window.print();
+}
+
+/** The Status of Construction print (PrintPlanDialog + BlueBookForms.sdpPlan) for `#/p/<id>/print/sdp`. */
+async function drawSdpPrint({ page, project, records }) {
+  const sites = L.sdpSites(records);
+  // PrintPlanDialog: several sites start as all sites on a landscape page; the choice stays once made.
+  const st = (page.sdp ||= {});
+  const all = st.all ?? sites.length > 1, landscape = st.landscape ?? sites.length > 1;
+  const current = sites.find(x => x.site === page.lots?.site) || sites[0];
+  const chosen = all && sites.length > 1 ? sites : current ? [current] : [];
+  const many = chosen.length > 1;
+  page.chips.progress = 'Lots'; // the back link returns to the Lots view
+  document.title = `SDP Progress - ${project.name}`;
+  const token = page.printToken = {};
+  const opt = (value, label, on) => `<option value="${value}"${on ? ' selected' : ''}>${esc(label)}</option>`;
+  main.innerHTML = `${landscape ? '<style>@page { size: A4 landscape; }</style>' : ''}
+    <div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Lots</a>
+      <div class="print-opts">
+        ${sites.length > 1 ? `<label class="field">Sites<select id="sdp-sites">${opt('all', `All ${sites.length} sites on one page`, all)}${opt('one', `${current.site || 'Main site'} only`, !all)}</select></label>` : ''}
+        <label class="field">Page<select id="sdp-page">${opt('l', many ? 'Landscape: sites side by side' : 'Landscape', landscape)}${opt('p', many ? 'Portrait: sites one above the other' : 'Portrait', !landscape)}</select></label>
+        <button class="btn" id="do-print" disabled>${icon('print', 'sm')}Drawing the plan…</button></div></div>
+    <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb full${landscape ? ' land' : ''}" id="sheet"></div></div>`;
+  const sitesSel = document.getElementById('sdp-sites');
+  if (sitesSel) sitesSel.onchange = () => { st.all = sitesSel.value === 'all'; if (st.all) st.landscape = true; drawProject(page); };
+  document.getElementById('sdp-page').onchange = e => { st.landscape = e.target.value === 'l'; drawProject(page); };
+  const sheet = document.getElementById('sheet');
+  if (!chosen.length) { sheet.innerHTML = '<p>No subdivision plan uploaded yet.</p>'; return; }
+  let images;
+  try { images = await Promise.all(chosen.map(planImage)); } catch (e) {
+    if (page.printToken === token) sheet.innerHTML = `<p>The plan PDF could not be opened (${esc(e.message || e)}). Open the Lots view to check that it is uploaded.</p>`;
+    return;
+  }
+  if (page.printToken !== token || page !== s.page) return;
+  sheet.innerHTML = P.sdpPlanHtml({
+    project, landscape, asOf: today(), banner: 'blue-book-header.png',
+    sheets: chosen.map((x, i) => ({ site: x.site, image: images[i], summary: L.sdpSummary(x.lots) })),
+  });
+  // Wait for load, not decode(): decode() of a big data-URI plan can stay pending in a tab that is not painting.
+  await Promise.all([...sheet.querySelectorAll('img')].map(img => (img.complete ? null : new Promise(done => { img.onload = img.onerror = done; }))));
+  if (page.printToken !== token) return;
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.innerHTML = `${icon('print', 'sm')}Print`;
+  btn.onclick = () => window.print();
+}
+
+let pdfjs;
+/**
+ * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
+ * across A4, each lot filled with its colour and outlined, turned the way the plan is turned on screen. A PNG data URI.
+ */
+async function planImage({ plan, lots }) {
+  const url = await photoUrl(plan.pdfFileUrl);
+  if (!url) throw new Error('the PDF is not uploaded yet');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`download failed, ${res.status}`);
+  pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
+  // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
+  const doc = await pdfjs.getDocument({ data: await res.arrayBuffer(), isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+  try {
+    const pdfPage = await doc.getPage(1);
+    const base = pdfPage.getViewport({ scale: 1 });
+    const polys = lots.map(l => [l, L.lotPolygon(l)]);
+    const f = L.parseFrame(plan.frame) || L.frameAround(polys.map(p => p[1])) || [0, 0, 1, 1];
+    const fw = (f[2] - f[0]) * base.width, fh = (f[3] - f[1]) * base.height;
+    const sc = 2800 / Math.max(fw, fh);
+    const w = Math.max(1, Math.trunc(fw * sc)), h = Math.max(1, Math.trunc(fh * sc));
+    const canvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    const viewport = pdfPage.getViewport({ scale: sc, offsetX: -f[0] * base.width * sc, offsetY: -f[1] * base.height * sc });
+    await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
+    ctx.lineWidth = 2;
+    for (const [l, pts] of polys) {
+      if (pts.length < 3) continue;
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo']((x - f[0]) / (f[2] - f[0]) * w, (y - f[1]) / (f[3] - f[1]) * h));
+      ctx.closePath();
+      ctx.fillStyle = ctx.strokeStyle = L.lotPrintHex(l);
+      ctx.globalAlpha = 115 / 255;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+    }
+    const deg = ((Number(plan.rotation) || 0) % 360 + 360) % 360;
+    if (!deg) return canvas.toDataURL('image/png');
+    const rad = deg * Math.PI / 180, cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+    const out = Object.assign(document.createElement('canvas'), { width: Math.round(w * cos + h * sin), height: Math.round(w * sin + h * cos) });
+    const o = out.getContext('2d');
+    o.fillStyle = '#fff';
+    o.fillRect(0, 0, out.width, out.height);
+    o.translate(out.width / 2, out.height / 2);
+    o.rotate(rad); // clockwise, as Matrix.postRotate on the phone
+    o.drawImage(canvas, -w / 2, -h / 2);
+    return out.toDataURL('image/png');
+  } finally {
+    doc.destroy();
+  }
 }
 
 /* ---------- Files and site photos from Storage ---------- */

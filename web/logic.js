@@ -698,3 +698,46 @@ export function auditBadge(actionType) {
     ['restore', 'ok', 'cloud_download'], ['migration', 'neutral', 'storage'], ['upload', 'link', 'upload_file'], ['document', 'link', 'upload_file'],
   ].find(([w]) => a.includes(w))?.slice(1) || ['link', 'info'];
 }
+
+/* ---------- Status of Construction print (BlueBookForms.sdpPlan, ProjectViewModel.sdpPlanImage) ---------- */
+
+/** SdpSummary.ROAD_STATES. */
+export const ROAD_STATES = ['Not completed', 'Concreting', 'Completed'];
+
+/** lotFill on paper (LightNHAColors): the six bands, then neutral for lots that are not built on. */
+export const LOT_PRINT_HEX = ['#B91C1C', '#7C3AED', '#EA580C', '#CA8A04', '#2563EB', '#15803D'];
+export const lotPrintHex = l => { const c = lotColour(l).slice(4); return c === 'n' ? '#6B6B6B' : LOT_PRINT_HEX[c]; };
+
+/** ProjectViewModel.polygonOf: the lot's [[x, y], ...] (0..1 of the page); [] when unreadable. */
+export function lotPolygon(l) {
+  try {
+    const pts = JSON.parse(l.polygonNormalizedJson || '[]');
+    return Array.isArray(pts) ? pts.map(p => [Number(p[0]), Number(p[1])]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)) : [];
+  } catch { return []; }
+}
+
+/** SdpSummary.parseFrame: a saved "minX,minY,maxX,maxY" box on the page, or null. */
+export function parseFrame(text) {
+  const v = String(text || '').split(',').map(x => x.trim()).filter(Boolean).map(Number).filter(Number.isFinite);
+  if (v.length !== 4 || v.some(x => x < 0 || x > 1) || v[2] <= v[0] || v[3] <= v[1]) return null;
+  return v;
+}
+
+/** SdpSummary.frameAround: the box around all polygons plus a margin, kept on the page; null with no points. */
+export function frameAround(polygons, margin = 0.03) {
+  const pts = polygons.flat();
+  if (!pts.length) return null;
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  return [Math.max(0, Math.min(...xs) - margin), Math.max(0, Math.min(...ys) - margin), Math.min(1, Math.max(...xs) + margin), Math.min(1, Math.max(...ys) + margin)];
+}
+
+/** SdpSummary.of for one site's lots: saleable lots per band and in all, and road lots per state. */
+export function sdpSummary(lots) {
+  const saleable = lots.filter(l => lotUse(l) === 'Saleable');
+  const roadState = p => (p >= 100 ? 2 : p > 0 ? 1 : 0);
+  return {
+    bands: LOT_BANDS.map((_, b) => saleable.filter(l => lotBand(lotProgress(l)) === b).length),
+    saleable: saleable.length,
+    roads: ROAD_STATES.map((_, r) => lots.filter(l => lotUse(l) === 'Road Lot' && roadState(lotProgress(l)) === r).length),
+  };
+}
