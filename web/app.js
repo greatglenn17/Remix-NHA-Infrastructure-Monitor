@@ -643,10 +643,11 @@ function monthlyView({ page, weekly, of, now }) {
 
 /* ---------- Lots (SubdivisionPlanTab, read-only) ---------- */
 
-// SubdivisionPlanTab: the plan PDF with each lot coloured over it (click one for its details), then the same lots
-// block by block, which is also the keyboard path. shortcut: the plan has no zoom; use the browser's zoom for small lots.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null });
+// SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
+// double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null });
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
+const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
 function lotsView(c) {
   const st = lotState(c.page);
@@ -665,22 +666,33 @@ function lotsView(c) {
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       ${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}
     </div>
-    ${site.plan.pdfFileUrl && site.lots.length ? '<div class="lot-plan-box" id="lot-plan"><p class="muted">Drawing the plan…</p></div>' : ''}
-    <div id="lot-results">${lotResults(site, st)}</div>
+    <p class="muted lot-count" id="lot-count"></p>
+    <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
+    ${site.lots.length ? `<div class="lot-viewer" id="lot-plan">
+      <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
+      <div class="zoom-bar" role="group" aria-label="Zoom">
+        ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
+        <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
+        <button data-zoom="reset">Reset</button></div>
+      <div class="lot-card" id="lot-card" hidden></div>
+    </div>` : emptyLine('No lots drawn on this plan yet.')}
+    <div id="lot-results"></div>
   </section>`;
 }
 
-function lotResults(site, st) {
-  if (!site.lots.length) return emptyLine('No lots drawn on this plan yet.');
-  const n = site.lots.filter(l => L.lotMatches(l, st)).length;
-  const sel = site.lots.find(l => l.uuid === st.sel);
-  return `<p class="muted lot-count">${n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`}</p>
-    <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span></div>
-    ${L.lotBlocks(site.lots).map(b => `<div class="lot-block"><h4>${esc(b.name)}</h4><div class="lot-grid">${b.lots.map(l => {
-      const p = L.lotProgress(l);
-      return `<button class="lot ${L.lotColour(l)}${L.lotMatches(l, st) ? '' : ' dim'}" data-lot="${esc(l.uuid)}" aria-pressed="${l.uuid === st.sel}"
-        aria-label="${esc(`${L.lotLabel(l)}, ${p}%`)}" title="${esc(`${L.lotLabel(l)} · ${p}%`)}">${esc(l.lotNumber || '?')}</button>`;
-    }).join('')}</div>${sel && b.lots.includes(sel) ? lotDetail(sel) : ''}</div>`).join('')}`;
+/** The selected lot's card under the plan (the phone's bottom sheet). */
+function lotCard(l) {
+  const p = l.progress || {};
+  const pct = L.lotProgress(l), billing = L.lotBillingLabel(l.progress), billed = billing !== 'NOT BILLED';
+  const road = L.lotUse(l) === 'Road Lot';
+  const line = (road ? `Road: ${L.ROAD_STATES[L.roadState(pct)]} • Drainage: ${Number(p.drainageProgress) >= 100 ? 'Completed' : 'Not completed'}`
+    : `Progress: ${pct}% (${p.constructionStatus || 'Not Started'})`) + ` • Area: ${Number(l.lotAreaSqM) || 0} sq.m • Unit: ${l.housingUnitNumber || 'N/A'}`;
+  return `<div class="lc-head"><span class="lot-pct ${L.lotColour(l)}">${icon('home_work', 'sm')}</span><b>${esc(L.lotLabel(l))}</b>
+      <span class="lc-bill${billed ? ' on' : ''}">${billed ? `● ${esc(billing)}` : 'NOT BILLED'}</span>
+      <button class="icon-btn" id="lot-card-close" aria-label="Close">${icon('close', 'sm')}</button></div>
+    <p>${esc(line)}</p>
+    ${p.lastModifiedBy ? `<p class="lc-upd">Last updated: ${esc(p.lastModifiedDate ? L.displayDate(p.lastModifiedDate) : '')} by ${esc(p.lastModifiedBy)}</p>` : ''}
+    <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
 
 /** LotInfoDialog's current status, read-only. */
@@ -707,52 +719,139 @@ function lotDetail(l) {
   </div>`;
 }
 
-function bindLots(c) {
-  const st = lotState(c.page);
-  const results = document.getElementById('lot-results');
-  // Only the results redraw while typing, so the search box keeps its focus.
-  const plan = document.getElementById('lot-plan');
-  const redraw = scroll => {
-    results.innerHTML = lotResults(lotSite(c, st).site, st);
-    if (plan) showPlan(lotSite(c, st).site, st, plan);
-    bindResults();
-    loadFiles(results);
-    if (scroll) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
-  const bindResults = () => {
-    results.querySelectorAll('[data-lot]').forEach(b => { b.onclick = () => { st.sel = st.sel === b.dataset.lot ? null : b.dataset.lot; redraw(true); }; });
-    const close = document.getElementById('lot-close');
-    if (close) close.onclick = () => { st.sel = null; redraw(false); };
-  };
-  bindResults();
-  if (plan) {
-    showPlan(lotSite(c, st).site, st, plan);
-    plan.onclick = e => { const id = e.target.closest('[data-lot]')?.dataset.lot; if (id) { st.sel = st.sel === id ? null : id; redraw(true); } };
-  }
-  document.getElementById('lot-q').oninput = e => { st.query = e.target.value; redraw(false); };
-  main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; redraw(false); }; });
-  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; drawProject(c.page); }; });
+const planDrawings = new Map();
+/** The plan page (without lots), drawn once per plan. */
+function planBase(site) {
+  const key = [site.plan.uuid, site.plan.pdfFileUrl, site.plan.frame, site.plan.rotation].join('|');
+  if (!planDrawings.has(key)) planDrawings.set(key, planDrawing(site, false).then(d => { if (d.problem) planDrawings.delete(key); return d; }));
+  return planDrawings.get(key);
 }
 
-const planDrawings = new Map();
-/** The plan page (without lots) drawn once per plan, with each lot over it as a shape that dims with the filters. */
-async function showPlan(site, st, box) {
-  const key = [site.plan.uuid, site.plan.pdfFileUrl, site.plan.frame, site.plan.rotation].join('|');
-  if (!planDrawings.has(key)) planDrawings.set(key, planDrawing(site, false));
-  const d = await planDrawings.get(key);
-  if (d.problem) planDrawings.delete(key); // try again next time
-  if (!box.isConnected) return;
-  const shapes = site.lots.map(l => {
-    const pts = L.lotPolygon(l);
-    if (pts.length < 3) return '';
-    const hex = L.lotPrintHex(l);
-    return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotMatches(l, st) ? '' : 'dim'}${l.uuid === st.sel ? ' sel' : ''}" fill="${hex}" stroke="${hex}"
-      points="${pts.map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)).join(',')).join(' ')}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
-  }).join('');
-  box.innerHTML = `${d.problem ? `<p class="error">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>` : ''}
-    <div class="lot-plan" style="width:min(100%, calc(75vh * ${d.width} / ${d.height})); aspect-ratio:${d.width} / ${d.height}">
-      <img src="${d.image}" alt="Subdivision plan">
-      <svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="none" aria-hidden="true">${shapes}</svg></div>`;
+async function bindLots(c) {
+  const st = lotState(c.page);
+  const site = lotSite(c, st).site;
+  const viewer = document.getElementById('lot-plan');
+  const count = document.getElementById('lot-count');
+  const card = document.getElementById('lot-card');
+  const more = document.getElementById('lot-results');
+  let d = null, svg = null, stage = null;
+
+  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters, the selection outlined.
+  const paint = () => {
+    const n = site.lots.filter(l => L.lotMatches(l, st)).length;
+    count.textContent = n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`;
+    if (svg) svg.innerHTML = site.lots.map(l => {
+      const pts = d.shapes.get(l.uuid);
+      if (!pts) return '';
+      const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
+      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${l.uuid === st.sel ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
+    }).join('');
+    const sel = site.lots.find(l => l.uuid === st.sel);
+    if (card) {
+      card.hidden = !sel;
+      card.innerHTML = sel ? lotCard(sel) : '';
+      if (sel) {
+        document.getElementById('lot-card-close').onclick = () => { st.sel = null; st.more = false; paint(); };
+        document.getElementById('lot-more').onclick = () => { st.more = !st.more; paint(); if (st.more) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+      }
+    }
+    more.innerHTML = sel && st.more ? lotDetail(sel) : '';
+    loadFiles(more);
+    const close = document.getElementById('lot-close');
+    if (close) close.onclick = () => { st.more = false; paint(); };
+  };
+  const pick = id => { st.sel = id; st.more = false; paint(); };
+
+  document.getElementById('lot-q').oninput = e => {
+    st.query = e.target.value;
+    // As on the phone: when the search finds one lot, it is selected and centred at 200%.
+    const found = st.query.trim() ? site.lots.filter(l => L.lotMatches(l, st)) : [];
+    if (found.length === 1 && d?.centres.has(found[0].uuid)) { st.sel = found[0].uuid; centreOn(d.centres.get(found[0].uuid), 2); }
+    paint();
+  };
+  main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; paint(); }; });
+  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; drawProject(c.page); }; });
+  paint();
+  if (!viewer) return;
+
+  // The view: the plan fitted to the viewer is 100%; x, y move it, s zooms it (0.2 to 5, as on the phone).
+  let fit = 1, W = 0, H = 0;
+  const view = () => st.view;
+  const apply = () => {
+    const v = view();
+    stage.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
+    document.getElementById('zoom-pct').textContent = `${Math.round(v.s * 100)}%`;
+    viewer.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
+  };
+  const reset = () => { st.view = { s: 1, x: (W - d.width * fit) / 2, y: (H - d.height * fit) / 2 }; apply(); };
+  const zoomAt = (s, px = W / 2, py = H / 2) => {
+    const v = view(), ns = Math.min(5, Math.max(0.2, s));
+    st.view = { s: ns, x: px - (px - v.x) * ns / v.s, y: py - (py - v.y) * ns / v.s };
+    apply();
+  };
+  const centreOn = ([cx, cy], s) => { st.view = { s, x: W / 2 - cx * fit * s, y: H / 2 - cy * fit * s }; apply(); };
+
+  d = await planBase(site);
+  if (!viewer.isConnected) return;
+  // Each lot's points in plan-image pixels, and its centre for the search.
+  d.shapes = new Map(); d.centres = new Map();
+  for (const l of site.lots) {
+    const pts = L.lotPolygon(l).map(([x, y]) => d.place(x, y));
+    if (pts.length < 3) continue;
+    d.shapes.set(l.uuid, pts.map(q => q.map(n => n.toFixed(1)).join(',')).join(' '));
+    d.centres.set(l.uuid, [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length]);
+  }
+  W = viewer.clientWidth; H = viewer.clientHeight;
+  fit = Math.min(W / d.width, H / d.height);
+  stage = document.getElementById('lot-stage');
+  stage.style.width = `${d.width * fit}px`;
+  stage.style.height = `${d.height * fit}px`;
+  stage.innerHTML = `<img src="${d.image}" alt="Subdivision plan" draggable="false">
+    <svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="none" aria-hidden="true"></svg>`;
+  svg = stage.querySelector('svg');
+  if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
+  if (!st.view) reset(); else apply();
+  paint();
+
+  viewer.querySelectorAll('[data-zoom]').forEach(b => { b.onclick = () => (b.dataset.zoom === 'reset' ? reset() : Number(b.dataset.zoom) === 1 ? reset() : zoomAt(Number(b.dataset.zoom))); });
+  viewer.querySelectorAll('[data-zoom-step]').forEach(b => { b.onclick = () => zoomAt(view().s * Number(b.dataset.zoomStep)); });
+
+  // Drag to move, two fingers to pinch, a click without a drag picks the lot under it (or clears the selection).
+  const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const down = new Map();
+  let moved = false;
+  stage.onpointerdown = e => {
+    down.set(e.pointerId, local(e));
+    if (down.size === 1) moved = false;
+    stage.setPointerCapture(e.pointerId);
+  };
+  stage.onpointermove = e => {
+    const was = down.get(e.pointerId);
+    if (!was) return;
+    const now = local(e);
+    if (down.size === 1) {
+      if (!moved && Math.hypot(now[0] - was[0], now[1] - was[1]) < 4) return;
+      moved = true;
+      const v = view();
+      st.view = { ...v, x: v.x + now[0] - was[0], y: v.y + now[1] - was[1] };
+      apply();
+    } else if (down.size === 2) {
+      moved = true;
+      const other = [...down].find(([id]) => id !== e.pointerId)[1];
+      const before = Math.hypot(was[0] - other[0], was[1] - other[1]), after = Math.hypot(now[0] - other[0], now[1] - other[1]);
+      if (before > 0) zoomAt(view().s * after / before, (now[0] + other[0]) / 2, (now[1] + other[1]) / 2);
+    }
+    down.set(e.pointerId, now);
+  };
+  stage.onpointerup = stage.onpointercancel = e => {
+    const tap = e.type === 'pointerup' && down.size === 1 && !moved;
+    down.delete(e.pointerId);
+    if (!tap) return;
+    const hit = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot);
+    pick(hit && hit.dataset.lot !== st.sel ? hit.dataset.lot : null);
+  };
+  stage.ondblclick = e => { const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
+  viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };
 }
 
 /* ---------- Weather (WeatherChartTab), read-only ---------- */

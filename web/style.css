@@ -542,21 +542,41 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
-.lot-block { margin-top: 12px; }
-.lot-block h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
-/* The plan with its lots over it (SubdivisionPlanTab). */
-.lot-plan-box { margin-bottom: 12px; }
-.lot-plan { position: relative; margin: 0 auto; border-radius: 8px; overflow: hidden; background: #fff; }
-.lot-plan img, .lot-plan svg { display: block; width: 100%; height: 100%; }
-.lot-plan svg { position: absolute; inset: 0; }
-.lot-plan polygon { fill-opacity: 0.45; stroke-width: 1; vector-effect: non-scaling-stroke; cursor: pointer; }
-.lot-plan polygon:hover { fill-opacity: 0.75; }
-.lot-plan polygon.dim { fill-opacity: 0.08; stroke-opacity: 0.3; }
-.lot-plan polygon.sel { fill-opacity: 0.85; stroke: #000; stroke-width: 3; }
-.lot-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-.lot { min-width: 40px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; color: #0B0F17; font: 700 13px Inter, sans-serif; cursor: pointer; font-variant-numeric: tabular-nums; }
-.lot.dim { opacity: 0.18; }
-.lot[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+/* The plan viewer (SubdivisionPlanTab): the plan moves and zooms inside a fixed frame, with the zoom bar and lot card over it. */
+.lot-viewer { position: relative; height: min(70vh, 720px); min-height: 360px; margin: 4px 0 12px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; background: var(--surface-variant); touch-action: none; }
+.lot-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; cursor: grab; user-select: none; }
+.lot-stage:active { cursor: grabbing; }
+.lot-stage img, .lot-stage svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.lot-wait { position: absolute; left: 16px; top: 12px; white-space: nowrap; }
+.lot-note { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2; margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--surface); }
+.lot-stage polygon { fill-opacity: 0.4; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.lot-stage polygon.lot-0 { fill: #FCA5A5; stroke: #FCA5A5; } .lot-stage polygon.lot-1 { fill: #A78BFA; stroke: #A78BFA; }
+.lot-stage polygon.lot-2 { fill: #FB923C; stroke: #FB923C; } .lot-stage polygon.lot-3 { fill: #FACC15; stroke: #FACC15; }
+.lot-stage polygon.lot-4 { fill: #60A5FA; stroke: #60A5FA; } .lot-stage polygon.lot-5 { fill: #4ADE80; stroke: #4ADE80; }
+.lot-stage polygon.lot-n { fill: #A3A3A3; stroke: #A3A3A3; }
+/* As on the phone: billed lots get a dashed blue edge, unmatched lots fade, the selected lot is amber. */
+.lot-stage polygon.billed { stroke: var(--primary); stroke-width: 3.5; stroke-dasharray: 14 7; }
+.lot-stage polygon.dim { fill-opacity: 0.08; stroke: #94A3B8; stroke-opacity: 0.25; stroke-width: 0.75; }
+.lot-stage polygon.sel { fill: var(--watch); fill-opacity: 0.65; stroke: var(--watch); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
+.lot-legend .dot.billed { background: none; border: 2px dashed var(--primary); width: 8px; height: 8px; }
+.zoom-bar { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
+.zoom-bar button { font: 700 11px Inter, sans-serif; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; cursor: pointer; }
+.zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
+.zoom-bar b { font-size: 11px; color: var(--link); min-width: 36px; text-align: center; }
+.lot-card { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 16px 16px 0 0; background: var(--surface-variant); }
+.lot-card p { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
+.lot-card .lc-upd { color: var(--link); }
+.lot-card .btn { margin-top: 10px; }
+.lc-head { display: flex; align-items: center; gap: 8px; }
+.lc-head b { font-size: 16px; }
+.lc-head .lot-pct { display: inline-flex; padding: 2px; border-radius: 6px; color: #111; }
+.lc-head .icon-btn { margin-left: auto; }
+.icon-btn { display: inline-flex; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text-2); cursor: pointer; }
+.icon-btn:hover { background: var(--surface); }
+.btn.lc-more { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 32px; font-size: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); }
+.lc-bill { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--outline); color: var(--text-2); }
+.lc-bill.on { color: #052e16; background: var(--ok); border-color: var(--ok); }
+@media (max-width: 600px) { .zoom-bar [data-zoom]:not([data-zoom="reset"]) { display: none; } }
 .lot-detail { background: var(--surface-variant); border-radius: 10px; padding: 12px 14px; margin: 8px 0 4px; scroll-margin: 80px; }
 .ld-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .ld-head h3 { margin: 0; font-size: 16px; flex: 1; }

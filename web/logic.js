@@ -610,17 +610,6 @@ export function lotColour(l) {
   return use === 'Saleable' ? `lot-${lotBand(p)}` : 'lot-n';
 }
 
-/** The lots grouped by block for the grid, blocks and lots in natural order ("2" before "10"); unassigned lots last. */
-export function lotBlocks(lots) {
-  const cmp = (a, b) => String(a).localeCompare(String(b), 'en', { numeric: true });
-  const blocks = new Map();
-  for (const l of [...lots].sort((a, b) => cmp(a.lotNumber || '', b.lotNumber || ''))) {
-    const k = lotLabel(l) === 'Unassigned lot' ? '' : NUMBERED_USES[lotUse(l)] === l.blockNumber ? lotUse(l) : `Block ${l.blockNumber}`;
-    if (!blocks.has(k)) blocks.set(k, []);
-    blocks.get(k).push(l);
-  }
-  return [...blocks].sort(([a], [b]) => (!a) - (!b) || cmp(a, b)).map(([name, list]) => ({ name: name || 'Unassigned lots', lots: list }));
-}
 const NUMBERED_USES = { 'Road Lot': 'RL', Easement: 'EA' };
 
 /** HOUSING_BILLING_TYPES. */
@@ -703,6 +692,8 @@ export function auditBadge(actionType) {
 
 /** SdpSummary.ROAD_STATES. */
 export const ROAD_STATES = ['Not completed', 'Concreting', 'Completed'];
+/** SdpSummary.roadState: the ROAD_STATES index of a road lot's progress. */
+export const roadState = p => (p >= 100 ? 2 : p > 0 ? 1 : 0);
 
 /** lotFill on paper (LightNHAColors): the six bands, then neutral for lots that are not built on. */
 export const LOT_PRINT_HEX = ['#B91C1C', '#7C3AED', '#EA580C', '#CA8A04', '#2563EB', '#15803D'];
@@ -734,7 +725,6 @@ export function frameAround(polygons, margin = 0.03) {
 /** SdpSummary.of for one site's lots: saleable lots per band and in all, and road lots per state. */
 export function sdpSummary(lots) {
   const saleable = lots.filter(l => lotUse(l) === 'Saleable');
-  const roadState = p => (p >= 100 ? 2 : p > 0 ? 1 : 0);
   return {
     bands: LOT_BANDS.map((_, b) => saleable.filter(l => lotBand(lotProgress(l)) === b).length),
     saleable: saleable.length,
