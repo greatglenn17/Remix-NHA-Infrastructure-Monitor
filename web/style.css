@@ -225,8 +225,10 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .bar i { border-radius: 5px; }
 
 /* Bento: identity on the left, dates in the middle, money and reports on the right, payments across. */
-.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; align-items: start; }
-.bento .col { display: grid; gap: 12px; min-width: 0; }
+.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+/* Each column's last card grows to the tallest column, so no dead space is left under the short ones. */
+.bento .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bento .col > :last-child { flex: 1; }
 .section { padding: 4px 16px 16px; min-width: 0; }
 .section-head { display: flex; align-items: center; gap: 8px; min-height: 48px; }
 .section-head .icon { color: var(--link); }
@@ -408,8 +410,9 @@ span.file.gone { text-decoration: none; }
 .grid-table tfoot th { border-top: 1px solid var(--outline); }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Photos: two across on a phone, more on wider screens; each opens full size. */
-.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }
-.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-wrap: anywhere; }
+/* ul only: the print form's table.photos must keep its table layout. */
+ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }
+ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-wrap: anywhere; }
 .thumb { display: grid; place-items: center; align-content: center; gap: 4px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
   background: var(--surface-variant); border: 1px solid var(--border); color: var(--text-2); text-decoration: none; }
 .thumb small { font-size: 11px; }

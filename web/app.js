@@ -521,8 +521,8 @@ function summaryBody({ project, records, of, documents, payments, weekly, cost, 
   return `
     <div class="bento">
       <div class="col c1">${attention}${profile}</div>
-      <div class="col c2">${dates}${construction}</div>
-      <div class="col c3">${costCard}${report}</div>
+      <div class="col c2">${dates}</div>
+      <div class="col c3">${costCard}${report}${construction}</div>
       ${paymentCard}
     </div>`;
 }
@@ -577,7 +577,7 @@ function reportCard(r, all, pid) {
       <div class="rep-body">
         <h4>1. Weekly accomplishment status</h4>
         ${table(['Item', { text: 'Target', num: 1 }, { text: 'Actual', num: 1 }, { text: 'Variance', num: 1 }],
-          acc.map(a => `<tr><td>${esc(a.itemDescription)} (${esc(a.weightPct)}%)</td><td class="num">${pct(a.targetPct)}</td><td class="num">${pct(a.actualPct)}</td>${vCell(a.variancePct)}</tr>`).join(''),
+          acc.map(a => `<tr><td>${esc(a.itemDescription)} (${pct(a.weightPct)})</td><td class="num">${pct(a.targetPct)}</td><td class="num">${pct(a.actualPct)}</td>${vCell(a.variancePct)}</tr>`).join(''),
           `<tfoot><tr><th>Grand total</th><th class="num">${pct(target)}</th><th class="num">${pct(actual)}</th>${vCell(actual - target, 'th')}</tr></tfoot>`)}
         <h4>2. Activities of the week</h4>
         ${activities.length ? table(['Day of week', 'Activities', 'Remarks'], activities.map(a => `<tr><td><b>${esc(a.day)}</b></td><td>${esc(a.description)}</td><td class="muted">${esc(a.remarks || '-')}</td></tr>`).join(''))
