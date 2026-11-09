@@ -391,9 +391,9 @@ const fileLink = (refText, label) => (L.storagePathOf(refText)
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
 /** ProjectSection: the project screen's four sections. */
 const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
-/** SectionChips: the views inside Progress (Weather is not on the website yet; Lots only for housing) and Documents. */
+/** SectionChips: the views inside Progress (Lots only for housing) and Documents. */
 const CHIPS = {
-  progress: ['Weekly', 'Monthly', 'Photos', 'Issues'],
+  progress: ['Weekly', 'Monthly', 'Photos', 'Weather', 'Issues'],
   documents: ['Suspension / Resumption', 'Time Extensions', 'Variation Orders', 'Letters to Contractor', 'Developer Requests', 'Related Files'],
 };
 
@@ -416,7 +416,7 @@ function drawProject(page) {
   if (page.section === 'print') return drawPrint(c);
 
   const housing = /housing/i.test(project.projectType || '');
-  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Issues'] : CHIPS[page.section];
+  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues'] : CHIPS[page.section];
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
@@ -440,6 +440,7 @@ function drawProject(page) {
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
+  main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
@@ -549,6 +550,7 @@ function progressBody(c, chip) {
   if (chip === 'Monthly') return monthlyView(c);
   if (chip === 'Lots') return lotsView(c);
   if (chip === 'Photos') return photosView(c);
+  if (chip === 'Weather') return weatherView(c);
   if (chip === 'Issues') return issuesView(c);
   if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
   return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id)).join('')}</div>`;
@@ -720,6 +722,48 @@ function bindLots(c) {
   document.getElementById('lot-q').oninput = e => { st.query = e.target.value; redraw(false); };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; redraw(false); }; });
   main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; drawProject(c.page); }; });
+}
+
+/* ---------- Weather (WeatherChartTab), read-only ---------- */
+
+/** WeatherChartTab: each logged day as a 24-hour clock, by weekly report (7 days) or by month. */
+function weatherView({ page, weekly }) {
+  // Only logs saved with a weekly report reach the cloud, which matches the phone's submittedWeatherLogs.
+  const logs = weekly.flatMap(r => (Array.isArray(r._weather) ? r._weather : []));
+  if (!logs.length && !weekly.length) return `<div class="card empty">${icon('sunny')}<p>No Weather Logs Recorded Yet</p><small>Field staff can submit daily 24h weather logs when submitting weekly reports.</small></div>`;
+  const st = (page.wx ||= { mode: weekly.length ? 'week' : 'month', report: '', month: '' });
+  // label is HTML built from the date only.
+  const clock = (log, day, label = '') => `<figure class="wx-day">${label ? `<figcaption>${label}</figcaption>` : ''}${P.weatherClock(log, day)}</figure>`;
+  let body;
+  if (st.mode === 'week') {
+    const report = weekly.find(r => r.uuid === st.report) || weekly[0];
+    const own = Array.isArray(report?._weather) ? report._weather : [];
+    const days = report ? L.weekDays(report.reportingWeek) : [];
+    body = !report ? emptyLine('No weekly reports submitted yet.') : `
+      <label class="field">Report<select data-wx="report">${weekly.map((r, i) => `<option value="${esc(r.uuid)}"${r === report ? ' selected' : ''}>Week ${weekly.length - i}: ${esc(r.reportingWeek)}</option>`).join('')}</select></label>
+      <h3 class="wx-title">Weekly report weather mapping <span class="muted">7 days</span></h3>
+      <p class="muted small">Reporting period: ${esc(report.reportingWeek)}</p>
+      ${days.length ? `<div class="wx-grid">${days.map(d => {
+        const t = new Date(`${d}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
+        return clock(own.find(w => (w.date || '').trim() === d), Number(d.slice(8)), `${fmt({ weekday: 'short' })}<span>${fmt({ month: 'short', day: '2-digit' })}</span>`);
+      }).join('')}</div>` : emptyLine('The site cannot read the dates of this report\'s week.')}`;
+  } else {
+    const months = L.weatherMonths(logs);
+    const month = months.includes(st.month) ? st.month : months[0];
+    body = !month ? emptyLine('No weather logs submitted with weekly reports yet.') : `
+      <label class="field">Month<select data-wx="month">${months.map(m => `<option value="${m}"${m === month ? ' selected' : ''}>${esc(P.monthName(m))}</option>`).join('')}</select></label>
+      <div class="wx-grid month">${Array.from({ length: L.daysInMonth(month) }, (_, i) => {
+        const d = `${month}-${String(i + 1).padStart(2, '0')}`;
+        return clock(logs.find(w => (w.date || '').trim() === d), i + 1);
+      }).join('')}</div>`;
+  }
+  const mode = (key, label, ic) => `<button data-wx="mode" value="${key}" aria-pressed="${st.mode === key}">${icon(ic, 'sm')}${label}</button>`;
+  return `<section class="card section wx">
+    <div class="chips" role="group" aria-label="Weather view">${mode('week', 'Weekly Report Range', 'date_range')}${mode('month', 'Monthly View', 'calendar_month')}</div>
+    ${body}
+    <p class="wx-legend">${P.WEATHER.map(([, label, hex]) => `<span><i style="background:${hex}"></i>${label}</span>`).join('')}</p>
+    <p class="muted small">Inner ring 12 AM to 11 AM, outer ring 12 PM to 11 PM. A day with no log stays blank.</p>
+  </section>`;
 }
 
 /* ---------- Issues (IssuesTab, IssueCard), read-only ---------- */

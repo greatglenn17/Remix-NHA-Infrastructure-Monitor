@@ -659,3 +659,15 @@ export function issueMatches(i, query, filter, today) {
   if (filter === 'Pending') return /pending|open/i.test(status);
   return true;
 }
+
+/** WeatherChartTab.parseWeeklyReportDates: the report's 7 days (yyyy-MM-dd) from its first day; [] when the label has no dates. */
+export function weekDays(label) {
+  const start = weekStart(label);
+  return start == null ? [] : Array.from({ length: 7 }, (_, i) => new Date(start + i * 86400000).toISOString().slice(0, 10));
+}
+
+/** WeatherChartTab.availableMonths: "yyyy-MM" of the logged days, newest first. */
+export const weatherMonths = logs => [...new Set(logs.map(w => (w.date || '').trim().slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+
+/** WeatherChartTab.daysInMonth for "yyyy-MM". */
+export const daysInMonth = month => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();

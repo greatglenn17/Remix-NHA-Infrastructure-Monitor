@@ -421,7 +421,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .album > .muted { font-size: 13px; margin-bottom: 10px; }
 /* Monthly */
 .month-head { padding-top: 12px; max-width: 320px; }
-.month-head select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
+.month-head select, .wx select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
 .month h3 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
 .month > p { margin-bottom: 12px; }
 
@@ -549,3 +549,22 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .issue-card h4.link { color: var(--link); }
 .issue-card h4 + p { margin: 0; font-size: 14px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
 .issue-card .logged { margin: 10px 0 0; font-style: italic; text-align: right; }
+
+/* Weather (WeatherChartTab); the clock SVG is the print's, recoloured for the dark site */
+.wx .field { margin-top: 4px; }
+.wx-title { margin: 16px 0 2px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--link); }
+.wx-title .muted { float: right; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.wx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(120px, 22%), 1fr)); gap: 8px; margin: 12px 0; padding: 8px; border-radius: 8px; background: var(--surface-variant); }
+.wx-grid.month { grid-template-columns: repeat(auto-fill, minmax(min(96px, 22%), 1fr)); gap: 4px; }
+.wx-day { margin: 0; padding: 4px; border-radius: 6px; border: 1px solid var(--outline); background: var(--bg); text-align: center; min-width: 0; }
+.wx-day figcaption { display: grid; font-size: 11px; line-height: 14px; font-weight: 700; color: var(--link); }
+.wx-day figcaption span { font-weight: 500; color: var(--text-2); }
+.wx .chips button { display: inline-flex; align-items: center; gap: 6px; }
+.wx-day svg { display: block; width: 100%; height: auto; }
+.wx-day svg circle[fill='#fff'] { fill: var(--bg); }
+.wx-day svg [stroke='#888'] { stroke: var(--outline); }
+.wx-day svg text { fill: var(--text-2); }
+.wx-day svg text[font-weight='bold'] { fill: var(--text); }
+.wx-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; margin: 8px 0; font-size: 12px; font-weight: 700; }
+.wx-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.wx-legend i { width: 12px; height: 12px; border-radius: 3px; }

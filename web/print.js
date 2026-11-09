@@ -19,12 +19,12 @@ const dayMs = s => (iso(s) ? Date.parse(`${s.trim()}T00:00:00Z`) : null);
 const inWeek = (start, s) => { const t = dayMs(s); return t != null && t >= start && t <= start + 6 * 86400000; };
 
 // Weather tab colours (Color.kt WeatherFairGreen ... WeatherStormyRed), in WeatherCondition order.
-const WEATHER = [['FAIR', 'Fair', '#22C55E'], ['CLOUDY', 'Cloudy', '#F59E0B'], ['RAIN_SHOWERS', 'Rain Showers', '#38BDF8'], ['RAINY', 'Rainy', '#3B82F6'], ['STORMY', 'Stormy', '#EF4444']];
+export const WEATHER = [['FAIR', 'Fair', '#22C55E'], ['CLOUDY', 'Cloudy', '#F59E0B'], ['RAIN_SHOWERS', 'Rain Showers', '#38BDF8'], ['RAINY', 'Rainy', '#3B82F6'], ['STORMY', 'Stormy', '#EF4444']];
 const WEEK_DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']; // the reporting week runs Saturday to Friday
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']; // ActivityDays.DAYS
 
 /** BlueBookForms.weatherClock: inner ring 12 AM-11 AM, outer ring 12 PM-11 PM, one slice per hour; an unknown hour reads Fair. */
-export function weatherClock(log) {
+export function weatherClock(log, day = iso(log?.date) ? Number(log.date.trim().slice(8)) : '') {
   const parts = (log?.hourlyConditionsCsv || '').split(',');
   const colour = h => (log ? (WEATHER.find(w => w[0] === (parts[h] ?? 'FAIR').trim()) || WEATHER[0])[2] : 'none');
   const cx = 50, cy = 50, r = 36, inner = r * 0.6, center = r * 0.25;
@@ -42,7 +42,7 @@ export function weatherClock(log) {
     s += `<line x1='${x(center, a)}' y1='${y(center, a)}' x2='${x(r, a)}' y2='${y(r, a)}' stroke='#888' stroke-width='0.5'/>`;
     s += `<text x='${x(r + 7, a)}' y='${y(r + 7, a)}' font-size='6' text-anchor='middle' dominant-baseline='middle'>${i === 0 ? 12 : i}</text>`;
   }
-  if (iso(log?.date)) s += `<text x='${cx}' y='${cy}' font-size='8' font-weight='bold' text-anchor='middle' dominant-baseline='middle'>${Number(log.date.trim().slice(8))}</text>`;
+  if (day !== '') s += `<text x='${cx}' y='${cy}' font-size='8' font-weight='bold' text-anchor='middle' dominant-baseline='middle'>${day}</text>`;
   return `${s}</svg>`;
 }
 
