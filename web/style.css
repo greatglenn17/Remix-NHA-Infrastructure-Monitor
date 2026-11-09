@@ -225,8 +225,10 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .bar i { border-radius: 5px; }
 
 /* Bento: identity on the left, dates in the middle, money and reports on the right, payments across. */
-.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; align-items: start; }
-.bento .col { display: grid; gap: 12px; min-width: 0; }
+.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+/* Each column's last card grows to the tallest column, so no dead space is left under the short ones. */
+.bento .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bento .col > :last-child { flex: 1; }
 .section { padding: 4px 16px 16px; min-width: 0; }
 .section-head { display: flex; align-items: center; gap: 8px; min-height: 48px; }
 .section-head .icon { color: var(--link); }
@@ -356,4 +358,144 @@ tfoot th { color: var(--text); font-weight: 700; border-bottom: 0; }
   .pay { font-size: 12px; }
   .pay th, .pay td { padding: 6px 3px; }
   .pay thead .num { white-space: normal; }
+}
+
+/* Project sections (ProjectSection): one row of tabs under the header; sideways scroll on a narrow phone. */
+.tabs { display: flex; gap: 4px; margin: 12px 0 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.tabs a { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--text-2);
+  text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs a:hover { color: var(--text); }
+.tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.tabs a[aria-current="page"] .icon { color: var(--link); }
+/* On a phone the four labels share the row without icons, so Documents never hides off the edge. */
+@media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } .tabs a .icon { display: none; } }
+/* SectionChips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.chips button { font: 500 13px Inter, sans-serif; min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--outline); background: var(--field); color: var(--text-2); }
+.chips button:hover { color: var(--text); }
+.chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
+.project-head + .tabs + .bento, .tabs + .stack, .tabs + .card, .tabs + .section { margin-top: 12px; }
+.stack { display: grid; gap: 12px; }
+.list-title { font-size: 13px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-2); margin: 4px 0 10px; }
+.card.empty { display: grid; justify-items: center; gap: 6px; padding: 40px 16px; }
+.card.empty > .icon { font-size: 40px; color: var(--text-2); }
+.card.empty p { color: var(--text); font-weight: 600; }
+.small { font-size: 12px; }
+.lv-primary { color: var(--on-primary-container); background: var(--primary-container); }
+
+/* Attached files: a link once Storage gives its address; grey when it cannot. */
+.file { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--link); text-decoration: none; border-radius: 6px; padding: 6px 4px; min-height: 32px; }
+a.file:not([href]) { color: var(--text-2); cursor: progress; }
+.file:hover { text-decoration: underline; }
+.file.gone { color: var(--text-2); font-weight: 500; text-decoration: line-through; cursor: default; }
+span.file.gone { text-decoration: none; }
+
+/* Weekly report cards (WeeklyReportCard) */
+.report { padding: 14px 16px; }
+.rep-head { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.rep-head h3 { font-size: 16px; font-weight: 600; }
+.rep-head p { font-size: 13px; margin-top: 2px; }
+.rep-head .text-btn { flex: none; margin: -6px -8px 0 0; }
+.rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; }
+.report details { margin-top: 10px; border-top: 1px solid var(--border); }
+.report summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
+.report summary::-webkit-details-marker { display: none; }
+.report summary .icon { transition: transform 150ms ease-out; }
+.report details[open] summary .icon { transform: rotate(180deg); }
+.rep-body h4 { font-size: 13px; font-weight: 700; margin: 14px 0 6px; }
+.rep-body h4:first-child { margin-top: 2px; }
+.grid-table { font-size: 13px; }
+.grid-table thead th { font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; background: var(--surface-variant); }
+.grid-table tfoot th { border-top: 1px solid var(--outline); }
+.raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Photos: two across on a phone, more on wider screens; each opens full size. */
+/* ul only: the print form's table.photos must keep its table layout. */
+ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }
+ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-wrap: anywhere; }
+.thumb { display: grid; place-items: center; align-content: center; gap: 4px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
+  background: var(--surface-variant); border: 1px solid var(--border); color: var(--text-2); text-decoration: none; }
+.thumb small { font-size: 11px; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.album { margin-bottom: 12px; }
+.album > .muted { font-size: 13px; margin-bottom: 10px; }
+/* Monthly */
+.month-head { padding-top: 12px; max-width: 320px; }
+.month-head select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
+.month h3 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
+.month > p { margin-bottom: 12px; }
+
+/* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
+.two-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px 16px; margin-top: 10px; }
+.pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
+.pay-card { padding: 12px 16px 14px; min-width: 0; }
+.pc-head { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; }
+.pc-head h3 { font-size: 15px; font-weight: 600; }
+.pc-head .muted { font-size: 12px; }
+.pay-card > .muted { margin: 6px 0; }
+
+/* Documents: LogEntry rows; continuances sit under their suspension; requests not yet packaged stand out. */
+.entry { display: grid; gap: 2px; padding: 10px 12px; margin-top: 6px; border-radius: 6px; background: var(--surface-variant); font-size: 13px; min-width: 0; }
+.entry b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.entry span { color: var(--text-2); overflow-wrap: anywhere; }
+.entry .badge { justify-self: start; margin-top: 4px; }
+.entry .file { justify-self: start; }
+.entry.nested { margin-left: 24px; }
+.entry.waiting > b { color: var(--watch); }
+.n-watch { color: var(--watch); }
+
+/* Status of construction (ConstructionCard): the lot map's progress colours, Color.kt DarkNHAColors (behind, progressQuarter1-4, onTrack). */
+.lot-0 { background: #FCA5A5; } .lot-1 { background: #A78BFA; } .lot-2 { background: #FB923C; }
+.lot-3 { background: #FACC15; } .lot-4 { background: #60A5FA; } .lot-5 { background: #4ADE80; }
+.asof { font-size: 12px; margin-bottom: 8px; }
+.lot-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--track); margin-bottom: 8px; }
+.lot-bar i { display: block; height: 100%; }
+.band { display: flex; align-items: center; gap: 8px; }
+.band .kv { flex: 1; }
+.band .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.band.total { justify-content: space-between; padding: 6px 0 0 18px; margin-top: 4px; border-top: 1px solid var(--border); font-size: 14px; }
+.sub.strong { color: var(--text); font-size: 14px; font-weight: 600; margin-top: 16px; }
+
+/* Weekly report print: the phone's Blue Book form (BlueBookForms.page) on a white A4 sheet. Print ink, not app colours. */
+.print-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.print-note { font-size: 13px; margin: 4px 0 12px; }
+.bb-scroll { overflow-x: auto; padding-bottom: 8px; }
+.bb { width: 198mm; padding: 6mm; margin: 0 auto; background: #fff; color: #000; font: 9pt/1.3 Arial, Helvetica, sans-serif; box-shadow: 0 2px 12px rgb(0 0 0 / 0.5); color-scheme: light; }
+.bb:empty { min-height: 120mm; }
+.bb table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; font-size: inherit; }
+.bb tr { page-break-inside: avoid; }
+.bb tr:has(> th) { break-after: avoid; }
+.bb th, .bb td { border: 0.6pt solid #000; padding: 1.2mm 1.5mm; vertical-align: top; text-align: left; height: 4mm; color: #000; }
+.bb th { font-weight: bold; text-align: center; vertical-align: middle; }
+.bb th.sec { text-align: left; background: #d9d9d9; }
+.bb td.lab { font-weight: bold; width: 22%; }
+.bb td.n { text-align: right; white-space: nowrap; }
+.bb td.c { text-align: center; }
+.bb td.day { font-weight: bold; width: 18%; }
+.bb td.empty { text-align: center; color: #555; }
+.bb tr.tot { break-before: avoid; }
+.bb tr.tot td { font-weight: bold; }
+.bb h1 { font-size: 13pt; text-align: center; margin: 3mm 0 0; }
+.bb .period { text-align: center; margin-bottom: 3mm; font-weight: bold; }
+.bb .legend { margin-bottom: 1.5mm; }
+.bb .legend span { margin-right: 3mm; white-space: nowrap; }
+.bb .legend i { display: inline-block; width: 3mm; height: 3mm; border: 0.4pt solid #000; margin-right: 1mm; vertical-align: middle; }
+.bb table.clocks th, .bb table.clocks td { text-align: center; width: 14.28%; padding: 0.5mm; font-size: 7pt; }
+.bb svg.clock { width: 100%; height: auto; }
+.bb .small { font-size: 6.5pt; }
+.bb table.photos td { width: 50%; text-align: center; }
+.bb table.photos img { max-width: 100%; max-height: 80mm; }
+.bb img.banner { display: block; width: 100%; margin-bottom: 3mm; }
+.bb table.sig { margin-top: 6mm; }
+.bb table.sig td { border: none; width: 33%; }
+.bb .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
+.bb .note { font-size: 8pt; font-style: italic; }
+.bb .keep { break-inside: avoid; }
+@page { size: A4; margin: 6mm; }  /* narrow, as the phone's full-page prints (BlueBookForms fullPage) */
+@media print {
+  html, body { background: #fff; }
+  .appbar, .no-print { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .bb-scroll { overflow: visible; padding: 0; }
+  .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }
 }

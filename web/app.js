@@ -5,11 +5,12 @@ import {
   initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, query, where, onSnapshot,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
+import * as P from './print.js';
 
 // `?emulator` on localhost talks to `firebase emulators:start --project demo-nha` instead of the live project.
 const emulator = new URLSearchParams(location.search).has('emulator') && ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -53,8 +54,8 @@ const TERM_HELP = [
 const main = document.getElementById('app');
 const who = document.getElementById('who');
 const s = {
-  user: null, claims: {}, projects: null, projectsError: null,
-  payments: new Map(), docs: new Map(), unsub: [], unsubPage: [],
+  user: null, claims: {}, profile: {}, projects: null, projectsError: null,
+  payments: new Map(), docs: new Map(), unsub: [], unsubPage: [], page: null,
   filter: null, mineOnly: false, q: '',
 };
 
@@ -104,11 +105,13 @@ function listenRecords(type, into) {
 onAuthStateChanged(auth, async user => {
   s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear();
+  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear(); s.page = null; s.profile = {};
   document.body.classList.toggle('signed-out', !user);
   if (!user) { who.innerHTML = ''; return renderSignIn(); }
   // Fresh token: the role claim may have changed since this browser last signed in.
   s.claims = (await user.getIdTokenResult(true)).claims;
+  // Name and position for the weekly form's "Prepared by" when the project has none saved (signatoriesFor).
+  getDoc(doc(db, 'users', user.uid)).then(d => { s.profile = { name: d.get('displayName') || '', title: d.get('position') || '' }; }).catch(() => {});
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon('visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · read only</span>
@@ -126,11 +129,21 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('hashchange', () => s.user && route());
 
+// #/p/<project>[/progress|/payments|/documents|/print/<weekly report>]
+const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|payments|documents|print)(?:\/([\w-]+))?)?$/;
+
 function route() {
-  s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  const m = /^#\/p\/([\w-]+)$/.exec(location.hash);
+  const m = PAGE.exec(location.hash);
   window.scrollTo(0, 0);
-  if (m) renderProject(m[1]); else renderDashboard();
+  document.title = 'NHA Monitor';
+  // Another section of the open project: keep its listeners and redraw.
+  if (m && s.page?.id === m[1]) {
+    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null });
+    freshScreen();
+    return drawProject(s.page);
+  }
+  s.unsubPage.forEach(u => u()); s.unsubPage = []; s.page = null;
+  if (m) renderProject(m[1], m[2] || 'summary', m[3] || null); else renderDashboard();
 }
 
 /* ---------- Sign in (LoginScreen: brand gradient hero beside the form) ---------- */
@@ -345,10 +358,10 @@ function tile(it) {
   </a></li>`;
 }
 
-/* ---------- Project Summary (ProjectHeader + SummarySection) ---------- */
+/* ---------- Project page (ProjectHeader, the four ProjectSection tabs) ---------- */
 
-function renderProject(projectUuid) {
-  const page = { project: undefined, records: [], error: null };
+function renderProject(projectUuid, section, sub) {
+  const page = s.page = { id: projectUuid, project: undefined, records: [], error: null, section, sub, chips: {}, month: null };
   main.innerHTML = '<p class="muted">Loading project…</p>';
   freshScreen();
   const draw = () => drawProject(page);
@@ -369,8 +382,24 @@ const kv = (k, v, cls = '') => {
 };
 const section = (title, ic, body, cls = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2></div>${body}</section>`;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
+const signedPct = v => `${v >= 0 ? '+' : ''}${(Number(v) || 0).toFixed(2)}%`;
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const emptyLine = text => `<p class="none-note">${icon('info', 'sm')}${esc(text)}</p>`;
+/** A link to an attached file (a scan, letter or photo); its address is filled in once Storage gives it. */
+const fileLink = (refText, label) => (L.storagePathOf(refText)
+  ? `<a class="file" data-file="${esc(refText)}" target="_blank" rel="noopener">${icon(L.isPdf(refText) ? 'picture_as_pdf' : 'attach_file', 'sm')}${esc(label)}</a>`
+  : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
+/** ProjectSection: the project screen's four sections. */
+const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
+/** SectionChips: the views inside Progress (Lots, Weather and Issues are not on the website yet) and Documents. */
+const CHIPS = {
+  progress: ['Weekly', 'Monthly', 'Photos'],
+  documents: ['Suspension / Resumption', 'Time Extensions', 'Variation Orders', 'Letters to Contractor', 'Developer Requests', 'Related Files'],
+};
 
-function drawProject({ project: stored, records, error }) {
+function drawProject(page) {
+  if (page !== s.page) return;
+  const { project: stored, records, error } = page;
   if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
   if (stored === undefined) return;
   if (stored === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
@@ -379,17 +408,56 @@ function drawProject({ project: stored, records, error }) {
   const project = L.withSchedule(stored, documents, today());
   // Room lists billings by local id (creation order); the cloud has no id, so date then last edit.
   const payments = of('project_payments').sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.updatedAt - b.updatedAt);
-  const latest = of('weekly_reports').sort((a, b) => b.createdAtTimestamp - a.createdAtTimestamp)[0];
-  const openIssues = of('project_issues').filter(L.isOpenIssue).length;
-  const orders = documents.filter(d => SCHEDULE_ORDER.test(d.documentName || ''));
+  // The phone lists weekly reports newest added first.
+  const weekly = of('weekly_reports').sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0));
   const cost = L.currentCost(project, documents);
   const billed = L.billedTotal(payments);
-  const it = { billed, cost };
-  const now = today();
+  const c = { page, project, records, of, documents, payments, weekly, cost, billed, now: today() };
+  if (page.section === 'print') return drawPrint(c);
+
+  const chips = CHIPS[page.section];
+  const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
+  const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
+  const focused = document.activeElement?.dataset?.chip;
+  main.innerHTML = `
+    ${backLink}
+    <header class="card project-head">
+      <div class="ph-top">
+        <div class="ph-title"><h1>${esc(project.name)}</h1>
+          <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p></div>
+        <div class="ph-badges">${statusBadge(project)}
+          ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
+      </div>
+      <div class="ph-bars">${workDone(project, true)}${billedLine({ billed, cost }, true)}</div>
+    </header>
+    <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
+      <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
+    </nav>
+    ${chips ? `<div class="chips" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}</button>`).join('')}</div>` : ''}
+    ${body(c, chip)}`;
+  main.querySelectorAll('[data-chip]').forEach(b => { b.onclick = () => { page.chips[page.section] = b.dataset.chip; drawProject(page); }; });
+  if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
+  const month = document.getElementById('month');
+  if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
+  if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
+  loadFiles(main);
+}
+
+/* ---------- Summary (SummarySection) ---------- */
+
+function summaryBody({ project, records, of, documents, payments, weekly, cost, billed, now }) {
+  const latest = weekly[0];
+  const openIssues = of('project_issues').filter(L.isOpenIssue).length;
+  const orders = documents.filter(d => SCHEDULE_ORDER.test(d.documentName || ''));
   const flags = L.attentionFlags(project, documents, billed, now);
   const housing = /housing/i.test(project.projectType || '');
-  const revised = (project.completionDateRevised || '').trim();
   const finished = L.isCompleted(project);
+  // KeyDatesCard: approved time extensions first, else the stored revised date; Days left counts down to the same date.
+  const fromOrders = L.revisedCompletion(project, documents);
+  const stored = (project.completionDateRevised || '').trim();
+  const revised = fromOrders || (stored !== '-' ? stored : '');
+  const dated = fromOrders ? { ...project, completionDateRevised: fromOrders } : project;
+  const revisedDays = L.revisedDurationDays(project, L.addedDays(documents));
 
   // Needs attention: one alert box per flag; critical ones (overdue, 15%+ behind) carry a pulsing dot.
   const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => `
@@ -411,17 +479,18 @@ function drawProject({ project: stored, records, error }) {
     const state = !has ? 'none' : date > now ? 'next' : completion && !finished ? 'late' : 'done';
     return `<li class="step ${state}"><span>${esc(label)}</span><b>${has ? esc(L.displayDate(date)) : '-'}</b></li>`;
   };
-  const daysLeft = L.daysLeftText(project, now);
+  const daysLeft = L.daysLeftText(dated, now);
   const dates = section('Key dates', 'event', `
     <ol class="timeline">
       ${step('Date started', project.dateStarted, false)}
       ${step('Original completion', project.completionDateOriginal, true)}
-      ${step('Revised completion', revised !== '-' ? revised : '', true)}
+      ${step('Revised completion', revised, true)}
     </ol>
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
+    ${kv('Revised duration', revisedDays == null ? '-' : `${revisedDays} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
-    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.withEnd(d.remarks))}` : ''}</span></div>`).join('')
+    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.withEnd(d.remarks))}` : ''}</span></div>`).join('')
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
@@ -431,6 +500,7 @@ function drawProject({ project: stored, records, error }) {
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
     ${kv('Target', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
+  const construction = housing ? constructionCard(L.lotSummary(records), payments, now) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
@@ -448,27 +518,246 @@ function drawProject({ project: stored, records, error }) {
         <th class="num">${L.formatDecimal(cost - billed)}</th></tr></tfoot>
     </table></div>`, 'wide');
 
-  main.innerHTML = `
-    ${backLink}
-    <header class="card project-head">
-      <div class="ph-top">
-        <div class="ph-title"><h1>${esc(project.name)}</h1>
-          <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p></div>
-        <div class="ph-badges">${statusBadge(project)}
-          ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
-      </div>
-      <div class="ph-bars">${workDone(project, true)}${billedLine(it, true)}</div>
-    </header>
+  return `
     <div class="bento">
       <div class="col c1">${attention}${profile}</div>
       <div class="col c2">${dates}</div>
-      <div class="col c3">${costCard}${report}</div>
+      <div class="col c3">${costCard}${report}${construction}</div>
       ${paymentCard}
     </div>`;
-  showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
 }
 
-/* ---------- Site photos from Storage ---------- */
+/** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
+function constructionCard(summary, payments, now) {
+  if (!summary.saleable) return '';
+  return section('Status of construction', 'home_work', `
+    <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
+    <div class="lot-bar" role="img" aria-label="${esc(L.LOT_BANDS.map((b, i) => `${b}: ${summary.bands[i]}`).join(', '))}">${summary.bands.map((n, i) => (n ? `<i class="lot-${i}" style="flex:${n}"></i>` : '')).join('')}</div>
+    ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
+    <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'unit')}</b></div>
+    <p class="sub strong">Status of billing</p>
+    <table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${summary.saleable}</th></tr></thead>
+      <tbody>${L.billingStatus(payments, summary.saleable).map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>`);
+}
+
+/* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
+
+function progressBody(c, chip) {
+  if (chip === 'Monthly') return monthlyView(c);
+  if (chip === 'Photos') return photosView(c);
+  if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
+  return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id)).join('')}</div>`;
+}
+
+const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
+/** The Equipment table's status chip: Operational green, Idle or For Repair amber, anything else grey. */
+const equipmentLevel = status => (/^operational$/i.test(status.trim()) ? 'ok' : /^(idle|for repair)$/i.test(status.trim()) ? 'watch' : 'neutral');
+
+/** varianceColor as a text colour class; small slips stay grey. */
+const noteLevel = v => { const lv = L.varianceLevel(Math.round(v * 100) / 100); return lv === 'neutral' ? 'muted' : lv; };
+
+/** WeeklyReportCard: week, who and when, actual against target; the report's five tables and photos under "Report details". */
+function reportCard(r, all, pid) {
+  const target = Number(r.targetAccomplishmentPct) || 0, actual = Number(r.actualAccomplishmentPct) || 0;
+  const prev = L.previousReport(all, r);
+  const acc = L.accomplishmentOf(r.accomplishmentItemsJson);
+  const activities = L.activitiesOf(r.activitiesJson), manpower = L.manpowerOf(r.manpowerJson), equipment = L.equipmentOf(r.equipmentJson), issues = L.issuesOf(r.issuesJson);
+  const photos = L.attachmentList(r.attachedPhotoUrlsJson);
+  const vCell = (v, tag = 'td') => `<${tag} class="num n-${noteLevel(v)}">${signedPct(v)}</${tag}>`;
+  const crew = manpower.reduce((t, m) => t + m.count, 0);
+  return `<article class="card report">
+    <div class="rep-head">
+      <div><h3>${esc(r.reportingWeek)}</h3><p class="muted">${esc(r.submittedByStaff || '-')} · Day ${esc(r.daysElapsed ?? 0)}, ${esc(r.remainingDays ?? 0)} days left</p></div>
+      <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a>
+    </div>
+    <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
+      <span class="muted">Target ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
+    <details>
+      <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
+      <div class="rep-body">
+        <h4>1. Weekly accomplishment status</h4>
+        ${table(['Item', { text: 'Target', num: 1 }, { text: 'Actual', num: 1 }, { text: 'Variance', num: 1 }],
+          acc.map(a => `<tr><td>${esc(a.itemDescription)} (${pct(a.weightPct)})</td><td class="num">${pct(a.targetPct)}</td><td class="num">${pct(a.actualPct)}</td>${vCell(a.variancePct)}</tr>`).join(''),
+          `<tfoot><tr><th>Grand total</th><th class="num">${pct(target)}</th><th class="num">${pct(actual)}</th>${vCell(actual - target, 'th')}</tr></tfoot>`)}
+        <h4>2. Activities of the week</h4>
+        ${activities.length ? table(['Day of week', 'Activities', 'Remarks'], activities.map(a => `<tr><td><b>${esc(a.day)}</b></td><td>${esc(a.description)}</td><td class="muted">${esc(a.remarks || '-')}</td></tr>`).join(''))
+          : /^\s*(\[\s*\])?\s*$/.test(r.activitiesJson || '') ? emptyLine('No activities logged.') : `<p class="raw">${esc(r.activitiesJson)}</p>`}
+        <h4>3. Manpower summary</h4>
+        ${manpower.length ? table(['Designation', { text: 'No. of personnel', num: 1 }], manpower.map(m => `<tr><td>${esc(m.designation)}</td><td class="num"><b>${m.count}</b></td></tr>`).join(''),
+          `<tfoot><tr><th>Grand total weekly</th><th class="num">${plural(crew, 'personnel', 'personnel')}</th></tr></tfoot>`) : emptyLine('No manpower logged.')}
+        <h4>4. Equipment summary</h4>
+        ${equipment.length ? table(['Name of equipment', { text: 'No.', num: 1 }, 'Remarks / status'], equipment.map(e => `<tr><td>${esc(e.description)}</td><td class="num"><b>${e.count}</b></td><td><span class="badge lv-${equipmentLevel(e.status)}">${esc(e.status)}</span></td></tr>`).join(''))
+          : emptyLine('No equipment logged.')}
+        <h4>5. Issues encountered / action taken</h4>
+        ${issues.length ? table(['Issues encountered', 'Action taken'], issues.map(i => `<tr><td>${esc(i.description)}</td><td><b>${esc(i.actionTaken)}</b></td></tr>`).join(''))
+          : emptyLine('No issues encountered for this reporting period.')}
+        ${photos.length ? `<h4>Attached site photos (${photos.length})</h4>${photoGrid(photos, L.photoDetails(r.photoDetailsJson))}` : ''}
+      </div>
+    </details>
+  </article>`;
+}
+
+/** Photos as thumbnails that open full size; PDFs in the list as file links. */
+function photoGrid(refs, details) {
+  return `<ul class="photos">${refs.map(refText => {
+    const d = details[refText] || {};
+    const caption = [d.title, d.takenAt].filter(Boolean).map(esc).join('<br>');
+    if (L.isPdf(refText)) return `<li>${fileLink(refText, d.title || 'Attached PDF')}</li>`;
+    if (!L.storagePathOf(refText)) return `<li><span class="thumb gone">${icon('photo_camera')}<small>Not uploaded yet</small></span></li>`;
+    return `<li><a class="thumb" data-file="${esc(refText)}" data-alt="${esc(d.title || 'Site photo')}" target="_blank" rel="noopener">${icon('photo_camera')}</a>${caption ? `<p>${caption}</p>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+
+/** MonthlyReportSingleTableCard: the month's weekly figures; the month stands at its last week. */
+function monthlyView({ page, weekly, of, now }) {
+  const months = L.reportMonths(weekly, of('monthly_reports'), now);
+  const month = months.includes(page.month) ? page.month : months[0];
+  const rows = L.monthReports(weekly, month);
+  const last = rows[rows.length - 1];
+  const t = Number(last?.targetAccomplishmentPct) || 0, a = Number(last?.actualAccomplishmentPct) || 0, v = a - t;
+  const level = L.varianceLevel(Math.round(v * 100) / 100);
+  return `<section class="card section month">
+    <div class="month-head">
+      <label class="field">Month <select id="month">${months.map(m => `<option${m === month ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></label>
+    </div>
+    <h3>Monthly accomplishment report – ${esc(month)}</h3>
+    <p><span class="badge lv-${level}">${v >= 0 ? `AHEAD (${signedPct(v)})` : `SLIPPAGE (${signedPct(v)})`}</span></p>
+    ${rows.length ? table(['Reporting week', { text: 'Target %', num: 1 }, { text: 'Actual %', num: 1 }, { text: 'Variance %', num: 1 }],
+      rows.map(r => { const rv = (Number(r.actualAccomplishmentPct) || 0) - (Number(r.targetAccomplishmentPct) || 0);
+        return `<tr><td>${esc(r.reportingWeek)}</td><td class="num">${pct(r.targetAccomplishmentPct)}</td><td class="num">${pct(r.actualAccomplishmentPct)}</td><td class="num n-${noteLevel(rv)}"><b>${signedPct(rv)}</b></td></tr>`; }).join(''),
+      `<tfoot><tr><th>As of month end</th><th class="num">${pct(t)}</th><th class="num">${pct(a)}</th><th class="num n-${noteLevel(v)}">${signedPct(v)}</th></tr></tfoot>`)
+      : emptyLine(`No weekly reports found for ${month}.`)}
+  </section>`;
+}
+
+/** PhotoGalleryTab: one album per reporting week, in report order. */
+function photosView({ weekly }) {
+  const albums = weekly.map(r => [r, L.attachmentList(r.attachedPhotoUrlsJson)]).filter(([, p]) => p.length);
+  const total = albums.reduce((t, [, p]) => t + p.length, 0);
+  if (!total) return `<div class="card empty">${icon('photo_library')}<p>No site update photos uploaded yet</p><small>Update photos attached to weekly reports will appear here.</small></div>`;
+  return `<h2 class="list-title">Project update photo gallery (${plural(total, 'photo')})</h2>${albums.map(([r, refs]) => `
+    <section class="card section album"><div class="section-head">${icon('photo_library')}<h2>${esc(r.reportingWeek)} · ${plural(refs.length, 'photo')}</h2></div>
+      <p class="muted">By ${esc(r.submittedByStaff || '-')}</p>${photoGrid(refs, L.photoDetails(r.photoDetailsJson))}</section>`).join('')}`;
+}
+
+/* ---------- Payments (MoneySection, PaymentCard) ---------- */
+
+function paymentsBody({ project, payments, cost, billed }) {
+  const actual = Number(project.actualAccomplishment) || 0;
+  const summary = section('Billing summary', 'payments', `
+    ${kv('Current contract cost', L.formatPhp(cost))}
+    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
+    ${kv('Balance', L.formatPhp(cost - billed))}
+    <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>`);
+  if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
+  return `<div class="stack">${summary}<ul class="pay-cards">${payments.map(p => {
+    const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = Number(p.units) || 0;
+    return `<li class="card pay-card">
+      <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">DV ${esc(p.dvNo || 'N/A')}</p></div>
+        ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
+      <p class="muted small">${esc(L.displayDate(p.date || '-'))} · ${esc(p.periodCovered || '-')}</p>
+      ${p.billingType ? `<p class="muted small">${esc(p.billingType)} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${esc(L.formatPhp(Number(p.unitPrice) || 0))}</p>` : ''}
+      ${kv('Net amount', L.formatPhp(L.netAmount(p)))}
+      ${retention > 0 ? kv('Gross amount', L.formatPhp(gross)) + kv(`Retention (${Math.trunc(retention)}%)`, L.formatPhp(gross - L.netAmount(p))) : ''}
+      ${kv('Share of contract', pct(p.percentage))}
+      ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
+      ${kv('Balance share', pct(p.balancePercentage))}
+    </li>`;
+  }).join('')}</ul></div>`;
+}
+
+/* ---------- Documents (DocumentsSection, ContractorLettersCard, DeveloperRequestsCard) ---------- */
+
+/** LogEntry: a title and its lines (blank ones skipped), with any attached file under them. */
+const entry = (title, lines, extra = '', cls = '') => `<div class="entry ${cls}"><b>${esc(title)}</b>${lines.filter(x => x && x.trim()).map(x => `<span>${esc(x)}</span>`).join('')}${extra}</div>`;
+const orderEntry = (d, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.withEnd(d.remarks)], d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '', cls);
+const ordersCard = (title, ic, items, emptyText) => section(title, ic, items || emptyLine(emptyText));
+
+function documentsBody({ of, documents, now }, chip) {
+  const named = text => documents.filter(d => (d.documentName || '').toLowerCase().includes(text));
+  if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d)).join(''), 'No time extensions.');
+  if (chip === 'Variation Orders') {
+    const vos = named('variation order');
+    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(vo => entry(vo.documentName, L.variationLines(vo), vo.fileUrl ? fileLink(vo.fileUrl, 'Attached copy') : '')).join(''), 'No variation orders recorded.');
+  }
+  if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents));
+  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now);
+  if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents));
+  const suspensions = documents.filter(L.isSuspension);
+  const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
+  // A continuance whose suspension was deleted still shows, at the end.
+  const listed = new Set(chains.flatMap(([ws, list]) => [ws, ...list]));
+  const orphans = named('work suspension').filter(d => !listed.has(d));
+  return `<div class="stack">
+    ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([ws, list]) => orderEntry(ws) + list.map(d => orderEntry(d, 'nested')).join('')).join('') + orphans.map(d => orderEntry(d)).join(''), 'No work suspension orders.')}
+    ${ordersCard('Work resumption orders', 'play_circle', named('work resumption').map(d => orderEntry(d)).join(''), 'No work resumption orders.')}
+  </div>`;
+}
+
+/** ContractorLettersCard as a table: date and receipt, subject, the contractor's action, and the reply letter. */
+function lettersCard(letters) {
+  if (!letters.length) return section('Letters to contractor', 'mail', emptyLine('No letters to the contractor yet.'));
+  return section('Letters to contractor', 'mail', table(['Date', 'Subject', 'Action taken by contractor', 'Reply'], letters.map(l => {
+    const received = l.dateReceived ? `Received ${L.displayDate(l.dateReceived)}` : null;
+    const receipt = l.receivedFileUrl ? fileLink(l.receivedFileUrl, received || 'Receiving copy') : `<small class="${received ? 'muted' : 'n-watch'}">${esc(received || 'Not received')}</small>`;
+    const reply = l.replyFileUrl ? fileLink(l.replyFileUrl, 'Reply') : l.dateReplied ? '<small class="muted">Replied</small>' : '<span class="muted">-</span>';
+    return `<tr><td class="nw">${esc(L.displayDate(l.dateSent || '-'))}<br>${receipt}</td><td>${esc(l.subject || '-')}</td>
+      <td>${l.actionTaken ? esc(l.actionTaken) : '<span class="n-watch">None yet</span>'}</td><td>${reply}</td></tr>`;
+  }).join('')));
+}
+
+/** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them. */
+function requestsCard(requests, now) {
+  return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
+    const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
+    return entry(r.requestType || '-', [
+      `Requested: ${r.dateRequested || '-'}  ·  Received: ${r.dateReceived || '-'}`,
+      r.datePackaged ? `Packaged: ${r.datePackaged}` : `NOT YET PACKAGED${waiting == null ? '' : ` · ${waiting} days since received`}`,
+      r.details,
+    ], r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '', r.datePackaged ? '' : 'waiting');
+  }).join('') : emptyLine('No requests from the developer.'));
+}
+
+/** RelatedFilesList: other project files with their status and attached copy. */
+function relatedCard(files) {
+  const level = st => (st === 'Approved' ? 'ok' : st === 'Notarized' || st === 'Signed' ? 'primary' : st === 'Submitted' ? 'watch' : 'neutral');
+  return section(`Related files (${files.length})`, 'folder_open', files.length ? files.map(d => entry(d.documentName, [d.remarks || 'N/A'],
+    `<span class="badge lv-${level(d.status)}">${esc(d.status || 'Pending')}</span>${d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '<small class="muted">No copy attached</small>'}`)).join('')
+    : emptyLine('No related project files or scanned documents uploaded yet.'));
+}
+
+/* ---------- Weekly report print (BlueBookForms.weeklyReport on an A4 sheet) ---------- */
+
+async function drawPrint({ page, project, of, documents, weekly }) {
+  const report = weekly.find(r => r.uuid === page.sub);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
+  if (!report) { main.innerHTML = `${back}<p class="muted">This weekly report was deleted or does not exist.</p>`; return; }
+  // The file name "Save as PDF" offers, as the phone names it (BlueBookPrint.pdfName).
+  document.title = `Weekly Report - ${(report.reportingWeek || '').replace(/^Week \d+: /, '')}`;
+  const token = page.printToken = {};
+  main.innerHTML = `<div class="print-bar no-print">${back}<button class="btn" id="do-print" disabled>${icon('print', 'sm')}Preparing photos…</button></div>
+    <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
+  // Photos are the report's uploaded images (PDFs and files not uploaded yet are left out, as on the phone).
+  const titles = L.photoDetails(report.photoDetailsJson);
+  const refs = L.attachmentList(report.attachedPhotoUrlsJson).filter(x => !L.isPdf(x));
+  const photos = (await Promise.all(refs.map(async x => [await photoUrl(x), titles[x]?.title || '']))).filter(([src]) => src);
+  if (page.printToken !== token || page !== s.page) return;
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = P.weeklyReportHtml({
+    project, report, docs: documents, issues: of('project_issues'), photos, banner: 'blue-book-header.png',
+    letters: L.mergedLetters(of('contractor_letters'), documents), requests: of('developer_requests'),
+    signatories: P.weeklySignatories(project, s.profile),
+  });
+  await Promise.all([...sheet.querySelectorAll('img')].map(img => img.decode().catch(() => {})));
+  if (page.printToken !== token) return;
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.innerHTML = `${icon('print', 'sm')}Print`;
+  btn.onclick = () => window.print();
+}
+
+/* ---------- Files and site photos from Storage ---------- */
 
 const photoUrls = new Map();
 /** Resolves an `nhafile:` ref to a download URL once; a missing file or no read access gives null. */
@@ -488,5 +777,21 @@ function loadPhotos(root) {
   root.querySelectorAll('.photo[data-ref]').forEach(async box => {
     const url = await photoUrl(box.dataset.ref);
     if (url && box.isConnected) box.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
+  });
+}
+
+/** Fills in each attached-file link and thumbnail; one Storage cannot give says so. */
+function loadFiles(root) {
+  root.querySelectorAll('[data-file]').forEach(async a => {
+    const url = await photoUrl(a.dataset.file);
+    if (!a.isConnected) return;
+    if (!url) {
+      a.classList.add('gone');
+      a.title = 'This file is not in the cloud, or this account cannot open it.';
+      if (a.classList.contains('thumb')) a.insertAdjacentHTML('beforeend', '<small>Not available</small>');
+      return;
+    }
+    a.href = url;
+    if (a.classList.contains('thumb')) a.innerHTML = `<img src="${esc(url)}" alt="${esc(a.dataset.alt || '')}" loading="lazy">`;
   });
 }
