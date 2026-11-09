@@ -1,8 +1,8 @@
 {
-  "versionCode": 274,
-  "versionName": "2.7.4",
-  "releaseNotes": "v2.7.4: About NHA Monitor's build info now says \"Made for NHA Bulacan District Office\" instead of naming the National Housing Authority.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.7.4/NHA_Monitor_v2.7.4_Build274.apk",
-  "apkSha256": "bb56adeb4c3df1c4a75471a285aa9d0242d9985134dcf4ef84bec3b4757420b6",
+  "versionCode": 280,
+  "versionName": "2.8.0",
+  "releaseNotes": "v2.8.0: Target % now follows each project's approved bar chart. Monthly reports use the month's last weekly report. On the Lots tab you can rotate an SDP plan that came in sideways, or delete a wrongly uploaded plan.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.0/NHA_Monitor_v2.8.0_Build280.apk",
+  "apkSha256": "e90ce140f385edab2b241f0dd99bf5a13f57eec065fbe268d57b9a2c7cc8b777",
   "isMandatory": true
 }
