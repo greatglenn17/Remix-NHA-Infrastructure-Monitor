@@ -206,6 +206,10 @@ interface ProjectDao {
     @Update
     suspend fun updateSdpPlan(sdpPlan: SdpPlan)
 
+    // A hard delete: the sync trigger sends the cloud tombstone, and its lots, roads, progress and inspections cascade (each tombstoned too).
+    @Query("DELETE FROM sdp_plans WHERE id = :sdpPlanId")
+    suspend fun deleteSdpPlan(sdpPlanId: Long)
+
     // Sites of one contract keep their own plan in use (see SdpSites).
     @Query("UPDATE sdp_plans SET isActive = 0 WHERE projectId = :projectId AND siteName = :siteName")
     suspend fun deactivateSdpPlansForSite(projectId: Long, siteName: String)

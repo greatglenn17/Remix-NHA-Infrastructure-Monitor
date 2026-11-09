@@ -3,7 +3,10 @@ package com.example
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
 import com.example.data.model.SdpLot
@@ -12,6 +15,8 @@ import com.example.data.model.UserRole
 import com.example.ui.detail.tabs.SubdivisionPlanTab
 import com.example.ui.theme.NHATheme
 import kotlinx.coroutines.flow.emptyFlow
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,7 +35,7 @@ class SubdivisionPlanRoleTest {
     private val plan = SdpPlan(id = 1, projectId = 1, planName = "Plan", pdfFileUrl = "", uploadedDate = "2026-10-29", uploadedBy = "x", scaleDenominator = 1000)
     private val lot = SdpLot(id = 1, projectId = 1, sdpPlanId = 1, blockNumber = "1", lotNumber = "1", polygonNormalizedJson = "[]")
 
-    private fun show(role: UserRole) = rule.setContent {
+    private fun show(role: UserRole, onDeletePlan: (SdpPlan) -> Unit = {}) = rule.setContent {
         NHATheme(themeMode = AppThemeMode.LIGHT) {
             SubdivisionPlanTab(
                 project = project, sdpPlans = listOf(plan), activeSdpPlan = plan, activeLots = listOf(lot), activeRoads = emptyList(),
@@ -38,7 +43,8 @@ class SubdivisionPlanRoleTest {
                 onUploadSdpPlan = { _, _, _ -> }, onSelectActiveVersion = {}, onAddLot = { _, _, _, _, _, _, _ -> },
                 onUpdateLot = {}, onDeactivateLot = {}, onAddRoad = { _, _, _ -> }, onUpdateRoad = {}, onDeactivateRoad = {},
                 onUpdateLotProgress = { _, _, _, _, _, _, _, _, _, _ -> }, onUpdateLotBillingStatus = { _, _, _, _, _ -> },
-                onRecordInspection = { _, _, _, _, _, _, _, _ -> }, onGetInspectionsForLot = { emptyFlow() }
+                onRecordInspection = { _, _, _, _, _, _, _, _ -> }, onGetInspectionsForLot = { emptyFlow() },
+                onDeletePlan = onDeletePlan
             )
         }
     }
@@ -50,6 +56,7 @@ class SubdivisionPlanRoleTest {
             rule.onAllNodesWithText(label).assertCountEquals(0)
         }
         rule.onNodeWithText("Scale 1:1000").assertExists()
+        rule.onAllNodesWithContentDescription("Plan options").assertCountEquals(0)
     }
 
     @Test
@@ -59,5 +66,21 @@ class SubdivisionPlanRoleTest {
         for (label in listOf("Upload Revised", "EDIT SDP", "Scale 1:1000 (change)")) {
             rule.onNodeWithText(label).assertExists()
         }
+    }
+
+    // Delete asks first, says what goes and that it cannot be undone, then deletes the plan on screen.
+    @Test
+    fun engineerAdminDeletesThePlanAfterConfirming() {
+        var deleted: SdpPlan? = null
+        show(UserRole.ENGINEER_ADMIN) { deleted = it }
+        rule.onNodeWithContentDescription("Plan options").performClick()
+        rule.onNodeWithText("Rotate plan").assertExists()
+        rule.onNodeWithText("Delete plan").performClick()
+        rule.onNodeWithText("Delete SDP v1?").assertExists()
+        rule.onNodeWithText("its 1 lots, with their progress", substring = true).assertExists()
+        rule.onNodeWithText("cannot be undone", substring = true).assertExists()
+        assertNull(deleted)
+        rule.onNodeWithText("Delete").performClick()
+        assertEquals(plan, deleted)
     }
 }

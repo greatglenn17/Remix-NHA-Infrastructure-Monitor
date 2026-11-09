@@ -331,6 +331,8 @@ fun SubdivisionPlanTab(
     // Null: the whole page.
     onSetPlanFrame: (SdpPlan, List<Float>?) -> Unit = { _, _ -> },
     onPrintPlan: (allSites: Boolean, landscape: Boolean) -> Unit = { _, _ -> },
+    onRotatePlan: (SdpPlan) -> Unit = {},
+    onDeletePlan: (SdpPlan) -> Unit = {},
     // Another site under the same contract, with its first plan; currentSiteName names the site on screen when it has no name.
     onAddSite: (newSite: String, currentSiteName: String, planName: String, pdfUrl: String, description: String) -> Unit = { _, _, _, _, _ -> },
     onSelectSite: (String) -> Unit = {},
@@ -361,6 +363,11 @@ fun SubdivisionPlanTab(
     var isTracing by remember { mutableStateOf(false) }
     var tapAddMessage by remember { mutableStateOf<String?>(null) }
     var confirmRemoveDetected by remember { mutableStateOf(false) }
+    var confirmDeletePlan by remember { mutableStateOf(false) }
+    // Lots, roads and the print frame are kept on the unturned page; the plan on screen may be turned.
+    val rotation = activeSdpPlan?.rotation ?: 0
+    fun Offset.toView() = com.example.util.PlanRotation.toView(x, y, rotation).let { (a, b) -> Offset(a, b) }
+    fun Offset.toPage() = com.example.util.PlanRotation.toPage(x, y, rotation).let { (a, b) -> Offset(a, b) }
     val runDetection = { plan: SdpPlan ->
         isDetecting = true
         onDetectLots(plan) { areas ->
@@ -468,9 +475,10 @@ fun SubdivisionPlanTab(
         current.map { plan -> plan.siteName to LotStats(allSitesLots.filter { it.sdpPlanId == plan.id }, allSitesProgress) } +
             (null to LotStats(allSitesLots.filter { lot -> current.any { it.id == lot.sdpPlanId } }, allSitesProgress))
     }
-    val planFrame = remember(activeSdpPlan?.frame, activeLots) {
-        com.example.util.SdpSummary.parseFrame(activeSdpPlan?.frame ?: "")
-            ?: com.example.util.SdpSummary.frameAround(activeLots.map { l -> jsonToNormalized(l.polygonNormalizedJson).map { it.x to it.y } })
+    val planFrame = remember(activeSdpPlan?.frame, activeLots, rotation) {
+        (com.example.util.SdpSummary.parseFrame(activeSdpPlan?.frame ?: "")
+            ?: com.example.util.SdpSummary.frameAround(activeLots.map { l -> jsonToNormalized(l.polygonNormalizedJson).map { it.x to it.y } }))
+            ?.let { com.example.util.PlanRotation.frameToView(it, rotation) }
     }
 
     // Filter active check & matching lot calculation
@@ -486,9 +494,9 @@ fun SubdivisionPlanTab(
     }
 
     // PRE-PARSE GEOMETRY & CALCULATE BOUNDING BOXES FOR FAST VIEWPORT CULLING AND SPATIAL HIT-TESTING
-    val parsedLots = remember(activeLots) {
+    val parsedLots = remember(activeLots, rotation) {
         activeLots.mapNotNull { lot ->
-            val polygon = jsonToNormalized(lot.polygonNormalizedJson)
+            val polygon = jsonToNormalized(lot.polygonNormalizedJson).map { it.toView() }
             if (polygon.size >= 3) {
                 var minX = Float.MAX_VALUE
                 var minY = Float.MAX_VALUE
@@ -519,9 +527,9 @@ fun SubdivisionPlanTab(
         lots.zip(numbers).associate { (p, n) -> p.lot.id to n }
     }
 
-    val parsedRoads = remember(activeRoads) {
+    val parsedRoads = remember(activeRoads, rotation) {
         activeRoads.mapNotNull { road ->
-            val polyline = jsonToNormalized(road.polylineNormalizedJson)
+            val polyline = jsonToNormalized(road.polylineNormalizedJson).map { it.toView() }
             if (polyline.size >= 2) {
                 var minX = Float.MAX_VALUE
                 var minY = Float.MAX_VALUE
@@ -586,9 +594,12 @@ fun SubdivisionPlanTab(
                         page.close()
                         renderer.close()
                         pfd.close()
+                        val turned = if (currentPlan.rotation.mod(360) == 0) bitmap else Bitmap.createBitmap(
+                            bitmap, 0, 0, renderWidth, renderHeight, android.graphics.Matrix().apply { postRotate(currentPlan.rotation.toFloat()) }, true
+                        ).also { bitmap.recycle() }
 
                         val oldBitmap = renderedBitmap
-                        renderedBitmap = bitmap
+                        renderedBitmap = turned
                         oldBitmap?.recycle()
                     } else {
                         renderer.close()
@@ -724,6 +735,41 @@ fun SubdivisionPlanTab(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                            }
+                        }
+
+                        if (activeSdpPlan != null && (canDigitize || canManageSdp)) {
+                            var planMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { planMenu = true }, modifier = Modifier.size(32.dp).testTag("plan_menu_button")) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Plan options", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                }
+                                DropdownMenu(expanded = planMenu, onDismissRequest = { planMenu = false }) {
+                                    if (canDigitize) {
+                                        DropdownMenuItem(
+                                            text = { Text("Rotate plan") },
+                                            leadingIcon = { Icon(Icons.Default.Rotate90DegreesCw, contentDescription = null) },
+                                            onClick = {
+                                                planMenu = false
+                                                scale = 1f
+                                                offset = Offset.Zero
+                                                // Unsaved taps are on the old turn.
+                                                draftPoints.clear()
+                                                frameCorner = null
+                                                onRotatePlan(activeSdpPlan)
+                                            },
+                                            modifier = Modifier.testTag("rotate_plan")
+                                        )
+                                    }
+                                    if (canManageSdp) {
+                                        DropdownMenuItem(
+                                            text = { Text("Delete plan", color = LocalNHAColors.current.behind) },
+                                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = LocalNHAColors.current.behind) },
+                                            onClick = { planMenu = false; confirmDeletePlan = true },
+                                            modifier = Modifier.testTag("delete_plan")
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1208,7 +1254,7 @@ fun SubdivisionPlanTab(
                     LaunchedEffect(matchingLots, searchQuery) {
                         if (searchQuery.isNotBlank() && matchingLots.size == 1) {
                             val targetLot = matchingLots[0]
-                            val polygon = jsonToNormalized(targetLot.polygonNormalizedJson)
+                            val polygon = jsonToNormalized(targetLot.polygonNormalizedJson).map { it.toView() }
                             if (polygon.isNotEmpty()) {
                                 val centroid = calculateCentroid(polygon)
                                 val targetPx = centroid.x * bitmapWidth
@@ -1242,7 +1288,7 @@ fun SubdivisionPlanTab(
                                             val a = frameCorner
                                             if (a == null) frameCorner = tappedNorm
                                             else {
-                                                onSetPlanFrame(activeSdpPlan, listOf(minOf(a.x, normX), minOf(a.y, normY), maxOf(a.x, normX), maxOf(a.y, normY)))
+                                                onSetPlanFrame(activeSdpPlan, com.example.util.PlanRotation.frameToPage(listOf(a.x, a.y, normX, normY), rotation))
                                                 frameCorner = null
                                                 framing = false
                                             }
@@ -1265,13 +1311,14 @@ fun SubdivisionPlanTab(
                                             } else {
                                                 isTracing = true
                                                 tapAddMessage = null
-                                                onTraceLot(activeSdpPlan, normX, normY) { outline ->
+                                                val onPage = tappedNorm.toPage()
+                                                onTraceLot(activeSdpPlan, onPage.x, onPage.y) { outline ->
                                                     isTracing = false
                                                     if (outline == null) {
                                                         tapAddMessage = "No closed lot outline there. Zoom in and tap inside the lot, or use Edit SDP to tap its corners."
                                                     } else {
                                                         draftPoints.clear()
-                                                        draftPoints.addAll(outline.map { (x, y) -> Offset(x, y) })
+                                                        draftPoints.addAll(outline.map { (x, y) -> Offset(x, y).toView() })
                                                         showAddLotDialog = true
                                                     }
                                                 }
@@ -2219,7 +2266,7 @@ fun SubdivisionPlanTab(
     if (showAddLotDialog && activeSdpPlan != null) {
         LaunchedEffect(Unit) {
             draftArea = null
-            onLotArea(activeSdpPlan, draftPoints.map { it.x to it.y }) { draftArea = it }
+            onLotArea(activeSdpPlan, draftPoints.map { it.toPage() }.map { it.x to it.y }) { draftArea = it }
         }
         AddLotDialog(
             suggestedArea = draftArea,
@@ -2229,7 +2276,7 @@ fun SubdivisionPlanTab(
                 if (interactionMode == SdpInteractionMode.TAP_ADD_LOT) draftPoints.clear()
             },
             onSubmit = { use: String, block: String, lot: String, unit: String, area: Double, desc: String ->
-                val json = normalizedToJson(draftPoints)
+                val json = normalizedToJson(draftPoints.map { it.toPage() })
                 onAddLot(use, block, lot, unit, area, json, desc)
                 draftPoints.clear()
                 showAddLotDialog = false
@@ -2283,7 +2330,7 @@ fun SubdivisionPlanTab(
         AddRoadDialog(
             onDismiss = { showAddRoadDialog = false },
             onSubmit = { name: String, type: String ->
-                val json = normalizedToJson(draftPoints)
+                val json = normalizedToJson(draftPoints.map { it.toPage() })
                 onAddRoad(name, type, json)
                 draftPoints.clear()
                 showAddRoadDialog = false
@@ -2361,6 +2408,31 @@ fun SubdivisionPlanTab(
                 ) { Text("Deactivate") }
             },
             dismissButton = { TextButton(onClick = { roadToDeactivate = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        )
+    }
+
+    if (confirmDeletePlan && activeSdpPlan != null) {
+        val site = if (sites.size > 1) " of ${com.example.data.model.SdpSites.label(activeSdpPlan.siteName)}" else ""
+        AlertDialog(
+            onDismissRequest = { confirmDeletePlan = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Delete SDP v${activeSdpPlan.version}$site?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "This removes the plan PDF and its ${activeLots.size} lots, with their progress, billing and inspection records, " +
+                        "from every phone and the website. This cannot be undone.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onDeletePlan(activeSdpPlan); confirmDeletePlan = false },
+                    shape = MaterialTheme.shapes.small,
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalNHAColors.current.behind, contentColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.testTag("confirm_delete_plan")
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeletePlan = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         )
     }
 

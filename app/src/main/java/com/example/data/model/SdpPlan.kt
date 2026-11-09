@@ -34,6 +34,8 @@ data class SdpPlan(
     val frame: String = "",
     // The site of the contract this plan is for ("Phase 2"); its revisions share it. Blank: the first site, unnamed.
     val siteName: String = "",
+    // Degrees clockwise the plan is shown turned (0, 90, 180, 270). Lots stay in fractions of the unturned page.
+    val rotation: Int = 0,
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
