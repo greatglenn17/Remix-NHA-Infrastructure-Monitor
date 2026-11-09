@@ -96,8 +96,8 @@ class ProjectAttentionTest {
         assertEquals("15.00% behind schedule", f.message)
     }
 
-    @Test fun behindScheduleStatus_isWarningEvenWithSmallSlippage() {
-        assertEquals(WARNING, flags(project(50.0, 47.0, status = "Behind Schedule")).level(BEHIND))
+    @Test fun behindScheduleStatus_withSmallSlippage_isNotFlagged() {
+        assertEquals(emptyList<Any>(), flags(project(50.0, 47.0, status = "Behind Schedule")).of(BEHIND))
     }
 
     @Test fun billingGapOfExactlyTen_notFlagged() {

@@ -82,7 +82,8 @@ fun DeveloperRequestDialog(
     onSave: (DeveloperRequest, order: Pair<String, String>?) -> Unit,
     onDelete: ((DeveloperRequest) -> Unit)?,
     documents: List<com.example.data.model.PendingDocument> = emptyList(),
-    today: LocalDate = LocalDate.now()
+    today: LocalDate = LocalDate.now(),
+    workItems: List<String> = emptyList()
 ) {
     var type by remember { mutableStateOf(existing?.requestType ?: ProjectAttention.REQUEST_TYPES.first()) }
     var details by remember { mutableStateOf(existing?.details ?: "") }
@@ -121,7 +122,7 @@ fun DeveloperRequestDialog(
                 if (existing == null) {
                     Text("Order requested", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     Text("Saved to Documents › $type as Pending.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    com.example.ui.dialogs.OrderFieldInputs(type, order, documents)
+                    com.example.ui.dialogs.OrderFieldInputs(type, order, documents, workItems)
                 }
                 if (existing != null && onDelete != null) {
                     TextButton(onClick = { onDelete(existing) }) { Text("Delete request", color = LocalNHAColors.current.behind) }

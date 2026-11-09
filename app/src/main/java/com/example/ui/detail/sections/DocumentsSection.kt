@@ -115,7 +115,7 @@ fun OrderStatusDialog(
  * was changed (its key still present) is left as edited.
  */
 internal fun keepOrderFields(original: String, edited: String): String {
-    val dropped = Regex("\\b(Duration|Effectivity|End|Date Approved):[^|]*", RegexOption.IGNORE_CASE).findAll(original)
+    val dropped = Regex("\\b(Duration|Effectivity|End|Date Approved|Items):[^|]*", RegexOption.IGNORE_CASE).findAll(original)
         .filter { field -> !Regex("\\b${field.groupValues[1]}:", RegexOption.IGNORE_CASE).containsMatchIn(edited) }
         .map { it.value.trim() }
         .toList()

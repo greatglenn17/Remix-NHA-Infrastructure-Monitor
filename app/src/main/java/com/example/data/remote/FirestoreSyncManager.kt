@@ -285,6 +285,7 @@ class FirestoreSyncManager(
                         notedByOffice = doc.getString("notedByOffice").orEmpty(),
                         weeklyCheckedByOffice = doc.getString("weeklyCheckedByOffice").orEmpty(),
                         weeklyNotedByOffice = doc.getString("weeklyNotedByOffice").orEmpty(),
+                        barChartJson = doc.getString("barChartJson").orEmpty(),
                         contractCostOriginal = doc.getDouble("contractCostOriginal") ?: 0.0,
                         contractCostRevised = doc.getDouble("contractCostRevised") ?: 0.0,
                         contractDurationDays = doc.getLong("contractDurationDays")?.toInt() ?: 0,
@@ -349,6 +350,7 @@ class FirestoreSyncManager(
                         notedByOffice = doc.getString("notedByOffice") ?: localProject.notedByOffice,
                         weeklyCheckedByOffice = doc.getString("weeklyCheckedByOffice") ?: localProject.weeklyCheckedByOffice,
                         weeklyNotedByOffice = doc.getString("weeklyNotedByOffice") ?: localProject.weeklyNotedByOffice,
+                        barChartJson = doc.getString("barChartJson") ?: localProject.barChartJson,
                         contractCostRevised = doc.getDouble("contractCostRevised") ?: localProject.contractCostRevised,
                         status = doc.getString("status") ?: localProject.status,
                         targetAccomplishment = doc.getDouble("targetAccomplishment") ?: localProject.targetAccomplishment,
@@ -592,6 +594,9 @@ class FirestoreSyncManager(
                             "isDeleted" to (event.operation == "DELETE" || project.isDeleted)
                         )
 
+                        // Only the chart's editors send it (firestore.rules refuses anyone else's change), so a stale copy on a
+                        // Field Engineer's phone never blocks their project updates.
+                        if (superAdmin || role == "ENGINEER_ADMIN") data["barChartJson"] = project.barChartJson
                         uploadProject(project, data, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)

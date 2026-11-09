@@ -70,7 +70,9 @@ data class Project(
     val latestUpdatePhotoUrl: String = "",
     val assignedStaff: String = "",
     val assignedUids: String = "", // JSON array of Firebase uids allowed to open this project
-    val lastUpdatedDate: String = "2026-08-01"
+    val lastUpdatedDate: String = "2026-08-01",
+    // The approved bar chart and its revisions (JSON); see BarChart. Blank: the target is typed in the weekly report.
+    val barChartJson: String = ""
 ) {
     val variance: Double
         get() = actualAccomplishment - targetAccomplishment

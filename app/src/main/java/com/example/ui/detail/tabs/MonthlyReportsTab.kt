@@ -69,11 +69,12 @@ fun MonthlyReportsTab(
         weeklyReports.filter {
             (it.reportingWeek.contains(monthStr, ignoreCase = true) || it.reportingWeek.contains(shortMonth, ignoreCase = true)) &&
             it.reportingWeek.contains(yearStr, ignoreCase = true)
-        }.sortedBy { it.id }
+        }.sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
     }
 
-    val sumTarget = remember(monthWeeklyReports) { monthWeeklyReports.sumOf { it.targetAccomplishmentPct } }
-    val sumActual = remember(monthWeeklyReports) { monthWeeklyReports.sumOf { it.actualAccomplishmentPct } }
+    // Weekly figures are cumulative (as of the week), so the month stands at its last week, not their sum.
+    val sumTarget = remember(monthWeeklyReports) { monthWeeklyReports.lastOrNull()?.targetAccomplishmentPct ?: 0.0 }
+    val sumActual = remember(monthWeeklyReports) { monthWeeklyReports.lastOrNull()?.actualAccomplishmentPct ?: 0.0 }
     val sumVariance = sumActual - sumTarget
 
     LazyColumn(
@@ -278,7 +279,7 @@ private fun MonthlyReportSingleTableCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "MONTH TOTAL",
+                                text = "AS OF MONTH END",
                                 modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                             )

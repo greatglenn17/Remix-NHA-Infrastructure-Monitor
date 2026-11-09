@@ -138,6 +138,7 @@ class GoogleDriveSyncManager(
                     put("implementingOffice", p.implementingOffice)
                     put("contractor", p.contractor)
                     put("scopeOfWork", p.scopeOfWork)
+                    put("barChartJson", p.barChartJson)
                     put("projectType", p.projectType)
                     put("status", p.status)
                     put("contractCostOriginal", p.contractCostOriginal)
@@ -697,6 +698,7 @@ class GoogleDriveSyncManager(
                     implementingOffice = p.getString("implementingOffice"),
                     contractor = p.getString("contractor"),
                     scopeOfWork = p.optString("scopeOfWork", ""),
+                    barChartJson = p.optString("barChartJson", existing?.barChartJson.orEmpty()),
                     projectType = p.getString("projectType"),
                     status = p.getString("status"),
                     contractCostOriginal = p.getDouble("contractCostOriginal"),

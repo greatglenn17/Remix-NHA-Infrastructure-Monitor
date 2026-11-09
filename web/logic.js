@@ -90,6 +90,97 @@ function isoDay(s) {
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null;
 }
 
+const DAY = 86400000;
+
+/**
+ * BarChart.targetOn: the approved bar chart's planned accomplishment (%) on `today` (yyyy-MM-dd), or null without
+ * a chart. Each item's amount is spread evenly over its bars' contract days (the start date is day 1); a revised
+ * chart applies from its effective date; approved suspensions taking effect on or after it stop the clock, a Partial
+ * one only for the items it names.
+ */
+export function plannedTarget(project, docs, today) {
+  let versions;
+  try { versions = JSON.parse(project.barChartJson || '[]'); } catch { return null; }
+  if (!Array.isArray(versions) || !versions.length) return null;
+  const start = isoDay(project.dateStarted), now = isoDay(today);
+  if (start == null || now == null) return null;
+  versions = [...versions].sort((a, b) => String(a.effective).localeCompare(String(b.effective)));
+  const v = [...versions].reverse().find(x => { const e = isoDay(x.effective); return e == null || e <= now; }) || versions[0];
+  const from = Math.max(isoDay(v.effective) ?? start, start);
+  const dayOf = item => (now - start) / DAY + 1 - suspendedDays(docs, from, now, item);
+  const items = v.items || [];
+  const total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0);
+  if (total <= 0) return 0;
+  const len = ([a, b]) => Math.max(0, b - a + 1);
+  const planned = items.reduce((t, i) => {
+    const bars = i.bars || [], day = dayOf(i.name);
+    const days = bars.reduce((n, bar) => n + len(bar), 0);
+    const done = bars.reduce((n, [a, b]) => n + Math.min(Math.max(Math.min(day, b) - a + 1, 0), len([a, b])), 0);
+    return t + (days ? (Number(i.amount) || 0) * done / days : 0);
+  }, 0);
+  return planned / total * 100;
+}
+
+/** BarChart.withPlannedTarget: the project with today's target from its chart; unchanged without one, or once completed. */
+export function withPlannedTarget(project, docs, today) {
+  if (isCompleted(project)) return project;
+  const t = plannedTarget(project, docs, today);
+  return t == null ? project : { ...project, targetAccomplishment: Math.round(t * 100) / 100 };
+}
+
+// "2nd Partial Continuance of …", "Partial Work Suspension Order No. 1"; an old "(Full) of …" continuance says so itself.
+const isPartialOrder = name => { const m = /\((full|partial)\)\s+of/i.exec(name); return m ? /partial/i.test(m[1]) : /partial/i.test(name); };
+
+const orderNo = name => (/No\. ?(\S+?)(?:\s|$|\))/.exec(name || '') || [])[1];
+const itemsOf = remarks => { const m = /Items: ([^|]*)/.exec(remarks || ''); return m ? m[1].split(';').map(x => x.trim()).filter(Boolean) : null; };
+
+/** BarChart.pausedItems: the items a Partial suspension names (a continuance without a list takes its suspension's), or null for a Full one. */
+function pausedItems(d, docs) {
+  const name = d.documentName || '';
+  if (!isPartialOrder(name)) return null;
+  const own = itemsOf(d.remarks);
+  if (own || !/continuance/i.test(name)) return own || [];
+  const s = (docs || []).find(x => !/continuance/i.test(x.documentName || '') && /work suspension/i.test(x.documentName || '') && orderNo(x.documentName) === orderNo(name));
+  return (s && itemsOf(s.remarks)) || [];
+}
+
+/**
+ * BarChart.periods: each approved suspension (and continuance) with its Effectivity and when work resumes, the earlier
+ * of its resumption order's Effectivity and its End (UTC ms); a null end means it is still suspended.
+ */
+function periods(docs) {
+  const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
+  const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''));
+  const field = (remarks, key) => isoDay((new RegExp(`${key}: (\\d{4}-\\d{2}-\\d{2})`).exec(remarks || '') || [])[1]);
+  return approved.filter(d => /work suspension/i.test(d.documentName || '')).flatMap(d => {
+    const begin = field(d.remarks, 'Effectivity');
+    if (begin == null) return [];
+    const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
+    const ends = [field(d.remarks, 'End'), r ? field(r.remarks, 'Effectivity') : null].filter(x => x != null);
+    return [{ d, begin, end: ends.length ? Math.min(...ends) : null }];
+  });
+}
+
+/** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved suspensions that pause `item`. */
+function suspendedDays(docs, from, until, item) {
+  return periods(docs)
+    .filter(({ d }) => { const p = pausedItems(d, docs); return p == null || p.includes(item); })
+    .reduce((t, { begin, end }) => begin < from ? t : t + Math.max(0, (Math.min(end ?? until + DAY, until + DAY) - begin) / DAY), 0);
+}
+
+/** BarChart.isSuspendedOn: an approved Full suspension is in effect on `today` (yyyy-MM-dd); Partial ones leave it going. */
+export function isSuspendedOn(docs, today) {
+  const now = isoDay(today);
+  return now != null && periods(docs).some(({ d, begin, end }) => pausedItems(d, docs) == null && begin <= now && (end == null || now < end));
+}
+
+/** BarChart.withSchedule: today's target from the chart, then Suspended during a Full suspension, else Behind Schedule at any negative slippage, else On-going. */
+export function withSchedule(project, docs, today) {
+  const p = withPlannedTarget(project, docs, today);
+  if (isCompleted(p)) return p;
+  return { ...p, status: isSuspendedOn(docs, today) ? 'Suspended' : slippage(p) < 0 ? 'Behind Schedule' : 'On-going' };
+}
+
 /** ProjectViewModel.isMine (AssignmentPolicy.isVisible without seesAll): assigned, or the creator of a list-less project. */
 export function isMine(project, uid, claims) {
   const list = project.assignedUids || [];
@@ -146,9 +237,9 @@ export function attentionFlags(project, docs, billed, today) {
   const flags = [];
   const finished = isCompleted(project);
   const slip = slippage(project);
-  if (!finished && (slip <= -10 || project.status === 'Behind Schedule')) {
-    flags.push({ kind: 'behind', level: slip <= -15 ? 'critical' : 'warning',
-      message: slip < 0 ? `${(-slip).toFixed(2)}% behind schedule` : 'Marked behind schedule' });
+  // Any negative slippage reads "Behind Schedule" (withSchedule); only 10% or more is flagged.
+  if (!finished && slip <= -10) {
+    flags.push({ kind: 'behind', level: slip <= -15 ? 'critical' : 'warning', message: `${(-slip).toFixed(2)}% behind schedule` });
   }
   const cost = currentCost(project, docs);
   if (cost > 0) {

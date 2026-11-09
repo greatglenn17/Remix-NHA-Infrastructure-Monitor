@@ -309,7 +309,7 @@ internal fun statusColor(project: Project, colors: NHAColors, overdue: Boolean =
     if (overdue) return colors.behind
     if (project.status == ProjectStatus.SUSPENDED.label) return colors.neutral
     val slip = varianceColor(ProjectAttention.slippage(project), colors)
-    // Marked behind by the engineer but the numbers are close: still not green.
+    // Behind Schedule (any shortfall) but the numbers are close: amber, not green; the flag waits for 10%.
     return if (project.status == ProjectStatus.BEHIND_SCHEDULE.label && slip in listOf(colors.onTrack, colors.neutral)) colors.watch else slip
 }
 

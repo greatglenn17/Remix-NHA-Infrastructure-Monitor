@@ -1,5 +1,6 @@
 package com.example.ui.dialogs
 
+import com.example.data.model.WeeklyReport
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -17,6 +18,9 @@ object WeekRange {
         val saturday = day.with(TemporalAdjusters.previousOrSame(DayOfWeek.SATURDAY))
         return "${saturday.format(format)} - ${saturday.plusDays(6).format(format)}"
     }
+
+    /** Weekly reports in week order: by first day (labels that don't parse first), then as entered. */
+    val byWeek: Comparator<WeeklyReport> = compareBy({ parse(it.reportingWeek)?.first }, { it.id })
 
     /** First and last day of a range; null for labels written another way (older "Week 41: ..." reports). */
     fun parse(range: String): Pair<LocalDate, LocalDate>? = runCatching {

@@ -63,10 +63,13 @@ service cloud.firestore {
         || (isWriter()
             && request.resource.data.assignedUids.size() == 1
             && request.auth.uid in request.resource.data.assignedUids);
+      // The approved bar chart (the target % follows it) is the Super Admin's or an assigned Engineer Admin's to change.
       allow update: if isSuperAdmin()
         || (isWriter()
             && assigned(resource.data.assignedUids)
-            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedUids']));
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedUids'])
+            && (request.auth.token.get('role', '') == 'ENGINEER_ADMIN'
+                || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['barChartJson'])));
       // Deletion is the isDeleted tombstone, never a physical delete.
       allow delete: if false;
 

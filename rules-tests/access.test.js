@@ -106,6 +106,8 @@ describe('assigned field engineer', () => {
   it('updates project name', () => assertSucceeds(updateDoc(doc(asEng().firestore(), 'projects/P'), { name: 'Y' })));
   it('cannot change assignedUids', () =>
     assertFails(updateDoc(doc(asEng().firestore(), 'projects/P'), { assignedUids: ['eng', 'x'] })));
+  it('cannot change the bar chart', () =>
+    assertFails(updateDoc(doc(asEng().firestore(), 'projects/P'), { barChartJson: '[]' })));
   it('gets record', () => assertSucceeds(getDoc(doc(asEng().firestore(), 'records/R'))));
   it('writes record with matching assignedUids', () =>
     assertSucceeds(setDoc(doc(asEng().firestore(), 'records/R'), rec(['eng', 'viewer']))));
@@ -171,6 +173,13 @@ describe('viewer (assigned)', () => {
   it('cannot write record', () => assertFails(setDoc(doc(asViewer().firestore(), 'records/R'), rec(['eng', 'viewer']))));
   it('cannot upload file', () => assertFails(uploadBytes(ref(asViewer().storage(), 'attachments/P/v.jpg'), bytes(10), jpeg)));
   it('cannot delete file', () => assertFails(deleteObject(ref(asViewer().storage(), 'attachments/P/f.jpg'))));
+});
+
+describe('assigned engineer admin', () => {
+  const asEngAdmin = () => testEnv.authenticatedContext('eng', { role: 'ENGINEER_ADMIN' });
+  it('changes the bar chart', () => assertSucceeds(updateDoc(doc(asEngAdmin().firestore(), 'projects/P'), { barChartJson: '[]' })));
+  it('cannot change it on a project not assigned to them', () =>
+    assertFails(updateDoc(doc(testEnv.authenticatedContext('other', { role: 'ENGINEER_ADMIN' }).firestore(), 'projects/P'), { barChartJson: '[]' })));
 });
 
 describe('super admin', () => {
