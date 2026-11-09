@@ -1,8 +1,8 @@
 {
-  "versionCode": 281,
-  "versionName": "2.8.1",
-  "releaseNotes": "v2.8.1: Suspension end dates count the effectivity date as day 1 (90 days from May 26 end Aug 23), and suspension forms have an End Date you can pick. A Time Extension for a suspension fills in its days. The revised completion date is no longer one day late.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.1/NHA_Monitor_v2.8.1_Build281.apk",
-  "apkSha256": "2975bd0e4df0bbcd9ae10a9a54ffc2d1bc43a3aa03b3be619efdf9ae34103fd2",
+  "versionCode": 282,
+  "versionName": "2.8.2",
+  "releaseNotes": "v2.8.2: Find Lots now gives each lot the block and lot printed on the SDP plan; lots the plan does not name come in without numbers as before. A lot at 0% shows as Not yet started (red), and 1-25% is now violet.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.2/NHA_Monitor_v2.8.2_Build282.apk",
+  "apkSha256": "eb48c4f0156e9229467fd80b7ef5eac6d36dd71fd7d2e99445f1a30423d7ef4c",
   "isMandatory": true
 }
