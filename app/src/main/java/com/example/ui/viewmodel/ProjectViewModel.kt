@@ -2111,7 +2111,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             var computedRevisedDate = p.completionDateOriginal
             try {
                 val start = LocalDate.parse(p.dateStarted)
-                computedRevisedDate = start.plusDays(revisedDurationDays.toLong()).toString()
+                computedRevisedDate = com.example.util.ProjectSchedule.lastDay(start, revisedDurationDays).toString()
             } catch (e: Exception) {}
 
             val extension = TimeExtension(

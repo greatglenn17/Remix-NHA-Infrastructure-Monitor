@@ -356,6 +356,7 @@ class MainActivity : ComponentActivity() {
                                 initialType = addDocumentInitialType,
                                 onDismiss = { showAddDocumentDialog = false },
                                 workItems = viewModel.selectedProject.value?.let(com.example.util.BarChart::itemNames).orEmpty(),
+                                documents = viewModel.pendingDocuments.collectAsState().value,
                                 onSubmit = { docName, remarks ->
                                     viewModel.addPendingDocument(pId, docName, remarks)
                                     showAddDocumentDialog = false

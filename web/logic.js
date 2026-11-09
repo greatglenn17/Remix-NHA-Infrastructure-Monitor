@@ -145,8 +145,23 @@ function pausedItems(d, docs) {
 }
 
 /**
+ * ProjectSchedule.withEnd: remarks with the End worked out again from Duration and Effectivity, the effectivity
+ * date being day 1 (May 26 + 90 days ends Aug 23), so orders saved a day late read right. Unchanged without both.
+ */
+export function withEnd(remarks) {
+  const r = remarks || '';
+  const days = Number((/Duration: (\d+)/.exec(r) || [])[1]);
+  const eff = /Effectivity: (\d{4}-\d{2}-\d{2})/.exec(r);
+  const begin = eff && isoDay(eff[1]);
+  if (!(days > 0) || begin == null) return r;
+  const end = `End: ${new Date(begin + (days - 1) * DAY).toISOString().slice(0, 10)}`;
+  return /End: \d{4}-\d{2}-\d{2}/.test(r) ? r.replace(/End: \d{4}-\d{2}-\d{2}/g, end) : r.replace(eff[0], `${eff[0]} | ${end}`);
+}
+
+/**
  * BarChart.periods: each approved suspension (and continuance) with its Effectivity and when work resumes, the earlier
- * of its resumption order's Effectivity and its End (UTC ms); a null end means it is still suspended.
+ * of its resumption order's Effectivity and the day after its End, its last suspended day (UTC ms); a null end means
+ * it is still suspended.
  */
 function periods(docs) {
   const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
@@ -156,7 +171,8 @@ function periods(docs) {
     const begin = field(d.remarks, 'Effectivity');
     if (begin == null) return [];
     const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
-    const ends = [field(d.remarks, 'End'), r ? field(r.remarks, 'Effectivity') : null].filter(x => x != null);
+    const last = field(withEnd(d.remarks), 'End');
+    const ends = [last == null ? null : last + DAY, r ? field(r.remarks, 'Effectivity') : null].filter(x => x != null);
     return [{ d, begin, end: ends.length ? Math.min(...ends) : null }];
   });
 }

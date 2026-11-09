@@ -162,3 +162,13 @@ test('bar chart target: a revised chart applies from its effective date', () => 
   const later = approvedDoc('Work Suspension Order No. 2', 'Duration: 5 Days | Effectivity: 2026-03-02 | End: 2026-03-07');
   assert.equal(L.plannedTarget(p, [before, later], '2026-03-07'), 61);
 });
+
+test('suspension End: the effectivity date is day 1, old one-day-late Ends read right', () => {
+  assert.equal(L.withEnd('Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24'), 'Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-23');
+  assert.equal(L.withEnd('Duration: 10 Days | Effectivity: 2026-12-27'), 'Duration: 10 Days | Effectivity: 2026-12-27 | End: 2027-01-05');
+  assert.equal(L.withEnd('Duration: 0 Days | Effectivity: 2026-01-21'), 'Duration: 0 Days | Effectivity: 2026-01-21');
+  // Suspended through Aug 23 (the End), going again on Aug 24.
+  const ws = approvedDoc('Work Suspension Order No. 1', 'Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24');
+  assert.equal(L.isSuspendedOn([ws], '2026-08-23'), true);
+  assert.equal(L.isSuspendedOn([ws], '2026-08-24'), false);
+});

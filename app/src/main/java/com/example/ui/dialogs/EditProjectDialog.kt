@@ -113,7 +113,7 @@ fun EditProjectDialog(
             val start = LocalDate.parse(dateStarted)
             val duration = durationText.trim().toIntOrNull() ?: 0
             if (duration > 0) {
-                start.plusDays((duration - 1).toLong()).toString()
+                com.example.util.ProjectSchedule.lastDay(start, duration).toString()
             } else {
                 start.toString()
             }

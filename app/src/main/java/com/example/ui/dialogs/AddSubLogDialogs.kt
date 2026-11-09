@@ -17,7 +17,6 @@ import com.example.ui.components.DateField
 import com.example.ui.components.rememberDiscardGuard
 import com.example.util.FormValidation
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 @Composable
@@ -75,15 +74,7 @@ fun AddWorkSuspensionDialog(
     var reason by remember { mutableStateOf("") }
     var remarks by remember { mutableStateOf("") }
 
-    val endDate = remember(effectivityDate, durationStr) {
-        try {
-            val duration = durationStr.trim().toIntOrNull() ?: 0
-            val date = LocalDate.parse(effectivityDate, DateTimeFormatter.ISO_LOCAL_DATE)
-            date.plusDays(duration.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
-        } catch (e: Exception) {
-            "Invalid Date"
-        }
-    }
+    val endDate = com.example.util.ProjectSchedule.endText(effectivityDate, durationStr)
 
     val snapshot = { listOf(name, effectivityDate, durationStr, reason, remarks) }
     val initial = remember { snapshot() }
@@ -161,6 +152,8 @@ fun AddCustomDocumentDialog(
     initialType: String = "Custom Document",
     onDismiss: () -> Unit,
     workItems: List<String> = emptyList(),
+    // The project's, for a time extension's days from its suspensions.
+    documents: List<com.example.data.model.PendingDocument> = emptyList(),
     onSubmit: (docName: String, remarks: String) -> Unit
 ) {
     val docTypes = listOf("Custom Document", "Time Extension", "Variation Order", "Work Suspension Order", "Work Resumption Order")
@@ -220,7 +213,7 @@ fun AddCustomDocumentDialog(
                     OutlinedTextField(value = docName, onValueChange = { docName = it }, label = { Text("Document Name") }, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(value = remarks, onValueChange = { remarks = it }, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                 } else {
-                    OrderFieldInputs(selectedType, order, workItems = workItems)
+                    OrderFieldInputs(selectedType, order, documents, workItems)
                 }
             }
         },
@@ -330,6 +323,12 @@ fun OrderFieldInputs(
 ) {
     when (type) {
         "Time Extension" -> {
+            // For a suspension, the days start as the ones its approved suspensions stopped work; still editable.
+            LaunchedEffect(f.teReason) {
+                if (f.teDays.isBlank() && com.example.util.BarChart.isForSuspension(f.teReason)) {
+                    com.example.util.BarChart.suspensionExtensionDays(documents).takeIf { it > 0 }?.let { f.teDays = it.toString() }
+                }
+            }
             OutlinedTextField(value = f.teNo, onValueChange = { f.teNo = it }, label = { Text("Extension No.") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = f.teDays, onValueChange = { f.teDays = it }, label = { Text("No. of Days") }, isError = daysError(f.teDays) != null, supportingText = daysError(f.teDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(value = f.teReason, onValueChange = { f.teReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
@@ -388,6 +387,7 @@ fun OrderFieldInputs(
             FullOrPartialPicker("Type of Suspension", f.wsType) { f.wsType = it }
             OutlinedTextField(value = f.wsDays, onValueChange = { f.wsDays = it }, label = { Text("No. of Days") }, isError = daysError(f.wsDays) != null, supportingText = daysError(f.wsDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
             DateField(label = "Effectivity Date", value = f.wsEffectivity, onValueChange = { f.wsEffectivity = it }, clearable = true)
+            SuspensionEndField(f.wsEffectivity, f.wsDays) { f.wsDays = it }
             OutlinedTextField(value = f.wsReason, onValueChange = { f.wsReason = it }, label = { Text("Reason") }, modifier = Modifier.fillMaxWidth())
             if (f.wsType == "Partial" && workItems.isNotEmpty()) {
                 Text("Work items suspended (their target pauses; the rest go on)", style = MaterialTheme.typography.labelMedium)
@@ -415,6 +415,7 @@ fun OrderFieldInputs(
                 FullOrPartialPicker("Type of Suspension", f.coType) { f.coType = it }
                 OutlinedTextField(value = f.coDays, onValueChange = { f.coDays = it }, label = { Text("No. of Days") }, isError = daysError(f.coDays) != null, supportingText = daysError(f.coDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 DateField(label = "Effectivity Date", value = f.coEffectivity, onValueChange = { f.coEffectivity = it })
+                SuspensionEndField(f.coEffectivity, f.coDays) { f.coDays = it }
             }
         }
         "Work Resumption Order" -> {
@@ -425,6 +426,14 @@ fun OrderFieldInputs(
         }
     }
 }
+
+/** A suspension's or continuance's last day: follows the days typed (the effectivity date is day 1); picking it sets the days. */
+@Composable
+internal fun SuspensionEndField(effectivity: String, days: String, onDays: (String) -> Unit) = DateField(
+    label = "End Date", value = com.example.util.ProjectSchedule.endText(effectivity, days),
+    onValueChange = { end -> com.example.util.ProjectSchedule.daysText(effectivity, end)?.let(onDays) },
+    modifier = Modifier.testTag("suspension_end_date")
+)
 
 /** Full or Partial, for work suspension, continuance and resumption orders; saved in the order's name. */
 @OptIn(ExperimentalMaterial3Api::class)

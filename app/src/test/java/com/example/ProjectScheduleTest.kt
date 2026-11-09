@@ -48,7 +48,11 @@ class ProjectScheduleTest {
             doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
         )
         // The approved suspension stops the clock but adds no days; only the time extension does.
-        assertEquals("2026-05-11", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+        // 130 days counting Jan 1 as day 1 end May 10: the original completion (Apr 10) plus 30 days.
+        assertEquals("2026-05-10", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+        assertEquals(java.time.LocalDate.of(2026, 4, 10), ProjectSchedule.lastDay(java.time.LocalDate.of(2026, 1, 1), 100))
+        // Across a year end: 360 days from Apr 13, 2026 end Apr 7, 2027, as the project's original completion says.
+        assertEquals(java.time.LocalDate.of(2027, 4, 7), ProjectSchedule.lastDay(java.time.LocalDate.of(2026, 4, 13), 360))
     }
 
     @Test
@@ -68,13 +72,14 @@ class ProjectScheduleTest {
 
     @Test
     fun revisedDuration_fromStoredDate() {
-        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-12-01"))
+        // Jan 5 through Nov 30, both counted.
+        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-30"))
     }
 
     @Test
     fun revisedDuration_noneWhenSameOrBlank() {
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "-"))
-        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-01"))
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-10-31"))
         // Revised date left equal to the original: an approved suspension alone must not show a duration.
         assertNull(ProjectSchedule.revisedDurationDays("2026-04-13", 360, 0, "2027-04-07", "2027-04-07"))
     }
@@ -107,7 +112,7 @@ class ProjectScheduleTest {
         assertEquals("Work Suspension Order No. 1", ws.documentName)
         assertEquals("1st Continuance of Work Suspension Order No. 1" to "2026-01-31", ProjectSchedule.nextContinuance(ws, listOf(ws)))
         val c1 = doc("1st Continuance of Work Suspension Order No. 1", "Approved", ProjectSchedule.suspensionRemarks(15, "2026-01-31"))
-        assertEquals("Duration: 15 Days | Effectivity: 2026-01-31 | End: 2026-02-15", c1.remarks)
+        assertEquals("Duration: 15 Days | Effectivity: 2026-01-31 | End: 2026-02-14", c1.remarks)
         assertEquals("2nd Partial Continuance of Work Suspension Order No. 1" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1), "Partial"))
         assertTrue(ProjectSchedule.isSuspension(ws))
         assertFalse(ProjectSchedule.isSuspension(c1))
@@ -134,5 +139,38 @@ class ProjectScheduleTest {
         assertEquals("Work Resumption Order No. 3", ProjectSchedule.orderLabel("Work Resumption No. 3"))
         for (same in listOf("Time Extension No. 1 - 30 Days", "2nd Partial Continuance of Work Suspension Order No. 1", "Partial Work Suspension Order No. 2"))
             assertEquals(same, ProjectSchedule.orderLabel(same))
+    }
+
+    @Test
+    fun suspensionEnd_countsTheEffectivityDateAsDay1() {
+        // San Ildefonso Heights: effective May 26, 2026 for 90 days ends Aug 23, 2026.
+        assertEquals("Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-23", ProjectSchedule.suspensionRemarks(90, "2026-05-26"))
+        assertEquals("2026-08-23", ProjectSchedule.endText("2026-05-26", "90"))
+        assertEquals("90", ProjectSchedule.daysText("2026-05-26", "2026-08-23"))
+        // Across a year end and a month end, and a one-day suspension.
+        assertEquals("2027-01-05", ProjectSchedule.endText("2026-12-27", "10"))
+        assertEquals("2026-03-01", ProjectSchedule.endText("2026-02-28", "2"))
+        assertEquals("2026-05-26", ProjectSchedule.endText("2026-05-26", "1"))
+        assertEquals("", ProjectSchedule.endText("2026-05-26", "0"))
+        assertEquals("", ProjectSchedule.endText("", "90"))
+        assertNull(ProjectSchedule.daysText("2026-05-26", "2026-05-25"))
+        // An order saved with the old effectivity + days End reads a day earlier.
+        val old = "Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24 | Reason: ROW"
+        assertEquals("Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-23 | Reason: ROW", ProjectSchedule.withEnd(old))
+        assertEquals(java.time.LocalDate.of(2026, 8, 23), ProjectSchedule.suspensionEnd(old))
+        assertEquals("Duration: 5 Days | Effectivity: 2026-01-21 | End: 2026-01-25", ProjectSchedule.withEnd("Duration: 5 Days | Effectivity: 2026-01-21"))
+        assertEquals("Duration: 0 Days | Effectivity: 2026-01-21", ProjectSchedule.withEnd("Duration: 0 Days | Effectivity: 2026-01-21"))
+        // Picking another End changes the days; one before the Effectivity is ignored.
+        assertEquals("Duration: 100 Days | Effectivity: 2026-05-26 | End: 2026-09-02 | Reason: ROW", ProjectSchedule.withEndDate(old, "2026-09-02"))
+        assertEquals(old, ProjectSchedule.withEndDate(old, "2026-05-01"))
+    }
+
+    @Test
+    fun continuance_startsTheDayAfterTheChainEnds() {
+        val ws = doc("Work Suspension Order No. 1", "Approved", ProjectSchedule.suspensionRemarks(90, "2026-05-26"))
+        assertEquals("2026-08-24", ProjectSchedule.nextContinuance(ws, listOf(ws)).second)
+        val c1 = doc("1st Continuance of Work Suspension Order No. 1", "Approved", ProjectSchedule.suspensionRemarks(30, "2026-08-24"))
+        assertEquals("Duration: 30 Days | Effectivity: 2026-08-24 | End: 2026-09-22", c1.remarks)
+        assertEquals("2026-09-23", ProjectSchedule.nextContinuance(ws, listOf(ws, c1)).second)
     }
 }
