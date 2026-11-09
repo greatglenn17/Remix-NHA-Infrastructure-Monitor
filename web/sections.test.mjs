@@ -162,3 +162,61 @@ test('print: the weekly form has every section, escapes text, and marks orders f
   assert.equal(P.longDate('2026-10-24'), 'October 24, 2026');
   assert.equal(P.longDate('soon'), 'soon');
 });
+
+test('print: monthly form pieces read months, orders, weather and signatories like the phone', () => {
+  assert.equal(P.monthKey('September 2026'), '2026-09');
+  assert.equal(P.monthKey(' july 2026 '), '2026-07');
+  assert.equal(P.monthKey('Sept 2026'), null);
+  assert.equal(P.monthName('2026-09'), 'September 2026');
+
+  const hours = bad => Array.from({ length: 24 }, (_, h) => (h >= 8 && h < 8 + bad ? 'RAINY' : 'FAIR')).join(',');
+  assert.deepEqual(P.workableDays([
+    { date: '2026-09-02', hourlyConditionsCsv: hours(5) }, { date: '2026-09-02', hourlyConditionsCsv: hours(0) }, // the first log of a day counts
+    { date: '2026-09-03', hourlyConditionsCsv: hours(4) }, { date: '2026-08-31', hourlyConditionsCsv: 'STORMY' }, { date: 'x', hourlyConditionsCsv: '' },
+  ]), [['2026-08', 1, 0], ['2026-09', 1, 1]]);
+
+  const { suspensions, variations } = P.ordersOf([
+    { documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Duration: 90 Days | Effectivity: 2026-08-24 | Reason: Rain' },
+    { documentName: 'Variation Order No. 1 - PHP 1,500,000.00', status: 'Pending', remarks: 'Reason: Added road' },
+    { documentName: 'Variation Order No. 2 (Deductive)', status: 'Approved' },
+  ]);
+  assert.deepEqual(suspensions, [{ label: 'Work Suspension Order No. 1', value: '90 calendar days – August 24, 2026 to November 21, 2026', reason: 'Rain', status: '' }]);
+  assert.deepEqual(variations, [
+    { label: 'Variation Order No. 1', value: 'Php 1,500,000.00', reason: 'Added road', status: '(for approval)' },
+    { label: 'Variation Order No. 2', value: '', reason: '', status: '' }]);
+
+  const s = P.monthlySignatories({ preparedByName: 'Ana', implementingOffice: 'NHA Bulacan' }, {});
+  assert.equal(s.preparedName, 'Ana');
+  assert.equal(s.checkedPosition, 'District Manager');
+  assert.equal(s.checkedOffice, 'NHA Bulacan');
+  assert.equal(s.notedPosition, 'Regional Manager');
+  assert.equal(s.notedOffice, 'Region 3 Office');
+});
+
+test('print: the monthly form has every section and the month\'s figures', () => {
+  const project = { name: 'Phase 1', contractDurationDays: 100, dateStarted: '2026-07-15', completionDateOriginal: '2026-10-22', scopeOfWork: 'Roads' };
+  const docs = [{ documentName: 'Time Extension No. 1 - 30 Days', status: 'Approved', remarks: 'Reason: Rain' }];
+  const weeks = [
+    { reportingWeek: 'Sep 5, 2026 - Sep 11, 2026', targetAccomplishmentPct: 10, actualAccomplishmentPct: 8, accomplishmentItemsJson: '[]' },
+    { reportingWeek: 'Sep 26, 2026 - Oct 2, 2026', targetAccomplishmentPct: 20, actualAccomplishmentPct: 18,
+      accomplishmentItemsJson: '[{"itemDescription":"Roads","weightPct":100,"targetPct":20,"actualPct":18}]' },
+  ];
+  const html = P.monthlyReportHtml({
+    project, month: '2026-09', weeks, docs, banner: '',
+    payments: [{ name: '1st billing', date: '2026-09-30', grossAmount: 1000, balanceAmount: 9000, percentage: 10, balancePercentage: 90 },
+      { name: 'Next', date: '2026-10-01', grossAmount: 1 }],
+    issues: [{ description: 'Flooding', date: '2026-09-04', actionTaken: 'Pumped', actionBy: 'Contractor/Developer' }, { description: 'Old', date: '2026-08-01' }],
+    weather: [{ date: '2026-09-02', hourlyConditionsCsv: 'FAIR' }], saved: { recommendations: 'Add crews\nWork Sundays' },
+    signatories: P.monthlySignatories(project, { name: 'Juan' }),
+  });
+  for (const x of ['For the Month of September 2026', 'II. PROJECT STATUS', 'III. STATUS OF PAYMENT', 'IV. CONTRACT SCHEDULE STATUS',
+    'V. SUMMARY OF UNWORKABLE DAYS', 'VI. STATUS OF SUBMISSION', 'VII. ISSUES / CONCERNS', 'VIII. RECOMMENDATIONS',
+    '<td>Roads</td><td class=\'n\'>100.00%</td><td class=\'n\'>20.00%</td><td class=\'n\'>18.00%</td><td class=\'n\'>18.00%</td>',
+    '1. 1st billing', 'Php 1,000.00', 'Php 9,000.00 (90.00%)', '130 c.d.', 'November 21, 2026',
+    "<td class='c'>3</td><td>September 2026</td>", '1. Flooding', 'September 4, 2026</td><td></td><td>Pumped</td>',
+    'Add crews<br>Work Sundays', 'Checked by:', 'JUAN', 'on or before end of each month']) {
+    assert.ok(html.includes(x), x);
+  }
+  assert.ok(!html.includes('Next') && !html.includes('Old'), 'October billing and August issue are left out');
+  assert.ok(html.includes('<td>None</td>'), 'no variation or suspension orders');
+});

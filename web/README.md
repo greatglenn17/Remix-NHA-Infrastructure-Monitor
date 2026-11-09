@@ -18,8 +18,9 @@ version keep working.
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
     the contractor, developer requests and related files, each with its scan.
-- **Print** (from a weekly report): the A4 Project Engineer's Report laid out as the phone prints
-  it (`BlueBookPrint.kt`, `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
+- **Print** (from a weekly report, or a month on the Monthly view): the A4 weekly or monthly
+  Project Engineer's Report laid out as the phone prints it (`BlueBookPrint.kt`,
+  `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
 
 The layouts, type and components follow the Android app (`app/src/main/java/com/example/ui/`).
 The colours are a dark "command center" palette (a #0B0F17 canvas with a faint dot grid, #111827
@@ -88,5 +89,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing of any kind, the Lots, Weather and Issues screens, monthly report printing, and the
-audit log.
+Editing of any kind, the Lots, Weather and Issues screens, and the audit log.

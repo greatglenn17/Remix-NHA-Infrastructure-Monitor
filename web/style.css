@@ -471,7 +471,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb td.lab { font-weight: bold; width: 22%; }
 .bb td.n { text-align: right; white-space: nowrap; }
 .bb td.c { text-align: center; }
+.bb th.sub { background: #f2f2f2; }
 .bb td.day { font-weight: bold; width: 18%; }
+.bb td.rec { height: 30mm; }
 .bb td.empty { text-align: center; color: #555; }
 .bb tr.tot { break-before: avoid; }
 .bb tr.tot td { font-weight: bold; }
