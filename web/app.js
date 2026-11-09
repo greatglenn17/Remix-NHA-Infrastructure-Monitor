@@ -643,8 +643,8 @@ function monthlyView({ page, weekly, of, now }) {
 
 /* ---------- Lots (SubdivisionPlanTab, read-only) ---------- */
 
-// shortcut: lots show as a block-by-block grid, not over the plan PDF (the site cannot draw the PDF or know its page shape);
-// the plan opens as a file instead. Roads drawn on the plan are not shown.
+// SubdivisionPlanTab: the plan PDF with each lot coloured over it (click one for its details), then the same lots
+// block by block, which is also the keyboard path. shortcut: the plan has no zoom; use the browser's zoom for small lots.
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null });
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 
@@ -665,6 +665,7 @@ function lotsView(c) {
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       ${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}
     </div>
+    ${site.plan.pdfFileUrl && site.lots.length ? '<div class="lot-plan-box" id="lot-plan"><p class="muted">Drawing the plan…</p></div>' : ''}
     <div id="lot-results">${lotResults(site, st)}</div>
   </section>`;
 }
@@ -710,8 +711,10 @@ function bindLots(c) {
   const st = lotState(c.page);
   const results = document.getElementById('lot-results');
   // Only the results redraw while typing, so the search box keeps its focus.
+  const plan = document.getElementById('lot-plan');
   const redraw = scroll => {
     results.innerHTML = lotResults(lotSite(c, st).site, st);
+    if (plan) showPlan(lotSite(c, st).site, st, plan);
     bindResults();
     loadFiles(results);
     if (scroll) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -722,9 +725,34 @@ function bindLots(c) {
     if (close) close.onclick = () => { st.sel = null; redraw(false); };
   };
   bindResults();
+  if (plan) {
+    showPlan(lotSite(c, st).site, st, plan);
+    plan.onclick = e => { const id = e.target.closest('[data-lot]')?.dataset.lot; if (id) { st.sel = st.sel === id ? null : id; redraw(true); } };
+  }
   document.getElementById('lot-q').oninput = e => { st.query = e.target.value; redraw(false); };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; redraw(false); }; });
   main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; drawProject(c.page); }; });
+}
+
+const planDrawings = new Map();
+/** The plan page (without lots) drawn once per plan, with each lot over it as a shape that dims with the filters. */
+async function showPlan(site, st, box) {
+  const key = [site.plan.uuid, site.plan.pdfFileUrl, site.plan.frame, site.plan.rotation].join('|');
+  if (!planDrawings.has(key)) planDrawings.set(key, planDrawing(site, false));
+  const d = await planDrawings.get(key);
+  if (d.problem) planDrawings.delete(key); // try again next time
+  if (!box.isConnected) return;
+  const shapes = site.lots.map(l => {
+    const pts = L.lotPolygon(l);
+    if (pts.length < 3) return '';
+    const hex = L.lotPrintHex(l);
+    return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotMatches(l, st) ? '' : 'dim'}${l.uuid === st.sel ? ' sel' : ''}" fill="${hex}" stroke="${hex}"
+      points="${pts.map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)).join(',')).join(' ')}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
+  }).join('');
+  box.innerHTML = `${d.problem ? `<p class="error">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>` : ''}
+    <div class="lot-plan" style="width:min(100%, calc(75vh * ${d.width} / ${d.height})); aspect-ratio:${d.width} / ${d.height}">
+      <img src="${d.image}" alt="Subdivision plan">
+      <svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="none" aria-hidden="true">${shapes}</svg></div>`;
 }
 
 /* ---------- Weather (WeatherChartTab), read-only ---------- */
@@ -1051,7 +1079,7 @@ async function drawSdpPrint({ page, project, records }) {
   const sheet = document.getElementById('sheet');
   if (!chosen.length) { sheet.innerHTML = '<p>No subdivision plan uploaded yet.</p>'; return; }
   let plans;
-  try { plans = await Promise.all(chosen.map(planImage)); } catch (e) {
+  try { plans = await Promise.all(chosen.map(x => planDrawing(x))); } catch (e) {
     console.error('SDP print', e);
     if (page.printToken === token) sheet.innerHTML = `<p>The plan could not be drawn (${esc(e.message || e)}).</p>`;
     return;
@@ -1100,10 +1128,11 @@ async function planBytes(refText) {
 let pdfjs;
 /**
  * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
- * across A4, each lot filled with its colour and outlined, turned the way the plan is turned on screen.
- * Returns {image: PNG data URI, problem}; when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
+ * across A4, each lot filled with its colour and outlined (unless `withLots` is false), turned the way the plan is turned
+ * on screen. Returns {image: PNG data URI, width, height, place(x, y) → that plan point in image pixels, problem};
+ * when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
  */
-async function planImage({ plan, lots }) {
+async function planDrawing({ plan, lots }, withLots = true) {
   let doc = null, problem = '';
   try {
     const data = await planBytes(plan.pdfFileUrl);
@@ -1132,11 +1161,12 @@ async function planImage({ plan, lots }) {
       const viewport = pdfPage.getViewport({ scale: sc, offsetX: -f[0] * base.width * sc, offsetY: -f[1] * base.height * sc });
       await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
     }
+    const px = (x, y) => [(x - f[0]) / (f[2] - f[0]) * w, (y - f[1]) / (f[3] - f[1]) * h];
     ctx.lineWidth = 2;
-    for (const [l, pts] of polys) {
+    for (const [l, pts] of withLots ? polys : []) {
       if (pts.length < 3) continue;
       ctx.beginPath();
-      pts.forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo']((x - f[0]) / (f[2] - f[0]) * w, (y - f[1]) / (f[3] - f[1]) * h));
+      pts.forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo'](...px(x, y)));
       ctx.closePath();
       ctx.fillStyle = ctx.strokeStyle = L.lotPrintHex(l);
       ctx.globalAlpha = 115 / 255;
@@ -1145,16 +1175,19 @@ async function planImage({ plan, lots }) {
       ctx.stroke();
     }
     const deg = ((Number(plan.rotation) || 0) % 360 + 360) % 360;
-    if (!deg) return { image: canvas.toDataURL('image/png'), problem };
+    if (!deg) return { image: canvas.toDataURL('image/png'), width: w, height: h, place: px, problem };
     const rad = deg * Math.PI / 180, cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
     const out = Object.assign(document.createElement('canvas'), { width: Math.round(w * cos + h * sin), height: Math.round(w * sin + h * cos) });
+    // The same clockwise turn about the centre, for points.
+    const c = Math.cos(rad), sn = Math.sin(rad);
+    const place = (x, y) => { const [a, b] = px(x, y), dx = a - w / 2, dy = b - h / 2; return [dx * c - dy * sn + out.width / 2, dx * sn + dy * c + out.height / 2]; };
     const o = out.getContext('2d');
     o.fillStyle = '#fff';
     o.fillRect(0, 0, out.width, out.height);
     o.translate(out.width / 2, out.height / 2);
     o.rotate(rad); // clockwise, as Matrix.postRotate on the phone
     o.drawImage(canvas, -w / 2, -h / 2);
-    return { image: out.toDataURL('image/png'), problem };
+    return { image: out.toDataURL('image/png'), width: out.width, height: out.height, place, problem };
   } finally {
     doc?.destroy();
   }

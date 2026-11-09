@@ -544,6 +544,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
 .lot-block { margin-top: 12px; }
 .lot-block h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+/* The plan with its lots over it (SubdivisionPlanTab). */
+.lot-plan-box { margin-bottom: 12px; }
+.lot-plan { position: relative; margin: 0 auto; border-radius: 8px; overflow: hidden; background: #fff; }
+.lot-plan img, .lot-plan svg { display: block; width: 100%; height: 100%; }
+.lot-plan svg { position: absolute; inset: 0; }
+.lot-plan polygon { fill-opacity: 0.45; stroke-width: 1; vector-effect: non-scaling-stroke; cursor: pointer; }
+.lot-plan polygon:hover { fill-opacity: 0.75; }
+.lot-plan polygon.dim { fill-opacity: 0.08; stroke-opacity: 0.3; }
+.lot-plan polygon.sel { fill-opacity: 0.85; stroke: #000; stroke-width: 3; }
 .lot-grid { display: flex; flex-wrap: wrap; gap: 4px; }
 .lot { min-width: 40px; height: 40px; padding: 0 6px; border: 0; border-radius: 6px; color: #0B0F17; font: 700 13px Inter, sans-serif; cursor: pointer; font-variant-numeric: tabular-nums; }
 .lot.dim { opacity: 0.18; }

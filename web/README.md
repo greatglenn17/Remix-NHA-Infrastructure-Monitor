@@ -16,8 +16,8 @@ version keep working.
   - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
     photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
     its search and filters, and each block's lots as squares in the band colours (tap one for
-    its status, billing and photos). The lots are not drawn over the plan on screen; the PDF opens
-    as a file, and the print below draws them on it. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
+    its status, billing and photos). Above them the plan PDF is drawn with each lot coloured over it, as on the
+    phone; click a lot there for the same details. The filters dim the lots that do not match. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
   - **Payments**: the billing list with retention, housing units and the attached files.
