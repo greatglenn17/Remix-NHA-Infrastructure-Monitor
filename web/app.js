@@ -1076,7 +1076,8 @@ let pdfjs;
 async function planImage({ plan, lots }) {
   const url = await photoUrl(plan.pdfFileUrl);
   if (!url) throw new Error('the PDF is not uploaded yet');
-  const res = await fetch(url);
+  // no-store: a copy cached when the PDF was opened from its link has no CORS header, and the browser would refuse it here.
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`download failed, ${res.status}`);
   pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
