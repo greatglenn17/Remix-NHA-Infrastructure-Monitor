@@ -521,27 +521,107 @@ export const lotBand = p => (p >= 100 ? 5 : p >= 76 ? 4 : p >= 51 ? 3 : p >= 26 
 // Room booleans travel as 1/0; a row without the column keeps its default (true).
 const on = v => v !== false && v !== 0 && v !== '0';
 
+/** SdpLot.use: blank on lots saved before uses were kept; block "OS" was the open spaces then. */
+export const lotUse = l => l.lotUse || (l.blockNumber === 'OS' ? 'Open Space' : 'Saleable');
+/** SdpLot.label: "Block 3 Lot 12", "Road Lot 4" or "Easement 2", or "Unassigned lot" until it is named. */
+export function lotLabel(l) {
+  const b = (l.blockNumber || '').trim(), n = (l.lotNumber || '').trim();
+  if (!b || !n) return 'Unassigned lot';
+  return NUMBERED_USES[lotUse(l)] === l.blockNumber ?`${lotUse(l)} ${n}` : `Block ${b} Lot ${n}`;
+}
+/** A lot's progress, 0 without a progress row. */
+export const lotProgress = l => Number(l.progress?.physicalProgress) || 0;
+const billed = (p, key) => p?.[key] === 'BILLED';
+/** SdpLotProgress.billingLabel. */
+export function lotBillingLabel(p) {
+  const m1 = billed(p, 'billingStatus'), m2 = billed(p, 'm2BillingStatus');
+  return m1 && m2 ? 'M1 + M2 BILLED (100%)' : m1 ? 'M1 BILLED (80%)' : m2 ? 'M2 BILLED (20%)' : 'NOT BILLED';
+}
+
 /**
- * Saleable lots per band over every site's plan in use (SdpSites.current: each site's active plan with the
- * highest version, else its highest version), from a project's records. A lot without progress is at 0%.
+ * SdpSites.current with each plan's active lots: per site (in the order its first plan was uploaded), its active plan
+ * with the highest version, else its highest version. Each lot carries its latest progress row as `progress` (or null).
  */
-export function lotSummary(records) {
+export function sdpSites(records) {
   const sites = new Map();
-  for (const p of records.filter(r => r.type === 'sdp_plans')) {
+  for (const p of records.filter(r => r.type === 'sdp_plans').sort((a, b) => String(a.uploadedDate || '').localeCompare(String(b.uploadedDate || '')))) {
     const k = p.siteName || '';
     if (!sites.has(k)) sites.set(k, []);
     sites.get(k).push(p);
   }
   const top = list => list.reduce((best, p) => (!best || (Number(p.version) || 0) > (Number(best.version) || 0) ? p : best), null);
-  const inUse = new Set([...sites.values()].map(site => (top(site.filter(p => on(p.isActive))) || top(site)).uuid));
   const progress = new Map(records.filter(r => r.type === 'sdp_lot_progress')
-    .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0)).map(p => [p._ref_sdpLotId, Number(p.physicalProgress) || 0]));
-  const use = l => l.lotUse || (l.blockNumber === 'OS' ? 'Open Space' : 'Saleable');
-  const saleable = records.filter(r => r.type === 'sdp_lots' && on(r.isActive) && inUse.has(r._ref_sdpPlanId) && use(r) === 'Saleable');
+    .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0)).map(p => [p._ref_sdpLotId, p]));
+  const lots = records.filter(r => r.type === 'sdp_lots' && on(r.isActive));
+  return [...sites].map(([site, list]) => {
+    const plan = top(list.filter(p => on(p.isActive))) || top(list);
+    return { site, plan, lots: lots.filter(l => l._ref_sdpPlanId === plan.uuid).map(l => ({ ...l, progress: progress.get(l.uuid) || null })) };
+  });
+}
+
+/** Saleable lots per band over every site's plan in use, from a project's records. A lot without progress is at 0%. */
+export function lotSummary(records) {
+  const saleable = sdpSites(records).flatMap(s => s.lots).filter(l => lotUse(l) === 'Saleable');
   const bands = LOT_BANDS.map(() => 0);
-  for (const l of saleable) bands[lotBand(progress.get(l.uuid) ?? 0)]++;
+  for (const l of saleable) bands[lotBand(lotProgress(l))]++;
   return { bands, saleable: saleable.length };
 }
+
+/** LotStats: the Lots KPIs, over saleable lots only (open spaces, road lots and the like are not housing units). */
+export function lotStats(lots) {
+  const s = lots.filter(l => lotUse(l) === 'Saleable');
+  return {
+    total: s.length,
+    m1: s.filter(l => billed(l.progress, 'billingStatus')).length,
+    m2: s.filter(l => billed(l.progress, 'm2BillingStatus')).length,
+    notBilled: s.filter(l => !billed(l.progress, 'billingStatus') && !billed(l.progress, 'm2BillingStatus')).length,
+    completed: s.filter(l => lotProgress(l) >= 100).length,
+    avg: s.length ? s.reduce((t, l) => t + lotProgress(l), 0) / s.length : 0,
+  };
+}
+
+/** The Lots filter's choices (LOT_PROGRESS_FILTERS and the billing and status menus). */
+export const LOT_FILTERS = { band: ['ALL', ...LOT_BANDS], billing: ['ALL', 'M1 BILLED', 'M2 BILLED', 'NOT BILLED'], completion: ['ALL', 'COMPLETED', 'INCOMPLETE'] };
+
+/** isLotMatchingFilter: `f` is {query, band, billing, completion}; the query matches "b3-l12", "b3l12", "block 3", "lot 12" or the unit. */
+export function lotMatches(l, f) {
+  const q = (f.query || '').trim().toLowerCase();
+  if (q) {
+    const b = l.blockNumber || '', n = l.lotNumber || '', unit = (l.housingUnitNumber || '').toLowerCase();
+    const unassigned = !b.trim() || !n.trim();
+    const keys = unassigned ? [lotLabel(l).toLowerCase()] : [`b${b}-l${n}`, `b${b}l${n}`, `block ${b}`, `lot ${n}`].map(k => k.toLowerCase());
+    if (![...keys, unit].some(k => k.includes(q))) return false;
+  }
+  const m1 = billed(l.progress, 'billingStatus'), m2 = billed(l.progress, 'm2BillingStatus');
+  if ((f.billing === 'M1 BILLED' && !m1) || (f.billing === 'M2 BILLED' && !m2) || (f.billing === 'NOT BILLED' && (m1 || m2))) return false;
+  const done = lotProgress(l) >= 100;
+  if ((f.completion === 'COMPLETED' && !done) || (f.completion === 'INCOMPLETE' && done)) return false;
+  if (f.band && f.band !== 'ALL' && LOT_BANDS.indexOf(f.band) !== lotBand(lotProgress(l))) return false;
+  return true;
+}
+
+/**
+ * lotFill as a colour class: saleable lots by band (lot-0..lot-5); road lots red, yellow while concreting, green when
+ * done (SdpSummary.roadState); any other use neutral.
+ */
+export function lotColour(l) {
+  const p = lotProgress(l), use = lotUse(l);
+  if (use === 'Road Lot') return `lot-${p >= 100 ? 5 : p > 0 ? 3 : 0}`;
+  return use === 'Saleable' ? `lot-${lotBand(p)}` : 'lot-n';
+}
+
+/** The lots grouped by block for the grid, blocks and lots in natural order ("2" before "10"); unassigned lots last. */
+export function lotBlocks(lots) {
+  const cmp = (a, b) => String(a).localeCompare(String(b), 'en', { numeric: true });
+  const blocks = new Map();
+  for (const l of [...lots].sort((a, b) => cmp(a.lotNumber || '', b.lotNumber || ''))) {
+    const k = lotLabel(l) === 'Unassigned lot' ? '' : NUMBERED_USES[lotUse(l)] === l.blockNumber ? lotUse(l) : `Block ${l.blockNumber}`;
+    if (!blocks.has(k)) blocks.set(k, []);
+    blocks.get(k).push(l);
+  }
+  return [...blocks].sort(([a], [b]) => (!a) - (!b) || cmp(a, b)).map(([name, list]) => ({ name: name || 'Unassigned lots', lots: list }));
+}
+const NUMBERED_USES = { 'Road Lot': 'RL', Easement: 'EA' };
 
 /** HOUSING_BILLING_TYPES. */
 export const HOUSING_BILLING_TYPES = ['Land acquisition', 'Land development', 'M1 - Housing unit', 'M2 - Housing unit'];

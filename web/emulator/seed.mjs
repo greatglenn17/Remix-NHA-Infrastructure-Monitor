@@ -192,8 +192,12 @@ const lotProgress = [0, 0, 0, 10, 20, 25, 30, 45, 60, 70, 80, 95, 100, 100, 100,
 for (const [i, p] of lotProgress.entries()) {
   const lotId = rid(100 + i);
   await record(lotId, 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: String(1 + (i >> 2)), lotNumber: String(1 + (i % 4)), lotAreaSqM: 40,
-    polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });
-  if (p) await record(rid(200 + i), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: lotId, physicalProgress: p });
+    polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable', housingUnitNumber: `HU-${i + 1}` });
+  // Built lots are billed M1 at 76% and M2 when done, so the Lots KPIs and filters have something to show.
+  if (p) await record(rid(200 + i), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: lotId, physicalProgress: p,
+    constructionStatus: p >= 100 ? 'Completed' : 'Under Construction', currentActivity: p >= 100 ? '' : 'Walls and roofing', contractor: 'ABC Builders',
+    billingStatus: p >= 76 ? 'BILLED' : 'NOT BILLED', billingDate: p >= 76 ? '2026-10-15' : '', billingReference: p >= 76 ? 'DV 2026-118' : '',
+    m2BillingStatus: p >= 100 ? 'BILLED' : 'NOT BILLED', m2BillingDate: p >= 100 ? '2026-11-02' : '' });
 }
 await record(rid(130), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: 'RL', lotNumber: '1', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Road Lot' });
 await record(rid(131), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(30), blockNumber: '9', lotNumber: '9', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });

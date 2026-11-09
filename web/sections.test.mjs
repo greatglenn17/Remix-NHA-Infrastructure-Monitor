@@ -231,3 +231,43 @@ test('print: extensions read either name style; one for approval does not move t
   assert.ok(!html.includes('No weather logged'));
   assert.ok(html.includes("<td class='nw'>Php 0.00</td>"), 'contract costs stay on one line');
 });
+
+test('lots: sites, labels, KPIs, filters, colours and blocks read like the phone', () => {
+  const rec = (type, o) => ({ type, uuid: o.uuid || `${type}-${Math.random()}`, ...o });
+  const records = [
+    rec('sdp_plans', { uuid: 'old', version: 1, isActive: 0, uploadedDate: '2026-01-01', siteName: '' }),
+    rec('sdp_plans', { uuid: 'p1', version: 2, isActive: 1, uploadedDate: '2026-02-01', siteName: '' }),
+    rec('sdp_plans', { uuid: 'p2', version: 1, isActive: 0, uploadedDate: '2026-03-01', siteName: 'Phase 2' }),
+    rec('sdp_lots', { uuid: 'a', _ref_sdpPlanId: 'p1', blockNumber: '10', lotNumber: '2', housingUnitNumber: 'U-7' }),
+    rec('sdp_lots', { uuid: 'b', _ref_sdpPlanId: 'p1', blockNumber: '2', lotNumber: '10' }),
+    rec('sdp_lots', { uuid: 'c', _ref_sdpPlanId: 'p1', blockNumber: '2', lotNumber: '9' }),
+    rec('sdp_lots', { uuid: 'r', _ref_sdpPlanId: 'p1', blockNumber: 'RL', lotNumber: '1', lotUse: 'Road Lot' }),
+    rec('sdp_lots', { uuid: 'o', _ref_sdpPlanId: 'p1', blockNumber: 'OS', lotNumber: '1' }),
+    rec('sdp_lots', { uuid: 'u', _ref_sdpPlanId: 'p1', blockNumber: '', lotNumber: '' }),
+    rec('sdp_lots', { uuid: 'x', _ref_sdpPlanId: 'p1', blockNumber: '2', lotNumber: '1', isActive: 0 }),
+    rec('sdp_lots', { uuid: 'q', _ref_sdpPlanId: 'old', blockNumber: '1', lotNumber: '1' }),
+    rec('sdp_lots', { uuid: 'z', _ref_sdpPlanId: 'p2', blockNumber: '1', lotNumber: '1' }),
+    rec('sdp_lot_progress', { _ref_sdpLotId: 'a', physicalProgress: 10, updatedAt: 1 }),
+    rec('sdp_lot_progress', { _ref_sdpLotId: 'a', physicalProgress: 100, billingStatus: 'BILLED', m2BillingStatus: 'BILLED', updatedAt: 2 }),
+    rec('sdp_lot_progress', { _ref_sdpLotId: 'b', physicalProgress: 30, billingStatus: 'BILLED' }),
+    rec('sdp_lot_progress', { _ref_sdpLotId: 'r', physicalProgress: 50 }),
+  ];
+  const sites = L.sdpSites(records);
+  assert.deepEqual(sites.map(s => [s.site, s.plan.uuid, s.lots.length]), [['', 'p1', 6], ['Phase 2', 'p2', 1]]);
+  const lots = sites[0].lots, by = id => lots.find(l => l.uuid === id);
+  assert.deepEqual(['a', 'r', 'o', 'u'].map(id => L.lotLabel(by(id))), ['Block 10 Lot 2', 'Road Lot 1', 'Block OS Lot 1', 'Unassigned lot']);
+  assert.equal(L.lotProgress(by('a')), 100); // the latest progress row
+  assert.equal(L.lotBillingLabel(by('a').progress), 'M1 + M2 BILLED (100%)');
+  assert.equal(L.lotBillingLabel(null), 'NOT BILLED');
+  assert.deepEqual(L.lotStats(lots), { total: 4, m1: 2, m2: 1, notBilled: 2, completed: 1, avg: 32.5 });
+  const all = { query: '', band: 'ALL', billing: 'ALL', completion: 'ALL' };
+  const ids = f => lots.filter(l => L.lotMatches(l, { ...all, ...f })).map(l => l.uuid);
+  assert.deepEqual(ids({ query: 'b2-l1' }), ['b']);
+  assert.deepEqual(ids({ query: 'u-7' }), ['a']);
+  assert.deepEqual(ids({ query: 'unassigned' }), ['u']);
+  assert.deepEqual(ids({ billing: 'NOT BILLED', band: 'Not yet started' }), ['c', 'o', 'u']);
+  assert.deepEqual(ids({ completion: 'COMPLETED' }), ['a']);
+  assert.deepEqual(['a', 'b', 'c', 'r', 'o'].map(id => L.lotColour(by(id))), ['lot-5', 'lot-2', 'lot-0', 'lot-3', 'lot-n']);
+  assert.deepEqual(L.lotBlocks(lots).map(b => [b.name, b.lots.map(l => l.lotNumber)]),
+    [['Block 2', ['9', '10']], ['Block 10', ['2']], ['Block OS', ['1']], ['Road Lot', ['1']], ['Unassigned lots', ['']]]);
+});
