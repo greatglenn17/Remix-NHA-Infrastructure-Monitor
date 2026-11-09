@@ -16,8 +16,8 @@ version keep working.
   - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
     photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
     its search and filters, and each block's lots as squares in the band colours (tap one for
-    its status, billing and photos). The lots are not drawn over the plan PDF; the PDF opens
-    as a file. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
+    its status, billing and photos). The lots are not drawn over the plan on screen; the PDF opens
+    as a file, and the print below draws them on it. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
   - **Payments**: the billing list with retention, housing units and the attached files.
@@ -28,6 +28,10 @@ version keep working.
 - **Print** (from a weekly report, or a month on the Monthly view): the A4 weekly or monthly
   Project Engineer's Report laid out as the phone prints it (`BlueBookPrint.kt`,
   `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
+- **Status of Construction** print (Print on the Lots view): the plan PDF's first page inside its frame, each lot
+  coloured by progress, and the legend of units per band, for one site or all sites on one landscape or portrait
+  page, as the phone prints it. The PDF is drawn by pdf.js 4.10.38, bundled in `web/vendor/pdfjs/` (Apache 2.0, see
+  `licenses/pdfjs-Apache-2.0.txt`; its standard fonts carry their own licences).
 
 The layouts, type and components follow the Android app (`app/src/main/java/com/example/ui/`).
 The colours are a dark "command center" palette (a #0B0F17 canvas with a faint dot grid, #111827
@@ -96,4 +100,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing of any kind, and the Status of Construction print.
+Editing of any kind.

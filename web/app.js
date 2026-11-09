@@ -7,7 +7,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getStorage, connectStorageEmulator, ref, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
 import * as P from './print.js';
@@ -658,7 +658,8 @@ function lotsView(c) {
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
     <div class="lots-head"><h3>${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span></h3>
-      ${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}</div>
+      <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
+        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}</span></div>
     <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
@@ -966,6 +967,7 @@ function relatedCard(files) {
 
 async function drawPrint(c) {
   if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
+  if (c.page.sub === 'sdp') return drawSdpPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -1019,6 +1021,143 @@ async function drawMonthlyPrint({ page, project, of, documents, payments, weekly
   btn.disabled = false;
   btn.innerHTML = `${icon('print', 'sm')}Print`;
   btn.onclick = () => window.print();
+}
+
+/** The Status of Construction print (PrintPlanDialog + BlueBookForms.sdpPlan) for `#/p/<id>/print/sdp`. */
+async function drawSdpPrint({ page, project, records }) {
+  const sites = L.sdpSites(records);
+  // PrintPlanDialog: several sites start as all sites on a landscape page; the choice stays once made.
+  const st = (page.sdp ||= {});
+  const all = st.all ?? sites.length > 1, landscape = st.landscape ?? sites.length > 1;
+  const current = sites.find(x => x.site === page.lots?.site) || sites[0];
+  const chosen = all && sites.length > 1 ? sites : current ? [current] : [];
+  const many = chosen.length > 1;
+  page.chips.progress = 'Lots'; // the back link returns to the Lots view
+  document.title = `SDP Progress - ${project.name}`;
+  const token = page.printToken = {};
+  const opt = (value, label, on) => `<option value="${value}"${on ? ' selected' : ''}>${esc(label)}</option>`;
+  main.innerHTML = `${landscape ? '<style>@page { size: A4 landscape; }</style>' : ''}
+    <div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Lots</a>
+      <div class="print-opts">
+        ${sites.length > 1 ? `<label class="field">Sites<select id="sdp-sites">${opt('all', `All ${sites.length} sites on one page`, all)}${opt('one', `${current.site || 'Main site'} only`, !all)}</select></label>` : ''}
+        <label class="field">Page<select id="sdp-page">${opt('l', many ? 'Landscape: sites side by side' : 'Landscape', landscape)}${opt('p', many ? 'Portrait: sites one above the other' : 'Portrait', !landscape)}</select></label>
+        <button class="btn" id="do-print" disabled>${icon('print', 'sm')}Drawing the plan…</button></div></div>
+    <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <p class="error no-print" id="sdp-note" hidden></p>
+    <div class="bb-scroll"><div class="bb full${landscape ? ' land' : ''}" id="sheet"></div></div>`;
+  const sitesSel = document.getElementById('sdp-sites');
+  if (sitesSel) sitesSel.onchange = () => { st.all = sitesSel.value === 'all'; if (st.all) st.landscape = true; drawProject(page); };
+  document.getElementById('sdp-page').onchange = e => { st.landscape = e.target.value === 'l'; drawProject(page); };
+  const sheet = document.getElementById('sheet');
+  if (!chosen.length) { sheet.innerHTML = '<p>No subdivision plan uploaded yet.</p>'; return; }
+  let plans;
+  try { plans = await Promise.all(chosen.map(planImage)); } catch (e) {
+    console.error('SDP print', e);
+    if (page.printToken === token) sheet.innerHTML = `<p>The plan could not be drawn (${esc(e.message || e)}).</p>`;
+    return;
+  }
+  if (page.printToken !== token || page !== s.page) return;
+  // The form still prints when a plan PDF cannot be loaded: its lots are drawn on blank paper (the phone prints nothing then).
+  const missing = chosen.filter((x, i) => plans[i].problem);
+  if (missing.length) {
+    const note = document.getElementById('sdp-note');
+    note.hidden = false;
+    note.textContent = `The plan PDF of ${missing.map(x => x.site || 'Main site').join(' and ')} could not be loaded in this browser (${plans.find(x => x.problem).problem}), so ${missing.length > 1 ? 'their' : 'its'} lots are drawn without the plan. Try again, or another browser.`;
+  }
+  sheet.innerHTML = P.sdpPlanHtml({
+    project, landscape, asOf: today(), banner: 'blue-book-header.png',
+    sheets: chosen.map((x, i) => ({ site: x.site, image: plans[i].image, summary: L.sdpSummary(x.lots) })),
+  });
+  // Wait for load, not decode(): decode() of a big data-URI plan can stay pending in a tab that is not painting.
+  await Promise.all([...sheet.querySelectorAll('img')].map(img => (img.complete ? null : new Promise(done => { img.onload = img.onerror = done; }))));
+  if (page.printToken !== token) return;
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.innerHTML = `${icon('print', 'sm')}Print`;
+  btn.onclick = () => window.print();
+}
+
+/** The plan PDF's bytes: a plain download first, then the Storage SDK's own request if the browser refuses that one. */
+async function planBytes(refText) {
+  const path = L.storagePathOf(refText);
+  if (!path) throw new Error('the PDF is not uploaded yet');
+  try {
+    const url = await photoUrl(refText);
+    if (!url) throw new Error('the PDF is not uploaded yet');
+    // no-store: a copy cached when the PDF was opened from its link may lack the CORS header the browser needs here.
+    // Range: download managers such as IDM take over a plain PDF download (the page then gets "Failed to fetch"),
+    // but leave a partial (206) answer alone; bytes=0- is still the whole file.
+    const res = await fetch(url, { cache: 'no-store', headers: { Range: 'bytes=0-' } });
+    if (!res.ok) throw new Error(`download failed, ${res.status}`);
+    return await res.arrayBuffer();
+  } catch (e) {
+    console.error('SDP print: the plan PDF download failed; trying the Storage SDK', e);
+    // The SDK retries a refused download for up to two minutes; give up sooner and print without the plan.
+    return Promise.race([getBytes(ref(storage, path)), new Promise((_, fail) => setTimeout(() => fail(new Error(`download refused: ${e.message}`)), 15000))]);
+  }
+}
+
+let pdfjs;
+/**
+ * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
+ * across A4, each lot filled with its colour and outlined, turned the way the plan is turned on screen.
+ * Returns {image: PNG data URI, problem}; when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
+ */
+async function planImage({ plan, lots }) {
+  let doc = null, problem = '';
+  try {
+    const data = await planBytes(plan.pdfFileUrl);
+    pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
+    // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
+    doc = await pdfjs.getDocument({ data, isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+  } catch (e) {
+    console.error('SDP print: the plan PDF could not be loaded', e);
+    problem = e.code || e.message || String(e);
+  }
+  try {
+    const pdfPage = doc && await doc.getPage(1);
+    // shortcut: without the PDF its page size is unknown, so the lots go on an A4 landscape page; shapes may stretch.
+    const base = pdfPage ? pdfPage.getViewport({ scale: 1 }) : { width: 842, height: 595 };
+    const polys = lots.map(l => [l, L.lotPolygon(l)]);
+    const f = L.parseFrame(plan.frame) || L.frameAround(polys.map(p => p[1])) || [0, 0, 1, 1];
+    const fw = (f[2] - f[0]) * base.width, fh = (f[3] - f[1]) * base.height;
+    const sc = 2800 / Math.max(fw, fh);
+    const w = Math.max(1, Math.trunc(fw * sc)), h = Math.max(1, Math.trunc(fh * sc));
+    const canvas = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    if (pdfPage) {
+      const viewport = pdfPage.getViewport({ scale: sc, offsetX: -f[0] * base.width * sc, offsetY: -f[1] * base.height * sc });
+      await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
+    }
+    ctx.lineWidth = 2;
+    for (const [l, pts] of polys) {
+      if (pts.length < 3) continue;
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo']((x - f[0]) / (f[2] - f[0]) * w, (y - f[1]) / (f[3] - f[1]) * h));
+      ctx.closePath();
+      ctx.fillStyle = ctx.strokeStyle = L.lotPrintHex(l);
+      ctx.globalAlpha = 115 / 255;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+    }
+    const deg = ((Number(plan.rotation) || 0) % 360 + 360) % 360;
+    if (!deg) return { image: canvas.toDataURL('image/png'), problem };
+    const rad = deg * Math.PI / 180, cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
+    const out = Object.assign(document.createElement('canvas'), { width: Math.round(w * cos + h * sin), height: Math.round(w * sin + h * cos) });
+    const o = out.getContext('2d');
+    o.fillStyle = '#fff';
+    o.fillRect(0, 0, out.width, out.height);
+    o.translate(out.width / 2, out.height / 2);
+    o.rotate(rad); // clockwise, as Matrix.postRotate on the phone
+    o.drawImage(canvas, -w / 2, -h / 2);
+    return { image: out.toDataURL('image/png'), problem };
+  } finally {
+    doc?.destroy();
+  }
 }
 
 /* ---------- Files and site photos from Storage ---------- */

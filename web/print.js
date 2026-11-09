@@ -351,3 +351,29 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
     ${signatures(signatories, 'Checked by')}</div>`);
   return b.join('\n');
 }
+
+
+/**
+ * BlueBookForms.sdpPlan: the subdivision plan coloured by lot progress on one A4 page, with the legend of saleable units
+ * per band. `sheets` are [{site, image, summary}] (image a data URI, summary from L.sdpSummary). One plan has the legend
+ * over its bottom-left corner; several sit side by side (landscape) or one above the other (portrait) with the legend apart.
+ */
+export function sdpPlanHtml({ project, sheets, asOf, banner, landscape }) {
+  const multi = sheets.length > 1;
+  const span = multi ? sheets.length + 2 : 2;
+  const site = s => esc(s || 'Main site');
+  const counts = of => (multi ? sheets.map(x => `<td class='n'>${of(x.summary)}</td>`).join('') : '') + `<td class='n'>${sheets.reduce((t, x) => t + of(x.summary), 0)}</td>`;
+  const legend = `<table class='lg'><tr><th class='sec' colspan='${span}'>LEGEND</th></tr><tr><th class='sub'>Progress</th>${multi ? sheets.map(x => `<th class='sub'>${site(x.site)}</th>`).join('') : ''}<th class='sub'>${multi ? 'Total' : 'Units'}</th></tr>
+    ${L.LOT_BANDS.map((band, i) => `<tr><td><i class='sw' style='background:${L.LOT_PRINT_HEX[i]}'></i>${esc(band)}</td>${counts(s => s.bands[i])}</tr>`).join('')}
+    <tr class='tot'><td>Total units</td>${counts(s => s.saleable)}</tr>
+    <tr><th class='sub' colspan='${span}'>Road lot</th></tr>
+    ${L.ROAD_STATES.map((state, i) => `<tr><td colspan='${span}'><i class='sw' style='background:${L.LOT_PRINT_HEX[[0, 3, 5][i]]}'></i>${esc(state)}</td></tr>`).join('')}</table>`;
+  // Height left for plans under the banner and title: 244mm portrait, 157mm landscape; a site name takes 6mm.
+  const room = landscape ? 157 : 244;
+  const maxHeight = !multi ? room : landscape ? room - 6 : Math.trunc((room - 12 * 6 - sheets.length * 9) / sheets.length);
+  const style = multi || landscape ? ` style='max-height:${maxHeight}mm'` : '';
+  const plan = !multi ? `<div class='plan'><img src='${esc(sheets[0].image)}' alt='Subdivision plan'${style}>${legend}</div>`
+    : `<div class='plan multi${landscape ? ' row' : ''}'>${sheets.map(x => `<figure><figcaption>${site(x.site)}</figcaption><img src='${esc(x.image)}' alt='${site(x.site)} plan'${style}></figure>`).join('')}${legend}</div>`;
+  return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}<h1>STATUS OF CONSTRUCTION</h1>
+    <div class='period'>${esc([project.name, project.location].filter(x => (x || '').trim()).join(', '))} &#183; as of ${esc(longDate(asOf))}</div>${plan}`;
+}

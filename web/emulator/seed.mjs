@@ -142,17 +142,37 @@ const BUCKET = `http://127.0.0.1:9199/v0/b/${PROJECT}.appspot.com/o`;
 const { readFile } = await import('node:fs/promises');
 const photoBytes = await readFile(new URL('../signin-bg.webp', import.meta.url)); // any image the browser can draw
 const pdfBytes = Buffer.from('%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 300 144]/Parent 2 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
-async function upload(id, ext) {
+// A small drawn subdivision plan (A4 landscape): each lot a rectangle at the spot `lotBox` gives, the road a strip.
+// Points are 0..1 from the top-left, as polygonNormalizedJson keeps them.
+const lotBox = i => { const x = 0.1 + (i >> 2) * 0.2, y = 0.12 + (i % 4) * 0.16; return [[x, y], [x + 0.16, y], [x + 0.16, y + 0.14], [x, y + 0.14]]; };
+const ROAD = [[0.1, 0.78], [0.86, 0.78], [0.86, 0.86], [0.1, 0.86]];
+function planPdf(count) {
+  const W = 842, H = 595, at = ([x, y]) => `${(x * W).toFixed(1)} ${((1 - y) * H).toFixed(1)}`;
+  const shape = pts => `${at(pts[0])} m ${pts.slice(1).map(q => `${at(q)} l`).join(' ')} h S`;
+  const ops = ['0.8 w', ...Array.from({ length: count }, (_, i) => shape(lotBox(i))), shape(ROAD),
+    'BT /F1 14 Tf 84 560 Td (SUBDIVISION PLAN - SAMPLE) Tj ET', ...Array.from({ length: Math.ceil(count / 4) }, (_, b) => `BT /F1 10 Tf ${at([0.1 + b * 0.2, 0.1])} Td (BLOCK ${b + 1}) Tj ET`)];
+  const stream = ops.join('\n');
+  const objs = ['<</Type/Catalog/Pages 2 0 R>>', '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    `<</Type/Page/MediaBox[0 0 ${W} ${H}]/Parent 2 0 R/Resources<</Font<</F1 5 0 R>>>>/Contents 4 0 R>>`,
+    `<</Length ${stream.length}>>stream\n${stream}\nendstream`, '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>'];
+  let out = '%PDF-1.4\n';
+  const offsets = objs.map((o, i) => { const at0 = out.length; out += `${i + 1} 0 obj${o}endobj\n`; return at0; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map(o => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+  return Buffer.from(`${out}trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF\n`, 'latin1');
+}
+async function upload(id, ext, bytes) {
   const name = `attachments/${A}/${id}.${ext}`;
   const res = await fetch(`${BUCKET}?name=${encodeURIComponent(name)}`, {
-    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': ext === 'pdf' ? 'application/pdf' : 'image/jpeg' }, body: ext === 'pdf' ? pdfBytes : photoBytes,
+    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': ext === 'pdf' ? 'application/pdf' : 'image/jpeg' }, body: bytes || (ext === 'pdf' ? pdfBytes : photoBytes),
   });
   if (!res.ok) throw new Error(`upload ${name}: ${res.status} ${await res.text()}`);
   return `nhafile:${A}/${id}.${ext}`;
 }
 const fid = n => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const [photo1, photo2, photo3, dvScan, letterScan, replyScan, requestScan, orderScan] = await Promise.all([
+const [photo1, photo2, photo3, dvScan, letterScan, replyScan, requestScan, orderScan, planScan, phase2Scan] = await Promise.all([
   upload(fid(1), 'jpg'), upload(fid(2), 'jpg'), upload(fid(3), 'jpg'), upload(fid(4), 'pdf'), upload(fid(5), 'jpg'), upload(fid(6), 'pdf'), upload(fid(7), 'pdf'), upload(fid(8), 'jpg'),
+  upload(fid(9), 'pdf', planPdf(16)), upload(fid(10), 'pdf', planPdf(4)),
 ]);
 const hours = pattern => Array.from({ length: 24 }, (_, h) => pattern(h)).join(',');
 const week = (from, days) => days.map((dayOfWeek, i) => ({
@@ -201,18 +221,26 @@ await record(rid(21), 'developer_requests', A, [engineer], { requestType: 'Varia
   dateReceived: '2026-07-03', datePackaged: '2026-07-20', requestFileUrl: '' });
 // Subdivision plan: an old version and the one in use; its lots in each progress band, plus lots that are not counted.
 await record(rid(30), 'sdp_plans', A, [engineer], { planName: 'SDP rev 0', pdfFileUrl: '', version: 1, isActive: 0, uploadedDate: '2026-01-10', uploadedBy: 'x', siteName: '' });
-await record(rid(31), 'sdp_plans', A, [engineer], { planName: 'SDP rev 1', pdfFileUrl: '', version: 2, isActive: 1, uploadedDate: '2026-03-10', uploadedBy: 'x', siteName: '' });
+await record(rid(31), 'sdp_plans', A, [engineer], { planName: 'SDP rev 1', pdfFileUrl: planScan, version: 2, isActive: 1, uploadedDate: '2026-03-10', uploadedBy: 'x', siteName: '' });
+// A second site, so the print can put both plans on one page; its plan is turned a quarter turn, as on the phone.
+await record(rid(32), 'sdp_plans', A, [engineer], { planName: 'Phase 2 SDP', pdfFileUrl: phase2Scan, version: 1, isActive: 1, uploadedDate: '2026-05-02', uploadedBy: 'x', siteName: 'Phase 2', rotation: 90 });
+for (const [i, p] of [100, 60, 0, 30].entries()) {
+  await record(rid(140 + i), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(32), blockNumber: '1', lotNumber: String(i + 1), lotAreaSqM: 40,
+    polygonNormalizedJson: JSON.stringify(lotBox(i)), isActive: 1, lotUse: 'Saleable' });
+  if (p) await record(rid(240 + i), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(32), _ref_sdpLotId: rid(140 + i), physicalProgress: p });
+}
 const lotProgress = [0, 0, 0, 10, 20, 25, 30, 45, 60, 70, 80, 95, 100, 100, 100, 100];
 for (const [i, p] of lotProgress.entries()) {
   const lotId = rid(100 + i);
   await record(lotId, 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: String(1 + (i >> 2)), lotNumber: String(1 + (i % 4)), lotAreaSqM: 40,
-    polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable', housingUnitNumber: `HU-${i + 1}` });
+    polygonNormalizedJson: JSON.stringify(lotBox(i)), isActive: 1, lotUse: 'Saleable', housingUnitNumber: `HU-${i + 1}` });
   // Built lots are billed M1 at 76% and M2 when done, so the Lots KPIs and filters have something to show.
   if (p) await record(rid(200 + i), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: lotId, physicalProgress: p,
     constructionStatus: p >= 100 ? 'Completed' : 'Under Construction', currentActivity: p >= 100 ? '' : 'Walls and roofing', contractor: 'ABC Builders',
     billingStatus: p >= 76 ? 'BILLED' : 'NOT BILLED', billingDate: p >= 76 ? '2026-10-15' : '', billingReference: p >= 76 ? 'DV 2026-118' : '',
     m2BillingStatus: p >= 100 ? 'BILLED' : 'NOT BILLED', m2BillingDate: p >= 100 ? '2026-11-02' : '' });
 }
-await record(rid(130), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: 'RL', lotNumber: '1', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Road Lot' });
+await record(rid(130), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: 'RL', lotNumber: '1', polygonNormalizedJson: JSON.stringify(ROAD), isActive: 1, lotUse: 'Road Lot' });
+await record(rid(230), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: rid(130), physicalProgress: 50 });
 await record(rid(131), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(30), blockNumber: '9', lotNumber: '9', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });
-console.log('Seeded demo-nha: 3 accounts, 5 projects, records and 8 files.');
+console.log('Seeded demo-nha: 3 accounts, 5 projects, records and 10 files.');
