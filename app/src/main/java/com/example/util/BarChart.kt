@@ -112,7 +112,8 @@ object BarChart {
 
     /**
      * Each approved suspension (and continuance) with when it stops the clock: its Effectivity up to (not including)
-     * its resumption order's Effectivity or its End, whichever comes first; a null end means it is still suspended.
+     * its resumption order's Effectivity or the day after its End (its last suspended day), whichever comes first;
+     * a null end means it is still suspended.
      */
     private fun periods(documents: List<PendingDocument>): List<Pair<PendingDocument, Pair<LocalDate, LocalDate?>>> {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
@@ -120,9 +121,24 @@ object BarChart {
         return approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.mapNotNull { doc ->
             val begin = field(doc.remarks, "Effectivity") ?: return@mapNotNull null
             val resumed = resumptions.firstOrNull { orderNo(it.documentName) == orderNo(doc.documentName) }?.let { field(it.remarks, "Effectivity") }
-            doc to (begin to listOfNotNull(field(doc.remarks, "End"), resumed).minOrNull())
+            doc to (begin to listOfNotNull(ProjectSchedule.suspensionEnd(doc.remarks)?.plusDays(1), resumed).minOrNull())
         }
     }
+
+    /**
+     * Days a Time Extension for a suspension asks for: the days approved suspensions and continuances stopped work
+     * ([periods], the effectivity date as day 1, cut short by a resumption), less the days of time extensions
+     * already logged for a suspension (" - N Days" names, "suspension" in the reason). Still-open ones count nothing yet.
+     */
+    fun suspensionExtensionDays(documents: List<PendingDocument>): Int {
+        val suspended = periods(documents).sumOf { (_, period) -> period.second?.let { ChronoUnit.DAYS.between(period.first, it).toInt().coerceAtLeast(0) } ?: 0 }
+        val claimed = documents.filter { it.documentName.contains("Time Extension", ignoreCase = true) && isForSuspension(it.remarks) }
+            .sumOf { Regex(" - (\\d+) Days", RegexOption.IGNORE_CASE).find(it.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: 0 }
+        return (suspended - claimed).coerceAtLeast(0)
+    }
+
+    /** A time extension reason that names a suspension ("suspension", "suspensyon"). */
+    fun isForSuspension(reason: String) = reason.contains("suspen", ignoreCase = true)
 
     /** True when an approved Full suspension (or continuance) is in effect on [date]; Partial ones leave the project going. */
     fun isSuspendedOn(documents: List<PendingDocument>, date: LocalDate): Boolean = periods(documents).any { (doc, period) ->

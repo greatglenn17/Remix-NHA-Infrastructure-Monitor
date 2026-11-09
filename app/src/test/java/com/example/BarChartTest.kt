@@ -182,4 +182,25 @@ class BarChartTest {
         val done = stored.copy(actualAccomplishment = 100.0, targetAccomplishment = 100.0)
         assertEquals(done, BarChart.withSchedule(done, emptyList(), LocalDate.of(2026, 3, 1)))
     }
+
+    @Test
+    fun suspension_pausesThroughItsEnd_andGivesItsDaysToATimeExtension() {
+        val p = project(listOf(sanIldefonso)).copy(actualAccomplishment = 99.0) // ahead, so not behind once it resumes
+        // Saved before the effectivity date counted as day 1, with its End a day late.
+        val ws = approved("Work Suspension Order No. 1", "Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24")
+        assertEquals("Suspended", BarChart.withSchedule(p, listOf(ws), LocalDate.of(2026, 8, 23)).status)
+        assertEquals("On-going", BarChart.withSchedule(p, listOf(ws), LocalDate.of(2026, 8, 24)).status)
+        assertEquals(90L, BarChart.suspendedDays(listOf(ws), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)))
+        val c1 = approved("1st Continuance of Work Suspension Order No. 1", com.example.util.ProjectSchedule.suspensionRemarks(30, "2026-08-24"))
+        assertEquals("Suspended", BarChart.withSchedule(p, listOf(ws, c1), LocalDate.of(2026, 9, 22)).status)
+        assertEquals("On-going", BarChart.withSchedule(p, listOf(ws, c1), LocalDate.of(2026, 9, 23)).status)
+        assertEquals(120, BarChart.suspensionExtensionDays(listOf(ws, c1)))
+        // A pending continuance adds nothing yet; a resumption cuts the suspension short (and leaves the continuance none).
+        assertEquals(90, BarChart.suspensionExtensionDays(listOf(ws, c1.copy(status = "Pending"))))
+        assertEquals(10, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-06-05"))))
+        // Days already given by a time extension for a suspension are not asked for again.
+        val te = approved("Time Extension No. 1 - 90 Days", "Reason: Work Suspension Order No. 1")
+        assertEquals(30, BarChart.suspensionExtensionDays(listOf(ws, c1, te)))
+        assertEquals(120, BarChart.suspensionExtensionDays(listOf(ws, c1, te.copy(remarks = "Reason: Typhoon"))))
+    }
 }

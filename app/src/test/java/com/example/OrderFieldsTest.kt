@@ -30,7 +30,7 @@ class OrderFieldsTest {
     fun suspension_remarksCarryTheEndDate() {
         val f = OrderFields().apply { wsNo = "1"; wsType = "Partial"; wsDays = "10"; wsEffectivity = "2026-10-01"; wsReason = "Rain" }
         assertEquals("Partial Work Suspension Order No. 1", f.name("Work Suspension Order"))
-        assertEquals("Duration: 10 Days | Effectivity: 2026-10-01 | End: 2026-10-11 | Reason: Rain", f.remarks("Work Suspension Order"))
+        assertEquals("Duration: 10 Days | Effectivity: 2026-10-01 | End: 2026-10-10 | Reason: Rain", f.remarks("Work Suspension Order"))
     }
 
     @Test
@@ -41,7 +41,7 @@ class OrderFieldsTest {
         val docs = listOf(suspension)
         assertTrue(f.valid(OrderFields.CONTINUANCE, docs))
         assertEquals("1st Continuance of Work Suspension Order No. 1", f.name(OrderFields.CONTINUANCE, docs))
-        assertEquals("Duration: 5 Days | Effectivity: 2026-10-11 | End: 2026-10-16", f.remarks(OrderFields.CONTINUANCE))
+        assertEquals("Duration: 5 Days | Effectivity: 2026-10-11 | End: 2026-10-15", f.remarks(OrderFields.CONTINUANCE))
     }
 
     @Test

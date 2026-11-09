@@ -91,12 +91,12 @@ object ProjectSchedule {
 
     /**
      * Name of the next continuance of [suspension] of [type], e.g. "2nd Partial Continuance of Work Suspension Order No. 1",
-     * and the day it starts: the latest End of the suspension and its continuances so far.
+     * and the day it starts: the day after the latest End of the suspension and its continuances so far.
      */
     fun nextContinuance(suspension: PendingDocument, documents: List<PendingDocument>, type: String = suspensionType(suspension)): Pair<String, String> {
         val chain = continuances(suspension, documents)
-        val lastEnd = (chain + suspension).mapNotNull { endOf(it.remarks) }.maxOrNull()
-        return "${ordinal(chain.size + 1)}${if (type == "Partial") " Partial" else ""} Continuance of ${baseOf(suspension.documentName)}" to (lastEnd?.toString() ?: "")
+        val lastEnd = (chain + suspension).mapNotNull { suspensionEnd(it.remarks) }.maxOrNull()
+        return "${ordinal(chain.size + 1)}${if (type == "Partial") " Partial" else ""} Continuance of ${baseOf(suspension.documentName)}" to (lastEnd?.plusDays(1)?.toString() ?: "")
     }
 
     /**
@@ -121,14 +121,53 @@ object ProjectSchedule {
     /** The suspension ([baseOf]) that [name] continues, or null when it is not a continuance. */
     private fun continuanceOf(name: String) = CONTINUANCE.find(name.trim())?.groupValues?.get(4)?.let(::baseOf)
 
+    /** Last day of a suspension or continuance of [days] days: the effectivity date is day 1 (May 26 + 90 days ends Aug 23). */
+    fun suspensionEnd(effectivity: LocalDate, days: Int): LocalDate = effectivity.plusDays(days - 1L)
+
+    /** Days from [effectivity] through [end], both counted. */
+    fun suspensionDays(effectivity: LocalDate, end: LocalDate): Int = ChronoUnit.DAYS.between(effectivity, end).toInt() + 1
+
+    /** The End a form shows for [days] typed from [effectivity]; blank until both are set. */
+    fun endText(effectivity: String, days: String): String {
+        val n = days.trim().toIntOrNull()?.takeIf { it > 0 } ?: return ""
+        return parse(effectivity)?.let { suspensionEnd(it, n).toString() } ?: ""
+    }
+
+    /** The day count for an End picked on a form, or null when it is before [effectivity] or either date is unset. */
+    fun daysText(effectivity: String, end: String): String? {
+        val from = parse(effectivity) ?: return null
+        return parse(end)?.takeIf { !it.isBefore(from) }?.let { suspensionDays(from, it).toString() }
+    }
+
     /** Remarks in the same "Duration | Effectivity | End" form as a suspension, so the schedule and forms read it. */
     fun suspensionRemarks(days: Int, effectivity: String): String {
-        val end = parse(effectivity)?.plusDays(days.toLong())
+        val end = parse(effectivity)?.takeIf { days > 0 }?.let { suspensionEnd(it, days) }
         return "Duration: $days Days | Effectivity: $effectivity" + (end?.let { " | End: $it" } ?: "")
     }
 
-    private fun endOf(remarks: String): LocalDate? =
-        Regex("End: (\\d{4}-\\d{2}-\\d{2})").find(remarks)?.groupValues?.get(1)?.let(::parse)
+    /**
+     * [remarks] with its End worked out again from Duration and Effectivity, so orders saved before the
+     * effectivity date counted as day 1 (May 26 + 90 days saved as Aug 24) read right. Unchanged without both.
+     */
+    fun withEnd(remarks: String): String {
+        val days = DURATION.find(remarks)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 } ?: return remarks
+        val effectivity = EFFECTIVITY.find(remarks) ?: return remarks
+        val end = "End: ${suspensionEnd(parse(effectivity.groupValues[1]) ?: return remarks, days)}"
+        return if (END.containsMatchIn(remarks)) remarks.replace(END, end) else remarks.replaceRange(effectivity.range, "${effectivity.value} | $end")
+    }
+
+    /** [remarks] ending on [end] instead: its Duration follows. Unchanged when [end] is before the Effectivity. */
+    fun withEndDate(remarks: String, end: String): String {
+        val days = daysText(EFFECTIVITY.find(remarks)?.groupValues?.get(1).orEmpty(), end) ?: return remarks
+        return withEnd(if (DURATION.containsMatchIn(remarks)) remarks.replace(DURATION, "Duration: $days") else "Duration: $days Days | $remarks")
+    }
+
+    /** The last day of a suspension or continuance from its remarks ([withEnd]), or null when it has none. */
+    fun suspensionEnd(remarks: String): LocalDate? = END.find(withEnd(remarks))?.groupValues?.get(1)?.let(::parse)
+
+    private val DURATION = Regex("Duration: (\\d+)")
+    private val EFFECTIVITY = Regex("Effectivity: (\\d{4}-\\d{2}-\\d{2})")
+    private val END = Regex("End: (\\d{4}-\\d{2}-\\d{2})")
 
     private fun parse(date: String): LocalDate? = try {
         LocalDate.parse(date.trim())

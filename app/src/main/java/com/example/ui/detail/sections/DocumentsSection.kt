@@ -65,7 +65,8 @@ fun OrderStatusDialog(
     onAddContinuance: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
-    var remarks by remember(doc.id) { mutableStateOf(doc.remarks) }
+    // Older suspensions saved their End a day late; it reads (and saves) right from here.
+    var remarks by remember(doc.id) { mutableStateOf(ProjectSchedule.withEnd(doc.remarks)) }
     val canApprove = currentUserRole.hasPermission(Permission.APPROVE_ORDER)
     // Only approvers set or undo Approved; others may update an order still in progress.
     val canEdit = canApprove || (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT) && doc.status != "Approved")
@@ -87,6 +88,13 @@ fun OrderStatusDialog(
                     }
                 }
                 if (!canApprove) Text("Only an Engineer Admin can approve.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (canEdit && doc.documentName.contains("Work Suspension", ignoreCase = true) && ProjectSchedule.suspensionEnd(remarks) != null) {
+                    // Picking another End changes the Duration to match.
+                    com.example.ui.components.DateField(
+                        label = "End Date", value = ProjectSchedule.suspensionEnd(remarks).toString(),
+                        onValueChange = { remarks = ProjectSchedule.withEndDate(remarks, it) }, modifier = Modifier.testTag("order_end_date")
+                    )
+                }
                 OutlinedTextField(value = remarks, onValueChange = { remarks = it }, enabled = canEdit, label = { Text("Remarks") }, modifier = Modifier.fillMaxWidth())
                 onAddContinuance?.let { add ->
                     OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onDismiss(); add() }, modifier = Modifier.fillMaxWidth().testTag("add_continuance_button")) {
@@ -403,7 +411,7 @@ private fun OrdersCard(
 
 @Composable
 private fun OrderEntry(doc: PendingDocument, onOpen: ((PendingDocument) -> Unit)?) {
-    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", doc.remarks), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
+    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", ProjectSchedule.withEnd(doc.remarks)), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
 }
 
 /** Documents › Variation orders: every order, pending too, so a new one shows; only approved ones change the cost. */
@@ -484,6 +492,7 @@ private fun ContinuanceDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 com.example.ui.components.DateField(label = "Effectivity Date", value = effectivity, onValueChange = { effectivity = it })
+                com.example.ui.dialogs.SuspensionEndField(effectivity, days) { days = it }
                 Text(
                     "Saved as Pending. Like the suspension, it adds no days to the contract; an approved Time Extension does.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant

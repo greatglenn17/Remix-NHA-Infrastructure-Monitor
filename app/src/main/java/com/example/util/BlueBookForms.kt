@@ -76,7 +76,7 @@ data class ContractLogs(
                 suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.map { d ->
                     val days = field(d.remarks, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it calendar days – " }.orEmpty()
                     val from = BlueBookForms.date(field(d.remarks, "Effectivity"))
-                    val to = field(d.remarks, "End")
+                    val to = field(ProjectSchedule.withEnd(d.remarks), "End")
                     Order(
                         ProjectSchedule.orderLabel(d.documentName), days + (if (to.isEmpty()) from else "$from to ${BlueBookForms.date(to)}"),
                         if (ProjectSchedule.isSuspension(d)) field(d.remarks, "Reason") else "", mark(d).trim()

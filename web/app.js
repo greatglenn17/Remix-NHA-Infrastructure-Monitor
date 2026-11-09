@@ -421,7 +421,7 @@ function drawProject({ project: stored, records, error }) {
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
-    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(d.remarks)}` : ''}</span></div>`).join('')
+    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(d.documentName)}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.withEnd(d.remarks))}` : ''}</span></div>`).join('')
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
