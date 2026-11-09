@@ -356,7 +356,7 @@ object BlueBookForms {
         // Road lot colours always show, so the key is the same on every print.
         legend.append("<tr><th class='sub' colspan='$span'>Road lot</th></tr>")
         SdpSummary.ROAD_STATES.forEachIndexed { i, state ->
-            legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[i * 2]}'></i>${esc(state)}</td></tr>")
+            legend.append("<tr><td colspan='$span'><i class='sw' style='background:${bandHex[listOf(0, 3, 5)[i]]}'></i>${esc(state)}</td></tr>")
         }
         legend.append("</table>")
         // Height left for plans under the banner and title: 244mm portrait, 157mm landscape; a site name takes 6mm.

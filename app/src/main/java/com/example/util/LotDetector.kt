@@ -21,8 +21,11 @@ import kotlin.math.sqrt
  */
 object LotDetector {
 
-    /** One detected area; [polygon] is normalized to the picture (x, y in 0..1). */
-    data class Area(val block: Int, val lot: Int, val polygon: List<Pair<Float, Float>>, val isLot: Boolean)
+    /**
+     * One detected area; [polygon] is normalized to the picture (x, y in 0..1). [blockName] and
+     * [lotName] are printed on the plan (see PlanLabels), blank when the plan names no such lot.
+     */
+    data class Area(val block: Int, val lot: Int, val polygon: List<Pair<Float, Float>>, val isLot: Boolean, val blockName: String = "", val lotName: String = "")
 
     private class Region(val id: Int) {
         var area = 0

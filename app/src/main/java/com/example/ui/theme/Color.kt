@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 // - onTrack (green): on or ahead of target.
 // - Plain actions (Clear filters, Remove attachment) use the primary colour, never red.
 // Progress against target always goes through varianceColor, not a red/green split.
-// Exception: the subdivision lot map keeps its progress scale (0-25% red ... 100% green).
+// Exception: the subdivision lot map keeps its progress scale (not yet started red, 1-25% violet ... 100% green).
 data class NHAColors(
     val background: Color,
     val surface: Color,
@@ -32,7 +32,8 @@ data class NHAColors(
     val watchContainer: Color,
     val behindContainer: Color,
     val neutralContainer: Color,
-    // Lot progress bands between behind (0-25%) and onTrack (100%).
+    // Lot progress bands between behind (not yet started, 0%) and onTrack (100%).
+    val progressQuarter1: Color,
     val progressQuarter2: Color,
     val progressQuarter3: Color,
     val progressQuarter4: Color,
@@ -59,6 +60,7 @@ val DarkNHAColors = NHAColors(
     watchContainer = Color(0xFF3A2D10),
     behindContainer = Color(0xFF3F1E1E),
     neutralContainer = Color(0xFF383838),
+    progressQuarter1 = Color(0xFFA78BFA),
     progressQuarter2 = Color(0xFFFB923C),
     progressQuarter3 = Color(0xFFFACC15),
     progressQuarter4 = Color(0xFF60A5FA),
@@ -84,6 +86,7 @@ val LightNHAColors = NHAColors(
     watchContainer = Color(0xFFFEF3C7),
     behindContainer = Color(0xFFFEE2E2),
     neutralContainer = Color(0xFFF0F0F0),
+    progressQuarter1 = Color(0xFF7C3AED),
     progressQuarter2 = Color(0xFFEA580C),
     progressQuarter3 = Color(0xFFCA8A04),
     progressQuarter4 = Color(0xFF2563EB),

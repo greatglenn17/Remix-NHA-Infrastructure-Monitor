@@ -97,13 +97,14 @@ class SummaryReportPromptTest {
                 SummarySection(
                     project, emptyList(), emptyList(), null, openIssues = 0, canEditProject = false, onEditProject = {},
                     currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
-                    today = today, construction = SdpSummary.Summary(listOf(18, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0)),
+                    today = today, construction = SdpSummary.Summary(listOf(6, 12, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0)),
                     payments = listOf(billing("Land development", 20), billing("Land development", 10), billing("M1 - Housing unit", 6), billing("", 0))
                 )
             }
         }
         rule.onNodeWithText("120 units").assertExists()
         rule.onNodeWithText("100% / RFO").assertExists()
+        rule.onNodeWithText("Not yet started").assertExists()
         rule.onNodeWithText("40").assertExists()
         rule.onNodeWithText("As of Oct 27, 2026", substring = true).assertExists()
         // Billed lots add up per type, against the 120 saleable units.

@@ -326,7 +326,7 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek
 private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<ProjectPayment>, today: LocalDate, modifier: Modifier) {
     val nha = LocalNHAColors.current
     // The first % of each band picks its colour on the lot map.
-    val colors = listOf(0, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
+    val colors = listOf(0, 1, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
     SectionCard("Status of construction", Icons.Default.HomeWork, modifier.testTag("summary_construction")) {
         Text("As of ${ProjectSchedule.displayDate(today)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).height(10.dp).clip(RoundedCornerShape(5.dp))) {
