@@ -34,17 +34,23 @@ object ProjectSchedule {
     }
 
     /**
-     * Start date plus the contract duration plus the days of approved time extensions (" - N Days" in the name).
+     * Day [days] counting [start] as day 1: a contract's completion date, a suspension's End.
+     * 100 days from Jan 1, 2026 end Apr 10, 2026; 90 days from May 26, 2026 end Aug 23, 2026.
+     */
+    fun lastDay(start: LocalDate, days: Int): LocalDate = start.plusDays(days - 1L)
+
+    /**
+     * The last day ([lastDay]) of the contract duration plus the days of approved time extensions (" - N Days" in the name).
      * Null when nothing approved adds days or the start date is unparseable.
      */
     fun revisedCompletion(dateStarted: String, contractDurationDays: Int, documents: List<PendingDocument>): String? {
         val added = addedDays(documents)
         if (added <= 0) return null
-        return parse(dateStarted)?.plusDays((contractDurationDays + added).toLong())?.toString()
+        return parse(dateStarted)?.let { lastDay(it, contractDurationDays + added) }?.toString()
     }
 
     /**
-     * Contract duration plus approved order days, else the span from the start to the stored revised date.
+     * Contract duration plus approved order days, else the days from the start through the stored revised date (both counted).
      * Null when neither applies, the dates are unparseable, the span equals the contract duration,
      * or the stored revised date is just the original completion (nothing was revised).
      */
@@ -53,7 +59,8 @@ object ProjectSchedule {
         if (completionDateRevised.trim() == completionDateOriginal.trim()) return null
         val start = parse(dateStarted) ?: return null
         val end = parse(completionDateRevised) ?: return null
-        return ChronoUnit.DAYS.between(start, end).toInt().takeIf { it > 0 && it != contractDurationDays }
+        // A stored date on or before the start is no revision (a span of 1 day or less).
+        return (ChronoUnit.DAYS.between(start, end).toInt() + 1).takeIf { it > 1 && it != contractDurationDays }
     }
 
     /**
@@ -121,16 +128,13 @@ object ProjectSchedule {
     /** The suspension ([baseOf]) that [name] continues, or null when it is not a continuance. */
     private fun continuanceOf(name: String) = CONTINUANCE.find(name.trim())?.groupValues?.get(4)?.let(::baseOf)
 
-    /** Last day of a suspension or continuance of [days] days: the effectivity date is day 1 (May 26 + 90 days ends Aug 23). */
-    fun suspensionEnd(effectivity: LocalDate, days: Int): LocalDate = effectivity.plusDays(days - 1L)
-
     /** Days from [effectivity] through [end], both counted. */
     fun suspensionDays(effectivity: LocalDate, end: LocalDate): Int = ChronoUnit.DAYS.between(effectivity, end).toInt() + 1
 
     /** The End a form shows for [days] typed from [effectivity]; blank until both are set. */
     fun endText(effectivity: String, days: String): String {
         val n = days.trim().toIntOrNull()?.takeIf { it > 0 } ?: return ""
-        return parse(effectivity)?.let { suspensionEnd(it, n).toString() } ?: ""
+        return parse(effectivity)?.let { lastDay(it, n).toString() } ?: ""
     }
 
     /** The day count for an End picked on a form, or null when it is before [effectivity] or either date is unset. */
@@ -141,7 +145,7 @@ object ProjectSchedule {
 
     /** Remarks in the same "Duration | Effectivity | End" form as a suspension, so the schedule and forms read it. */
     fun suspensionRemarks(days: Int, effectivity: String): String {
-        val end = parse(effectivity)?.takeIf { days > 0 }?.let { suspensionEnd(it, days) }
+        val end = parse(effectivity)?.takeIf { days > 0 }?.let { lastDay(it, days) }
         return "Duration: $days Days | Effectivity: $effectivity" + (end?.let { " | End: $it" } ?: "")
     }
 
@@ -152,7 +156,7 @@ object ProjectSchedule {
     fun withEnd(remarks: String): String {
         val days = DURATION.find(remarks)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 } ?: return remarks
         val effectivity = EFFECTIVITY.find(remarks) ?: return remarks
-        val end = "End: ${suspensionEnd(parse(effectivity.groupValues[1]) ?: return remarks, days)}"
+        val end = "End: ${lastDay(parse(effectivity.groupValues[1]) ?: return remarks, days)}"
         return if (END.containsMatchIn(remarks)) remarks.replace(END, end) else remarks.replaceRange(effectivity.range, "${effectivity.value} | $end")
     }
 

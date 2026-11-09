@@ -48,7 +48,11 @@ class ProjectScheduleTest {
             doc("Work Suspension Order No. 1", "Approved", "Duration: 10 Days")
         )
         // The approved suspension stops the clock but adds no days; only the time extension does.
-        assertEquals("2026-05-11", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+        // 130 days counting Jan 1 as day 1 end May 10: the original completion (Apr 10) plus 30 days.
+        assertEquals("2026-05-10", ProjectSchedule.revisedCompletion("2026-01-01", 100, docs))
+        assertEquals(java.time.LocalDate.of(2026, 4, 10), ProjectSchedule.lastDay(java.time.LocalDate.of(2026, 1, 1), 100))
+        // Across a year end: 360 days from Apr 13, 2026 end Apr 7, 2027, as the project's original completion says.
+        assertEquals(java.time.LocalDate.of(2027, 4, 7), ProjectSchedule.lastDay(java.time.LocalDate.of(2026, 4, 13), 360))
     }
 
     @Test
@@ -68,13 +72,14 @@ class ProjectScheduleTest {
 
     @Test
     fun revisedDuration_fromStoredDate() {
-        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-12-01"))
+        // Jan 5 through Nov 30, both counted.
+        assertEquals(330, ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-30"))
     }
 
     @Test
     fun revisedDuration_noneWhenSameOrBlank() {
         assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "-"))
-        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-11-01"))
+        assertNull(ProjectSchedule.revisedDurationDays("2026-01-05", 300, 0, "2026-10-31"))
         // Revised date left equal to the original: an approved suspension alone must not show a duration.
         assertNull(ProjectSchedule.revisedDurationDays("2026-04-13", 360, 0, "2027-04-07", "2027-04-07"))
     }

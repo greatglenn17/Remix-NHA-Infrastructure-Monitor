@@ -290,7 +290,7 @@ object BlueBookForms {
         repeat(maxOf(4, logs.extensions.size)) { i ->
             val t = logs.extensions.getOrNull(i)
             if (t != null) duration += t.days
-            val end = if (t != null) start?.plusDays(duration.toLong())?.format(LONG_DATE).orEmpty() else ""
+            val end = if (t != null) start?.let { ProjectSchedule.lastDay(it, duration) }?.format(LONG_DATE).orEmpty() else ""
             b.append("<tr><td class='c'>${esc(t?.no ?: "${i + 1}")}</td><td class='n'>${t?.days ?: ""}</td><td class='n'>${if (t != null) "$duration c.d." else ""}</td><td></td><td>${esc(t?.reason ?: "")}</td><td>$end</td><td>${esc(t?.status ?: "")}</td></tr>")
         }
         b.append("</table>")
