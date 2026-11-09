@@ -300,3 +300,25 @@ test('weather: the 7 days of a report, the logged months and month lengths read 
   assert.doesNotMatch(P.weatherClock(null), /font-weight='bold'/);
   assert.match(P.weatherClock({ date: '2026-11-05', hourlyConditionsCsv: '' }), />5<\/text><\/svg>/);
 });
+
+test('audit log: who sees it, the search and filter chips, and the badges read like the phone', () => {
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER', 'SUPER_VIEWER', undefined].map(role => L.canViewAuditLogs({ role })),
+    [true, true, true, false, false, false]);
+  const logs = [
+    { actionType: 'Weekly Report Creation', user: 'Engr. Cruz', device: 'samsung SM-A155F', details: 'Week 3' },
+    { actionType: 'Project Edit', user: 'Admin', oldValue: '41.25%', newValue: '45%' },
+    { actionType: 'Database Backup', user: 'Admin' },
+    { actionType: 'User Login', user: 'Engr. Cruz' },
+  ];
+  const ids = (q, f) => logs.filter(l => L.auditMatches(l, q, f)).map(l => logs.indexOf(l));
+  assert.deepEqual(ids('', 'All'), [0, 1, 2, 3]);
+  assert.deepEqual(ids('', 'Report'), [0]);
+  assert.deepEqual(ids('', 'Project'), [1]);
+  assert.deepEqual(ids('', 'User'), [3]);
+  assert.deepEqual(ids('', 'Backup/Restore/Migration'), [2]);
+  assert.deepEqual(ids('SM-A155', 'All'), [0]);
+  assert.deepEqual(ids('45%', 'All'), [1]);
+  assert.deepEqual(ids('cruz', 'Report'), [0]);
+  assert.deepEqual(logs.map(l => L.auditBadge(l.actionType)), [['ok', 'add_circle'], ['link', 'edit'], ['watch', 'cloud_upload'], ['neutral', 'login']]);
+  assert.deepEqual(L.auditBadge('Something else'), ['link', 'info']);
+});

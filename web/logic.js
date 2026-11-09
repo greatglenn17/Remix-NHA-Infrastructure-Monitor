@@ -671,3 +671,30 @@ export const weatherMonths = logs => [...new Set(logs.map(w => (w.date || '').tr
 
 /** WeatherChartTab.daysInMonth for "yyyy-MM". */
 export const daysInMonth = month => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
+
+/** UserRole.hasPermission(VIEW_AUDIT_LOGS): every role except the two viewer roles. */
+export const canViewAuditLogs = claims => ['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].includes(claims.role);
+
+/** AuditLogTab's filter chips. */
+export const AUDIT_FILTERS = ['All', 'Project', 'Report', 'Issue', 'Payment', 'Document', 'User', 'Sync', 'Backup/Restore/Migration'];
+
+/** AuditLogTab.filteredLogs: the query looks in the action, user, details, device and both values. */
+export function auditMatches(log, query, filter) {
+  const has = (text, word) => (text || '').toLowerCase().includes(word.toLowerCase());
+  const q = (query || '').trim();
+  if (q && ![log.actionType, log.user, log.details, log.device, log.oldValue, log.newValue].some(t => has(t, q))) return false;
+  const a = log.actionType;
+  if (filter === 'User') return ['User', 'Login', 'Logout'].some(w => has(a, w));
+  if (filter === 'Backup/Restore/Migration') return ['Backup', 'Restore', 'Migration'].some(w => has(a, w));
+  return !filter || filter === 'All' || has(a, filter);
+}
+
+/** AuditLogCard's badge: [colour level, Material Symbol] by action type, first match wins. */
+export function auditBadge(actionType) {
+  const a = (actionType || '').toLowerCase();
+  return [
+    ['creation', 'ok', 'add_circle'], ['edit', 'link', 'edit'], ['update', 'link', 'edit'], ['deletion', 'neutral', 'delete'],
+    ['login', 'neutral', 'login'], ['logout', 'neutral', 'logout'], ['sync', 'link', 'sync'], ['backup', 'watch', 'cloud_upload'],
+    ['restore', 'ok', 'cloud_download'], ['migration', 'neutral', 'storage'], ['upload', 'link', 'upload_file'], ['document', 'link', 'upload_file'],
+  ].find(([w]) => a.includes(w))?.slice(1) || ['link', 'info'];
+}

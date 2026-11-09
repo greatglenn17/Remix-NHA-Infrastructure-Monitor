@@ -93,6 +93,12 @@ await record(rid(301), 'project_issues', A, [engineer], {
   date: '2026-09-15', description: 'Water service connection', actionTaken: 'Coordinated with the water district.', remarks: '', loggedBy: 'Engr. Sample',
   timestamp: now - 1, status: 'Resolved', isCritical: 0, targetDate: '2026-10-01', actionBy: 'Implementing Office',
 });
+await record(rid(310), 'audit_logs', A, [engineer], { timestamp: now - 3600000, user: 'Engr. Sample', device: 'samsung SM-A155F',
+  actionType: 'Weekly Report Creation', details: 'Added the report for Oct 31, 2026 - Nov 6, 2026', oldValue: '', newValue: '' });
+await record(rid(311), 'audit_logs', A, [engineer], { timestamp: now - 1800000, user: 'Engr. Sample', device: 'samsung SM-A155F',
+  actionType: 'Project Edit', details: 'Actual accomplishment', oldValue: '40.10%', newValue: '41.25%' });
+await record(rid(312), 'audit_logs', A, [engineer], { timestamp: now - 600000, user: 'Engr. Sample', device: '',
+  actionType: 'Issue Deletion', details: 'Removed a duplicate issue', oldValue: 'Right-of-way issue at Block 3', newValue: '' });
 await record(rid(4), 'pending_documents', A, [engineer], {
   documentName: 'Variation Order No. 1 - PHP 1,500,000.00', status: 'Approved', remarks: '', isCoreChecklist: 0, fileUrl: '',
 });
