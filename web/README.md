@@ -17,7 +17,8 @@ version keep working.
     photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
     its search and filters, and each block's lots as squares in the band colours (tap one for
     its status, billing and photos). The lots are not drawn over the plan PDF; the PDF opens
-    as a file.
+    as a file. **Issues** lists the logged site issues newest first, with the phone's search and
+    its All / Critical / Pending / Overdue / Resolved chips.
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
     the contractor, developer requests and related files, each with its scan.
@@ -92,4 +93,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing of any kind, the Lots, Weather and Issues screens, and the audit log.
+Editing of any kind, the Weather screen, the Status of Construction print, and the audit log.

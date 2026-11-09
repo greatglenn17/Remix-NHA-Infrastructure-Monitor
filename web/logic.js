@@ -635,3 +635,27 @@ export const billingStatus = (payments, total) => HOUSING_BILLING_TYPES.map(type
 
 /** billingUnitName. */
 export const billingUnitName = type => (/^land/i.test(type || '') ? 'lot' : 'housing unit');
+
+/** ProjectIssue.isOverdue: still Pending and the target date (yyyy-MM-dd) is before `today`. */
+export function isOverdueIssue(i, today) {
+  const t = (i.targetDate || '').trim();
+  return /pending/i.test(i.status || '') && /^\d{4}-\d{2}-\d{2}$/.test(t) && t < today;
+}
+
+/** ProjectIssue.isCritical (sent as 1/0). */
+export const isCriticalIssue = i => on(i.isCritical);
+
+/** IssuesTab's filter chips. */
+export const ISSUE_FILTERS = ['All', 'Critical', 'Pending', 'Overdue', 'Resolved'];
+
+/** IssuesTab.filteredIssues: the query looks in the description, action taken, remarks and logger. */
+export function issueMatches(i, query, filter, today) {
+  const q = (query || '').trim().toLowerCase();
+  if (q && ![i.description, i.actionTaken, i.remarks, i.loggedBy].some(t => (t || '').toLowerCase().includes(q))) return false;
+  const status = i.status || '';
+  if (filter === 'Critical') return isCriticalIssue(i);
+  if (filter === 'Overdue') return isOverdueIssue(i, today);
+  if (filter === 'Resolved') return /resolved|closed/i.test(status);
+  if (filter === 'Pending') return /pending|open/i.test(status);
+  return true;
+}

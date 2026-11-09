@@ -271,3 +271,21 @@ test('lots: sites, labels, KPIs, filters, colours and blocks read like the phone
   assert.deepEqual(L.lotBlocks(lots).map(b => [b.name, b.lots.map(l => l.lotNumber)]),
     [['Block 2', ['9', '10']], ['Block 10', ['2']], ['Block OS', ['1']], ['Road Lot', ['1']], ['Unassigned lots', ['']]]);
 });
+
+test('issues: overdue and the search and filter chips read like the phone', () => {
+  const today = '2026-11-09';
+  const a = { description: 'Right-of-way at Block 3', status: 'Pending', isCritical: 1, targetDate: '2026-11-01', loggedBy: 'Engr. Cruz' };
+  const b = { description: 'Late delivery', actionTaken: 'Wrote the supplier', status: 'Resolved', isCritical: 0, targetDate: '2026-10-01' };
+  const c = { description: 'Drainage', remarks: 'Await rain', status: 'Open', isCritical: 0, targetDate: '2026-12-01' };
+  assert.deepEqual([a, b, c].map(i => L.isOverdueIssue(i, today)), [true, false, false]);
+  assert.equal(L.isOverdueIssue({ ...a, targetDate: 'Nov 1' }, today), false); // not a date
+  const ids = (q, f) => [a, b, c].filter(i => L.issueMatches(i, q, f, today)).map(i => i.description[0]);
+  assert.deepEqual(ids('', 'All'), ['R', 'L', 'D']);
+  assert.deepEqual(ids('', 'Critical'), ['R']);
+  assert.deepEqual(ids('', 'Pending'), ['R', 'D']);
+  assert.deepEqual(ids('', 'Overdue'), ['R']);
+  assert.deepEqual(ids('', 'Resolved'), ['L']);
+  assert.deepEqual(ids('SUPPLIER', 'All'), ['L']);
+  assert.deepEqual(ids('cruz', 'All'), ['R']);
+  assert.deepEqual(ids('rain', 'Pending'), ['D']);
+});
