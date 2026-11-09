@@ -308,3 +308,250 @@ export function storagePathOf(ref) {
   if (!m) return null;
   return m[1] ? `attachments/${m[1]}/${m[2]}` : `attachments/${m[2]}`;
 }
+
+/* ---------- Progress: weekly and monthly reports (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
+
+const jsonArray = text => { try { const a = JSON.parse(text || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+// org.json optString / optInt: the fallback when the key is missing or the value can't be read.
+const str = (v, fallback = '') => (v == null ? fallback : String(v));
+const int = (v, fallback) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : fallback);
+
+/** parseManpowerList. */
+export const manpowerOf = json => jsonArray(json).map(o => ({ designation: str(o?.designation, 'Personnel'), count: int(o?.count, 1), remarks: str(o?.remarks) }));
+/** parseEquipmentList: an older row kept its status in remarks. */
+export const equipmentOf = json => jsonArray(json).map(o => ({
+  description: str(o?.description, 'Equipment'), count: int(o?.count, 1), status: str(o?.status, str(o?.remarks, 'Operational')), remarks: str(o?.remarks),
+}));
+/** parseIssuesList. */
+export const issuesOf = json => jsonArray(json).map(o => ({ description: str(o?.description), actionTaken: str(o?.actionTaken), remarks: str(o?.remarks) }));
+/** parseActivitiesList: older rows say dayOfWeek and activity. */
+export const activitiesOf = json => jsonArray(json).map(o => ({
+  day: str(o?.day, str(o?.dayOfWeek)), description: str(o?.description, str(o?.activity)), remarks: str(o?.remarks),
+}));
+/** parseAccomplishmentItemsList: stops at the first row without a description, target or actual, keeping the rows before it. */
+export function accomplishmentOf(json) {
+  const out = [];
+  for (const o of jsonArray(json)) {
+    const t = Number(o?.targetPct), a = Number(o?.actualPct);
+    if (typeof o?.itemDescription !== 'string' || o.targetPct == null || o.actualPct == null || !Number.isFinite(t) || !Number.isFinite(a)) break;
+    out.push({ itemDescription: o.itemDescription, weightPct: Number(o.weightPct) || 0, targetPct: t, actualPct: a, variancePct: a - t });
+  }
+  return out;
+}
+
+/** Attachments.parseList: a weekly report's photo list, which older versions saved as an array, an array inside a string, or one uri. */
+export function attachmentList(json) {
+  const out = [];
+  const walk = v => {
+    const t = String(v ?? '').trim();
+    if (!t) return;
+    if (!t.startsWith('[')) { out.push(t); return; }
+    let a;
+    try { a = JSON.parse(t); } catch { return; }
+    if (Array.isArray(a)) a.forEach(x => walk(typeof x === 'string' ? x : JSON.stringify(x)));
+  };
+  walk(json);
+  return out;
+}
+
+/** PhotoDetails.parse: photo ref -> {title, takenAt}. */
+export function photoDetails(json) {
+  let o;
+  try { o = JSON.parse(json || '{}'); } catch { return {}; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
+  return Object.fromEntries(Object.entries(o).map(([ref, d]) => [ref, { title: str(d?.title), takenAt: str(d?.takenAt) }]));
+}
+
+export const isPdf = ref => /\.pdf$/i.test(ref || '');
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "Oct 24, 2026" or "October 24, 2026" as UTC ms; null otherwise. */
+function longDay(text) {
+  const m = /^([A-Za-z]+)\.? (\d{1,2}), (\d{4})$/.exec((text || '').trim());
+  if (!m) return null;
+  const word = m[1].toLowerCase();
+  const month = MONTHS.findIndex(x => x.toLowerCase() === word || x.slice(0, 3).toLowerCase() === word);
+  return month < 0 ? null : Date.UTC(+m[3], month, +m[2]);
+}
+
+/** BlueBookForms.weekStart: first day (UTC ms) of "Oct 24, 2026 - Oct 30, 2026" or the older "Week 30: July 20 - July 26, 2026". */
+export function weekStart(label) {
+  const parts = (label || '').replace(/^Week \d+: /, '').split(' - ').map(x => x.trim());
+  if (parts.length !== 2) return null;
+  const end = longDay(parts[1]);
+  if (end == null) return null;
+  return longDay(parts[0]) ?? longDay(`${parts[0]}, ${new Date(end).getUTCFullYear()}`);
+}
+
+/** WeekRange.byWeek: by first day (labels that don't read first), then as entered. */
+export const byWeek = (a, b) => (weekStart(a.reportingWeek) ?? -Infinity) - (weekStart(b.reportingWeek) ?? -Infinity)
+  || (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0);
+
+/** WeeklyReportsTab.previousReport: the report with the most days elapsed before this one's. */
+export const previousReport = (reports, report) => reports
+  .filter(r => (r.daysElapsed ?? 0) < (report.daysElapsed ?? 0))
+  .reduce((best, r) => (!best || r.daysElapsed > best.daysElapsed ? r : best), null);
+
+/**
+ * MonthlyReportsTab.availableMonths: saved months, then the month each weekly report's week names (the first of
+ * January..December it mentions, in the first year it names), else this month. `today` is yyyy-MM-dd.
+ */
+export function reportMonths(weekly, monthly, today) {
+  const [y, m] = today.split('-');
+  const fromWeekly = weekly.map(r => {
+    const clean = (r.reportingWeek || '').replace(/Week \d+: /, '').toLowerCase();
+    const year = (/\b(20\d{2})\b/.exec(clean) || [])[1] || y;
+    const i = MONTHS.findIndex(x => clean.includes(x.toLowerCase()) || clean.includes(x.slice(0, 3).toLowerCase()));
+    return i < 0 ? null : `${MONTHS[i]} ${year}`;
+  });
+  const all = [...new Set([...monthly.map(r => r.reportingMonth), ...fromWeekly].filter(x => x && x.trim()))];
+  return all.length ? all : [`${MONTHS[+m - 1]} ${y}`];
+}
+
+/** MonthlyReportsTab.monthWeeklyReports: weeks naming the month (or its first 3 letters) and its year, in week order. */
+export function monthReports(weekly, month) {
+  const parts = month.split(' ');
+  const name = (parts[0] || '').toLowerCase(), year = (parts[parts.length - 1] || '').toLowerCase();
+  return weekly.filter(r => {
+    const w = (r.reportingWeek || '').toLowerCase();
+    return (w.includes(name) || w.includes(name.slice(0, 3))) && w.includes(year);
+  }).sort(byWeek);
+}
+
+/* ---------- Key dates: the revised completion from approved orders (ProjectSchedule) ---------- */
+
+/** ProjectSchedule.lastDay: day `days` counting `start` (yyyy-MM-dd) as day 1. */
+export function lastDay(start, days) {
+  const t = isoDay(start);
+  return t == null ? null : new Date(t + (days - 1) * DAY).toISOString().slice(0, 10);
+}
+
+/** ProjectSchedule.addedDays: days added by approved Time Extensions (" - N Days" in the name). */
+export const addedDays = docs => docs
+  .filter(d => /^approved$/i.test(d.status || '') && /time extension/i.test(d.documentName || ''))
+  .reduce((t, d) => t + (Number((/.* - (\d+) Days/i.exec(d.documentName) || [])[1]) || 0), 0);
+
+/** ProjectSchedule.revisedCompletion: the last day of the contract duration plus approved extension days; null when none adds days. */
+export function revisedCompletion(project, docs) {
+  const added = addedDays(docs);
+  return added > 0 ? lastDay(project.dateStarted, (Number(project.contractDurationDays) || 0) + added) : null;
+}
+
+/**
+ * ProjectSchedule.revisedDurationDays: contract days plus approved order days, else the days from the start through the stored
+ * revised date (both counted); null when neither applies or nothing was revised.
+ */
+export function revisedDurationDays(project, added) {
+  const duration = Number(project.contractDurationDays) || 0;
+  if (added > 0) return duration + added;
+  if ((project.completionDateRevised || '').trim() === (project.completionDateOriginal || '').trim()) return null;
+  const start = isoDay(project.dateStarted), end = isoDay(project.completionDateRevised);
+  if (start == null || end == null) return null;
+  const days = Math.round((end - start) / DAY) + 1;
+  return days > 1 && days !== duration ? days : null;
+}
+
+/* ---------- Orders and letters (ProjectSchedule, ContractorLetters, DocumentsSection) ---------- */
+
+const ORDER = /^(Partial )?Work (Suspension|Resumption) (?:Order )?No\. ?(\S+?)(?: \((Full|Partial)\))?$/i;
+const CONTINUANCE = /^(?:Continuance No\. ?(\d+)(?: \((Full|Partial)\))?|\d+\w\w( Partial)? Continuance) of (.+)$/i;
+const partialOrder = m => !!m[1] || /^partial$/i.test(m[4] || '');
+const baseOf = name => { const m = ORDER.exec(name.trim()); return m ? `Work Suspension Order No. ${m[3]}` : name.trim(); };
+const continuanceOf = name => { const m = CONTINUANCE.exec((name || '').trim()); return m ? baseOf(m[4]) : null; };
+
+/** ProjectSchedule.ordinal: 1st, 2nd, 3rd, 11th, 21st. */
+export const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th')}`;
+
+/** ProjectSchedule.orderLabel: older names read like new ones ("Work Suspension No. 1 (Partial)" -> "Partial Work Suspension Order No. 1"). */
+export function orderLabel(name) {
+  const n = (name || '').trim();
+  const c = CONTINUANCE.exec(n);
+  if (c) {
+    const [, no, type, , base] = c;
+    if (!no) return n;
+    const b = ORDER.exec(base);
+    const partial = type ? /^partial$/i.test(type) : !!(b && partialOrder(b));
+    return `${ordinal(+no)}${partial ? ' Partial' : ''} Continuance of ${baseOf(base)}`;
+  }
+  const m = ORDER.exec(n);
+  return m ? `${partialOrder(m) ? 'Partial ' : ''}Work ${m[2].charAt(0).toUpperCase()}${m[2].slice(1)} Order No. ${m[3].trim()}` : n;
+}
+
+/** ProjectSchedule.isSuspension. */
+export const isSuspension = doc => /^suspension$/i.test((ORDER.exec((doc.documentName || '').trim()) || [])[2] || '');
+/** ProjectSchedule.continuances: a suspension's continuances, in the order given. */
+export const continuances = (suspension, docs) => docs.filter(d => continuanceOf(d.documentName) === baseOf(suspension.documentName || ''));
+
+/** A "Key: value" field of an order's or letter's remarks. */
+export const remarkField = (remarks, key) => ((new RegExp(`${key}: ([^|]*)`).exec(remarks || '') || [])[1] || '').trim();
+
+/** ContractorLetters.merged: letter records plus the older "Letter to Contractor No. N" documents, newest first. */
+export function mergedLetters(letters, docs) {
+  const old = docs.filter(d => /^letter to contractor/i.test(d.documentName || '')).map(d => {
+    const reason = remarkField(d.remarks, 'Reason');
+    return {
+      dateSent: '', subject: d.documentName + (reason ? `: ${reason}` : ''), actionTaken: '', dateReplied: '', replyFileUrl: '',
+      dateReceived: remarkField(d.remarks, 'Date Received'), receivedFileUrl: d.fileUrl || '', uuid: d.uuid,
+    };
+  });
+  const key = l => l.dateSent || l.dateReceived || '';
+  return [...letters, ...old].sort((a, b) => key(b).localeCompare(key(a)));
+}
+
+/** RelatedFilesList: documents that are not orders or letters. */
+export const relatedFiles = docs => docs.filter(d =>
+  !/time extension|variation order|work suspension|work resumption/i.test(d.documentName || '') && !/^letter to contractor/i.test(d.documentName || ''));
+
+/** VariationOrdersLog: a variation order's type, status, approval date and reason. */
+export function variationLines(vo) {
+  const approved = ((/\|\s*Date Approved:\s*([^|]+)/.exec(vo.remarks || '') || [])[1] || '').trim();
+  const clean = (vo.remarks || '').replace(/^Remarks:\s*/i, '').replace(/\|\s*Date Approved:[^|]*/g, '').trim();
+  const type = /additive/i.test(vo.documentName || '') ? 'Additive' : /deductive/i.test(vo.documentName || '') ? 'Deductive' : '';
+  return [type ? `Type: ${type}` : '', `Status: ${vo.status || ''}`, `Date Approved: ${approved || '-'}`,
+    /^reason:/i.test(clean) ? clean : clean ? `Reason: ${clean}` : ''].filter(Boolean);
+}
+
+/* ---------- Lots: Status of construction (SdpSummary, SdpSites, SummarySection.ConstructionCard) ---------- */
+
+/** SdpSummary.BANDS. */
+export const LOT_BANDS = ['Not yet started', '1–25%', '26–50%', '51–75%', '76–99%', '100% / RFO'];
+/** SdpSummary.band. */
+export const lotBand = p => (p >= 100 ? 5 : p >= 76 ? 4 : p >= 51 ? 3 : p >= 26 ? 2 : p > 0 ? 1 : 0);
+
+// Room booleans travel as 1/0; a row without the column keeps its default (true).
+const on = v => v !== false && v !== 0 && v !== '0';
+
+/**
+ * Saleable lots per band over every site's plan in use (SdpSites.current: each site's active plan with the
+ * highest version, else its highest version), from a project's records. A lot without progress is at 0%.
+ */
+export function lotSummary(records) {
+  const sites = new Map();
+  for (const p of records.filter(r => r.type === 'sdp_plans')) {
+    const k = p.siteName || '';
+    if (!sites.has(k)) sites.set(k, []);
+    sites.get(k).push(p);
+  }
+  const top = list => list.reduce((best, p) => (!best || (Number(p.version) || 0) > (Number(best.version) || 0) ? p : best), null);
+  const inUse = new Set([...sites.values()].map(site => (top(site.filter(p => on(p.isActive))) || top(site)).uuid));
+  const progress = new Map(records.filter(r => r.type === 'sdp_lot_progress')
+    .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0)).map(p => [p._ref_sdpLotId, Number(p.physicalProgress) || 0]));
+  const use = l => l.lotUse || (l.blockNumber === 'OS' ? 'Open Space' : 'Saleable');
+  const saleable = records.filter(r => r.type === 'sdp_lots' && on(r.isActive) && inUse.has(r._ref_sdpPlanId) && use(r) === 'Saleable');
+  const bands = LOT_BANDS.map(() => 0);
+  for (const l of saleable) bands[lotBand(progress.get(l.uuid) ?? 0)]++;
+  return { bands, saleable: saleable.length };
+}
+
+/** HOUSING_BILLING_TYPES. */
+export const HOUSING_BILLING_TYPES = ['Land acquisition', 'Land development', 'M1 - Housing unit', 'M2 - Housing unit'];
+
+/** SummarySection.BillingStatus: lots or units billed per housing billing type, and their share of `total` saleable units. */
+export const billingStatus = (payments, total) => HOUSING_BILLING_TYPES.map(type => {
+  const units = payments.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.units) || 0), 0);
+  const label = type + (type.startsWith('M1') ? ' (80%)' : type.startsWith('M2') ? ' (20%)' : '');
+  return { label, units, share: total > 0 ? `${(units * 100 / total).toFixed(2)}%` : '-' };
+});
+
+/** billingUnitName. */
+export const billingUnitName = type => (/^land/i.test(type || '') ? 'lot' : 'housing unit');
