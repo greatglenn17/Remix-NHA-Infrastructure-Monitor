@@ -7,7 +7,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getStorage, connectStorageEmulator, ref, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
 import * as P from './print.js';
@@ -1043,21 +1043,30 @@ async function drawSdpPrint({ page, project, records }) {
         <label class="field">Page<select id="sdp-page">${opt('l', many ? 'Landscape: sites side by side' : 'Landscape', landscape)}${opt('p', many ? 'Portrait: sites one above the other' : 'Portrait', !landscape)}</select></label>
         <button class="btn" id="do-print" disabled>${icon('print', 'sm')}Drawing the plan…</button></div></div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <p class="error no-print" id="sdp-note" hidden></p>
     <div class="bb-scroll"><div class="bb full${landscape ? ' land' : ''}" id="sheet"></div></div>`;
   const sitesSel = document.getElementById('sdp-sites');
   if (sitesSel) sitesSel.onchange = () => { st.all = sitesSel.value === 'all'; if (st.all) st.landscape = true; drawProject(page); };
   document.getElementById('sdp-page').onchange = e => { st.landscape = e.target.value === 'l'; drawProject(page); };
   const sheet = document.getElementById('sheet');
   if (!chosen.length) { sheet.innerHTML = '<p>No subdivision plan uploaded yet.</p>'; return; }
-  let images;
-  try { images = await Promise.all(chosen.map(planImage)); } catch (e) {
-    if (page.printToken === token) sheet.innerHTML = `<p>The plan PDF could not be opened (${esc(e.message || e)}). Open the Lots view to check that it is uploaded.</p>`;
+  let plans;
+  try { plans = await Promise.all(chosen.map(planImage)); } catch (e) {
+    console.error('SDP print', e);
+    if (page.printToken === token) sheet.innerHTML = `<p>The plan could not be drawn (${esc(e.message || e)}).</p>`;
     return;
   }
   if (page.printToken !== token || page !== s.page) return;
+  // The form still prints when a plan PDF cannot be loaded: its lots are drawn on blank paper (the phone prints nothing then).
+  const missing = chosen.filter((x, i) => plans[i].problem);
+  if (missing.length) {
+    const note = document.getElementById('sdp-note');
+    note.hidden = false;
+    note.textContent = `The plan PDF of ${missing.map(x => x.site || 'Main site').join(' and ')} could not be loaded in this browser (${plans.find(x => x.problem).problem}), so ${missing.length > 1 ? 'their' : 'its'} lots are drawn without the plan. Try again, or another browser.`;
+  }
   sheet.innerHTML = P.sdpPlanHtml({
     project, landscape, asOf: today(), banner: 'blue-book-header.png',
-    sheets: chosen.map((x, i) => ({ site: x.site, image: images[i], summary: L.sdpSummary(x.lots) })),
+    sheets: chosen.map((x, i) => ({ site: x.site, image: plans[i].image, summary: L.sdpSummary(x.lots) })),
   });
   // Wait for load, not decode(): decode() of a big data-URI plan can stay pending in a tab that is not painting.
   await Promise.all([...sheet.querySelectorAll('img')].map(img => (img.complete ? null : new Promise(done => { img.onload = img.onerror = done; }))));
@@ -1068,24 +1077,46 @@ async function drawSdpPrint({ page, project, records }) {
   btn.onclick = () => window.print();
 }
 
+/** The plan PDF's bytes: a plain download first, then the Storage SDK's own request if the browser refuses that one. */
+async function planBytes(refText) {
+  const path = L.storagePathOf(refText);
+  if (!path) throw new Error('the PDF is not uploaded yet');
+  try {
+    const url = await photoUrl(refText);
+    if (!url) throw new Error('the PDF is not uploaded yet');
+    // no-store: a copy cached when the PDF was opened from its link may lack the CORS header the browser needs here.
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`download failed, ${res.status}`);
+    return await res.arrayBuffer();
+  } catch (e) {
+    console.error('SDP print: the plan PDF download failed; trying the Storage SDK', e);
+    // The SDK retries a refused download for up to two minutes; give up sooner and print without the plan.
+    return Promise.race([getBytes(ref(storage, path)), new Promise((_, fail) => setTimeout(() => fail(new Error(`download refused: ${e.message}`)), 15000))]);
+  }
+}
+
 let pdfjs;
 /**
  * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
- * across A4, each lot filled with its colour and outlined, turned the way the plan is turned on screen. A PNG data URI.
+ * across A4, each lot filled with its colour and outlined, turned the way the plan is turned on screen.
+ * Returns {image: PNG data URI, problem}; when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
  */
 async function planImage({ plan, lots }) {
-  const url = await photoUrl(plan.pdfFileUrl);
-  if (!url) throw new Error('the PDF is not uploaded yet');
-  // no-store: a copy cached when the PDF was opened from its link has no CORS header, and the browser would refuse it here.
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`download failed, ${res.status}`);
-  pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
-  // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
-  const doc = await pdfjs.getDocument({ data: await res.arrayBuffer(), isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+  let doc = null, problem = '';
   try {
-    const pdfPage = await doc.getPage(1);
-    const base = pdfPage.getViewport({ scale: 1 });
+    const data = await planBytes(plan.pdfFileUrl);
+    pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
+    // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
+    doc = await pdfjs.getDocument({ data, isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+  } catch (e) {
+    console.error('SDP print: the plan PDF could not be loaded', e);
+    problem = e.code || e.message || String(e);
+  }
+  try {
+    const pdfPage = doc && await doc.getPage(1);
+    // shortcut: without the PDF its page size is unknown, so the lots go on an A4 landscape page; shapes may stretch.
+    const base = pdfPage ? pdfPage.getViewport({ scale: 1 }) : { width: 842, height: 595 };
     const polys = lots.map(l => [l, L.lotPolygon(l)]);
     const f = L.parseFrame(plan.frame) || L.frameAround(polys.map(p => p[1])) || [0, 0, 1, 1];
     const fw = (f[2] - f[0]) * base.width, fh = (f[3] - f[1]) * base.height;
@@ -1095,8 +1126,10 @@ async function planImage({ plan, lots }) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, w, h);
-    const viewport = pdfPage.getViewport({ scale: sc, offsetX: -f[0] * base.width * sc, offsetY: -f[1] * base.height * sc });
-    await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
+    if (pdfPage) {
+      const viewport = pdfPage.getViewport({ scale: sc, offsetX: -f[0] * base.width * sc, offsetY: -f[1] * base.height * sc });
+      await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
+    }
     ctx.lineWidth = 2;
     for (const [l, pts] of polys) {
       if (pts.length < 3) continue;
@@ -1110,7 +1143,7 @@ async function planImage({ plan, lots }) {
       ctx.stroke();
     }
     const deg = ((Number(plan.rotation) || 0) % 360 + 360) % 360;
-    if (!deg) return canvas.toDataURL('image/png');
+    if (!deg) return { image: canvas.toDataURL('image/png'), problem };
     const rad = deg * Math.PI / 180, cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
     const out = Object.assign(document.createElement('canvas'), { width: Math.round(w * cos + h * sin), height: Math.round(w * sin + h * cos) });
     const o = out.getContext('2d');
@@ -1119,9 +1152,9 @@ async function planImage({ plan, lots }) {
     o.translate(out.width / 2, out.height / 2);
     o.rotate(rad); // clockwise, as Matrix.postRotate on the phone
     o.drawImage(canvas, -w / 2, -h / 2);
-    return out.toDataURL('image/png');
+    return { image: out.toDataURL('image/png'), problem };
   } finally {
-    doc.destroy();
+    doc?.destroy();
   }
 }
 
