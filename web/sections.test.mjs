@@ -268,8 +268,7 @@ test('lots: sites, labels, KPIs, filters, colours and blocks read like the phone
   assert.deepEqual(ids({ billing: 'NOT BILLED', band: 'Not yet started' }), ['c', 'o', 'u']);
   assert.deepEqual(ids({ completion: 'COMPLETED' }), ['a']);
   assert.deepEqual(['a', 'b', 'c', 'r', 'o'].map(id => L.lotColour(by(id))), ['lot-5', 'lot-2', 'lot-0', 'lot-3', 'lot-n']);
-  assert.deepEqual(L.lotBlocks(lots).map(b => [b.name, b.lots.map(l => l.lotNumber)]),
-    [['Block 2', ['9', '10']], ['Block 10', ['2']], ['Block OS', ['1']], ['Road Lot', ['1']], ['Unassigned lots', ['']]]);
+  assert.deepEqual([0, 30, 100].map(L.roadState), [0, 1, 2]);
 });
 
 test('issues: overdue and the search and filter chips read like the phone', () => {

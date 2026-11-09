@@ -15,9 +15,9 @@ version keep working.
     `SdpSummary` bands) for housing projects.
   - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
     photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
-    its search and filters, and each block's lots as squares in the band colours (tap one for
-    its status, billing and photos). Above them the plan PDF is drawn with each lot coloured over it, as on the
-    phone; click a lot there for the same details. The filters dim the lots that do not match. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
+    its search and filters, and the plan PDF with each lot coloured over it, as on the phone (drag to move, wheel
+    or pinch to zoom, the zoom bar, double-click for 250%). Click a lot for its card, and "History & details" for its
+    status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
   - **Payments**: the billing list with retention, housing units and the attached files.
