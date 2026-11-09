@@ -127,7 +127,7 @@ class ProjectDetailScreenshotTest {
         ),
         // The fixture's older "Week 41: ..." labels don't cover this week, so the prompt shows.
         weeklyReports = reports, onAddWeeklyReport = {},
-        construction = SdpSummary.Summary(listOf(18, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0))
+        construction = SdpSummary.Summary(listOf(6, 12, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0))
     )
 
     @Composable

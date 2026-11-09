@@ -1216,14 +1216,24 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    /** Finds the lots in the plan's PDF (page 1); null when the PDF cannot be opened. */
+    /** Finds the lots in the plan's PDF (page 1), named by the block and lot printed on it; null when the PDF cannot be opened. */
     fun detectSdpLots(plan: SdpPlan, onResult: (List<com.example.util.LotDetector.Area>?) -> Unit) {
         viewModelScope.launch {
             val areas = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                 runCatching { planMask(plan)?.let { com.example.util.LotDetector.detect(it.dark, it.width, it.height) } }.getOrNull()
+                    ?.let { areas -> namedFromPlan(plan, areas) }
             }
             onResult(areas)
         }
+    }
+
+    /** [areas] with the block and lot the plan prints on each lot; unchanged when the PDF's text cannot be read. */
+    private suspend fun namedFromPlan(plan: SdpPlan, areas: List<com.example.util.LotDetector.Area>): List<com.example.util.LotDetector.Area> {
+        val file = com.example.data.files.Attachments.ensureLocal(getApplication(), plan.pdfFileUrl) ?: return areas
+        val page = runCatching { com.example.util.PlanLabels.read(getApplication(), file) }.getOrNull() ?: return areas
+        val lots = areas.filter { it.isLot }
+        val names = com.example.util.PlanLabels.name(lots.map { it.polygon }, lots.map { it.block }, page).iterator()
+        return areas.map { a -> if (a.isLot) names.next().let { (b, l) -> a.copy(blockName = b, lotName = l) } else a }
     }
 
     /** The outline of the lot around a tapped point (0..1) of the plan, for a lot detection missed. */
@@ -1320,16 +1330,20 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         doubleArrayOf(xs.min(), ys.min(), xs.max(), ys.max())
                     }.getOrNull()
                 }
+            // A name the plan gives a found lot that a kept lot already has stays off, so no name is used twice.
+            val keptNames = activeSdpLots.value.filter { it.sdpPlanId == plan.id && !it.isUnassigned && (!it.description.startsWith(DETECTED_LOT) || it.id in progress) }
+                .map { it.blockNumber to it.lotNumber }.toSet()
             val lots = areas.filter { a ->
                 val cx = a.polygon.map { it.first }.average(); val cy = a.polygon.map { it.second }.average()
                 kept.none { b -> cx in b[0]..b[2] && cy in b[1]..b[3] }
             }.map { a ->
+                val named = a.lotName.isNotBlank() && (a.blockName to a.lotName) !in keptNames
                 SdpLot(
                     projectId = plan.projectId,
                     sdpPlanId = plan.id,
-                    // No block or lot: the detector's numbers rarely match the plan, so the engineer names each lot.
-                    blockNumber = "",
-                    lotNumber = "",
+                    // The block and lot printed on the plan, else none and the engineer names the lot.
+                    blockNumber = if (named) a.blockName else "",
+                    lotNumber = if (named) a.lotName else "",
                     lotUse = if (a.isLot) "" else "Open Space",
                     lotAreaSqM = areaOn(plan, a.polygon.map { (x, y) -> x.toDouble() to y.toDouble() }) ?: 0.0,
                     polygonNormalizedJson = org.json.JSONArray(a.polygon.map { (x, y) -> org.json.JSONArray(listOf(x.toDouble(), y.toDouble())) }).toString(),
@@ -1529,7 +1543,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             )
             com.example.util.BlueBookForms.SdpSheet(plan.siteName, image, summary)
         }
-        val bandHex = listOf(0, 26, 51, 76, 100).map { p ->
+        val bandHex = listOf(0, 1, 26, 51, 76, 100).map { p ->
             "#%06X".format(com.example.ui.detail.tabs.lotProgressFill(p, com.example.ui.theme.LightNHAColors).toArgb() and 0xFFFFFF)
         }
         return com.example.util.BlueBookForms.sdpPlan(project, sheets, bandHex, LocalDate.now(), blueBookBanner, landscape)

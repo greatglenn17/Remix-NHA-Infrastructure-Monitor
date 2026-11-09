@@ -117,7 +117,7 @@ enum class SdpInteractionMode {
     EDITING_ROAD
 }
 /** Same bands as [lotProgressFill]. */
-val LOT_PROGRESS_FILTERS = listOf("ALL", "0-25%", "26-50%", "51-75%", "76-99%", "100%")
+val LOT_PROGRESS_FILTERS = listOf("ALL") + com.example.util.SdpSummary.BANDS
 
 fun isLotMatchingFilter(
     lot: SdpLot,
@@ -154,29 +154,15 @@ fun isLotMatchingFilter(
     }
 
     if (progressFilter != "ALL") {
-        val progVal = progress?.physicalProgress ?: 0
-        val matchesProg = when (progressFilter) {
-            "0-25%" -> progVal <= 25
-            "26-50%" -> progVal in 26..50
-            "51-75%" -> progVal in 51..75
-            "76-99%" -> progVal in 76..99
-            "100%" -> progVal >= 100
-            else -> true
-        }
-        if (!matchesProg) return false
+        if (com.example.util.SdpSummary.BANDS.indexOf(progressFilter) != com.example.util.SdpSummary.band(progress?.physicalProgress ?: 0)) return false
     }
 
     return true
 }
 
-/** 0-25% red, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
-fun lotProgressFill(progress: Int, nha: NHAColors): Color = when {
-    progress >= 100 -> nha.onTrack
-    progress >= 76 -> nha.progressQuarter4
-    progress >= 51 -> nha.progressQuarter3
-    progress >= 26 -> nha.progressQuarter2
-    else -> nha.behind
-}
+/** Not yet started (0%) red, 1-25% violet, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
+fun lotProgressFill(progress: Int, nha: NHAColors): Color =
+    listOf(nha.behind, nha.progressQuarter1, nha.progressQuarter2, nha.progressQuarter3, nha.progressQuarter4, nha.onTrack)[com.example.util.SdpSummary.band(progress)]
 
 /** Road lots: red not completed, yellow concreting, green completed. */
 fun roadLotFill(progress: Int, nha: NHAColors): Color = listOf(nha.behind, nha.progressQuarter3, nha.onTrack)[com.example.util.SdpSummary.roadState(progress)]
@@ -2487,6 +2473,7 @@ fun SubdivisionPlanTab(
         val lotCount = areas.count { it.isLot }
         val blockCount = areas.filter { it.isLot }.map { it.block }.distinct().size
         val largeCount = areas.count { !it.isLot }
+        val namedCount = areas.count { it.isLot && it.lotName.isNotBlank() }
         val updatedDetected = activeLots.count { it.description.startsWith("Auto-detected") && lotProgressMap.containsKey(it.id) }
         AlertDialog(
             onDismissRequest = { detectedAreas = null },
@@ -2497,7 +2484,11 @@ fun SubdivisionPlanTab(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Found $lotCount lots in $blockCount blocks" + if (largeCount > 0) ", and $largeCount larger areas (open spaces or facilities)." else ".")
                     Text(
-                        "The lots come in without block and lot numbers. Tap a lot and set its Block and Lot in Update Progress, or use Number lots to number a block at once. " +
+                        when (namedCount) {
+                            lotCount -> "Each lot takes the block and lot printed on the plan. Check them, and use Number lots to fix a block. "
+                            0 -> "The plan's block and lot numbers could not be read, so the lots come in without them. Tap a lot and set its Block and Lot in Update Progress, or use Number lots to number a block at once. "
+                            else -> "$namedCount lots take the block and lot printed on the plan; the other ${lotCount - namedCount} come in without them. Tap a lot and set its Block and Lot in Update Progress, or use Number lots to number a block at once. "
+                        } +
                             "Earlier found lots with no progress yet are replaced; renumbered lots stay" +
                             if (updatedDetected > 0) "; the $updatedDetected with progress stay." else ".",
                         style = MaterialTheme.typography.bodySmall,
@@ -3488,7 +3479,8 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold))
 
-                LegendRow(color = getLotProgressFillColor(0), label = "0 – 25% Physical Progress")
+                LegendRow(color = getLotProgressFillColor(0), label = "Not yet started (0%)")
+                LegendRow(color = getLotProgressFillColor(1), label = "1 – 25% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(26), label = "26 – 50% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
                 LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
