@@ -122,4 +122,79 @@ await put(`projects/${E}`, {
   dateStarted: '2026-07-01', completionDateOriginal: new Date(now - 5 * 86400000).toLocaleDateString('en-CA'), completionDateRevised: '-',
   status: 'On-going', targetAccomplishment: 0, actualAccomplishment: 0, assignedUids: [engineer],
 });
-console.log('Seeded demo-nha: 3 accounts, 5 projects, 7 records.');
+
+// Progress, Payments, Documents, print and lots for project A, with files in the Storage emulator.
+const BUCKET = `http://127.0.0.1:9199/v0/b/${PROJECT}.appspot.com/o`;
+const { readFile } = await import('node:fs/promises');
+const photoBytes = await readFile(new URL('../signin-bg.webp', import.meta.url)); // any image the browser can draw
+const pdfBytes = Buffer.from('%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 300 144]/Parent 2 0 R>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
+async function upload(id, ext) {
+  const name = `attachments/${A}/${id}.${ext}`;
+  const res = await fetch(`${BUCKET}?name=${encodeURIComponent(name)}`, {
+    method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': ext === 'pdf' ? 'application/pdf' : 'image/jpeg' }, body: ext === 'pdf' ? pdfBytes : photoBytes,
+  });
+  if (!res.ok) throw new Error(`upload ${name}: ${res.status} ${await res.text()}`);
+  return `nhafile:${A}/${id}.${ext}`;
+}
+const fid = n => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const [photo1, photo2, photo3, dvScan, letterScan, replyScan, requestScan, orderScan] = await Promise.all([
+  upload(fid(1), 'jpg'), upload(fid(2), 'jpg'), upload(fid(3), 'jpg'), upload(fid(4), 'pdf'), upload(fid(5), 'jpg'), upload(fid(6), 'pdf'), upload(fid(7), 'pdf'), upload(fid(8), 'jpg'),
+]);
+const hours = pattern => Array.from({ length: 24 }, (_, h) => pattern(h)).join(',');
+const week = (from, days) => days.map((dayOfWeek, i) => ({
+  date: new Date(Date.parse(from) + i * 86400000).toISOString().slice(0, 10), dayOfWeek,
+  hourlyConditionsCsv: hours(h => (i === 3 && h >= 9 && h <= 15 ? 'RAINY' : h >= 13 && h <= 15 ? 'CLOUDY' : i === 4 && h > 17 ? 'STORMY' : 'FAIR')),
+}));
+const DAYS7 = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const weekly = (n, label, from, day, target, actual, extra) => record(rid(n), 'weekly_reports', A, [engineer], {
+  reportingWeek: label, daysElapsed: day, remainingDays: 540 - day, targetAccomplishmentPct: target, actualAccomplishmentPct: actual,
+  submittedByStaff: 'Engr. Sample', createdAtTimestamp: Date.parse(from),
+  manpowerJson: JSON.stringify([{ designation: 'Foreman', count: 1 }, { designation: 'Mason', count: 6 }, { designation: 'Laborer', count: 12 }]),
+  equipmentJson: JSON.stringify([{ description: 'Concrete mixer', count: 2, status: 'Operational' }, { description: 'Backhoe', count: 1, status: 'Idle', remarks: 'Awaiting fuel' }]),
+  activitiesJson: JSON.stringify([{ day: 'Saturday', description: 'Survey of Block 4' }, { day: 'Monday - Wednesday', description: 'Excavation for footings, Block 3', remarks: 'On schedule' },
+    { day: 'Thursday', description: 'Rebar works', remarks: 'Rain in the afternoon' }]),
+  issuesJson: JSON.stringify([{ description: 'Rain stopped concreting on Tuesday', actionTaken: 'Moved concreting to Wednesday' }]),
+  accomplishmentItemsJson: JSON.stringify([{ itemDescription: 'Land development', weightPct: 60, targetPct: target + 4, actualPct: actual + 3 }, { itemDescription: 'Housing units', weightPct: 40, targetPct: target - 6, actualPct: actual - 5 }]),
+  documentsIssuedReceivedJson: '[]', _weather: week(from, DAYS7), ...extra,
+});
+await weekly(1, 'Oct 31, 2026 - Nov 6, 2026', '2026-10-31', 301, 45, 41.25, {
+  attachedPhotoUrlsJson: JSON.stringify([photo1, photo2, photo3]),
+  photoDetailsJson: JSON.stringify({ [photo1]: { title: 'Footings, Block 3', takenAt: 'Nov 2, 2026 9:14 AM' }, [photo2]: { title: 'Rebar works' } }),
+});
+await weekly(8, 'Oct 24, 2026 - Oct 30, 2026', '2026-10-24', 294, 43, 40.1, { attachedPhotoUrlsJson: JSON.stringify([photo2]), photoDetailsJson: '{}' });
+await weekly(9, 'Week 42: October 17 - October 23, 2026', '2026-10-17', 287, 41, 39, { attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', issuesJson: '[]', _weather: [] });
+await record(rid(10), 'monthly_reports', A, [engineer], { reportingMonth: 'September 2026', scopeWeightPct: 100, scopeTargetPct: 38, scopeActualPct: 36,
+  paymentsJson: '[]', unworkableDaysCount: 2, workableDaysCount: 28, cpesIssuesJson: '[]', recommendations: '' });
+await record(rid(11), 'project_payments', A, [engineer], {
+  name: '2nd partial billing', dvNo: '2026-10-0141', date: '2026-10-15', periodCovered: 'Jul - Sep 2026', grossAmount: 4000000, percentage: 8,
+  balanceAmount: 37500000, balancePercentage: 75, fileUrl: dvScan, billingType: 'M1 - Housing unit', units: 5, unitPrice: 800000, retentionPct: 0,
+});
+await record(rid(12), 'pending_documents', A, [engineer], { documentName: 'Time Extension No. 2 - 30 Days', status: 'Approved', remarks: 'Reason: Rain delays', fileUrl: orderScan });
+await record(rid(13), 'pending_documents', A, [engineer], { documentName: 'Work Suspension No. 1 (Partial)', status: 'Approved',
+  remarks: 'Duration: 10 Days | Effectivity: 2026-08-01 | End: 2026-08-11 | Reason: Right of way | Items: Housing units' });
+await record(rid(14), 'pending_documents', A, [engineer], { documentName: '1st Partial Continuance of Work Suspension Order No. 1', status: 'Pending',
+  remarks: 'Duration: 5 Days | Effectivity: 2026-08-11' });
+await record(rid(15), 'pending_documents', A, [engineer], { documentName: 'Partial Work Resumption Order No. 1', status: 'Submitted', remarks: 'Effectivity: 2026-08-16' });
+await record(rid(16), 'pending_documents', A, [engineer], { documentName: 'Building permit', status: 'Submitted', remarks: 'Filed at the municipal hall', fileUrl: orderScan });
+await record(rid(17), 'pending_documents', A, [engineer], { documentName: 'Letter to Contractor No. 1', status: 'Pending', remarks: 'Reason: Slow mobilization | Date Received: 2026-10-26', fileUrl: letterScan });
+await record(rid(18), 'contractor_letters', A, [engineer], { dateSent: '2026-10-27', subject: 'Additional manpower for Block 3', actionTaken: '',
+  dateReceived: '2026-10-28', receivedFileUrl: letterScan, dateReplied: '', replyFileUrl: '' });
+await record(rid(19), 'contractor_letters', A, [engineer], { dateSent: '2026-09-02', subject: 'Safety at the site', actionTaken: 'Added safety officer',
+  dateReceived: '2026-09-03', receivedFileUrl: '', dateReplied: '2026-09-10', replyFileUrl: replyScan });
+await record(rid(20), 'developer_requests', A, [engineer], { requestType: 'Time Extension', details: '30 days for rain', dateRequested: '2026-10-29',
+  dateReceived: '2026-11-02', datePackaged: '', requestFileUrl: requestScan });
+await record(rid(21), 'developer_requests', A, [engineer], { requestType: 'Variation Order', details: '', dateRequested: '2026-07-01',
+  dateReceived: '2026-07-03', datePackaged: '2026-07-20', requestFileUrl: '' });
+// Subdivision plan: an old version and the one in use; its lots in each progress band, plus lots that are not counted.
+await record(rid(30), 'sdp_plans', A, [engineer], { planName: 'SDP rev 0', pdfFileUrl: '', version: 1, isActive: 0, uploadedDate: '2026-01-10', uploadedBy: 'x', siteName: '' });
+await record(rid(31), 'sdp_plans', A, [engineer], { planName: 'SDP rev 1', pdfFileUrl: '', version: 2, isActive: 1, uploadedDate: '2026-03-10', uploadedBy: 'x', siteName: '' });
+const lotProgress = [0, 0, 0, 10, 20, 25, 30, 45, 60, 70, 80, 95, 100, 100, 100, 100];
+for (const [i, p] of lotProgress.entries()) {
+  const lotId = rid(100 + i);
+  await record(lotId, 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: String(1 + (i >> 2)), lotNumber: String(1 + (i % 4)), lotAreaSqM: 40,
+    polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });
+  if (p) await record(rid(200 + i), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: lotId, physicalProgress: p });
+}
+await record(rid(130), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: 'RL', lotNumber: '1', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Road Lot' });
+await record(rid(131), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(30), blockNumber: '9', lotNumber: '9', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });
+console.log('Seeded demo-nha: 3 accounts, 5 projects, records and 8 files.');

@@ -9,8 +9,17 @@ version keep working.
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
 - Screens: the dashboard (project count, total cost, status pills, attention filters, search, project cards with their own
-  Work done and Billed; portfolio averages are deliberately not shown) and the project **Summary** (profile,
-  key dates, contract cost, latest weekly report, open issues, status of payment).
+  Work done and Billed; portfolio averages are deliberately not shown) and four project tabs:
+  - **Summary**: profile, key dates with the revised completion from approved orders, contract
+    cost, latest weekly report, open issues, status of payment, and the lots status card (the six
+    `SdpSummary` bands) for housing projects.
+  - **Progress**: weekly reports (all sections and photos), monthly reports by month, and every
+    photo.
+  - **Payments**: the billing list with retention, housing units and the attached files.
+  - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
+    the contractor, developer requests and related files, each with its scan.
+- **Print** (from a weekly report): the A4 Project Engineer's Report laid out as the phone prints
+  it (`BlueBookPrint.kt`, `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
 
 The layouts, type and components follow the Android app (`app/src/main/java/com/example/ui/`).
 The colours are a dark "command center" palette (a #0B0F17 canvas with a faint dot grid, #111827
@@ -44,7 +53,7 @@ Open http://127.0.0.1:5000/?emulator and sign in with one of the test accounts l
 Tests for the copied rules:
 
 ```bash
-node --test web/logic.test.mjs
+node --test "web/*.test.mjs"
 ```
 
 ## One-time setup for the live project
@@ -77,7 +86,7 @@ firebase deploy --only hosting --project nha-monitor-bulacan-2026
 The site is then live at https://nha-monitor-bulacan-2026.web.app. Rules and functions are not
 touched by this command.
 
-## Not in this first version
+## Not on the site yet
 
-Progress, Payments and Documents sections, weekly report printing, editing, and photos other
-than the Summary's site photo.
+Editing of any kind, the Lots, Weather and Issues screens, monthly report printing, and the
+audit log.
