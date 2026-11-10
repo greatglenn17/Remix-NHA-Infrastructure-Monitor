@@ -1,8 +1,8 @@
 {
-  "versionCode": 283,
-  "versionName": "2.8.3",
-  "releaseNotes": "v2.8.3: Project Profile shows each suspension on three lines (days, effectivity dates, reason). Key dates list each suspension, then its continuances, then its resumption. The construction bar fills in, SYNCED pops in after an upload, and photos and the SDP plan shimmer while they load.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.3/NHA_Monitor_v2.8.3_Build283.apk",
-  "apkSha256": "e2b129d588f1b54a2a21f863221ae07c026cf50db4159014fbb5454ccf07df02",
+  "versionCode": 284,
+  "versionName": "2.8.4",
+  "releaseNotes": "v2.8.4: Easier to read on site. No text is smaller than 12, text uses regular and semibold only, and low-contrast colours are fixed. A lot's action buttons sit two per row and the plan's zoom bar scrolls sideways.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.4/NHA_Monitor_v2.8.4_Build284.apk",
+  "apkSha256": "2b302fec1955eff8b56c66d3dc6ece1f518db8b32c1c580636836d54ce42d394",
   "isMandatory": true
 }
