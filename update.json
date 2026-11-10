@@ -1,8 +1,8 @@
 {
-  "versionCode": 285,
-  "versionName": "2.8.5",
-  "releaseNotes": "v2.8.5: The approved bar chart no longer disappears when another phone that changed the same project syncs. If a chart already disappeared, upload it again once after every device has this update.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.5/NHA_Monitor_v2.8.5_Build285.apk",
-  "apkSha256": "54a01b0ac6ffb237329c4952377924d0eb1d3e0ef08957c136fc3b13a120bc05",
+  "versionCode": 286,
+  "versionName": "2.8.6",
+  "releaseNotes": "v2.8.6: Super Admin alerts now reach only the Super Admin's phones and also appear in the bell list. Signing out stops a phone's alerts for that account. The weather clocks have larger, easier-to-read numbers.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.6/NHA_Monitor_v2.8.6_Build286.apk",
+  "apkSha256": "82c869bc0d772ba572585db39806f5c524eb7a666bf02bc33033d55ea7105983",
   "isMandatory": true
 }
