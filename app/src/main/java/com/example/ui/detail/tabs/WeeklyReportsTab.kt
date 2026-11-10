@@ -54,7 +54,7 @@ fun WeeklyReportsTab(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "No Weekly Engineer Reports Submitted Yet",
-                        style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) Button(
@@ -65,7 +65,7 @@ fun WeeklyReportsTab(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add New Weekly Report", fontWeight = FontWeight.Bold)
+                        Text("Add New Weekly Report", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -82,7 +82,7 @@ fun WeeklyReportsTab(
                         Text(
                             text = "NHA WEEKLY PROJECT ENGINEER'S REPORT",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -149,7 +149,7 @@ private fun WeeklyReportCard(
                     Text(
                         text = report.reportingWeek,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -222,7 +222,7 @@ private fun WeeklyReportCard(
                     Text(
                         text = "Actual ${"%.2f".format(report.actualAccomplishmentPct)}%",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = slip
                         ),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -247,7 +247,7 @@ private fun WeeklyReportCard(
                     // 1. Weekly Accomplishment Status (Scope of Works)
                     Text(
                         text = "1. Weekly Accomplishment Status",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
@@ -272,14 +272,14 @@ private fun WeeklyReportCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("GRAND TOTAL", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("GRAND TOTAL", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
                                 Text("T: ${"%.2f".format(report.targetAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
-                                Text("A: ${"%.2f".format(report.actualAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("A: ${"%.2f".format(report.actualAccomplishmentPct)}%", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
                                 val varPct = report.actualAccomplishmentPct - report.targetAccomplishmentPct
                                 Text(
                                     "V: ${if (varPct >= 0) "+${"%.2f".format(varPct)}" else "%.2f".format(varPct)}%",
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = varianceColor(varPct, LocalNHAColors.current)
                                     )
                                 )
@@ -294,7 +294,7 @@ private fun WeeklyReportCard(
 
                     Text(
                         text = "2. Activities of the Week",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -312,9 +312,9 @@ private fun WeeklyReportCard(
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
-                                    Text("DAY OF WEEK", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.1f))
-                                    Text("ACTIVITIES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f))
-                                    Text("REMARKS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
+                                    Text("DAY OF WEEK", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.1f))
+                                    Text("ACTIVITIES", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f))
+                                    Text("REMARKS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                 }
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -325,7 +325,7 @@ private fun WeeklyReportCard(
                                             .padding(horizontal = 12.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(act.day, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1.1f))
+                                        Text(act.day, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1.1f))
                                         Text(act.description, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f))
                                         Text(act.remarks.ifEmpty { "-" }, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f))
                                     }
@@ -348,7 +348,7 @@ private fun WeeklyReportCard(
                     // 3. Manpower Summary Table
                     Text(
                         text = "3. Manpower Summary Table",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -369,9 +369,9 @@ private fun WeeklyReportCard(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("DESIGNATION", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                Text("DESIGNATION", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                Text("NO. OF PERSONNEL", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("NO. OF PERSONNEL", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -390,7 +390,7 @@ private fun WeeklyReportCard(
                                     ) {
                                         Text(item.designation, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < manpowerList.lastIndex) {
                                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -409,9 +409,9 @@ private fun WeeklyReportCard(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                         }
                     }
@@ -421,7 +421,7 @@ private fun WeeklyReportCard(
                     // 4. Equipment Summary Table
                     Text(
                         text = "4. Equipment Summary Table",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -442,11 +442,11 @@ private fun WeeklyReportCard(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("NAME OF EQUIPMENT", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
+                                Text("NAME OF EQUIPMENT", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                Text("NO.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
+                                Text("NO.", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                Text("REMARKS / STATUS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.3f).padding(horizontal = 12.dp))
+                                Text("REMARKS / STATUS", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1.3f).padding(horizontal = 12.dp))
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -464,7 +464,7 @@ private fun WeeklyReportCard(
                                     ) {
                                         Text(item.description, style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(2f).padding(horizontal = 12.dp))
                                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
+                                        Text("${item.count}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(0.7f).padding(horizontal = 12.dp))
                                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
 
                                         val (bgColor, textColor, borderColor) = when (item.status.trim()) {
@@ -485,7 +485,7 @@ private fun WeeklyReportCard(
                                             ) {
                                                 Text(
                                                     text = item.status,
-                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = textColor),
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = textColor),
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                                 )
                                             }
@@ -504,7 +504,7 @@ private fun WeeklyReportCard(
                     // 5. Issues Encountered / Action Taken Table
                     Text(
                         text = "5. Issues Encountered / Action Taken",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -525,9 +525,9 @@ private fun WeeklyReportCard(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("ISSUES ENCOUNTERED", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("ISSUES ENCOUNTERED", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                Text("ACTION TAKEN", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                Text("ACTION TAKEN", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -560,7 +560,7 @@ private fun WeeklyReportCard(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (photos.size > 1) "Attached Site Photos (${photos.size}, all in the Photos tab):" else "Attached Site Photo:",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         )
                         run {
                             com.example.ui.theme.LoadingImage(

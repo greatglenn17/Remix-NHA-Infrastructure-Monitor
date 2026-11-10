@@ -175,7 +175,7 @@ fun LoginScreen(
                             color = Color.White.copy(alpha = 0.9f),
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
-                            fontSize = 10.sp
+                            fontSize = 12.sp
                         ),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                     )
@@ -565,7 +565,7 @@ fun LoginScreen(
                                 text = "Initial User Role:",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 ),
                                 modifier = Modifier
                                     .align(Alignment.Start)
@@ -644,7 +644,7 @@ fun LoginScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Authenticating Account...",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                                 )
                             } else {
                                 Icon(
@@ -656,7 +656,7 @@ fun LoginScreen(
                                 Text(
                                     text = if (isSignUpMode) "Register New Account" else "Sign In",
                                     style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         fontSize = 15.sp
                                     )
                                 )
@@ -705,7 +705,7 @@ fun LoginScreen(
                     text = "Firebase Auth Secured • AES-256 Encrypted Storage & Backup",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp
+                        fontSize = 12.sp
                     )
                 )
             }
@@ -718,7 +718,7 @@ fun LoginScreen(
                 title = {
                     Text(
                         text = "Password Recovery & Reset",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     )
                 },
                 text = {
@@ -756,7 +756,7 @@ fun LoginScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
                         ) {
-                            Text("Send Email Link", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Send Email Link", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 },
@@ -808,7 +808,7 @@ private fun UserRoleChoiceChip(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -817,7 +817,7 @@ private fun UserRoleChoiceChip(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 9.5.sp
+                        fontSize = 12.sp
                     )
                 )
             }

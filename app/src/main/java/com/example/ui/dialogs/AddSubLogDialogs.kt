@@ -40,7 +40,7 @@ fun AddTimeExtensionDialog(
         modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
-        title = { Text("ADD TIME EXTENSION", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
+        title = { Text("ADD TIME EXTENSION", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -84,7 +84,7 @@ fun AddWorkSuspensionDialog(
         modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
-        title = { Text("ADD WORK SUSPENSION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
+        title = { Text("ADD WORK SUSPENSION ORDER", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -125,7 +125,7 @@ fun AddWorkResumptionDialog(
         modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
-        title = { Text("ADD WORK RESUMPTION LOG", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
+        title = { Text("ADD WORK RESUMPTION LOG", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -173,7 +173,7 @@ fun AddCustomDocumentDialog(
         modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(16.dp).imePadding(),
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         onDismissRequest = close,
-        title = { Text("ADD DOCUMENT", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) },
+        title = { Text("ADD DOCUMENT", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -411,7 +411,7 @@ fun OrderFieldInputs(
                 LaunchedEffect(suspension.id) {
                     if (f.coEffectivity.isBlank()) f.coEffectivity = com.example.util.ProjectSchedule.nextContinuance(suspension, documents).second
                 }
-                Text(f.name(type, documents), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(f.name(type, documents), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 FullOrPartialPicker("Type of Suspension", f.coType) { f.coType = it }
                 OutlinedTextField(value = f.coDays, onValueChange = { f.coDays = it }, label = { Text("No. of Days") }, isError = daysError(f.coDays) != null, supportingText = daysError(f.coDays)?.let { { Text(it) } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 DateField(label = "Effectivity Date", value = f.coEffectivity, onValueChange = { f.coEffectivity = it })

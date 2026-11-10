@@ -77,7 +77,7 @@ fun NotificationsDialog(
                             Text(
                                 text = "Activity Alerts",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 17.sp
                                 )
@@ -86,7 +86,7 @@ fun NotificationsDialog(
                                 text = "Field Engineer Project Updates",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
+                                    fontSize = 12.sp
                                 )
                             )
                         }
@@ -200,7 +200,7 @@ fun NotificationsDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Close", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                    Text(text = "Close", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -252,7 +252,7 @@ private fun NotificationCard(
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 13.5.sp
                         ),
@@ -265,7 +265,7 @@ private fun NotificationCard(
                         text = formattedTime,
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 10.sp
+                            fontSize = 12.sp
                         )
                     )
                 }
@@ -288,7 +288,7 @@ private fun NotificationCard(
                             text = "📍 ${item.projectName}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             ),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)

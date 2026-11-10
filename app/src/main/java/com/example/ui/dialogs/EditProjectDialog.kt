@@ -347,7 +347,7 @@ fun EditProjectDialog(
                 Text("Original Contract Cost (Auto-Computed)", style = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant))
                 Text(
                     text = com.example.utils.CurrencyFormatter.formatPhp(autoComputedCost),
-                    style = MaterialTheme.typography.titleMedium.copy(color = cs.onSurface, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = cs.onSurface, fontWeight = FontWeight.SemiBold)
                 )
             }
         }

@@ -73,11 +73,11 @@ typography:
   label:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "12px"
-    fontWeight: 500
+    fontWeight: 400
   label-sm:
     fontFamily: "Inter, system-ui, sans-serif"
-    fontSize: "11px"
-    fontWeight: 700
+    fontSize: "12px"
+    fontWeight: 600
   numeric:
     fontFamily: "Inter, system-ui, sans-serif"
     fontFeature: "tnum"
@@ -172,7 +172,7 @@ It rejects the generic admin template (side menu, KPI cards, blue-on-white data 
 - Always dark (`color-scheme: dark`), whatever the device's setting. There is no light theme.
 - Near-black dot-grid canvas, dark hairline panels, 12px card radius, no shadows; cards lift 2px on hover.
 - Blue for interaction and on-plan work, violet for Billed. Status colours are for status only.
-- Inter throughout. Tabular figures only on numbers that line up.
+- Inter throughout, two weights only (400 and 600), nothing under 12px, all text at least 4.5:1 contrast (2026-11-10). The Blue Book prints keep their own form styling. Tabular figures only on numbers that line up.
 - Material Symbols Outlined icons at 20px (16px small), always next to a text label.
 - One motion: the progress bars fill in when data arrives.
 

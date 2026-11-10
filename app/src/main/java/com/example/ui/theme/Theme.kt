@@ -50,11 +50,11 @@ private val LightColorScheme = lightColorScheme(
     // Figma blue, darkened from #0D99FF so white text on it passes 4.5:1.
     primary = Color(0xFF0A6FD4),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE5F4FF),
+    primaryContainer = Color(0xFFEEF7FF), // light enough that primary text on it passes 4.5:1
     onPrimaryContainer = Color(0xFF0757A8),
     secondary = Color(0xFF0A6FD4),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE5F4FF),
+    secondaryContainer = Color(0xFFEEF7FF),
     onSecondaryContainer = Color(0xFF0757A8),
     background = LightNHAColors.background,
     onBackground = LightNHAColors.textPrimary,

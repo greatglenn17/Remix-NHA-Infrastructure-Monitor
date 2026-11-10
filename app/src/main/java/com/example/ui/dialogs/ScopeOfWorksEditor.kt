@@ -54,7 +54,7 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Scope of Works", style = MaterialTheme.typography.titleSmall.copy(color = cs.primary, fontWeight = FontWeight.Bold))
+        Text("Scope of Works", style = MaterialTheme.typography.titleSmall.copy(color = cs.primary, fontWeight = FontWeight.SemiBold))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (editing != null) {
                 TextButton(onClick = { name = ""; amount = ""; editing = null }) { Text("Cancel", fontSize = 12.sp) }
@@ -66,7 +66,7 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
                 shape = RoundedCornerShape(6.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
             ) {
-                Text(if (editing != null) "Update item" else "Add Scope of Works", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(if (editing != null) "Update item" else "Add Scope of Works", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
             }
         }
     }
@@ -121,15 +121,15 @@ fun ScopeOfWorksEditor(items: SnapshotStateList<ScopeItem>) {
             HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(end = 12.dp, top = 4.dp, bottom = 4.dp))
             val totalWeight = items.sumOf { it.weightPct }
             Row(modifier = Modifier.fillMaxWidth().padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Total", color = cs.onSurface, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.6f))
+                Text("Total", color = cs.onSurface, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.6f))
                 Text(
                     CurrencyFormatter.formatPhp(items.sumOf { it.amount }), color = cs.primary, style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1.2f)
+                    fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1.2f)
                 )
                 Text(
                     "%.2f%%".format(totalWeight),
                     color = if (kotlin.math.abs(totalWeight - 100.0) < 0.01) nha.onTrack else nha.behind,
-                    style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.End,
+                    style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
                     modifier = Modifier.weight(0.8f)
                 )
                 Spacer(Modifier.width(96.dp))

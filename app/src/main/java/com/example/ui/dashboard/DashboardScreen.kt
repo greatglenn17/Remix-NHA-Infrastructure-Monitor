@@ -169,13 +169,13 @@ fun DashboardScreen(
                             Button(onClick = onCreateProjectClick, shape = RoundedCornerShape(6.dp)) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("New Project", fontWeight = FontWeight.Bold)
+                                Text("New Project", fontWeight = FontWeight.SemiBold)
                             }
                         }
                         OutlinedButton(onClick = { viewModel.syncFromCloud() }, shape = RoundedCornerShape(6.dp)) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Sync from Cloud", fontWeight = FontWeight.Medium)
+                            Text("Sync from Cloud", fontWeight = FontWeight.Normal)
                         }
                     }
                 }

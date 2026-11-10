@@ -14,7 +14,7 @@ import com.example.R
 // Below Android 8 variation settings are ignored and Compose fakes the bolder weights.
 @OptIn(ExperimentalTextApi::class)
 val Inter = FontFamily(
-    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { w ->
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.SemiBold).map { w ->
         Font(R.font.inter, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight)))
     }
 )
@@ -45,9 +45,10 @@ val Typography = Typography(
     bodyLarge = M3.bodyLarge.copy(letterSpacing = 0.sp),
     bodyMedium = M3.bodyMedium.copy(letterSpacing = 0.sp),
     bodySmall = M3.bodySmall.copy(letterSpacing = 0.1.sp),
-    labelLarge = M3.labelLarge.copy(letterSpacing = 0.sp),
-    labelMedium = M3.labelMedium.copy(letterSpacing = 0.1.sp),
-    labelSmall = M3.labelSmall.copy(letterSpacing = 0.2.sp)
+    // Two weights only (Normal and SemiBold), and nothing under 12sp: read outdoors on site.
+    labelLarge = M3.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp),
+    labelMedium = M3.labelMedium.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.1.sp),
+    labelSmall = M3.labelSmall.copy(fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.2.sp)
 )
 
 // Tabular digits so money and percentages line up in columns.

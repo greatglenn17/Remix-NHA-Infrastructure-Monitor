@@ -275,7 +275,7 @@ fun CreateProjectDialog(
                 Text("Original Contract Cost (Auto-Computed)", style = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant))
                 Text(
                     text = com.example.utils.CurrencyFormatter.formatPhp(autoComputedCost),
-                    style = MaterialTheme.typography.titleMedium.copy(color = cs.onSurface, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = cs.onSurface, fontWeight = FontWeight.SemiBold)
                 )
             }
         }
@@ -334,7 +334,7 @@ internal fun AlreadyCompletedFields(input: CompletionInput, title: String, subti
     val cs = MaterialTheme.colorScheme
     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
         Switch(checked = input.on, onCheckedChange = { input.on = it }, modifier = Modifier.testTag("switch_already_completed"))

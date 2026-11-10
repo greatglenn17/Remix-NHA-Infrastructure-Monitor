@@ -40,7 +40,7 @@ fun EditProfileDialog(
                 Text(
                     text = "Update Profile & Position",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -131,7 +131,7 @@ fun EditProfileDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
                 shape = RoundedCornerShape(6.dp)
             ) {
-                Text("Save Changes", fontWeight = FontWeight.Bold)
+                Text("Save Changes", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {

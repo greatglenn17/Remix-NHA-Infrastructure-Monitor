@@ -90,7 +90,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "PROJECT UPDATE PHOTO GALLERY (${photos.size} Photos)",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -104,7 +104,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             "$week  ·  ${weekPhotos.size} photo${if (weekPhotos.size == 1) "" else "s"}",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
@@ -137,7 +137,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                                         Text(
                                             text = label,
                                             maxLines = 2,
-                                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                                            style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.SemiBold)
                                         )
                                     }
                                 }
@@ -170,7 +170,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                         ) {
                             Text(
                                 text = photo.weekDate,
-                                style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.SemiBold)
                             )
                             Row {
                                 if (onDeletePhoto != null && photo.report != null) {
@@ -200,7 +200,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val d = photo.detail
-                        if (d.title.isNotBlank()) Text(d.title, style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                        if (d.title.isNotBlank()) Text(d.title, style = MaterialTheme.typography.titleSmall.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
                         if (d.takenAt.isNotBlank()) Text("Taken: ${d.takenAt}", style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray))
                         if (d.location.isNotBlank()) {
                             Text("Location: ${d.location}", style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray))
