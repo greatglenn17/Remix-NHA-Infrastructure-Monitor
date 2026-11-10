@@ -1,8 +1,8 @@
 {
-  "versionCode": 282,
-  "versionName": "2.8.2",
-  "releaseNotes": "v2.8.2: Find Lots now gives each lot the block and lot printed on the SDP plan; lots the plan does not name come in without numbers as before. A lot at 0% shows as Not yet started (red), and 1-25% is now violet.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.2/NHA_Monitor_v2.8.2_Build282.apk",
-  "apkSha256": "eb48c4f0156e9229467fd80b7ef5eac6d36dd71fd7d2e99445f1a30423d7ef4c",
+  "versionCode": 283,
+  "versionName": "2.8.3",
+  "releaseNotes": "v2.8.3: Project Profile shows each suspension on three lines (days, effectivity dates, reason). Key dates list each suspension, then its continuances, then its resumption. The construction bar fills in, SYNCED pops in after an upload, and photos and the SDP plan shimmer while they load.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.3/NHA_Monitor_v2.8.3_Build283.apk",
+  "apkSha256": "e2b129d588f1b54a2a21f863221ae07c026cf50db4159014fbb5454ccf07df02",
   "isMandatory": true
 }
