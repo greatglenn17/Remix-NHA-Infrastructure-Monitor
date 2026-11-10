@@ -1,8 +1,8 @@
 {
-  "versionCode": 289,
-  "versionName": "2.8.9",
-  "releaseNotes": "v2.8.9: Lot physical progress choices are Not yet started, 1–25%, 26–50%, 51–75%, 76–99% and 100% / RFO. The weekly accomplishment shows two decimals. Manpower designations and equipment names can be picked from a list or typed. Weekly issues say who took the action: Implementing Office or Contractor/Developer.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.9/NHA_Monitor_v2.8.9_Build289.apk",
-  "apkSha256": "96ac07e5a1f0a8fddd761ed1f49f8854ed364e623dd0522a662a1764d83891a4",
+  "versionCode": 290,
+  "versionName": "2.8.10",
+  "releaseNotes": "v2.8.10: The weekly report card shows each accomplishment line's weight in two decimals, e.g. Land Acquisition (9.15%).",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.10/NHA_Monitor_v2.8.10_Build290.apk",
+  "apkSha256": "c66fc25cdad0f72702e66ab22e04988dfb4df2c39f01d8e2eca512cd6b33e7f0",
   "isMandatory": true
 }
