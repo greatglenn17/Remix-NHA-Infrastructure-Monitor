@@ -7,6 +7,12 @@ import androidx.room.Query
 import com.example.data.model.SyncOutboxEvent
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Payload of the project event a bar chart save queues. Only that event uploads barChartJson, so another
+ * phone's older copy of the project (often without the chart) never replaces the chart in the cloud.
+ */
+fun barChartPayload(projectUuid: String) = "{\"projectUuid\":\"$projectUuid\",\"barChart\":true}"
+
 @Dao
 interface SyncOutboxDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -33,6 +39,10 @@ interface SyncOutboxDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityUuid = :entityUuid AND state IN ('PENDING', 'FAILED'))")
     suspend fun hasPendingFor(entityUuid: String): Boolean
+
+    /** True while this phone has a bar chart change for the project not yet in the cloud (see [barChartPayload]). */
+    @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityType = 'project' AND entityUuid = :projectUuid AND state IN ('PENDING', 'FAILED') AND payloadJson LIKE '%\"barChart\":true%')")
+    suspend fun hasPendingBarChartFor(projectUuid: String): Boolean
 
     /** True for a project this phone queued as new whose upload the cloud has not confirmed yet. */
     @Query(

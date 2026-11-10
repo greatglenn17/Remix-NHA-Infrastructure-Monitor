@@ -366,7 +366,10 @@ class FirestoreSyncManager(
                     projectDao.updateProject(updatedProj)
                     Log.d(tag, "Updated local project from remote revision $revision: $name")
                 }
-                if (localProject != null) adoptAssignedUids(localProject, doc, isSuperAdmin)
+                if (localProject != null) {
+                    adoptAssignedUids(localProject, doc, isSuperAdmin)
+                    adoptBarChart(projectUuid, doc)
+                }
             } catch (ex: Exception) {
                 Log.e(tag, "Error processing remote Firestore document", ex)
             }
@@ -421,6 +424,17 @@ class FirestoreSyncManager(
         if (AssignedUids.parse(remote) == AssignedUids.parse(local.assignedUids) && local.assignedUids.isNotBlank()) return
         if (isSuperAdmin && db.syncOutboxDao().hasPendingFor(local.projectUuid)) return
         recordSync.setAssignedUidsLocally(local.projectUuid, remote)
+    }
+
+    /**
+     * Takes the cloud's bar chart even when the rest of the project stays local (an unsent edit, or a higher local
+     * revision), since only a bar chart save uploads the chart. This phone's own unsent chart change is kept.
+     */
+    private suspend fun adoptBarChart(projectUuid: String, doc: DocumentSnapshot) {
+        val remote = doc.getString("barChartJson") ?: return
+        val local = db.projectDao().getProjectByUuid(projectUuid) ?: return
+        if (local.barChartJson == remote || db.syncOutboxDao().hasPendingBarChartFor(projectUuid)) return
+        db.projectDao().updateProject(local.copy(barChartJson = remote))
     }
 
     /** What a direct server read says about a project missing from the listener's snapshot. */
@@ -595,8 +609,11 @@ class FirestoreSyncManager(
                         )
 
                         // Only the chart's editors send it (firestore.rules refuses anyone else's change), so a stale copy on a
-                        // Field Engineer's phone never blocks their project updates.
-                        if (superAdmin || role == "ENGINEER_ADMIN") data["barChartJson"] = project.barChartJson
+                        // Field Engineer's phone never blocks their project updates. And only with this phone's own chart change
+                        // (or a new project): another save would replace a chart uploaded from another phone with this one's copy.
+                        if ((superAdmin || role == "ENGINEER_ADMIN") &&
+                            (event.operation == "CREATE" || db.syncOutboxDao().hasPendingBarChartFor(project.projectUuid))
+                        ) data["barChartJson"] = project.barChartJson
                         uploadProject(project, data, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)
