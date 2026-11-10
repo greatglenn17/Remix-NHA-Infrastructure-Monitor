@@ -1,7 +1,7 @@
 // node --test auditAlert.test.js (no emulator needed)
 const test = require("node:test");
 const assert = require("node:assert");
-const { auditAlert, MAX_AGE_MS } = require("./auditAlert");
+const { auditAlert, skipReason, MAX_AGE_MS } = require("./auditAlert");
 
 const NOW = 1_794_292_093_231;
 const ONGOING = { name: "Sample Resettlement", actualAccomplishment: 41.25 };
@@ -42,6 +42,16 @@ test("no alert for the Super Admin's own action, sign-ins, unknown actors or oth
   assert.equal(auditAlert(entry({ actionType: "Issue Creation" }), "", NOW, ONGOING), null);
   assert.equal(auditAlert(entry({ actionType: "Issue Creation" }, { type: "project_issues" }), "FIELD_ENGINEER", NOW, ONGOING), null);
   assert.equal(auditAlert(entry({ actionType: "Issue Creation" }, { data: "oops" }), "FIELD_ENGINEER", NOW, ONGOING), null);
+});
+
+test("the log says why an entry sent nothing", () => {
+  const why = (role, project, fields = {}) => skipReason(entry({ actionType: "Issue Creation", ...fields }), role, NOW, project);
+  assert.equal(why("FIELD_ENGINEER", ONGOING), null);
+  assert.equal(why("FIELD_ENGINEER", null), "project not found");
+  assert.equal(why("FIELD_ENGINEER", { actualAccomplishment: 100 }), "project finished");
+  assert.equal(why("", ONGOING), "editor has no role in users");
+  assert.equal(why("SUPER_ADMIN", ONGOING), "the Super Admin's own change");
+  assert.equal(why("FIELD_ENGINEER", ONGOING, { timestamp: NOW - MAX_AGE_MS - 1 }), "entry more than a day old");
 });
 
 test("an entry uploaded more than a day late stays quiet", () => {

@@ -15,14 +15,27 @@ const isOngoing = project => !!project && project.isDeleted !== true && !((Numbe
  * day old. `actorRole` is the editor's users/{uid} role; `project` is projects/{projectUuid}'s data.
  */
 function auditAlert(record, actorRole, now, project) {
-  if (!record || record.type !== "audit_logs" || record.isDeleted === true) return null;
-  if (!isOngoing(project)) return null;
-  if (!actorRole || actorRole === "SUPER_ADMIN") return null;
+  return skipReason(record, actorRole, now, project) ? null : buildAlert(record, actorRole, project);
+}
+
+/** Why no alert goes out (for the function's log, without names), or null when one does. */
+function skipReason(record, actorRole, now, project) {
+  if (!record || record.type !== "audit_logs" || record.isDeleted === true) return "not an audit entry";
+  if (!project) return "project not found";
+  if (!isOngoing(project)) return project.isDeleted === true ? "project deleted" : "project finished";
+  if (!actorRole) return "editor has no role in users";
+  if (actorRole === "SUPER_ADMIN") return "the Super Admin's own change";
   let d;
-  try { d = JSON.parse(record.data || "{}"); } catch { return null; }
+  try { d = JSON.parse(record.data || "{}"); } catch { return "unreadable entry"; }
   const action = String(d.actionType || "");
-  if (action === "User Login" || action === "User Logout") return null;
-  if (typeof d.timestamp === "number" && now - d.timestamp > MAX_AGE_MS) return null;
+  if (action === "User Login" || action === "User Logout") return "sign-in or sign-out";
+  if (typeof d.timestamp === "number" && now - d.timestamp > MAX_AGE_MS) return "entry more than a day old";
+  return null;
+}
+
+function buildAlert(record, actorRole, project) {
+  const d = JSON.parse(record.data || "{}");
+  const action = String(d.actionType || "");
   const by = ROLE_LABELS[actorRole] || actorRole;
   const has = word => action.toLowerCase().includes(word);
   const title =
@@ -38,4 +51,4 @@ function auditAlert(record, actorRole, now, project) {
   return { title, message: `${d.user || "Someone"}: ${d.details || action}${name}`, device: String(d.device || "") };
 }
 
-module.exports = { auditAlert, MAX_AGE_MS };
+module.exports = { auditAlert, skipReason, MAX_AGE_MS };
