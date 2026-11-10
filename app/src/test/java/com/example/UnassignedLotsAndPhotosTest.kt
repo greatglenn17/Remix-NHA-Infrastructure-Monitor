@@ -86,11 +86,11 @@ class UnassignedLotsAndPhotosTest {
             }
         }
         for (gone in listOf("Contractor", "Start Date", "Target Date")) rule.onNodeWithText(gone).assertDoesNotExist()
-        rule.onAllNodesWithText("RFO").onFirst().assertExists() // 85% falls in RFO (81 to 100%)
+        rule.onAllNodesWithText("76–99%").onFirst().assertExists() // an old 85% shows its band
         rule.onNodeWithTag("lot_progress_input").performClick()
         rule.onNodeWithTag("lot_progress_2").performClick()
         rule.onNodeWithText("SAVE PROGRESS").performClick()
-        assertEquals(listOf(40, "2026-09-01", "2027-01-31", "JRC Builders"), saved)
+        assertEquals(listOf(50, "2026-09-01", "2027-01-31", "JRC Builders"), saved)
     }
 
     private val report = WeeklyReport(

@@ -84,7 +84,7 @@ class WeeklyDraftsTest {
     @Test fun typing_keepsADraft() {
         open()
         assertNull(WeeklyDrafts.load(context, 1))
-        rule.onAllNodesWithText("0.0")[1].performTextReplacement("12.5")
+        rule.onAllNodesWithText("0.00")[1].performTextReplacement("12.5")
         rule.mainClock.advanceTimeBy(1000)
         rule.waitForIdle()
         val saved = WeeklyDrafts.load(context, 1)!!

@@ -545,7 +545,7 @@ private fun WeeklyReportCard(
                                     ) {
                                         Text(item.description, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                                        Text(item.actionTaken, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
+                                        Text(listOf(item.actionBy, item.actionTaken).filter(String::isNotBlank).joinToString(": "), style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f).padding(horizontal = 12.dp))
                                     }
                                     if (idx < issuesList.lastIndex) {
                                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -636,7 +636,8 @@ internal fun parseIssuesList(jsonStr: String): List<WeeklyIssue> {
                 WeeklyIssue(
                     description = obj.optString("description", ""),
                     actionTaken = obj.optString("actionTaken", ""),
-                    remarks = obj.optString("remarks", "")
+                    remarks = obj.optString("remarks", ""),
+                    actionBy = obj.optString("actionBy", "")
                 )
             )
         }

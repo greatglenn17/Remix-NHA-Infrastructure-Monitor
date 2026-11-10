@@ -94,24 +94,9 @@ class BlueBookFormsTest {
     }
 
     @Test
-    fun weeklyIssues_includeIssuesLoggedThatWeek() {
+    fun weekStart_readsBothWeekFormats() {
         assertEquals(LocalDate.of(2026, 10, 26), BlueBookForms.weekStart("Oct 26, 2026 - Nov 1, 2026"))
         assertEquals(LocalDate.of(2026, 7, 20), BlueBookForms.weekStart("Week 30: July 20 - July 26, 2026"))
-        val report = WeeklyReport(
-            projectId = 1, reportingWeek = "Oct 26, 2026 - Nov 1, 2026", daysElapsed = 0, remainingDays = 0,
-            targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0, manpowerJson = "[]", equipmentJson = "[]",
-            activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
-            attachedPhotoUrlsJson = "[]", submittedByStaff = ""
-        )
-        fun issue(date: String, text: String) = com.example.data.model.ProjectIssue(
-            projectId = 1, date = date, description = text, actionTaken = "Coordinated", remarks = "", loggedBy = "", targetDate = "2026-11-05"
-        )
-        val week = BlueBookForms.weekIssues(
-            report, listOf(com.example.data.model.WeeklyIssue("Typed in report", "None")),
-            listOf(issue("2026-10-25", "Before"), issue("2026-10-28", "Right of way"), issue("2026-11-01", "Sunday"), issue("2026-11-02", "After"))
-        )
-        assertEquals(listOf("Typed in report", "Right of way", "Sunday"), week.map { it.description })
-        assertEquals("Target: November 5, 2026", week[1].remarks)
     }
 
     @Test
@@ -191,6 +176,18 @@ class BlueBookFormsTest {
         assertTrue(html.contains("<tr><td>5. </td><td></td><td></td><td></td></tr>"))
         assertTrue(html.contains("Principal Engineer C<br>Bulacan District Office</td>"))
         assertTrue(html.contains("<br>Region 3 Office</td>"))
+        // Section VI: each action under who took it; one saved before "action by" goes under the Implementing Office.
+        val withIssues = BlueBookForms.weeklyReport(
+            project, report, emptyList(), emptyList(), emptyList(),
+            listOf(
+                com.example.data.model.WeeklyIssue("Flooded footing", "Pumped out", "Done", actionBy = "Contractor/Developer"),
+                com.example.data.model.WeeklyIssue("Late permit", "Followed up")
+            ),
+            emptyList(), emptyList(), emptyList(), ContractLogs.from(project, docs), Signatories("A", "B", "", "", "", "")
+        )
+        assertTrue(withIssues.contains("<th colspan='2'>ACTION TAKEN</th>"))
+        assertTrue(withIssues.contains("<tr><td>1. Flooded footing</td><td></td><td>Pumped out</td><td>Done</td></tr>"))
+        assertTrue(withIssues.contains("<tr><td>2. Late permit</td><td>Followed up</td><td></td><td></td></tr>"))
     }
 
     @Test

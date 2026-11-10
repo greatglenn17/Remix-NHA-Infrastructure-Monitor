@@ -202,10 +202,10 @@ private fun WeeklyReportForm(
             if (seed != null) {
                 // A report saved item by item opens as its three lines.
                 com.example.ui.detail.tabs.parseAccomplishmentItemsList(seed.accomplishmentItemsJson).forEach {
-                    put(it.itemDescription, Pair(it.targetPct.toString(), it.actualPct.toString()))
+                    put(it.itemDescription, Pair(twoDecimals(it.targetPct), twoDecimals(it.actualPct)))
                 }
             } else {
-                scopeItems.forEach { put(it.name, Pair("0.0", "0.0")) }
+                scopeItems.forEach { put(it.name, Pair("0.00", "0.00")) }
             }
         }
     }
@@ -216,7 +216,7 @@ private fun WeeklyReportForm(
         project?.takeIf { chartVersion != null }?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
             ?.let { t -> com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 }) }
     }
-    fun targetText(name: String) = chartTargets?.let { (it[name] ?: 0.0).toString() } ?: accomplishmentMap[name]?.first ?: "0.0"
+    fun targetText(name: String) = chartTargets?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.first ?: "0.00"
     val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallActual by remember { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (accomplishmentMap[it.name]?.second?.toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallVariance by remember { androidx.compose.runtime.derivedStateOf { overallActual - overallTarget } }
@@ -356,7 +356,7 @@ private fun WeeklyReportForm(
     val current = snapshot()
     val dirty = current != initial || draft != null
     fun accItemsJson() = JSONArray(scopeItems.map { item ->
-        val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
+        val vals = accomplishmentMap[item.name] ?: Pair("0.00", "0.00")
         JSONObject().put("itemDescription", item.name)
             .put("targetPct", targetText(item.name).toDoubleOrNull() ?: 0.0)
             .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
@@ -485,7 +485,7 @@ private fun WeeklyReportForm(
 
                 // Scope Items Rows
                 scopeItems.forEach { item ->
-                    val vals = accomplishmentMap[item.name] ?: Pair("0.0", "0.0")
+                    val vals = accomplishmentMap[item.name] ?: Pair("0.00", "0.00")
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -820,7 +820,7 @@ private fun WeeklyReportForm(
                             )
                             TextButton(
                                 onClick = {
-                                    manpowerItems = manpowerItems + ManpowerItem("New Designation", 1)
+                                    manpowerItems = manpowerItems + ManpowerItem("", 1)
                                 },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                             ) {
@@ -885,7 +885,7 @@ private fun WeeklyReportForm(
                             )
                             TextButton(
                                 onClick = {
-                                    equipmentItems = equipmentItems + EquipmentItem("New Equipment", 1, "Operational")
+                                    equipmentItems = equipmentItems + EquipmentItem("", 1, "Operational")
                                 },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                             ) {
@@ -1298,13 +1298,9 @@ private fun ManpowerInputRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        OutlinedTextField(
-            value = item.designation,
-            onValueChange = { newDesignation -> onUpdate(item.copy(designation = newDesignation)) },
-            label = { Text("Designation") },
-            modifier = Modifier.weight(2f),
-            singleLine = true
-        )
+        PickOrTypeField(item.designation, "Designation", com.example.data.model.MANPOWER_DESIGNATIONS, Modifier.weight(2f)) {
+            onUpdate(item.copy(designation = it))
+        }
 
         CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
@@ -1332,13 +1328,9 @@ private fun EquipmentInputRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            OutlinedTextField(
-                value = item.description,
-                onValueChange = { newDesc -> onUpdate(item.copy(description = newDesc)) },
-                label = { Text("Name of Equipment") },
-                modifier = Modifier.weight(2f),
-                singleLine = true
-            )
+            PickOrTypeField(item.description, "Name of Equipment", com.example.data.model.EQUIPMENT_NAMES, Modifier.weight(2f)) {
+                onUpdate(item.copy(description = it))
+            }
 
             CountStepper(item.count, { onUpdate(item.copy(count = it)) })
 
@@ -1415,6 +1407,44 @@ private fun IssueInputRow(
             label = { Text("Action Taken") },
             modifier = Modifier.fillMaxWidth()
         )
+        // Who took the action, as on the Issues tab.
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Action by", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            com.example.data.model.ISSUE_ACTION_BY.forEach { who ->
+                FilterChip(
+                    selected = issue.actionBy == who, onClick = { onUpdate(issue.copy(actionBy = if (issue.actionBy == who) "" else who)) },
+                    label = { Text(who) }, modifier = Modifier.testTag("weekly_issue_by_$who")
+                )
+            }
+        }
+    }
+}
+
+private fun twoDecimals(value: Double) = "%.2f".format(java.util.Locale.US, value)
+
+/** A text field to type in, with a list to pick the usual entries from. */
+@Composable
+private fun PickOrTypeField(value: String, label: String, options: List<String>, modifier: Modifier, onChange: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            placeholder = { Text("Pick or type") },
+            trailingIcon = {
+                IconButton(onClick = { open = true }, modifier = Modifier.testTag("pick_$label")) {
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose $label")
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(text = { Text(option) }, onClick = { onChange(option); open = false })
+            }
+        }
     }
 }
 
@@ -1450,6 +1480,7 @@ private fun encodeIssuesList(list: List<WeeklyIssue>): String {
         obj.put("description", item.description)
         obj.put("actionTaken", item.actionTaken)
         obj.put("remarks", item.remarks)
+        obj.put("actionBy", item.actionBy)
         array.put(obj)
     }
     return array.toString()

@@ -1983,7 +1983,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             com.example.ui.detail.tabs.parseManpowerList(report.manpowerJson),
             com.example.ui.detail.tabs.parseEquipmentList(report.equipmentJson),
             com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson),
-            com.example.util.BlueBookForms.weekIssues(report, com.example.ui.detail.tabs.parseIssuesList(report.issuesJson), repository.getProjectIssues(project.id).first()),
+            // Only the report's own construction issues; the Issues tab's are the project's and go on the monthly form.
+            com.example.ui.detail.tabs.parseIssuesList(report.issuesJson),
             com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson),
             repository.getDailyWeather(project.id).first().filter { it.weeklyReportId == report.id },
             photos,

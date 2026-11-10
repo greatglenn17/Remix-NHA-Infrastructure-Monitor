@@ -18,9 +18,9 @@ class LotProgressFillTest {
         val c = LightNHAColors
         val red = c.behind; val violet = Color(0xFF7C3AED); val orange = Color(0xFFEA580C); val yellow = Color(0xFFCA8A04) // light-theme violet, orange, yellow
         val blue = Color(0xFF2563EB); val green = c.onTrack
-        // A lot just found, with nothing recorded, is not yet started: red, apart from 1-20%.
-        mapOf(0 to red, 1 to violet, 20 to violet, 21 to orange, 40 to orange, 41 to yellow, 60 to yellow,
-            61 to blue, 80 to blue, 81 to green, 100 to green).forEach { (p, colour) ->
+        // A lot just found, with nothing recorded, is not yet started: red, apart from 1-25%.
+        mapOf(0 to red, 1 to violet, 25 to violet, 26 to orange, 50 to orange, 51 to yellow, 75 to yellow,
+            76 to blue, 99 to blue, 100 to green).forEach { (p, colour) ->
             assertEquals("at $p%", colour, lotProgressFill(p, c))
         }
     }
@@ -29,9 +29,9 @@ class LotProgressFillTest {
     fun notYetStartedAndOneToTwentyFivePercentLookApartInBothThemes() {
         fun apart(a: Color, b: Color) = kotlin.math.sqrt((a.red - b.red).let { it * it } + (a.green - b.green).let { it * it } + (a.blue - b.blue).let { it * it })
         for (c in listOf(LightNHAColors, com.example.ui.theme.DarkNHAColors)) {
-            // 1-20% sits apart from both neighbours: not yet started (red) and 21% to 40% (orange).
+            // 1-25% sits apart from both neighbours: not yet started (red) and 26-50% (orange).
             assertTrue("dark=${c.isDark}", apart(lotProgressFill(0, c), lotProgressFill(1, c)) > 0.45f)
-            assertTrue("dark=${c.isDark}", apart(lotProgressFill(1, c), lotProgressFill(21, c)) > 0.45f)
+            assertTrue("dark=${c.isDark}", apart(lotProgressFill(1, c), lotProgressFill(26, c)) > 0.45f)
         }
     }
 
@@ -42,14 +42,14 @@ class LotProgressFillTest {
         // A found lot has no progress record at all.
         assertEquals(listOf("Not yet started"), bands(emptyMap()))
         assertEquals(listOf("Not yet started"), bands(mapOf(1L to SdpLotProgress(projectId = 1, sdpPlanId = 1, sdpLotId = 1, physicalProgress = 0))))
-        assertEquals(listOf("1-20%"), bands(mapOf(1L to SdpLotProgress(projectId = 1, sdpPlanId = 1, sdpLotId = 1, physicalProgress = 1))))
+        assertEquals(listOf("1–25%"), bands(mapOf(1L to SdpLotProgress(projectId = 1, sdpPlanId = 1, sdpLotId = 1, physicalProgress = 1))))
     }
 
     @Test
     fun eachProgressFilterPicksOnlyItsOwnBand() {
         val lot = SdpLot(id = 1, projectId = 1, sdpPlanId = 1, blockNumber = "1", lotNumber = "1", polygonNormalizedJson = "[]")
         val bands = LOT_PROGRESS_FILTERS.drop(1)
-        for (p in listOf(0, 1, 20, 21, 40, 41, 60, 61, 80, 81, 99, 100)) {
+        for (p in listOf(0, 1, 25, 26, 50, 51, 75, 76, 99, 100)) {
             val progress = mapOf(1L to SdpLotProgress(projectId = 1, sdpPlanId = 1, sdpLotId = 1, physicalProgress = p))
             val matching = bands.filter { isLotMatchingFilter(lot, "", it, "ALL", "ALL", progress) }
             assertEquals("at $p%", 1, matching.size)

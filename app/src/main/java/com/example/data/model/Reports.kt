@@ -65,8 +65,17 @@ data class DailyActivity(
 data class WeeklyIssue(
     val description: String,
     val actionTaken: String,
-    val remarks: String = ""
+    val remarks: String = "",
+    // One of ISSUE_ACTION_BY, or blank on issues saved before it existed.
+    val actionBy: String = ""
 )
+
+/** The weekly report's manpower and equipment choices; any other can still be typed. */
+val MANPOWER_DESIGNATIONS = listOf(
+    "Project Manager", "Project Engineer", "Project Architect", "Safety Officer", "Foreman", "Operator", "Labor",
+    "Security Guard", "Driver", "Warehouseman"
+)
+val EQUIPMENT_NAMES = listOf("Backhoe", "Bulldozer", "Road Roller", "Forward Truck", "Mini Dump Truck", "Generator")
 
 data class ScopeItem(
     val name: String,

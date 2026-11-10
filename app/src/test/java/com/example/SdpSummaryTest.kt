@@ -17,8 +17,8 @@ class SdpSummaryTest {
     @Test
     fun onlySaleableLotsCountByBand() {
         val items = listOf(
-            Item("Saleable", 40.0, 0), Item("Saleable", 40.0, 20), Item("Saleable", 40.0, 21),
-            Item("Saleable", 40.0, 60), Item("Saleable", 40.0, 61), Item("Saleable", 40.0, 100),
+            Item("Saleable", 40.0, 0), Item("Saleable", 40.0, 25), Item("Saleable", 40.0, 26),
+            Item("Saleable", 40.0, 75), Item("Saleable", 40.0, 76), Item("Saleable", 40.0, 100),
             Item("Road Lot", 300.0, 100), Item("Open Space", 500.0, 0), Item("Easement", 80.0, 0)
         )
         val s = SdpSummary.of(items)
@@ -66,7 +66,7 @@ class SdpSummaryTest {
         assertTrue(html.contains("San Ildefonso &lt;Heights&gt;, Bulacan &#183; as of October 30, 2026"))
         assertTrue(html.contains("<div class='plan'><img src='data:image/png;base64,AA'><table class='lg'><tr><th class='sec' colspan='2'>LEGEND</th>"))
         assertTrue(html.contains("background:#111111'></i>Not yet started</td><td class='n'>0</td>"))
-        assertTrue(html.contains("background:#222222'></i>1-20%</td><td class='n'>1</td>"))
+        assertTrue(html.contains("background:#222222'></i>1–25%</td><td class='n'>1</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td>"))
         // Road lots: red not completed, yellow concreting, green completed; colours only, no counts.
         assertTrue(html.contains("<th class='sub' colspan='2'>Road lot</th>"))
@@ -95,7 +95,7 @@ class SdpSummaryTest {
         assertTrue(html.contains("size: A4 landscape; margin: 6mm;"))
         assertTrue(html.contains("<div class='plan multi row'><figure><figcaption>Phase 1</figcaption><img src='data:a' style='max-height:151mm'></figure>"))
         assertTrue(html.contains("<th class='sub'>Progress</th><th class='sub'>Phase 1</th><th class='sub'>Phase 2</th><th class='sub'>Total</th>"))
-        assertTrue(html.contains("1-20%</td><td class='n'>2</td><td class='n'>0</td><td class='n'>2</td>"))
+        assertTrue(html.contains("1–25%</td><td class='n'>2</td><td class='n'>0</td><td class='n'>2</td>"))
         assertTrue(html.contains("<td>Total units</td><td class='n'>2</td><td class='n'>1</td><td class='n'>3</td>"))
         // Portrait: one above the other, sharing the height left under the legend.
         val portrait = BlueBookForms.sdpPlan(project, sheets, bands, LocalDate.of(2026, 11, 7))

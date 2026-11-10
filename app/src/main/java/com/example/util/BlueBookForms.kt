@@ -210,8 +210,15 @@ object BlueBookForms {
         }
         b.append("</table>")
 
-        b.append("<table><tr><th colspan='3' class='sec'>VI. ISSUES / PROBLEMS ENCOUNTERED FOR THIS WEEK</th></tr><tr><th>DESCRIPTION</th><th>ACTION TAKEN</th><th>REMARKS</th></tr>")
-        numbered(maxOf(5, issues.size)) { i -> issues.getOrNull(i).let { listOf(it?.description, it?.actionTaken, it?.remarks) } }.let(b::append)
+        b.append("<table><tr><th colspan='4' class='sec'>VI. ISSUES / PROBLEMS ENCOUNTERED FOR THIS WEEK</th></tr>")
+        b.append("<tr><th rowspan='2'>DESCRIPTION</th><th colspan='2'>ACTION TAKEN</th><th rowspan='2'>REMARKS</th></tr><tr><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th></tr>")
+        numbered(maxOf(5, issues.size)) { i ->
+            issues.getOrNull(i).let {
+                // An issue saved before "action by" existed keeps its action under the Implementing Office, as the monthly form does.
+                val byContractor = it?.actionBy == ISSUE_ACTION_BY[1]
+                listOf(it?.description, it?.actionTaken.takeUnless { byContractor }, it?.actionTaken.takeIf { byContractor }, it?.remarks)
+            }
+        }.let(b::append)
         b.append("</table>")
 
         b.append("<table><tr><th colspan='4' class='sec'>VII. WEEKLY ACCOMPLISHMENT STATUS</th></tr><tr><th>ITEM DESCRIPTION</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>VARIANCE</th></tr>")
@@ -502,7 +509,6 @@ object BlueBookForms {
         return parse(parts[0]) ?: parse("${parts[0]}, ${end.year}")
     }
 
-    /** The report's own issues, then the Issues tab entries dated within its week. */
     /**
      * Section VIII rows for [report]'s week as (document, date, implementing office, contractor/developer):
      * developer requests NHA received that week and letters the contractor received that week, by date.
@@ -522,18 +528,6 @@ object BlueBookForms {
             listOf(l.subject, l.dateReceived, "Letter issued", "Received ${date(l.dateReceived)}")
         }
         return (fromDeveloper + received).sortedBy { it[1] }.map { row -> row.toMutableList().also { it[1] = date(it[1]) } }
-    }
-
-    fun weekIssues(report: WeeklyReport, reportIssues: List<WeeklyIssue>, logged: List<ProjectIssue>): List<WeeklyIssue> {
-        val start = weekStart(report.reportingWeek) ?: return reportIssues
-        val inWeek = logged
-            .filter { issue -> parseDate(issue.date)?.let { !it.isBefore(start) && !it.isAfter(start.plusDays(6)) } == true }
-            .sortedBy { it.date }
-            .map { issue ->
-                val target = issue.targetDate.takeIf { it.isNotBlank() }?.let { "Target: ${date(it)}" }
-                WeeklyIssue(issue.description, issue.actionTaken, listOfNotNull(issue.remarks.ifBlank { null }, target).joinToString("; "))
-            }
-        return reportIssues + inWeek.filterNot { w -> reportIssues.any { it.description.trim().equals(w.description.trim(), ignoreCase = true) } }
     }
 
     private fun parseDate(value: String): LocalDate? = runCatching { LocalDate.parse(value.trim()) }.getOrNull()
