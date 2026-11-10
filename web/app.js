@@ -1,6 +1,6 @@
 // Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only a new or edited issue (saveIssue),
-// made the way RecordSync writes so the phones take it, a new account's profile (signUp), and the Super Admin's
-// approvals and roles on the Users page (setUser).
+// made the way RecordSync writes so the phones take it, a new account's profile (signUp), your own name, position and
+// office (editProfile), and the Super Admin's approvals and roles on the Users page (setUser).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
@@ -126,8 +126,10 @@ onAuthStateChanged(auth, async user => {
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit issues' : 'read only'}</span>
     ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}Users</a>` : ''}
+    <button id="profile" class="text-btn">${icon('person', 'sm')}Profile</button>
     <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
   document.getElementById('out').onclick = () => signOut(auth);
+  document.getElementById('profile').onclick = editProfile;
   s.unsub.push(onSnapshot(scoped('projects'), snap => {
     s.projectsError = null;
     s.projects = snap.docs.map(d => ({ ...d.data(), projectUuid: d.id }))
@@ -299,6 +301,54 @@ async function signUp(f) {
   } finally {
     signingUp = false;
   }
+}
+
+/* ---------- Profile (EditProfileDialog) ---------- */
+
+/** "Update Profile & Position": the name, position and office every phone and printed form shows for this account. */
+async function editProfile() {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const done = () => { d.close(); d.remove(); };
+  let stored;
+  try { stored = await getDoc(doc(db, 'users', s.user.uid)); } catch { stored = null; }
+  const v = name => esc(stored?.get(name) || '');
+  d.innerHTML = `<form novalidate>
+    <h2>Update profile &amp; position</h2>
+    <p class="muted">Update your official title, position, and office location below.</p>
+    <label class="field">Full name<input name="fullName" autocomplete="name" value="${v('displayName')}" required></label>
+    <label class="field">Position / title<input name="position" autocomplete="organization-title" placeholder="e.g. Supervising Project Engineer" value="${v('position')}" required></label>
+    <label class="field">Office / department / region<input name="office" autocomplete="organization" placeholder="e.g. NHA Regional Office III" value="${v('office')}" required></label>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save changes</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => ({ name: form.fullName.value.trim(), position: form.position.value.trim(), office: form.office.value.trim() });
+  const initial = JSON.stringify(values());
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to your profile?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values();
+    if (!f.name || !f.position || !f.office) { err.textContent = 'Fill in your full name, position and office.'; return; }
+    if (JSON.stringify(f) === initial) { done(); return; }
+    // An account without a profile gets it from the app; a profile made here would have no role for the claims function.
+    if (!stored?.exists()) { err.textContent = 'Sign in to the NHA Monitor app once to set up your profile, then try again.'; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // syncUserProfile's fields; role, approval and "See all projects" stay as they are.
+      await updateDoc(doc(db, 'users', s.user.uid), { displayName: f.name, position: f.position, office: f.office, updatedAt: Date.now() });
+      s.profile = { name: f.name, title: f.position, office: f.office };
+      done();
+    } catch (x) {
+      err.textContent = `Could not save: ${x.message}`;
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
 }
 
 /* ---------- Users (ManageUsersDialog), Super Admin only ---------- */
