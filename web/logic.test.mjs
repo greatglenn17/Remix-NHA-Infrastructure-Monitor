@@ -255,3 +255,22 @@ test('website edits: a new issue is the record and audit entry the app uploads',
   assert.deepEqual(L.newIssueAudit(f), { actionType: 'Issue Creation', details: 'Logged issue: Flooded access road near Block...', oldValue: '',
     newValue: `Description: ${f.description}, Status: Pending, Critical: true` });
 });
+
+test('weather edit: the form reads a report\'s week, and only changed days are rewritten', () => {
+  const report = { reportingWeek: 'November 01, 2026 - November 07, 2026', _weather: [
+    { date: '2026-11-01', dayOfWeek: 'Sunday', hourlyConditionsCsv: Array(24).fill('CLOUDY').join(',') },
+    { date: '2026-11-02', dayOfWeek: 'Monday', hourlyConditionsCsv: 'RAIN SHOWERS,oops' },
+  ] };
+  const days = L.weatherForm(report);
+  assert.equal(days.length, 7);
+  assert.equal(days[0].date, '2026-11-01');
+  assert.deepEqual([days[0].logged, days[0].hours[5]], [true, 'CLOUDY']);
+  assert.deepEqual(days[1].hours.slice(0, 3), ['RAIN_SHOWERS', 'FAIR', 'FAIR'], 'old spellings and unknown hours read like the clock');
+  assert.deepEqual([days[2].logged, days[2].hours[0]], [false, 'FAIR']);
+  assert.equal(L.weatherChanges(report, days, new Set()), null);
+  days[2].hours[14] = 'STORMY';
+  const out = L.weatherChanges(report, days, new Set(['2026-11-03']))._weather;
+  assert.deepEqual(out.map(w => w.date), ['2026-11-01', '2026-11-02', '2026-11-03']);
+  assert.equal(out[1], report._weather[1], 'an untouched day stays exactly as stored');
+  assert.deepEqual(out[2], { date: '2026-11-03', dayOfWeek: 'Tuesday', hourlyConditionsCsv: [...Array(14).fill('FAIR'), 'STORMY', ...Array(9).fill('FAIR')].join(',') });
+});

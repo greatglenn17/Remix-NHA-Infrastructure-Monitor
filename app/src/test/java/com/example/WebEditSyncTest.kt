@@ -83,6 +83,45 @@ class WebEditSyncTest {
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
 
+    /** web/logic.js weatherChanges: the weekly report's record with one day's hours changed in `_weather`. */
+    @Test
+    fun websiteWeatherEdit_replacesThatWeeksWeather() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        val report = com.example.data.model.WeeklyReport(
+            projectId = projectId, reportingWeek = "October 31, 2026 - November 06, 2026", daysElapsed = 90, remainingDays = 60,
+            targetAccomplishmentPct = 40.0, actualAccomplishmentPct = 38.5, manpowerJson = "[]", equipmentJson = "[]",
+            activitiesJson = "[{\"day\":\"Monday\",\"description\":\"Rebar works\"}]", issuesJson = "[]", accomplishmentItemsJson = "[]",
+            documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]", submittedByStaff = "Engr. Sample"
+        )
+        val days = listOf("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+        val fair = List(24) { "FAIR" }.joinToString(",")
+        com.example.data.local.WeeklyReportWeatherWriter(db, db.reportDao()).create(report, days.mapIndexed { i, day ->
+            com.example.data.model.DailyHourlyWeather(projectId = projectId, date = "2026-${if (i == 0) "10-31" else "11-0$i"}", dayOfWeek = day, hourlyConditionsCsv = fair)
+        })
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+
+        val cloud = recordSync.buildDocument("weekly_reports", report.uuid, "phone")!!
+        val data = JSONObject(cloud["data"] as String)
+        val stormyAfternoon = List(24) { if (it in 14..17) "STORMY" else "FAIR" }.joinToString(",")
+        data.getJSONArray("_weather").getJSONObject(3).put("hourlyConditionsCsv", stormyAfternoon) // Tuesday, 2026-11-03
+        val revision = (cloud["revision"] as Long) + 1
+        recordSync.applyRemote(listOf(cloud + mapOf("revision" to revision, "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "data" to data.toString())))
+
+        assertEquals(7L, long("SELECT COUNT(*) FROM daily_hourly_weather WHERE projectId = ?", projectId))
+        assertEquals(stormyAfternoon, string("SELECT hourlyConditionsCsv FROM daily_hourly_weather WHERE date = '2026-11-03'"))
+        assertEquals("Tuesday", string("SELECT dayOfWeek FROM daily_hourly_weather WHERE date = '2026-11-03'"))
+        assertEquals(fair, string("SELECT hourlyConditionsCsv FROM daily_hourly_weather WHERE date = '2026-11-02'"))
+        assertEquals("the rest of the report stays", report.activitiesJson, string("SELECT activitiesJson FROM weekly_reports WHERE uuid = ?", report.uuid))
+        assertEquals(revision, long("SELECT revision FROM weekly_reports WHERE uuid = ?", report.uuid))
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
+
     /** web/logic.js newIssueRecord: a brand-new issue the phone has never seen. */
     @Test
     fun websiteNewIssue_isAddedToTheProject() = runBlocking {
