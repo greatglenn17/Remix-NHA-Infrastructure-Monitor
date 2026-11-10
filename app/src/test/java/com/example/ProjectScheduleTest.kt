@@ -137,6 +137,10 @@ class ProjectScheduleTest {
         assertEquals("1st Partial Continuance of Work Suspension Order No. 1", ProjectSchedule.orderLabel(oldC1.documentName))
         assertEquals("2nd Continuance of Work Suspension Order No. 1", ProjectSchedule.orderLabel(oldC2.documentName))
         assertEquals("Work Resumption Order No. 3", ProjectSchedule.orderLabel("Work Resumption No. 3"))
+        // Key dates: a suspension, its continuances, then its resumption; the rest keep their place.
+        val te = doc("Time Extension No. 1 - 30 Days", "Approved", "")
+        val wr = doc("Partial Work Resumption Order No. 1", "Pending", "Effectivity: 2026-09-10")
+        assertEquals(listOf(te, old, oldC1, oldC2, wr, ws), ProjectSchedule.chained(listOf(te, old, wr, oldC1, ws, oldC2)))
         for (same in listOf("Time Extension No. 1 - 30 Days", "2nd Partial Continuance of Work Suspension Order No. 1", "Partial Work Suspension Order No. 2"))
             assertEquals(same, ProjectSchedule.orderLabel(same))
     }

@@ -129,7 +129,8 @@ object BlueBookForms {
         row("Original Contract Amount", esc(peso(logs.originalCost)))
         row("Original Contract Duration", esc("${project.contractDurationDays} calendar days (c.d.)"))
         row("Contract Suspension/s", if (logs.suspensions.isEmpty()) "None" else "")
-        logs.suspensions.forEach { sub(it.label, withReason(it.value, it.status, it.reason)) }
+        // A suspension reads as three lines: its days, its effectivity dates, its reason.
+        logs.suspensions.forEach { sub(it.label, withReason(it.value.replaceFirst(" – ", "\n"), it.status, it.reason).replaceFirst("\n", "<br>")) }
         row("Contract Resumption", if (logs.resumptions.isEmpty()) "None" else "")
         logs.resumptions.forEach { (label, value) -> sub(label, esc(value)) }
         row("Contract Time Extensions", if (logs.extensions.isEmpty()) "None" else "")

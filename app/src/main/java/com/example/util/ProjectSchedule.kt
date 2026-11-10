@@ -96,6 +96,15 @@ object ProjectSchedule {
     fun continuances(suspension: PendingDocument, documents: List<PendingDocument>) =
         documents.filter { continuanceOf(it.documentName) == baseOf(suspension.documentName) }
 
+    /** Key dates' [orders]: each suspension, then its continuances, then its resumption; the other orders keep their place. */
+    fun chained(orders: List<PendingDocument>): List<PendingDocument> {
+        fun resumes(r: PendingDocument, s: PendingDocument) =
+            ORDER.find(r.documentName.trim())?.groupValues?.get(2).equals("Resumption", ignoreCase = true) && baseOf(r.documentName) == baseOf(s.documentName)
+        val chains = orders.filter(::isSuspension).associateWith { s -> listOf(s) + continuances(s, orders) + orders.filter { resumes(it, s) } }
+        val inChain = chains.values.flatten().toSet()
+        return orders.flatMap { chains[it] ?: if (it in inChain) emptyList() else listOf(it) }
+    }
+
     /**
      * Name of the next continuance of [suspension] of [type], e.g. "2nd Partial Continuance of Work Suspension Order No. 1",
      * and the day it starts: the day after the latest End of the suspension and its continuances so far.

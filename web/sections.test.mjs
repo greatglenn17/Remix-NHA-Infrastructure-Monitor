@@ -76,6 +76,9 @@ test('order names: older forms read like new ones; continuances follow their sus
   assert.equal(L.isSuspension(ws), true);
   assert.equal(L.isSuspension(docs[1]), false);
   assert.deepEqual(L.continuances(ws, docs), [docs[1]]);
+  // Key dates: a suspension, its continuances, then its resumption; the rest keep their place.
+  const te = { documentName: 'Time Extension No. 1 - 30 Days' }, wr = { documentName: 'Work Resumption Order No. 1' };
+  assert.deepEqual(L.chained([te, ws, wr, docs[1], docs[2]]), [te, ws, docs[1], wr, docs[2]]);
 });
 
 test('letters: old document letters merged in, newest first; related files leave out orders and letters', () => {
@@ -362,6 +365,8 @@ test('project profile: orders listed under their headings, revised cost only aft
   const vo = html([{ documentName: 'Variation Order No. 1 - PHP 500', status: 'Approved', remarks: 'Reason: More units' }]);
   assert.match(vo, /Variation Order No. 1<\/td><td class='pc'>:<\/td><td>Php 500.00<br>\(More units\)/);
   assert.match(vo, /Revised Contract Cost<\/td><td class='pc'>:<\/td><td>Php 1,500.00/);
+  assert.match(html([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-05-26 | Duration: 90 days | End: 2026-08-23 | Reason: EO 110' }]),
+    /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>90 calendar days<br>May 26, 2026 to August 23, 2026<br>\(EO 110\)/);
   assert.match(html([{ documentName: 'Work Resumption Order No. 1', status: 'Pending', remarks: 'Effectivity: 2026-08-16' }]),
     /Work Resumption Order No. 1<\/td><td class='pc'>:<\/td><td>August 16, 2026 \(for approval\)/);
 });

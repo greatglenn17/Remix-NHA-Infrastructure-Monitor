@@ -454,7 +454,7 @@ function drawProject(page) {
 function summaryBody({ page, project, records, of, documents, payments, weekly, cost, billed, now }) {
   const latest = weekly[0];
   const openIssues = of('project_issues').filter(L.isOpenIssue).length;
-  const orders = documents.filter(d => SCHEDULE_ORDER.test(d.documentName || ''));
+  const orders = L.chained(documents.filter(d => SCHEDULE_ORDER.test(d.documentName || '')));
   const flags = L.attentionFlags(project, documents, billed, now);
   const housing = /housing/i.test(project.projectType || '');
   const finished = L.isCompleted(project);

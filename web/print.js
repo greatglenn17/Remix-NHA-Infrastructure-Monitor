@@ -246,7 +246,8 @@ export function projectProfileHtml({ project, docs, preparer, asOf, banner }) {
   row('Original Contract Amount', esc(peso(L.originalCost(project))));
   row('Original Contract Duration', esc(`${project.contractDurationDays ?? 0} calendar days (c.d.)`));
   row('Contract Suspension/s', suspensions.length ? '' : 'None');
-  suspensions.forEach(o => sub(o.label, withReason(o.value, o.status, o.reason)));
+  // A suspension reads as three lines: its days, its effectivity dates, its reason.
+  suspensions.forEach(o => sub(o.label, withReason(o.value.replace(' – ', '\n'), o.status, o.reason).replace('\n', '<br>')));
   row('Contract Resumption', resumptions.length ? '' : 'None');
   resumptions.forEach(([label, value]) => sub(label, esc(value)));
   row('Contract Time Extensions', extensions.length ? '' : 'None');
