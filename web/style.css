@@ -356,6 +356,8 @@ tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
   .ph-loc { margin-bottom: 10px; }
   .ghost-rows { display: none; }
   #who .email { display: none; }
+  #who { flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; }
+  #who .text-btn { white-space: nowrap; }
   .search { max-width: none; }
   /* Filters on a phone: one per row, so each label stays on one line. */
   .pills { display: grid; grid-template-columns: 1fr; gap: 6px; }

@@ -14,6 +14,9 @@ is read only.
   its `users/{uid}` profile (name, position, office, and Field Engineer or Viewer). `syncUserCustomClaims` sets the
   role and alerts the Super Admin, the account waits for approval before it can edit, and the page goes back to
   sign in like the app. Trying again with the same email and password finishes a profile that never saved.
+- **Profile** (in the header) is the app's "Update Profile & Position": full name, position and office, all required.
+  It updates only those fields of your existing `users/{uid}` profile (an account without one sets it up in the app
+  first); printed forms here use the new values at once, and phones pick them up when they next sync the profile.
 - **Users** (Super Admin only, in the header) is the app's "Manage users & roles": approve a new account, give one of
   Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
   `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access.
