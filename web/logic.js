@@ -768,3 +768,44 @@ export function sdpSummary(lots) {
     roads: ROAD_STATES.map((_, r) => lots.filter(l => lotUse(l) === 'Road Lot' && roadState(lotProgress(l)) === r).length),
   };
 }
+
+/* ---------- Website edits (records the phones sync, written the way RecordSync writes them) ---------- */
+
+/** firestore.rules isWriter: approved (accounts from before approvals have a role and no approved claim) and not a Viewer or Super Viewer. */
+export const isWriter = claims => (claims.approved ?? Boolean(claims.role)) === true && !['VIEWER', 'SUPER_VIEWER'].includes(claims.role);
+
+/** The project rule on top: the Super Admin, or a writer assigned to the project. */
+export const canEdit = (project, uid, claims) => isWriter(claims) && (claims.role === 'SUPER_ADMIN' || (project.assignedUids || []).includes(uid));
+
+/** AddIssueDialog's choices. */
+export const ISSUE_STATUSES = ['Pending', 'Approved', 'No Action'];
+export const ISSUE_ACTION_BY = ['Implementing Office', 'Contractor/Developer'];
+
+/**
+ * The fields an edit writes to an existing cloud record. The revision goes up by one and the edit time changes, so
+ * every phone takes it (RemoteVersion.isNewer); every other field in `data` is kept as stored.
+ */
+export function editedRecord(stored, changes, { uid, now, assignedUids }) {
+  let data;
+  try { data = JSON.parse(stored.data || '{}'); } catch { throw new Error('This record could not be read, so it cannot be edited here.'); }
+  return { revision: (Number(stored.revision) || 1) + 1, updatedAt: now, updatedByUid: uid, assignedUids, data: JSON.stringify({ ...data, ...changes }) };
+}
+
+/** A new audit_logs record (AuditLog synced by RecordSync), with "Website" as the device. */
+export function auditRecord({ uuid, projectUuid, assignedUids, uid, now, user, actionType, details, oldValue = '', newValue = '' }) {
+  return {
+    uuid, type: 'audit_logs', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+    data: JSON.stringify({ timestamp: now, user, device: 'Website', actionType, oldValue, newValue, details }),
+  };
+}
+
+/** AddIssueDialog's checks: a date, the issue and the action taken are required; dates are yyyy-MM-dd. */
+export function issueErrors(f) {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  return [
+    !iso.test(f.date || '') && 'Pick the date.',
+    !f.description?.trim() && 'Type the issue or concern.',
+    !f.actionTaken?.trim() && 'Type the action taken.',
+    f.targetDate && !iso.test(f.targetDate) && 'Pick a valid target date.',
+  ].filter(Boolean);
+}

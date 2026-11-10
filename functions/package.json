@@ -4,7 +4,7 @@
   "description": "NHA Monitor Cloud Functions for Custom Claims and FCM",
   "main": "index.js",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project demo-nha \"node --test purge.test.js\""
+    "test": "node --test approval.test.js auditAlert.test.js && firebase emulators:exec --only firestore --project demo-nha \"node --test purge.test.js\""
   },
   "engines": {
     "node": "22"
