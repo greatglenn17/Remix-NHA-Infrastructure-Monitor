@@ -119,7 +119,7 @@ fun PhotoGalleryTab(weeklyReports: List<WeeklyReport>, onDeletePhoto: ((WeeklyRe
                                 .clickable { selectedPhoto = photo }
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                AsyncImage(
+                                com.example.ui.theme.LoadingImage(
                                     model = photo.url,
                                     contentDescription = "Project Photo",
                                     modifier = Modifier.fillMaxSize(),

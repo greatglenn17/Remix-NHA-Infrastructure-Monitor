@@ -563,7 +563,7 @@ private fun WeeklyReportCard(
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         )
                         run {
-                            AsyncImage(
+                            com.example.ui.theme.LoadingImage(
                                 model = photos.first(),
                                 contentDescription = "Site Photo",
                                 modifier = Modifier
