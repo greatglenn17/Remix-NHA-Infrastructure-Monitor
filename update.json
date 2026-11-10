@@ -1,8 +1,8 @@
 {
-  "versionCode": 284,
-  "versionName": "2.8.4",
-  "releaseNotes": "v2.8.4: Easier to read on site. No text is smaller than 12, text uses regular and semibold only, and low-contrast colours are fixed. A lot's action buttons sit two per row and the plan's zoom bar scrolls sideways.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.4/NHA_Monitor_v2.8.4_Build284.apk",
-  "apkSha256": "2b302fec1955eff8b56c66d3dc6ece1f518db8b32c1c580636836d54ce42d394",
+  "versionCode": 285,
+  "versionName": "2.8.5",
+  "releaseNotes": "v2.8.5: The approved bar chart no longer disappears when another phone that changed the same project syncs. If a chart already disappeared, upload it again once after every device has this update.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.5/NHA_Monitor_v2.8.5_Build285.apk",
+  "apkSha256": "54a01b0ac6ffb237329c4952377924d0eb1d3e0ef08957c136fc3b13a120bc05",
   "isMandatory": true
 }
