@@ -690,8 +690,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    fun signOutUser() {
+    fun signOutUser() = viewModelScope.launch {
         val previousUser = currentUserAccount.value.name
+        // While still signed in: this phone stops getting the account's pushes.
+        firestoreSyncManager.unregisterPushToken()
         firestoreSyncManager.stopRealtimeSync()
         authManager.signOut()
         _currentUserAccount.value = DefaultUserAccount
@@ -2331,50 +2333,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
 
-            // Notify Super Admin on ALL changes by Engineer Admin, Field Engineer, or User Registrations/Elevations!
-            val isRegistrationOrElevation = actionType.contains("Registration", ignoreCase = true) || actionType.contains("Elevation", ignoreCase = true)
-            val isNonSuperAdminAction = currentAccount.role != UserRole.SUPER_ADMIN && actionType != "User Login" && actionType != "User Logout"
-
-            if (isRegistrationOrElevation || isNonSuperAdminAction) {
-                var pName = ""
-                if (projectId != null) {
-                    try {
-                        pName = projectDao.getProjectById(projectId).first()?.name ?: ""
-                    } catch (e: Exception) {}
-                }
-
-                val notificationTitle = when {
-                    actionType.contains("Registration", ignoreCase = true) -> "New User Registration Alert"
-                    actionType.contains("Elevation", ignoreCase = true) -> "Role Elevation Alert"
-                    actionType.contains("Creation", ignoreCase = true) || actionType.contains("Project", ignoreCase = true) -> "Project Activity by ${currentAccount.role.label}"
-                    actionType.contains("Report", ignoreCase = true) -> "Report Submitted by ${currentAccount.role.label}"
-                    actionType.contains("Payment", ignoreCase = true) -> "Disbursement Added by ${currentAccount.role.label}"
-                    actionType.contains("Weather", ignoreCase = true) -> "Weather Entry by ${currentAccount.role.label}"
-                    actionType.contains("Issue", ignoreCase = true) -> "Site Issue Logged by ${currentAccount.role.label}"
-                    else -> "System Alert ($actionType) by ${currentAccount.role.label}"
-                }
-
-                val appNotification = AppNotification(
-                    title = notificationTitle,
-                    message = "$userName: $details",
-                    actorName = userName,
-                    actorRole = currentAccount.role.name,
-                    targetRole = "SUPER_ADMIN",
-                    projectId = projectId,
-                    projectName = pName,
-                    actionType = actionType,
-                    timestamp = System.currentTimeMillis(),
-                    isRead = false
-                )
-                notificationDao.insertNotification(appNotification)
-
-                // Send Native Android Status Bar Notification Alert
-                com.example.util.AppNotificationManager.sendAdminNotification(
-                    context = getApplication(),
-                    title = notificationTitle,
-                    message = "$userName: $details"
-                )
-            }
+            // The Super Admin hears about it from the notifySuperAdminsOnAudit Cloud Function once this entry syncs.
         }
     }
 

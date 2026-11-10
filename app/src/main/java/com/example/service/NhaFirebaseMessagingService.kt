@@ -1,6 +1,8 @@
 package com.example.service
 
 import android.util.Log
+import com.example.data.local.AppDatabase
+import com.example.data.model.AppNotification
 import com.example.util.AppNotificationManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -45,6 +47,28 @@ class NhaFirebaseMessagingService : FirebaseMessagingService() {
                 message = message
             )
         }
+        // The Super Admin's alerts also go in the app's notification list (the bell).
+        if (data["type"] == "AUDIT_ALERT" || data["type"] == "REGISTRATION_ALERT") listInBell(title, message, data)
+    }
+
+    private fun listInBell(title: String, message: String, data: Map<String, String>) = try {
+        // onMessageReceived runs on a background thread, so the insert may block it.
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getDatabase(applicationContext, kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO))
+                .notificationDao().insertNotification(
+                    AppNotification(
+                        title = title,
+                        message = message,
+                        actorName = data["actorName"] ?: data["displayName"].orEmpty(),
+                        actorRole = data["actorRole"].orEmpty(),
+                        targetRole = "SUPER_ADMIN",
+                        projectName = data["projectName"].orEmpty(),
+                        actionType = data["actionType"] ?: data["type"].orEmpty()
+                    )
+                )
+        }
+    } catch (e: Exception) {
+        Log.w(tag, "Alert not added to the notification list: ${e.message}")
     }
 
     private fun registerTokenToFirestore(token: String) {

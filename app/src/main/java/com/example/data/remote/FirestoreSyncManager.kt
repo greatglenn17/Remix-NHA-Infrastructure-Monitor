@@ -504,6 +504,25 @@ class FirestoreSyncManager(
     }
 
     /**
+     * Removes this phone's push token from the signed-in account, so the account's pushes (Super Admin alerts among
+     * them) stop reaching this phone once someone signs out. Call it before signing out; it waits at most 3 seconds.
+     * Offline, the token stays until the next account to sign in here claims it (the releaseTokenFromOtherUsers function).
+     */
+    suspend fun unregisterPushToken() {
+        val uid = auth.currentUser?.uid ?: return
+        try {
+            kotlinx.coroutines.withTimeoutOrNull(3_000) {
+                val token = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+                if (!token.isNullOrBlank()) {
+                    firestore.collection("users").document(uid).collection("fcmTokens").document(token.takeLast(20)).delete().await()
+                }
+            }
+        } catch (ex: Exception) {
+            Log.w(tag, "Push token not removed at sign-out: ${ex.message}")
+        }
+    }
+
+    /**
      * Stop real-time Firestore listeners.
      */
     fun stopRealtimeSync() = synchronized(listenerLock) {

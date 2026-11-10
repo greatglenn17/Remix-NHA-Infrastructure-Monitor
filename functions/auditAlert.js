@@ -48,7 +48,10 @@ function buildAlert(record, actorRole, project) {
                 : has("issue") ? `Site Issue Logged by ${by}`
                   : `System Alert (${action}) by ${by}`;
   const name = project.name ? ` (${project.name})` : "";
-  return { title, message: `${d.user || "Someone"}: ${d.details || action}${name}`, device: String(d.device || "") };
+  return {
+    title, message: `${d.user || "Someone"}: ${d.details || action}${name}`, device: String(d.device || ""),
+    actorName: String(d.user || ""), actionType: action,
+  };
 }
 
 module.exports = { auditAlert, skipReason, MAX_AGE_MS };
