@@ -528,10 +528,26 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   return `
     <div class="bento">
       <div class="col c1">${attention}${profile}</div>
-      <div class="col c2">${dates}</div>
+      <div class="col c2">${dates}${barChartCard(project, documents, now)}</div>
       <div class="col c3">${costCard}${report}${construction}</div>
       ${paymentCard}
     </div>`;
+}
+
+/** BarChartCard: the chart in force, today's planned % and its S-curve by month. */
+function barChartCard(project, documents, now) {
+  const plan = L.planOn(project, documents, now);
+  if (!plan) return section('Approved bar chart', 'stacked_line_chart', emptyLine('No bar chart yet. The target % is typed in each weekly report.'));
+  const { version, day } = plan, last = L.chartLastDay(version), [month, cell] = L.cellOf(Math.min(Math.max(day, 1), last));
+  const inForce = v => `${v.label} · from ${L.displayDate(v.effective)}`;
+  return section('Approved bar chart', 'stacked_line_chart', `
+    ${kv('In force', inForce(version))}
+    ${kv('Planned as of today', `${plan.plannedPct.toFixed(2)}%${day >= 1 && day <= last ? ` · Month ${month}, cell ${cell}` : ''}`)}
+    ${kv('Chart length', `${last} calendar days`)}
+    ${plan.versions.filter(v => v !== version).map(v => kv('Also on file', inForce(v))).join('')}
+    <p class="sub">S-curve</p>
+    ${table(['Month', { text: 'Monthly', num: true }, { text: 'Cumulative', num: true }], L.chartMonths(version).map(m =>
+      `<tr><td>${m.no}</td><td class="num">${m.monthlyPct.toFixed(2)}%</td><td class="num">${m.cumulativePct.toFixed(2)}%</td></tr>`).join(''))}`);
 }
 
 /** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */

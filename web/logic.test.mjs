@@ -115,6 +115,21 @@ test('bar chart target follows the approved chart per day', () => {
   assert.equal(L.withPlannedTarget(done, [], '2026-01-30'), done);
 });
 
+test('bar chart card: version in force, contract day, cell and S-curve', () => {
+  const v1 = { label: 'Original', effective: '2026-01-01', items: [{ name: 'A', amount: 60, bars: [[1, 30]] }, { name: 'B', amount: 40, bars: [[31, 70]] }] };
+  const v2 = { ...v1, label: 'Revision 1', effective: '2026-02-15' };
+  const p = chartProject([v2, v1]);
+  const plan = L.planOn(p, [], '2026-01-30');
+  assert.equal(plan.version.label, 'Original');
+  assert.deepEqual([plan.day, plan.plannedPct, plan.versions.length], [30, 60, 2]);
+  assert.equal(L.planOn(p, [], '2026-03-01').version.label, 'Revision 1');
+  assert.equal(L.planOn({ dateStarted: '2026-01-01' }, [], '2026-01-30'), null);
+  assert.deepEqual([L.cellOf(1), L.cellOf(5), L.cellOf(6), L.cellOf(30), L.cellOf(31)], [[1, 5], [1, 5], [1, 10], [1, 30], [2, 5]]);
+  assert.equal(L.chartLastDay(v1), 70);
+  // B's 40 is spread over 40 days: 30 in month 2, 10 in month 3.
+  assert.deepEqual(L.chartMonths(v1).map(m => [m.no, m.monthlyPct, m.cumulativePct]), [[1, 60, 60], [2, 30, 90], [3, 10, 100]]);
+});
+
 test('bar chart target: a Partial suspension pauses only the items it names', () => {
   const p = chartProject([{ label: 'Original', effective: '2026-01-01', items: [
     { name: 'A', amount: 50, bars: [[1, 100]] }, { name: 'B', amount: 50, bars: [[1, 100]] }] }]);
