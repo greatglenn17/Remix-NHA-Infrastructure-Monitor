@@ -5,7 +5,9 @@ A web version of the NHA Monitor app. It reads the same Firestore data as the ph
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. The edit is written the way the phones write a record (revision up by one, a new edit time, every other field
 kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
-A phone with its own unsent edit of the same issue keeps its version. Everything else is read only.
+A phone with its own unsent edit of the same issue keeps its version. The Cloud Function
+`notifySuperAdminsOnAudit` pushes that audit entry to the Super Admin's phones, as it does for app edits. Everything else
+is read only.
 
 - Sign-in uses the same email and password as the app.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with

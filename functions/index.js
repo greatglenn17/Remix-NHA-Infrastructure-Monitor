@@ -10,6 +10,7 @@ initializeApp();
 const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
+const { auditAlert } = require("./auditAlert");
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
 // taken from the client-written profile: only the account whose Firebase Auth
 // email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
@@ -257,24 +258,66 @@ exports.purgeOldRecordTombstones = functions.region(REGION).pubsub
     return null;
   });
 
+/** The FCM tokens of every Super Admin's devices, leaving out `exceptUid`'s. */
+async function superAdminTokens(exceptUid = "") {
+  const superAdminUsers = await getFirestore()
+    .collection("users").where("role", "==", "SUPER_ADMIN").get();
+  const tokens = [];
+  for (const doc of superAdminUsers.docs) {
+    if (doc.id === exceptUid) continue;
+    const tokenDocs = await getFirestore()
+      .collection("users").doc(doc.id).collection("fcmTokens").get();
+    tokenDocs.forEach((t) => {
+      const token = t.data().token;
+      if (token) tokens.push(token);
+    });
+  }
+  return tokens;
+}
+
+/**
+ * Triggered when a record is created. A new audit log entry (written by the app or the website with each change)
+ * by anyone but the Super Admin is pushed to the Super Admin's devices, with the alert the app builds in
+ * ProjectViewModel.logAuditAction. Other record types return at once.
+ */
+exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
+  .document("records/{recordId}")
+  .onCreate(async (snap, context) => {
+    const record = snap.data();
+    if (record.type !== "audit_logs") return null;
+    try {
+      const uid = record.updatedByUid || "";
+      const actor = uid ? await getFirestore().collection("users").doc(uid).get() : null;
+      const alert = auditAlert(record, actor && actor.exists ? actor.get("role") : "", Date.now());
+      if (!alert) return null;
+      const tokens = await superAdminTokens(uid);
+      if (tokens.length === 0) return null;
+      const project = await getFirestore().collection("projects").doc(record.projectUuid || "-").get();
+      const projectName = (project.exists && project.get("name")) || "";
+      const response = await getMessaging().sendEachForMulticast({
+        tokens,
+        data: {
+          type: "AUDIT_ALERT",
+          title: alert.title,
+          message: projectName ? `${alert.message} (${projectName})` : alert.message,
+          projectName,
+          eventId: `audit_${context.params.recordId}`,
+        },
+        android: { priority: "high" },
+      });
+      console.log(`Audit alert ${context.params.recordId}: Success=${response.successCount} Failed=${response.failureCount}`);
+    } catch (error) {
+      console.error(`Audit alert error for ${context.params.recordId}:`, error);
+    }
+    return null;
+  });
+
 /**
  * Send FCM notification to all Super Admin devices when a new subordinate registers.
  */
 async function notifySuperAdminsOnRegistration(userData) {
   try {
-    const superAdminUsers = await getFirestore()
-      .collection("users").where("role", "==", "SUPER_ADMIN").get();
-
-    const tokens = [];
-    for (const doc of superAdminUsers.docs) {
-      const tokenDocs = await getFirestore()
-        .collection("users").doc(doc.id).collection("fcmTokens").get();
-      tokenDocs.forEach((t) => {
-        const token = t.data().token;
-        if (token) tokens.push(token);
-      });
-    }
-
+    const tokens = await superAdminTokens();
     if (tokens.length === 0) return;
 
     await getMessaging().sendEachForMulticast({
