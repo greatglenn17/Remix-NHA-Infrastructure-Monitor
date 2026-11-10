@@ -3,6 +3,7 @@ package com.example
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -62,7 +63,7 @@ class WeeklyReportStepsTest {
             manpowerJson = JSONArray().put(JSONObject().put("designation", "Foreman").put("count", 2).put("remarks", "")).toString(),
             equipmentJson = "[]",
             activitiesJson = JSONArray().put(JSONObject().put("day", "Tuesday").put("description", "Backfill").put("remarks", "ok")).toString(),
-            issuesJson = JSONArray().put(JSONObject().put("description", "Rain").put("actionTaken", "Pumped").put("remarks", "")).toString(),
+            issuesJson = JSONArray().put(JSONObject().put("description", "Rain").put("actionTaken", "Pumped").put("remarks", "").put("actionBy", "")).toString(),
             accomplishmentItemsJson = acc,
             documentsIssuedReceivedJson = "[]",
             attachedPhotoUrlsJson = JSONArray().put("content://photos/1.jpg").toString(),
@@ -123,5 +124,32 @@ class WeeklyReportStepsTest {
         rule.onNodeWithText("Land Development: actual must be 0 to 100%").assertExists()
         rule.onNodeWithText("Go to Week").performSemanticsAction(SemanticsActions.OnClick)
         rule.onNodeWithText("Step 1 of 5: Week and progress").assertExists()
+    }
+
+    // Equipment is picked from the list; an issue says who took the action, and both are saved.
+    @Test fun equipmentPick_andIssueActionBy_areSaved() {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "",
+            contractCostOriginal = 1000.0, contractCostRevised = 0.0, contractDurationDays = 100, dateStarted = "2026-01-05",
+            completionDateOriginal = "2026-12-31", completionDateRevised = ""
+        )
+        var saved: Pair<String, String>? = null
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                AddWeeklyReportDialog(project = project, projectId = 1, onDismiss = {},
+                    onSubmit = { _, _, _, _, _, _, _, _, equipment, issues, _, _ -> saved = equipment to issues })
+            }
+        }
+        rule.onNodeWithText("Crew").performClick()
+        rule.onAllNodesWithText("Add")[1].performSemanticsAction(SemanticsActions.OnClick) // a small window: below the fold
+        rule.onNodeWithTag("pick_Name of Equipment", useUnmergedTree = true).performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithText("Mini Dump Truck").performClick()
+        rule.onNodeWithText("Work").performClick()
+        rule.onNodeWithTag("add_issue_button").performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithTag("weekly_issue_by_Contractor/Developer").performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNodeWithTag("submit_weekly_report_button").performClick()
+        val (equipment, issues) = saved!!
+        assertEquals("Mini Dump Truck", JSONArray(equipment).getJSONObject(0).getString("description"))
+        assertEquals("Contractor/Developer", JSONArray(issues).getJSONObject(0).getString("actionBy"))
     }
 }
