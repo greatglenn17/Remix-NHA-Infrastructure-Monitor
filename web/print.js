@@ -261,8 +261,8 @@ export function projectProfileHtml({ project, docs, preparer, asOf, banner }) {
   row('Status of the Project', esc(L.displayStatus(project)));
   return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
     <h1 class='title'>PROJECT PROFILE</h1>
-    <table class='profile'>${rows.join('')}</table>
-    <div class='sig1'>Prepared By:<br><br><br><b>${esc((preparer.name || '').toUpperCase())}</b><br>${esc(preparer.title)}<br>${esc(preparer.office)}</div>`;
+    <div class='profile'><table class='profile'>${rows.join('')}</table>
+    <div class='sig1'>Prepared By:<br><br><br><b>${esc((preparer.name || '').toUpperCase())}</b><br>${esc(preparer.title)}<br>${esc(preparer.office)}</div></div>`;
 }
 
 /* ---------- The monthly form (BlueBookForms.monthlyReport) ---------- */

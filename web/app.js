@@ -1129,7 +1129,8 @@ async function drawPrint(c) {
 /** The Project Profile sheet (BlueBookForms.projectProfile, Print on the Summary's profile card) for `#/p/<id>/print/profile`. */
 function drawProfilePrint({ page, project, documents }) {
   document.title = `Project Profile - ${project.name}`; // the file name "Save as PDF" offers, as on the phone
-  main.innerHTML = `<div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}">${icon('arrow_back', 'sm')}Summary</a>
+  // 12 mm page margins, as the phone prints this sheet (not the 6 mm of its full-page prints).
+  main.innerHTML = `<style>@page { margin: 12mm; }</style><div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}">${icon('arrow_back', 'sm')}Summary</a>
       <button class="btn" id="do-print">${icon('print', 'sm')}Print</button></div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet">${P.projectProfileHtml({
