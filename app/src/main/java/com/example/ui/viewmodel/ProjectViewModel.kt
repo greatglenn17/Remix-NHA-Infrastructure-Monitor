@@ -9,6 +9,7 @@ import java.time.format.DateTimeFormatter
 import com.example.data.auth.AuthManager
 import com.example.data.local.AppDatabase
 import com.example.data.local.WeeklyReportWeatherWriter
+import com.example.data.local.barChartPayload
 import com.example.data.model.*
 import kotlinx.coroutines.tasks.await
 import com.example.data.remote.AssignmentPolicy
@@ -2019,7 +2020,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             if (!currentUserAccount.value.role.hasPermission(Permission.MANAGE_BAR_CHART)) return@launch
             val current = projectDao.getProjectByIdOnce(projectId) ?: return@launch
             if (current.barChartJson == json) return@launch
-            saveProjectChange(current.copy(barChartJson = json))
+            saveProjectChange(current.copy(barChartJson = json), barChart = true)
             logAuditAction(projectId, "Bar Chart", if (json.isBlank()) "Removed the approved bar chart" else "Saved the approved bar chart")
         }
     }
@@ -2060,7 +2061,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
      * Saves a change to a project's master record and queues it for upload. Writing to
      * the DAO directly skips the revision bump and the outbox, so other phones never see it.
      */
-    private suspend fun saveProjectChange(updated: Project) {
+    private suspend fun saveProjectChange(updated: Project, barChart: Boolean = false) {
         val versioned = updated.copy(
             revision = updated.revision + 1,
             updatedAt = System.currentTimeMillis(),
@@ -2073,7 +2074,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 entityUuid = versioned.projectUuid,
                 operation = "UPDATE",
                 revision = versioned.revision,
-                payloadJson = "{\"projectUuid\":\"${versioned.projectUuid}\"}"
+                // Only a bar chart save uploads the chart (see barChartPayload).
+                payloadJson = if (barChart) barChartPayload(versioned.projectUuid) else "{\"projectUuid\":\"${versioned.projectUuid}\"}"
             )
         )
     }
