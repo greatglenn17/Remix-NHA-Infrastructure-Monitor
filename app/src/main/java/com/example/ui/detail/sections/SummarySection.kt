@@ -177,7 +177,7 @@ private fun KeyDatesCard(
 ) {
     val end = revisedCompletion ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)
     val daysLeft = runCatching { ChronoUnit.DAYS.between(today, LocalDate.parse(end.trim())) }.getOrNull()
-    val orders = documents.filter { doc -> SCHEDULE_ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) } }
+    val orders = ProjectSchedule.chained(documents.filter { doc -> SCHEDULE_ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) } })
     SectionCard(
         "Key dates",
         Icons.Default.Event,

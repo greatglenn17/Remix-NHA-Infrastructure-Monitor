@@ -481,6 +481,13 @@ export function orderLabel(name) {
 export const isSuspension = doc => /^suspension$/i.test((ORDER.exec((doc.documentName || '').trim()) || [])[2] || '');
 /** ProjectSchedule.continuances: a suspension's continuances, in the order given. */
 export const continuances = (suspension, docs) => docs.filter(d => continuanceOf(d.documentName) === baseOf(suspension.documentName || ''));
+/** ProjectSchedule.chained: each suspension, then its continuances, then its resumption; the other orders keep their place. */
+export function chained(orders) {
+  const resumes = (r, s) => /^resumption$/i.test((ORDER.exec((r.documentName || '').trim()) || [])[2] || '') && baseOf(r.documentName) === baseOf(s.documentName);
+  const chains = new Map(orders.filter(isSuspension).map(s => [s, [s, ...continuances(s, orders), ...orders.filter(r => resumes(r, s))]]));
+  const inChain = new Set([...chains.values()].flat());
+  return orders.flatMap(d => chains.get(d) || (inChain.has(d) ? [] : [d]));
+}
 
 /** A "Key: value" field of an order's or letter's remarks. */
 export const remarkField = (remarks, key) => ((new RegExp(`${key}: ([^|]*)`).exec(remarks || '') || [])[1] || '').trim();
