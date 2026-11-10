@@ -1,11 +1,12 @@
-// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). Its one write is an issue edit (saveIssue),
-// made the way RecordSync writes so the phones take it; nothing else here writes to Firestore or Storage.
+// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only an issue edit (saveIssue),
+// made the way RecordSync writes so the phones take it, and a new account's profile (signUp).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
+  createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot, runTransaction,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, query, where, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -103,11 +104,19 @@ function listenRecords(type, into) {
 }
 
 onAuthStateChanged(auth, async user => {
+  // signUp signs the new account in and out again; the sign-in screen stays until it is done.
+  if (user && signingUp) return;
   s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
   s.user = user; s.projects = null; s.payments.clear(); s.docs.clear(); s.page = null; s.profile = {};
   document.body.classList.toggle('signed-out', !user);
-  if (!user) { who.innerHTML = ''; return renderSignIn(); }
+  if (!user) {
+    who.innerHTML = '';
+    const after = afterSignUp; afterSignUp = null;
+    if (after) return renderSignIn('', after.note, after.email);
+    // A failed sign-up signs out too; its form and message stay.
+    return document.getElementById('signup') ? undefined : renderSignIn();
+  }
   // Fresh token: the role claim may have changed since this browser last signed in.
   s.claims = (await user.getIdTokenResult(true)).claims;
   // Name and position for the weekly form's "Prepared by" when the project has none saved (signatoriesFor).
@@ -152,7 +161,7 @@ function route() {
 const authTrouble = err => (err.code === 'auth/too-many-requests' ? 'Too many tries. Wait a few minutes, then try again.'
   : err.code === 'auth/network-request-failed' ? 'No internet connection. Check it and try again.' : null);
 
-function renderSignIn(message = '', note = '') {
+function renderSignIn(message = '', note = '', email = '') {
   main.innerHTML = `
     <div class="signin">
       <section class="hero">
@@ -165,12 +174,13 @@ function renderSignIn(message = '', note = '') {
       <form id="signin" class="signin-form" novalidate>
         <h2>Sign in</h2>
         <p class="muted">Use the same email and password as the NHA Monitor app.${emulator ? ' <b>Local emulator.</b>' : ''}</p>
-        <label class="field">Email address <input name="email" type="email" autocomplete="username" required></label>
+        <label class="field">Email address <input name="email" type="email" autocomplete="username" value="${esc(email)}" required></label>
         <label class="field">Password <input name="password" type="password" autocomplete="current-password" required></label>
         <p class="error" role="alert">${esc(message)}</p>
         ${note ? `<p class="note" role="status">${esc(note)}</p>` : ''}
         <button type="submit" class="btn">Sign in</button>
-        <div class="row"><button type="button" id="reset" class="text-btn">Forgot password?</button><span class="muted">View only. Edits stay in the app.</span></div>
+        <div class="row"><button type="button" id="reset" class="text-btn">Forgot password?</button></div>
+        <p class="muted switch">Don't have an account? <button type="button" id="to-sign-up" class="text-btn">Create account</button></p>
       </form>
     </div>`;
   const form = document.getElementById('signin');
@@ -189,6 +199,8 @@ function renderSignIn(message = '', note = '') {
       document.querySelector('#signin [name=email]').value = email;
     }
   };
+  document.getElementById('to-sign-up').onclick = () => renderSignUp();
+  if (email) form.password.focus();
   document.getElementById('reset').onclick = async () => {
     const email = form.email.value.trim();
     if (!email) return renderSignIn('Type your email first, then choose Forgot password.');
@@ -199,6 +211,91 @@ function renderSignIn(message = '', note = '') {
       if (trouble) renderSignIn(trouble); else renderSignIn('', sent);
     }
   };
+}
+
+let signingUp = false, afterSignUp = null;
+
+/** LoginScreen in sign-up mode: the same fields, and only the Field Engineer and Viewer roles. */
+function renderSignUp(message = '', f = { role: 'FIELD_ENGINEER' }) {
+  const v = name => esc(f[name] || '');
+  const role = (value, title, sub) => `<label class="check role"><input type="radio" name="role" value="${value}"${f.role === value ? ' checked' : ''}>
+    <span><b>${title}</b><small class="muted">${sub}</small></span></label>`;
+  main.innerHTML = `
+    <div class="signin">
+      <section class="hero">
+        <img class="hero-logo" src="logo.svg" alt="" width="72" height="72">
+        <h1>National Housing Authority</h1>
+        <p>Infrastructure Monitoring System</p>
+        <small>REGION III • BULACAN DISTRICT OFFICE</small>
+        <p class="unofficial">Unofficial app. Not issued or endorsed by the National Housing Authority. Made for the Bulacan District Office; other district offices are welcome to try it.</p>
+      </section>
+      <form id="signup" class="signin-form" novalidate>
+        <button type="button" id="to-sign-in" class="text-btn back">${icon('arrow_back', 'sm')}Back to sign in</button>
+        <h2>Create account</h2>
+        <p class="muted">The same account works in the NHA Monitor app.${emulator ? ' <b>Local emulator.</b>' : ''}</p>
+        <div class="name-row">
+          <label class="field">First name <input name="firstName" autocomplete="given-name" value="${v('firstName')}" required></label>
+          <label class="field mi">M.I. <input name="middleInitial" maxlength="3" autocomplete="additional-name" value="${v('middleInitial')}"></label>
+          <label class="field">Last name <input name="lastName" autocomplete="family-name" value="${v('lastName')}" required></label>
+        </div>
+        <label class="field">Email address <input name="email" type="email" autocomplete="email" value="${v('email')}" required></label>
+        <label class="field">Password <input name="password" type="password" autocomplete="new-password" minlength="6" required></label>
+        <label class="field">Retype password <input name="confirm" type="password" autocomplete="new-password" required></label>
+        <label class="field">Position / designation (optional) <input name="position" autocomplete="organization-title" placeholder="e.g. Supervising Project Engineer" value="${v('position')}"></label>
+        <label class="field">Office / department / region (optional) <input name="office" autocomplete="organization" placeholder="e.g. NHA Regional Office III" value="${v('office')}"></label>
+        <fieldset class="roles"><legend>Initial user role</legend>
+          ${role('FIELD_ENGINEER', 'Field Engineer', 'Reports, payments, weather and issues')}
+          ${role('VIEWER', 'Viewer', 'Read-only dashboard')}
+        </fieldset>
+        <p class="muted small">Engineer Admin access is given by the Super Admin after you register. Adding and editing start once the Super Admin approves your account.</p>
+        <p class="error" role="alert">${esc(message)}</p>
+        <button type="submit" class="btn">Create account</button>
+      </form>
+    </div>`;
+  const form = document.getElementById('signup');
+  document.getElementById('to-sign-in').onclick = () => renderSignIn('', '', form.email.value.trim());
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(form));
+    const errors = L.signUpErrors(f);
+    if (errors.length) return renderSignUp(errors.join(' '), f);
+    form.querySelector('[type=submit]').disabled = true;
+    const trouble = await signUp(f);
+    if (trouble) renderSignUp(trouble, f);
+  };
+}
+
+/**
+ * ProjectViewModel.authenticateWithFirebase(isSignUp): the Auth account, then its users/{uid} profile (from which
+ * syncUserCustomClaims sets the role and alerts the Super Admin), then back to sign in like the app. An account whose
+ * profile never saved gets it on the next try. Returns the error to show, or null.
+ */
+async function signUp(f) {
+  const email = f.email.trim().toLowerCase(), password = f.password.trim();
+  signingUp = true;
+  try {
+    let user;
+    try {
+      ({ user } = await createUserWithEmailAndPassword(auth, email, password));
+    } catch (err) {
+      if (err.code !== 'auth/email-already-in-use') throw err;
+      // The app's retry: the same email and password sign in, and finish a profile an earlier try left unsaved.
+      ({ user } = await signInWithEmailAndPassword(auth, email, password).catch(() => ({})));
+      if (!user || (await getDoc(doc(db, 'users', user.uid))).exists()) throw err;
+    }
+    await setDoc(doc(db, 'users', user.uid), L.newProfile(user.uid, f, Date.now()));
+    afterSignUp = { email, note: `Account created for ${email}. Type your password to sign in. You can view projects now; adding and editing start once the Super Admin approves your account.` };
+    await signOut(auth);
+    return null;
+  } catch (err) {
+    if (auth.currentUser) await signOut(auth).catch(() => {});
+    return err.code === 'auth/email-already-in-use' ? 'This email is already registered. Go back and sign in instead.'
+      : err.code === 'auth/invalid-email' ? 'Invalid email address format.'
+        : err.code === 'auth/weak-password' ? 'Password must be at least 6 characters long.'
+          : authTrouble(err) || 'Registration failed. Check your details and try again.';
+  } finally {
+    signingUp = false;
+  }
 }
 
 /* ---------- Dashboard (DashboardScreen + PortfolioCounts + PortfolioRow) ---------- */

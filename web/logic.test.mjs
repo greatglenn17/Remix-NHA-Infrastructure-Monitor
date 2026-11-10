@@ -221,3 +221,14 @@ test('website edits: the issue form checks what AddIssueDialog checks', () => {
   assert.equal(L.issueErrors({ ...ok, date: '' }).length, 1);
   assert.equal(L.issueErrors({ ...ok, targetDate: '11/10/2026' }).length, 1);
 });
+
+test('sign up: name, checks and the profile match the app', () => {
+  assert.equal(L.personName(' Juan ', 'c.', ' Dela Cruz'), 'Juan C. Dela Cruz');
+  assert.equal(L.personName('Ana', '', 'Reyes'), 'Ana Reyes');
+  const f = { firstName: 'Ana', middleInitial: 'b', lastName: 'Reyes', email: ' Ana@Example.PH ', password: 'secret1', confirm: 'secret1', position: ' Engineer II ', office: '', role: 'VIEWER' };
+  assert.deepEqual(L.signUpErrors(f), []);
+  assert.equal(L.signUpErrors({ ...f, lastName: ' ', email: 'ana', password: '12345', confirm: '12345' }).length, 3);
+  assert.deepEqual(L.signUpErrors({ ...f, confirm: 'other' }), ['The two passwords do not match.']);
+  assert.deepEqual(L.newProfile('u1', f, 5), { uid: 'u1', email: 'ana@example.ph', updatedAt: 5, displayName: 'Ana B. Reyes', role: 'VIEWER', position: 'Engineer II', office: '' });
+  assert.equal(L.newProfile('u1', { ...f, role: 'SUPER_ADMIN' }, 5).role, 'FIELD_ENGINEER');
+});
