@@ -331,16 +331,15 @@ fun WeatherChartTab(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 7 Weather Clocks Grid (Mapped specifically to the 7 dates of the weekly report)
-                Column(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(8.dp)
                 ) {
-                    // Display 7 days in 2 rows (4 on first row, 3 on second row)
-                    val rows = listOf(weekDays.take(4), weekDays.drop(4))
-                    for (rowDays in rows) {
+                    val perRow = clocksPerRow(maxWidth)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (rowDays in weekDays.chunked(perRow)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -393,12 +392,9 @@ fun WeatherChartTab(
                                 }
                             }
                             // Fill remaining slots in last row if needed
-                            if (rowDays.size < 4) {
-                                for (i in 0 until (4 - rowDays.size)) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
+                            repeat(perRow - rowDays.size) { Spacer(modifier = Modifier.weight(1f)) }
                         }
+                    }
                     }
                 }
             }
@@ -467,15 +463,15 @@ fun WeatherChartTab(
             val filteredLogs = remember(submittedWeatherLogs, selectedMonth) {
                 submittedWeatherLogs.filter { it.date.startsWith(selectedMonth) }
             }
-            val itemsPerRow = 4
-            val rows = (daysInMonth + itemsPerRow - 1) / itemsPerRow
-
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(6.dp))
                     .padding(1.dp)
             ) {
+            val itemsPerRow = clocksPerRow(maxWidth)
+            val rows = (daysInMonth + itemsPerRow - 1) / itemsPerRow
+            Column {
                 for (r in 0 until rows) {
                     Row(modifier = Modifier.fillMaxWidth()) {
                         for (c in 0 until itemsPerRow) {
@@ -504,6 +500,7 @@ fun WeatherChartTab(
                         }
                     }
                 }
+            }
             }
         }
         }
@@ -547,9 +544,13 @@ private fun WeatherClock(
         val canvasSize = size.minDimension
         val center = Offset(size.width / 2f, size.height / 2f)
 
-        val radius = canvasSize / 2f * 0.75f
+        // The 12sp hour numbers sit just inside the canvas edge and the dial fills the rest.
+        val hourStyle = TextStyle(color = canvasTextSec, fontSize = 12.sp, fontWeight = FontWeight.Normal)
+        val labelHeight = textMeasurer.measure("12", hourStyle).size.height.toFloat()
+        val textOffset = canvasSize / 2f - labelHeight / 2f - 1.dp.toPx()
+        val radius = (textOffset - labelHeight * 0.75f - 2.dp.toPx()).coerceAtLeast(canvasSize * 0.2f)
         val innerRadius = radius * 0.6f
-        val centerRadius = radius * 0.25f
+        val centerRadius = radius * 0.3f
 
         fun getColor(idx: Int): Color {
             val cond = conditions.getOrNull(idx)
@@ -611,13 +612,12 @@ private fun WeatherClock(
         for (i in 0..11) {
             val hour = if (i == 0) 12 else i
             val angleRad = Math.toRadians((-90.0 + i * 30.0))
-            val textOffset = radius + 10.dp.toPx()
             val x = center.x + textOffset * Math.cos(angleRad).toFloat()
             val y = center.y + textOffset * Math.sin(angleRad).toFloat()
 
             val layoutResult = textMeasurer.measure(
                 text = hour.toString(),
-                style = TextStyle(color = canvasTextSec, fontSize = 8.sp, fontWeight = FontWeight.Normal)
+                style = hourStyle
             )
             drawText(
                 textLayoutResult = layoutResult,
@@ -628,7 +628,7 @@ private fun WeatherClock(
         // Draw Day Number in center
         val dayResult = textMeasurer.measure(
             text = dayText,
-            style = TextStyle(color = canvasTextPri, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            style = TextStyle(color = canvasTextPri, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         )
         drawText(
             textLayoutResult = dayResult,
@@ -636,6 +636,9 @@ private fun WeatherClock(
         )
     }
 }
+
+/** Clocks at least 140dp wide so their 12sp hour numbers fit: two a row on a phone, more on a tablet. */
+private fun clocksPerRow(width: androidx.compose.ui.unit.Dp) = (width / 140.dp).toInt().coerceIn(2, 7)
 
 @Composable
 private fun LegendItem(label: String, color: Color) {

@@ -311,6 +311,9 @@ exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
           title: alert.title,
           message: alert.message,
           projectName,
+          actorName: alert.actorName,
+          actorRole: role,
+          actionType: alert.actionType,
           eventId: `audit_${context.params.recordId}`,
         },
         android: { priority: "high" },
@@ -320,6 +323,29 @@ exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
     } catch (error) {
       console.error(`Audit alert error for ${context.params.recordId}:`, error);
     }
+    return null;
+  });
+
+/**
+ * Triggered when a device saves its push token under an account (each sign-in and token refresh). The same token
+ * under any other account, saved earlier, is deleted, so a phone gets only the pushes of the account signed in on it now. The app
+ * names a token's document after the token's last 20 characters, so each account is checked at that one path.
+ */
+exports.releaseTokenFromOtherUsers = functions.region(REGION).firestore
+  .document("users/{uid}/fcmTokens/{tokenId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const token = change.after.get("token");
+    if (!token) return null;
+    const { uid, tokenId } = context.params;
+    const users = await getFirestore().collection("users").get();
+    const copies = await Promise.all(users.docs.filter((u) => u.id !== uid)
+      .map((u) => u.ref.collection("fcmTokens").doc(tokenId).get()));
+    // Only copies saved before this one: a late or retried run must not remove the account signed in now.
+    const savedAt = change.after.updateTime.toMillis();
+    const stale = copies.filter((d) => d.exists && d.get("token") === token && d.updateTime.toMillis() < savedAt);
+    await Promise.all(stale.map((d) => d.ref.delete()));
+    if (stale.length) console.log(`Token ${tokenId}: removed from ${stale.length} other account(s)`);
     return null;
   });
 

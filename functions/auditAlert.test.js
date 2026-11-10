@@ -14,6 +14,7 @@ const entry = (fields, extra = {}) => ({
 test("an issue edit by a Field Engineer reads like the app's alert", () => {
   assert.deepEqual(auditAlert(entry({ actionType: "Issue Creation" }), "FIELD_ENGINEER", NOW, ONGOING), {
     title: "Project Activity by Field Engineer", message: "Engr. Ana: Updated issue from 2026-10-28 (Sample Resettlement)", device: "Website",
+    actorName: "Engr. Ana", actionType: "Issue Creation",
   });
 });
 
