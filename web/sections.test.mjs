@@ -349,3 +349,19 @@ test('status of construction: frames, polygons, colours, summary and the form re
   assert.match(two, /Total units<\/td><td class='n'>3<\/td><td class='n'>3<\/td><td class='n'>6<\/td>/);
   assert.match(two, /max-height:151mm/);
 });
+
+test('project profile: orders listed under their headings, revised cost only after an approved variation order', () => {
+  const project = { name: 'P', contractCostOriginal: 1000, contractDurationDays: 100, actualAccomplishment: 40, targetAccomplishment: 45, status: 'Behind Schedule' };
+  const preparer = { name: 'Juan', title: 'Engineer', office: 'Bulacan District Office' };
+  const html = docs => P.projectProfileHtml({ project, docs, preparer, asOf: '2026-11-10' });
+  const plain = html([]);
+  assert.match(plain, /Contract Suspension\/s<\/td><td class='pc'>:<\/td><td>None/);
+  assert.match(plain, /Revised Contract Cost<\/td><td class='pc'>:<\/td><td><\/td>/);
+  assert.match(plain, /% Delay\/Advance<\/td><td class='pc'>:<\/td><td>-5.00%/);
+  assert.match(plain, /<b>JUAN<\/b>/);
+  const vo = html([{ documentName: 'Variation Order No. 1 - PHP 500', status: 'Approved', remarks: 'Reason: More units' }]);
+  assert.match(vo, /Variation Order No. 1<\/td><td class='pc'>:<\/td><td>Php 500.00<br>\(More units\)/);
+  assert.match(vo, /Revised Contract Cost<\/td><td class='pc'>:<\/td><td>Php 1,500.00/);
+  assert.match(html([{ documentName: 'Work Resumption Order No. 1', status: 'Pending', remarks: 'Effectivity: 2026-08-16' }]),
+    /Work Resumption Order No. 1<\/td><td class='pc'>:<\/td><td>August 16, 2026 \(for approval\)/);
+});

@@ -497,6 +497,17 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb table.photos td { width: 50%; text-align: center; }
 .bb table.photos img { max-width: 100%; max-height: 80mm; }
 .bb img.banner { display: block; width: 100%; margin-bottom: 3mm; }
+/* Project Profile (BlueBookForms.projectProfile). */
+.bb h1.title { font-size: 14pt; margin: 4mm 0 6mm; text-decoration: underline; }
+/* The sheet's rows and Prepared By as one block in the middle of the page (the phone's label column is 38% of the page). */
+.bb div.profile { width: fit-content; max-width: 100%; margin: 0 auto; }
+.bb table.profile { width: auto; }
+.bb table.profile td { border: none; padding: 0.8mm 1mm; font-size: 10.5pt; height: auto; }
+.bb td.pl { font-weight: bold; }
+.bb table.profile td.ps { font-weight: normal; padding-left: 10mm; white-space: nowrap; } /* an order's name on one line, never a lone "1" */
+.bb td.pc { width: 3%; }
+.bb .sig1 { margin-top: 12mm; font-size: 10.5pt; }
+.section-head .text-btn { margin-left: auto; }
 .bb table.sig { margin-top: 6mm; }
 .bb table.sig td { border: none; width: 33%; }
 .bb .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }

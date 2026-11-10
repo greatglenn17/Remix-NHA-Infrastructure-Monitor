@@ -1,5 +1,5 @@
-// The weekly and monthly Project Engineer's Reports (Blue Book forms) as the phone prints them: BlueBookForms.weeklyReport,
-// .monthlyReport and the pieces they use (ContractLogs, weekIssues, weekDocuments, weatherClock, workableDays). Change both
+// The Blue Book forms as the phone prints them: BlueBookForms.projectProfile, the weekly and monthly Project Engineer's
+// Reports (.weeklyReport, .monthlyReport) and the pieces they use (ContractLogs, weekIssues, weekDocuments, weatherClock, workableDays). Change both
 // together. Pure: no Firebase.
 import * as L from './logic.js';
 
@@ -214,6 +214,55 @@ function signatures(s, checkedTitle) {
   const office = name => ((name || '').trim() ? `<br>${esc(name.trim())}` : '');
   const sign = (title, name, position, off) => `<td>${title}:<br><br><br><b>${esc((name || '').toUpperCase())}</b><div class='line'></div>${esc(position)}${office(off)}</td>`;
   return `<table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign(checkedTitle, s.checkedName, s.checkedPosition, s.checkedOffice)}${sign('Noted by', s.notedName, s.notedPosition, s.notedOffice)}</tr></table>`;
+}
+
+/* ---------- The Project Profile sheet (BlueBookForms.projectProfile) ---------- */
+
+/** ContractLogs.resumptions: each Work Resumption Order with its effectivity, "(for approval)" until approved. */
+export const resumptionsOf = docs => docs.filter(d => /work resumption/i.test(d.documentName || ''))
+  .map(d => [L.orderLabel(d.documentName), longDate(L.remarkField(d.remarks, 'Effectivity')) + (/^approved$/i.test(d.status || '') ? '' : ' (for approval)')]);
+
+/** The Project Profile sheet; `preparer` is {name, title, office} and `asOf` an ISO date. */
+export function projectProfileHtml({ project, docs, preparer, asOf, banner }) {
+  const rows = [];
+  const row = (label, value, cls = 'pl') => rows.push(`<tr><td class='${cls}'>${esc(label)}</td><td class='pc'>:</td><td>${value}</td></tr>`);
+  const sub = (label, value) => row(label, value, 'pl ps');
+  // The reason goes on its own line, under the days or amount.
+  const withReason = (value, status, reason) => esc(value + (status ? ` ${status}` : '')) + (reason ? `<br>(${esc(reason)})` : '');
+  const { suspensions, variations } = ordersOf(docs), extensions = extensionsOf(docs), resumptions = resumptionsOf(docs);
+  // ContractCost.revised: blank until a variation order is approved.
+  const revised = docs.some(d => /variation order/i.test(d.documentName || '') && /^approved$/i.test(d.status || '')) ? peso(L.currentCost(project, docs)) : '';
+  const when = longDate(asOf), actual = Number(project.actualAccomplishment) || 0, target = Number(project.targetAccomplishment) || 0;
+  row('Project Title', esc(project.name));
+  row('Project Location', esc(project.location));
+  row('Projected Beneficiaries', esc(project.projectedBeneficiaries));
+  row('Contractor', esc(project.contractor));
+  row('Board Resolution/Date', esc(project.boardResolution));
+  row('Notice of Award', esc(longDate(project.noticeOfAward)));
+  row('Notice to Proceed', esc(longDate(project.noticeToProceed)));
+  row('Date Commenced', esc(longDate(project.dateStarted)));
+  row('Land Area', esc(project.landArea));
+  row('Number of Units', esc(project.numberOfUnits));
+  row('Original Contract Amount', esc(peso(L.originalCost(project))));
+  row('Original Contract Duration', esc(`${project.contractDurationDays ?? 0} calendar days (c.d.)`));
+  row('Contract Suspension/s', suspensions.length ? '' : 'None');
+  suspensions.forEach(o => sub(o.label, withReason(o.value, o.status, o.reason)));
+  row('Contract Resumption', resumptions.length ? '' : 'None');
+  resumptions.forEach(([label, value]) => sub(label, esc(value)));
+  row('Contract Time Extensions', extensions.length ? '' : 'None');
+  extensions.forEach(e => sub(`Time Extension No. ${e.no}`, withReason(`${e.days} calendar days`, e.status, e.reason)));
+  row('Variation Order/s', variations.length ? '' : 'None');
+  variations.forEach(o => sub(o.label, withReason(o.value, o.status, o.reason)));
+  row('Revised Contract Cost', esc(revised));
+  row('Revised Completion Date', esc(longDate(L.revisedCompletion(project, docs) ?? L.effectiveCompletion(project))));
+  row(`% Actual Accomplishment as of ${when}`, esc(pct(actual)));
+  row(`% Target Accomplishment as of ${when}`, esc(pct(target)));
+  row('% Delay/Advance', esc(pct(actual - target)));
+  row('Status of the Project', esc(L.displayStatus(project)));
+  return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
+    <h1 class='title'>PROJECT PROFILE</h1>
+    <div class='profile'><table class='profile'>${rows.join('')}</table>
+    <div class='sig1'>Prepared By:<br><br><br><b>${esc((preparer.name || '').toUpperCase())}</b><br>${esc(preparer.title)}<br>${esc(preparer.office)}</div></div>`;
 }
 
 /* ---------- The monthly form (BlueBookForms.monthlyReport) ---------- */

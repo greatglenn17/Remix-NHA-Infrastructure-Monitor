@@ -111,7 +111,7 @@ onAuthStateChanged(auth, async user => {
   // Fresh token: the role claim may have changed since this browser last signed in.
   s.claims = (await user.getIdTokenResult(true)).claims;
   // Name and position for the weekly form's "Prepared by" when the project has none saved (signatoriesFor).
-  getDoc(doc(db, 'users', user.uid)).then(d => { s.profile = { name: d.get('displayName') || '', title: d.get('position') || '' }; }).catch(() => {});
+  getDoc(doc(db, 'users', user.uid)).then(d => { s.profile = { name: d.get('displayName') || '', title: d.get('position') || '', office: d.get('office') || '' }; }).catch(() => {});
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon('visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · read only</span>
@@ -380,7 +380,7 @@ const kv = (k, v, cls = '') => {
   const nil = v === '' || v == null || v === '-';
   return `<div class="kv"><span>${esc(k)}</span><b class="${nil ? 'nil' : cls}">${nil ? '-' : esc(v)}</b></div>`;
 };
-const section = (title, ic, body, cls = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2></div>${body}</section>`;
+const section = (title, ic, body, cls = '', action = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2>${action}</div>${body}</section>`;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const signedPct = v => `${v >= 0 ? '+' : ''}${(Number(v) || 0).toFixed(2)}%`;
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -451,7 +451,7 @@ function drawProject(page) {
 
 /* ---------- Summary (SummarySection) ---------- */
 
-function summaryBody({ project, records, of, documents, payments, weekly, cost, billed, now }) {
+function summaryBody({ page, project, records, of, documents, payments, weekly, cost, billed, now }) {
   const latest = weekly[0];
   const openIssues = of('project_issues').filter(L.isOpenIssue).length;
   const orders = documents.filter(d => SCHEDULE_ORDER.test(d.documentName || ''));
@@ -477,7 +477,8 @@ function summaryBody({ project, records, of, documents, payments, weekly, cost, 
       ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
     </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
-      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`);
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`,
+    '', `<a class="text-btn" href="#/p/${esc(page.id)}/print/profile">${icon('print', 'sm')}Print</a>`);
 
   // Key dates as a timeline: filled = passed, hollow = ahead, red (late) = a completion date passed on an unfinished project.
   const step = (label, date, completion) => {
@@ -1095,6 +1096,7 @@ function relatedCard(files) {
 async function drawPrint(c) {
   if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
+  if (c.page.sub === 'profile') return drawProfilePrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -1122,6 +1124,21 @@ async function drawPrint(c) {
   btn.disabled = false;
   btn.innerHTML = `${icon('print', 'sm')}Print`;
   btn.onclick = () => window.print();
+}
+
+/** The Project Profile sheet (BlueBookForms.projectProfile, Print on the Summary's profile card) for `#/p/<id>/print/profile`. */
+function drawProfilePrint({ page, project, documents }) {
+  document.title = `Project Profile - ${project.name}`; // the file name "Save as PDF" offers, as on the phone
+  // 12 mm page margins, as the phone prints this sheet (not the 6 mm of its full-page prints).
+  main.innerHTML = `<style>@page { margin: 12mm; }</style><div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}">${icon('arrow_back', 'sm')}Summary</a>
+      <button class="btn" id="do-print">${icon('print', 'sm')}Print</button></div>
+    <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb" id="sheet">${P.projectProfileHtml({
+      project, docs: documents, asOf: today(), banner: 'blue-book-header.png',
+      // The phone's Prepared By is the person printing; an account without an office reads as the district office.
+      preparer: { name: s.profile.name || '', title: s.profile.title || '', office: s.profile.office || 'Bulacan District Office' },
+    })}</div></div>`;
+  document.getElementById('do-print').onclick = () => window.print();
 }
 
 /** The monthly form (BlueBookForms.monthlyReport) for `#/p/<id>/print/2026-09`. */
