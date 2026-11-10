@@ -92,34 +92,64 @@ function isoDay(s) {
 
 const DAY = 86400000;
 
+/** BarChart.parse: the chart's versions in effective-date order; blank or unreadable JSON is no chart. */
+export function chartVersions(json) {
+  let v;
+  try { v = JSON.parse(json || '[]'); } catch { return []; }
+  return Array.isArray(v) ? [...v].sort((a, b) => String(a.effective).localeCompare(String(b.effective))) : [];
+}
+
+const MONTH_DAYS = 30, CELL_DAYS = 5;
+const barDays = ([a, b]) => Math.max(0, b - a + 1);
+const chartTotal = v => (v.items || []).reduce((t, i) => t + (Number(i.amount) || 0), 0);
+/** Item.plannedShare: share of the item planned done by the end of contract `day`, 0 to 1. */
+const plannedShare = (item, day) => {
+  const bars = item.bars || [], days = bars.reduce((n, b) => n + barDays(b), 0);
+  return days ? bars.reduce((n, [a, b]) => n + Math.min(Math.max(Math.min(day, b) - a + 1, 0), barDays([a, b])), 0) / days : 0;
+};
+/** Version.lastDay: the last contract day any bar covers. */
+export const chartLastDay = v => Math.max(0, ...(v.items || []).flatMap(i => (i.bars || []).map(b => b[1])));
+
+/** BarChart.cellOf: [month, cell label 5 … 30] holding contract `day`. */
+export function cellOf(day) {
+  const d = Math.max(1, day) - 1;
+  return [Math.floor(d / MONTH_DAYS) + 1, (Math.floor((d % MONTH_DAYS) / CELL_DAYS) + 1) * CELL_DAYS];
+}
+
+/** BarChart.months: the S-curve, Month 1 to the month holding the last bar, as monthly and cumulative %. */
+export function chartMonths(v) {
+  const total = chartTotal(v), count = Math.ceil(chartLastDay(v) / MONTH_DAYS);
+  const pct = amount => total <= 0 ? 0 : amount / total * 100;
+  let previous = 0;
+  return Array.from({ length: count }, (_, i) => {
+    const cash = (v.items || []).reduce((t, it) => t + (Number(it.amount) || 0) * plannedShare(it, (i + 1) * MONTH_DAYS), 0);
+    const row = { no: i + 1, monthlyPct: pct(cash - previous), cumulativePct: pct(cash) };
+    previous = cash;
+    return row;
+  });
+}
+
 /**
- * BarChart.targetOn: the approved bar chart's planned accomplishment (%) on `today` (yyyy-MM-dd), or null without
- * a chart. Each item's amount is spread evenly over its bars' contract days (the start date is day 1); a revised
- * chart applies from its effective date; approved suspensions taking effect on or after it stop the clock, a Partial
- * one only for the items it names.
+ * BarChart.planOn: on `today` (yyyy-MM-dd), the chart version in force (and all `versions`), its contract day and the planned
+ * accomplishment (%); null without a chart or start date. Each item's amount is spread evenly over its bars' contract
+ * days (the start date is day 1); a revised chart applies from its effective date; approved suspensions taking effect
+ * on or after it stop the clock, a Partial one only for the items it names.
  */
-export function plannedTarget(project, docs, today) {
-  let versions;
-  try { versions = JSON.parse(project.barChartJson || '[]'); } catch { return null; }
-  if (!Array.isArray(versions) || !versions.length) return null;
+export function planOn(project, docs, today) {
+  const versions = chartVersions(project.barChartJson);
+  if (!versions.length) return null;
   const start = isoDay(project.dateStarted), now = isoDay(today);
   if (start == null || now == null) return null;
-  versions = [...versions].sort((a, b) => String(a.effective).localeCompare(String(b.effective)));
   const v = [...versions].reverse().find(x => { const e = isoDay(x.effective); return e == null || e <= now; }) || versions[0];
   const from = Math.max(isoDay(v.effective) ?? start, start);
   const dayOf = item => (now - start) / DAY + 1 - suspendedDays(docs, from, now, item);
-  const items = v.items || [];
-  const total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0);
-  if (total <= 0) return 0;
-  const len = ([a, b]) => Math.max(0, b - a + 1);
-  const planned = items.reduce((t, i) => {
-    const bars = i.bars || [], day = dayOf(i.name);
-    const days = bars.reduce((n, bar) => n + len(bar), 0);
-    const done = bars.reduce((n, [a, b]) => n + Math.min(Math.max(Math.min(day, b) - a + 1, 0), len([a, b])), 0);
-    return t + (days ? (Number(i.amount) || 0) * done / days : 0);
-  }, 0);
-  return planned / total * 100;
+  const total = chartTotal(v);
+  const plannedPct = total <= 0 ? 0 : (v.items || []).reduce((t, i) => t + (Number(i.amount) || 0) * plannedShare(i, dayOf(i.name)), 0) / total * 100;
+  return { version: v, versions, day: dayOf(undefined), plannedPct };
 }
+
+/** BarChart.targetOn: the planned accomplishment (%) on `today`, or null without a chart. */
+export const plannedTarget = (project, docs, today) => planOn(project, docs, today)?.plannedPct ?? null;
 
 /** BarChart.withPlannedTarget: the project with today's target from its chart; unchanged without one, or once completed. */
 export function withPlannedTarget(project, docs, today) {

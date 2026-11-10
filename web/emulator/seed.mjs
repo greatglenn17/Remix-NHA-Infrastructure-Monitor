@@ -56,6 +56,7 @@ const scope = JSON.stringify([
 await put(`projects/${A}`, {
   ...base, projectUuid: A, name: 'Sample Resettlement Phase 1', location: 'Pandi, Bulacan', contractor: 'ABC Builders',
   projectType: 'Housing', landArea: '5 ha', numberOfUnits: '400', scopeOfWork: scope, contractCostOriginal: 50000000,
+  barChartJson: JSON.stringify([{ label: 'Original', effective: '2026-01-05', items: [{ name: 'Land development', amount: 30000000, bars: [[1, 240]] }, { name: 'Housing units', amount: 20000000, bars: [[121, 540]] }] }]),
   contractDurationDays: 540, dateStarted: '2026-01-05', completionDateOriginal: '2027-06-28', completionDateRevised: '-',
   status: 'On-going', targetAccomplishment: 45, actualAccomplishment: 41.25, assignedUids: [engineer], latestUpdatePhotoUrl: '',
 });
