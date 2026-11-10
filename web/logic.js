@@ -889,3 +889,33 @@ export function userChange(user, change) {
   }
   return { seesAllProjects: change.seesAllProjects === true, role };
 }
+
+/* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
+
+export const WEATHER_KEYS = ['FAIR', 'CLOUDY', 'RAIN_SHOWERS', 'RAINY', 'STORMY'];
+const weatherKey = v => { const k = String(v ?? '').trim().toUpperCase().replace(/ /g, '_'); return WEATHER_KEYS.includes(k) ? k : 'FAIR'; };
+
+/** The 7 days of a weekly report for the weather form: its stored hours, or Fair all day for a day with no log. */
+export function weatherForm(report) {
+  const rows = Array.isArray(report?._weather) ? report._weather : [];
+  return weekDays(report?.reportingWeek || '').map(date => {
+    const row = rows.find(w => (w.date || '').trim() === date);
+    const parts = (row?.hourlyConditionsCsv || '').split(',');
+    return { date, logged: Boolean(row), hours: Array.from({ length: 24 }, (_, h) => weatherKey(row ? parts[h] : 'FAIR')) };
+  });
+}
+
+/**
+ * The weekly report's new `_weather` (RecordSync.buildDocument's rows, by date): days changed in the form are rewritten
+ * as the app saves them, every other stored row stays exactly as it was. Null when nothing changed.
+ */
+export function weatherChanges(report, days, changed) {
+  const rows = Array.isArray(report?._weather) ? report._weather : [];
+  if (!changed.size) return null;
+  const byDate = new Map(rows.map(w => [(w.date || '').trim(), w]));
+  for (const d of days.filter(d => changed.has(d.date))) {
+    const dayOfWeek = new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    byDate.set(d.date, { ...byDate.get(d.date), date: d.date, dayOfWeek, hourlyConditionsCsv: d.hours.join(',') });
+  }
+  return { _weather: [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date))) };
+}

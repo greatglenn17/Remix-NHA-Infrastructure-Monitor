@@ -1,4 +1,4 @@
-// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only a new or edited issue (saveIssue),
+// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only a new or edited issue, a weekly report's weather (saveEdit),
 // made the way RecordSync writes so the phones take it, a new account's profile (signUp), your own name, position and
 // office (editProfile), and the Super Admin's approvals and roles on the Users page (setUser).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -661,6 +661,8 @@ function drawProject(page) {
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  const editWx = main.querySelector('[data-edit-weather]');
+  if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
   if (document.getElementById('audit-results')) bindAudit(c);
   loadFiles(main);
 }
@@ -1087,10 +1089,10 @@ async function bindLots(c) {
   viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };
 }
 
-/* ---------- Weather (WeatherChartTab), read-only ---------- */
+/* ---------- Weather (WeatherChartTab); writers edit a weekly report's 24-hour weather (AddWeeklyReportDialog) ---------- */
 
 /** WeatherChartTab: each logged day as a 24-hour clock, by weekly report (7 days) or by month. */
-function weatherView({ page, weekly }) {
+function weatherView({ page, weekly, project }) {
   // Only logs saved with a weekly report reach the cloud, which matches the phone's submittedWeatherLogs.
   const logs = weekly.flatMap(r => (Array.isArray(r._weather) ? r._weather : []));
   if (!logs.length && !weekly.length) return `<div class="card empty">${icon('sunny')}<p>No Weather Logs Recorded Yet</p><small>Field staff can submit daily 24h weather logs when submitting weekly reports.</small></div>`;
@@ -1105,6 +1107,7 @@ function weatherView({ page, weekly }) {
     body = !report ? emptyLine('No weekly reports submitted yet.') : `
       <label class="field">Report<select data-wx="report">${weekly.map((r, i) => `<option value="${esc(r.uuid)}"${r === report ? ' selected' : ''}>Week ${weekly.length - i}: ${esc(r.reportingWeek)}</option>`).join('')}</select></label>
       <h3 class="wx-title">Weekly report weather mapping <span class="muted">7 days</span></h3>
+      ${days.length && L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn wx-edit-btn" data-edit-weather="${esc(report.uuid)}">${icon('edit', 'sm')}Edit weather</button>` : ''}
       <p class="muted small">Reporting period: ${esc(report.reportingWeek)}</p>
       ${days.length ? `<div class="wx-grid">${days.map(d => {
         const t = new Date(`${d}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
@@ -1274,7 +1277,14 @@ function editIssue(c, issue) {
     if (!isNew && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
-    try { await (isNew ? addIssue(c, f) : saveIssue(c, issue, f)); done(); } catch (x) {
+    try {
+      await (isNew ? addIssue(c, f) : saveEdit(c, issue, f, 'issue', {
+        // ProjectViewModel.updateProjectIssue's entry, word for word.
+        actionType: 'Issue Creation', details: `Updated issue from ${f.date}`, oldValue: 'Previous issue state',
+        newValue: `Status: ${f.status}, Remarks: ${issue.remarks || ''}`,
+      }));
+      done();
+    } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
       save.disabled = false;
     }
@@ -1284,27 +1294,112 @@ function editIssue(c, issue) {
 }
 
 /**
- * Writes an issue edit and its audit log entry in one transaction, the way RecordSync uploads: revision + 1, this
- * edit's time and editor, the project's assignedUids. It refuses when the issue changed since the form opened.
+ * Writes a record edit (`changes` merged into its data) and its audit log entry in one transaction, the way RecordSync
+ * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
+ * since the form opened. `noun` names the record in those messages.
  */
-async function saveIssue(c, issue, f) {
-  const ref = doc(db, 'records', issue.uuid), uid = s.user.uid;
+async function saveEdit(c, rec, changes, noun, entry) {
+  const ref = doc(db, 'records', rec.uuid), uid = s.user.uid;
   await runTransaction(db, async t => {
     const [stored, project] = await Promise.all([t.get(ref), t.get(doc(db, 'projects', c.page.id))]);
-    if (!stored.exists() || stored.get('isDeleted') === true) throw new Error('This issue was deleted on another device.');
-    if (stored.get('revision') !== issue.revision || stored.get('updatedAt') !== issue.updatedAt) {
-      throw new Error('This issue was just changed on another device. Close this form and edit it again.');
+    if (!stored.exists() || stored.get('isDeleted') === true) throw new Error(`This ${noun} was deleted on another device.`);
+    if (stored.get('revision') !== rec.revision || stored.get('updatedAt') !== rec.updatedAt) {
+      throw new Error(`This ${noun} was just changed on another device. Close this form and edit it again.`);
     }
     const now = Date.now(), assignedUids = project.get('assignedUids') ?? stored.get('assignedUids') ?? [];
-    t.update(ref, L.editedRecord(stored.data(), f, { uid, now, assignedUids }));
-    const audit = L.auditRecord({
-      uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email,
-      // ProjectViewModel.updateProjectIssue's entry, word for word.
-      actionType: 'Issue Creation', details: `Updated issue from ${f.date}`, oldValue: 'Previous issue state',
-      newValue: `Status: ${f.status}, Remarks: ${issue.remarks || ''}`,
-    });
+    t.update(ref, L.editedRecord(stored.data(), changes, { uid, now, assignedUids }));
+    const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
     t.set(doc(db, 'records', audit.uuid), audit);
   });
+}
+
+/**
+ * AddWeeklyReportDialog's 24-hour weather for one weekly report: pick a condition, then tap or drag over hours (or
+ * "Whole day"). Save rewrites only the days changed, inside the report's record, with the app's audit entry.
+ */
+function editWeather(c, report) {
+  const days = L.weatherForm(report), changed = new Set();
+  let brush = 'RAINY';
+  const label = Object.fromEntries(P.WEATHER.map(([k, l]) => [k, l]));
+  const colour = Object.fromEntries(P.WEATHER.map(([k, , hex]) => [k, hex]));
+  const hourName = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
+  const cell = (di, h) => `<button type="button" class="wx-h" data-d="${di}" data-h="${h}" style="background:${colour[days[di].hours[h]]}"
+    aria-label="${esc(hourName(h))}: ${esc(label[days[di].hours[h]])}">${h % 12 || 12}</button>`;
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form wx-edit';
+  d.innerHTML = `<form novalidate>
+    <h2>Edit weather</h2>
+    <p class="muted small">${esc(report.reportingWeek)}. Pick a condition, then tap or drag over the hours.</p>
+    <div class="seg wx-brush" role="group" aria-label="Condition">${L.WEATHER_KEYS.map(k =>
+      `<button type="button" data-brush="${k}" aria-pressed="${k === brush}"><i style="background:${colour[k]}"></i>${esc(label[k])}</button>`).join('')}</div>
+    ${days.map((day, di) => {
+      const t = new Date(`${day.date}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
+      return `<fieldset class="wx-row"><legend>${fmt({ weekday: 'short' })}, ${fmt({ month: 'short', day: '2-digit' })}${day.logged ? '' : ' <span class="muted">(no log yet)</span>'}
+        <button type="button" class="text-btn" data-all="${di}">Whole day</button></legend>
+        <div class="wx-hours"><span class="muted">AM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h)).join('')}
+        <span class="muted">PM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h + 12)).join('')}</div></fieldset>`;
+    }).join('')}
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const paint = (di, hours) => {
+    for (const h of hours) {
+      if (days[di].hours[h] === brush) continue;
+      days[di].hours[h] = brush; changed.add(days[di].date);
+      const b = form.querySelector(`[data-d="${di}"][data-h="${h}"]`);
+      b.style.background = colour[brush]; b.setAttribute('aria-label', `${hourName(h)}: ${label[brush]}`);
+    }
+  };
+  // A mouse or pen paints from pointer down and drags; a finger paints on tap, so it can still scroll the form.
+  let dragging = null, pressed = false; // dragging: the last hour painted, {di, h}
+  form.onclick = e => {
+    const b = e.target.closest('button');
+    if (b?.dataset.brush) { brush = b.dataset.brush; form.querySelectorAll('[data-brush]').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+    else if (b?.dataset.all !== undefined) paint(Number(b.dataset.all), [...Array(24).keys()]);
+    else if (b?.dataset.h !== undefined && !pressed) paint(Number(b.dataset.d), [Number(b.dataset.h)]); // a tap or the keyboard
+    pressed = false;
+  };
+  const under = e => document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.wx-h');
+  form.addEventListener('pointerdown', e => {
+    const b = under(e);
+    if (!b || e.pointerType === 'touch') return;
+    pressed = true; e.preventDefault();
+    dragging = { di: Number(b.dataset.d), h: Number(b.dataset.h) };
+    paint(dragging.di, [dragging.h]);
+  });
+  // Pointer events skip cells when the pointer moves fast, so fill every hour between the last one and this one.
+  form.addEventListener('pointermove', e => {
+    const b = dragging && under(e);
+    if (!b) return;
+    const di = Number(b.dataset.d), h = Number(b.dataset.h);
+    const from = di === dragging.di ? Math.min(h, dragging.h) : h, to = di === dragging.di ? Math.max(h, dragging.h) : h;
+    paint(di, Array.from({ length: to - from + 1 }, (_, i) => from + i));
+    dragging = { di, h };
+  });
+  const up = () => { dragging = null; };
+  addEventListener('pointerup', up);
+  const done = () => { removeEventListener('pointerup', up); d.close(); d.remove(); };
+  const close = () => (!changed.size || confirm('Discard your changes to this weather?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const changes = L.weatherChanges(report, days, changed);
+    if (!changes) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // ProjectViewModel.updateWeeklyReportWithWeather's entry, word for word.
+      await saveEdit(c, report, changes, 'weekly report', { actionType: 'Edited Weekly Report', details: `Modified report and weather for ${report.reportingWeek}` });
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
 }
 
 /** MainActivity's addProjectIssue: a new issue logged by this account, and ProjectViewModel's audit entry, in one batch. */

@@ -1,7 +1,8 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit),
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit) and a weekly report's
+24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -17,6 +18,9 @@ is read only.
 - **Profile** (in the header) is the app's "Update Profile & Position": full name, position and office, all required.
   It updates only those fields of your existing `users/{uid}` profile (an account without one sets it up in the app
   first); printed forms here use the new values at once, and phones pick them up when they next sync the profile.
+- **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
+  gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
+  changed are rewritten; the other stored days stay exactly as they were.
 - **Users** (Super Admin only, in the header) is the app's "Manage users & roles": approve a new account, give one of
   Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
   `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access.

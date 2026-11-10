@@ -685,3 +685,17 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .uc-approve .waiting { color: var(--behind-text); font-size: 13px; }
 .user-card .seg { flex-wrap: wrap; }
 .user-card .check span { display: grid; gap: 2px; }
+
+/* Weather edit (AddWeeklyReportDialog's 24-hour weather) */
+.wx-edit-btn { margin: 4px 0 0 -8px; }
+.wx-edit { width: min(600px, calc(100vw - 32px)); }
+.wx-brush { flex-wrap: wrap; }
+.wx-brush button { display: inline-flex; align-items: center; gap: 6px; }
+.wx-brush i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.wx-row { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px 10px; margin: 0; min-width: 0; }
+.wx-row legend { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 0 4px; }
+.wx-row legend .text-btn { font-size: 12px; min-height: 32px; }
+.wx-hours { display: grid; grid-template-columns: 26px repeat(12, minmax(0, 1fr)); gap: 3px; align-items: center; }
+.wx-hours > span { font-size: 11px; }
+.wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 11px Inter, sans-serif; color: #0B0F17; cursor: pointer; user-select: none; }
+.wx-h:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
