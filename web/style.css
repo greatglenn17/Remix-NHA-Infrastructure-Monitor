@@ -408,11 +408,15 @@ span.file.gone { text-decoration: none; }
 .grid-table { font-size: 13px; }
 .grid-table thead th { font-size: 11px; letter-spacing: 0.4px; text-transform: uppercase; background: var(--surface-variant); }
 .grid-table tfoot th { border-top: 1px solid var(--outline); }
+/* Every cell boxed, so the report tables read like the printed form. */
+.grid-table th, .grid-table td { border: 1px solid var(--outline); padding: 8px 10px; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Photos: two across on a phone, more on wider screens; each opens full size. */
 /* ul only: the print form's table.photos must keep its table layout. */
 ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }
 ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-wrap: anywhere; }
+/* A weekly report's site photos, large enough to see the work. */
+.rep-body ul.photos { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 12px; }
 .thumb { display: grid; place-items: center; align-content: center; gap: 4px; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
   background: var(--surface-variant); border: 1px solid var(--border); color: var(--text-2); text-decoration: none; }
 .thumb small { font-size: 11px; }
