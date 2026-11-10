@@ -787,31 +787,20 @@ private fun WeeklyReportForm(
                             }
                         }
 
-                        // Preset Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            OutlinedButton(shape = MaterialTheme.shapes.small, 
-                                onClick = { for (i in 0 until 24) currentDayHours[i] = "FAIR" },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("All Fair", fontSize = 12.sp)
-                            }
-                            OutlinedButton(shape = MaterialTheme.shapes.small, 
-                                onClick = { for (i in 8..17) currentDayHours[i] = "RAINY" },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("Rain (8am-5pm)", fontSize = 12.sp)
-                            }
-                            OutlinedButton(shape = MaterialTheme.shapes.small, 
-                                onClick = { for (i in 0 until 24) currentDayHours[i] = "CLOUDY" },
-                                modifier = Modifier.weight(1f).height(32.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text("All Cloudy", fontSize = 12.sp)
+                        // Preset buttons: a whole day in one tap, three to a row.
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            com.example.data.model.WEATHER_PRESETS.chunked(3).forEach { row ->
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    row.forEach { (label, hours) ->
+                                        OutlinedButton(shape = MaterialTheme.shapes.small,
+                                            onClick = { hours.forEachIndexed { i, condition -> currentDayHours[i] = condition } },
+                                            modifier = Modifier.weight(1f).heightIn(min = 36.dp),
+                                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(label, fontSize = 12.sp, lineHeight = 14.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

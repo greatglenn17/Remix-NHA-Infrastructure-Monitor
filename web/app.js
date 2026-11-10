@@ -1335,7 +1335,8 @@ function editWeather(c, report) {
     ${days.map((day, di) => {
       const t = new Date(`${day.date}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
       return `<fieldset class="wx-row"><legend>${fmt({ weekday: 'short' })}, ${fmt({ month: 'short', day: '2-digit' })}${day.logged ? '' : ' <span class="muted">(no log yet)</span>'}
-        <button type="button" class="text-btn" data-all="${di}">Whole day</button></legend>
+        <button type="button" class="text-btn" data-all="${di}">Whole day</button>
+        <select data-preset="${di}" aria-label="Preset for this day"><option value="">Preset…</option>${L.WEATHER_PRESETS.map(([name], i) => `<option value="${i}">${esc(name)}</option>`).join('')}</select></legend>
         <div class="wx-hours"><span class="muted">AM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h)).join('')}
         <span class="muted">PM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h + 12)).join('')}</div></fieldset>`;
     }).join('')}
@@ -1343,13 +1344,21 @@ function editWeather(c, report) {
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
-  const paint = (di, hours) => {
+  const paint = (di, hours, as = () => brush) => {
     for (const h of hours) {
-      if (days[di].hours[h] === brush) continue;
-      days[di].hours[h] = brush; changed.add(days[di].date);
+      const k = as(h);
+      if (days[di].hours[h] === k) continue;
+      days[di].hours[h] = k; changed.add(days[di].date);
       const b = form.querySelector(`[data-d="${di}"][data-h="${h}"]`);
-      b.style.background = colour[brush]; b.setAttribute('aria-label', `${hourName(h)}: ${label[brush]}`);
+      b.style.background = colour[k]; b.setAttribute('aria-label', `${hourName(h)}: ${label[k]}`);
     }
+  };
+  form.onchange = e => {
+    const sel = e.target.closest('[data-preset]');
+    if (!sel || sel.value === '') return;
+    const [, hours] = L.WEATHER_PRESETS[Number(sel.value)];
+    paint(Number(sel.dataset.preset), [...Array(24).keys()], h => hours[h]);
+    sel.value = '';
   };
   // A mouse or pen paints from pointer down and drags; a finger paints on tap, so it can still scroll the form.
   let dragging = null, pressed = false; // dragging: the last hour painted, {di, h}
