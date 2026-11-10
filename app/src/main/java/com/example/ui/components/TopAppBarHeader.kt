@@ -55,9 +55,9 @@ fun HeaderBadge(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            if (isSpinning) {
-                val infiniteTransition = rememberInfiniteTransition(label = "spin_trans")
-                val angle by infiniteTransition.animateFloat(
+            // A new icon pops in, so the badge turning SYNCED after an upload reads like a check mark.
+            androidx.compose.animation.AnimatedContent(icon, transitionSpec = { com.example.ui.theme.Motion.pop() }, label = "badge_icon") { shown ->
+                val angle = if (isSpinning) rememberInfiniteTransition(label = "spin_trans").animateFloat(
                     initialValue = 0f,
                     targetValue = 360f,
                     animationSpec = infiniteRepeatable(
@@ -65,21 +65,14 @@ fun HeaderBadge(
                         repeatMode = RepeatMode.Restart
                     ),
                     label = "spin_angle"
-                )
+                ) else null
                 Icon(
-                    imageVector = icon,
+                    imageVector = shown,
                     contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier
                         .size(10.dp)
-                        .graphicsLayer { rotationZ = angle }
-                )
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(10.dp)
+                        .graphicsLayer { rotationZ = angle?.value ?: 0f }
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))

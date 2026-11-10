@@ -1222,9 +1222,8 @@ fun SubdivisionPlanTab(
                 }
 
                 if (isLoadingPdf) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
+                    // The plan's place shimmers while the PDF is fetched and drawn.
+                    Box(Modifier.fillMaxSize().padding(16.dp).clip(RoundedCornerShape(12.dp)).shimmer())
                 } else if (pdfError != null) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(pdfError!!, color = LocalNHAColors.current.behind)

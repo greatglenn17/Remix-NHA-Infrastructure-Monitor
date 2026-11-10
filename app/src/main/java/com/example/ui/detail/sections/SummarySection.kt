@@ -329,9 +329,15 @@ private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<Project
     val colors = listOf(0, 1, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
     SectionCard("Status of construction", Icons.Default.HomeWork, modifier.testTag("summary_construction")) {
         Text("As of ${ProjectSchedule.displayDate(today)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
-        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).height(10.dp).clip(RoundedCornerShape(5.dp))) {
-            summary.saleableBands.forEachIndexed { i, units ->
-                if (units > 0) Box(Modifier.weight(units.toFloat()).fillMaxHeight().background(colors[i]))
+        // Like the Work done bar: it fills in when it first shows, and the bands slide when counts change.
+        val grow = remember { androidx.compose.animation.core.Animatable(0f) }
+        LaunchedEffect(Unit) { grow.animateTo(1f, com.example.ui.theme.Motion.medium()) }
+        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).height(10.dp)) {
+            Row(Modifier.fillMaxWidth(grow.value).fillMaxHeight().clip(RoundedCornerShape(5.dp))) {
+                summary.saleableBands.forEachIndexed { i, units ->
+                    val w by androidx.compose.animation.core.animateFloatAsState(units.toFloat(), com.example.ui.theme.Motion.medium(), label = "band")
+                    if (w > 0f) Box(Modifier.weight(w).fillMaxHeight().background(colors[i]))
+                }
             }
         }
         SdpSummary.BANDS.forEachIndexed { i, band ->
