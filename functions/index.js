@@ -10,7 +10,7 @@ initializeApp();
 const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
-const { auditAlert } = require("./auditAlert");
+const { auditAlert, skipReason } = require("./auditAlert");
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
 // taken from the client-written profile: only the account whose Firebase Auth
 // email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
@@ -258,15 +258,18 @@ exports.purgeOldRecordTombstones = functions.region(REGION).pubsub
     return null;
   });
 
-/** The FCM tokens of every Super Admin's devices, leaving out `exceptUid`'s. */
+/** The FCM tokens of every Super Admin's devices (role SUPER_ADMIN, plus the designated account), leaving out `exceptUid`'s. */
 async function superAdminTokens(exceptUid = "") {
   const superAdminUsers = await getFirestore()
     .collection("users").where("role", "==", "SUPER_ADMIN").get();
+  const uids = new Set(superAdminUsers.docs.map((d) => d.id));
+  const designated = await getAuth().getUserByEmail(SUPER_ADMIN_EMAIL).catch(() => null);
+  if (designated) uids.add(designated.uid);
   const tokens = [];
-  for (const doc of superAdminUsers.docs) {
-    if (doc.id === exceptUid) continue;
+  for (const id of uids) {
+    if (id === exceptUid) continue;
     const tokenDocs = await getFirestore()
-      .collection("users").doc(doc.id).collection("fcmTokens").get();
+      .collection("users").doc(id).collection("fcmTokens").get();
     tokenDocs.forEach((t) => {
       const token = t.data().token;
       if (token) tokens.push(token);
@@ -291,10 +294,15 @@ exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
         uid ? getFirestore().collection("users").doc(uid).get() : null,
         getFirestore().collection("projects").doc(record.projectUuid || "-").get(),
       ]);
-      const alert = auditAlert(record, actor && actor.exists ? actor.get("role") : "", Date.now(), project.exists ? project.data() : null);
-      if (!alert) return null;
+      // The profile's role, else the sign-in account's role claim (what the Firestore rules check).
+      const role = (actor && actor.exists && actor.get("role"))
+        || (uid ? ((await getAuth().getUser(uid).catch(() => null))?.customClaims?.role || "") : "");
+      const projectData = project.exists ? project.data() : null;
+      const skip = skipReason(record, role, Date.now(), projectData);
+      if (skip) { console.log(`Audit alert ${context.params.recordId}: skipped, ${skip}`); return null; }
+      const alert = auditAlert(record, role, Date.now(), projectData);
       const tokens = await superAdminTokens(uid);
-      if (tokens.length === 0) return null;
+      if (tokens.length === 0) { console.log(`Audit alert ${context.params.recordId}: skipped, no Super Admin device has a push token`); return null; }
       const projectName = project.get("name") || "";
       const response = await getMessaging().sendEachForMulticast({
         tokens,
@@ -307,7 +315,8 @@ exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
         },
         android: { priority: "high" },
       });
-      console.log(`Audit alert ${context.params.recordId}: Success=${response.successCount} Failed=${response.failureCount}`);
+      const errors = response.responses.filter((r) => !r.success).map((r) => (r.error && r.error.code) || "unknown");
+      console.log(`Audit alert ${context.params.recordId}: Success=${response.successCount} Failed=${response.failureCount}${errors.length ? ` (${errors.join(", ")})` : ""}`);
     } catch (error) {
       console.error(`Audit alert error for ${context.params.recordId}:`, error);
     }
