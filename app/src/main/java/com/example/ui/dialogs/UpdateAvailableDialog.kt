@@ -61,7 +61,7 @@ fun UpdateAvailableDialog(
                     Text(
                         text = "New Update Available!",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 17.sp
                         )
@@ -70,8 +70,8 @@ fun UpdateAvailableDialog(
                         text = "Build ${updateInfo.latestVersionName} (${updateInfo.latestVersionCode})",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = LocalNHAColors.current.onTrack,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
                         )
                     )
                 }
@@ -98,8 +98,8 @@ fun UpdateAvailableDialog(
                             text = "WHAT'S NEW IN THIS RELEASE",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
                                 letterSpacing = 0.5.sp
                             )
                         )
@@ -130,7 +130,7 @@ fun UpdateAvailableDialog(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Downloading update... ${(progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         )
                     }
                 }
@@ -138,7 +138,7 @@ fun UpdateAvailableDialog(
                 error?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     )
                 }
             }
@@ -181,7 +181,7 @@ fun UpdateAvailableDialog(
                         error != null -> "TRY AGAIN"
                         else -> "DOWNLOAD & INSTALL UPDATE"
                     },
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
         },
@@ -192,7 +192,7 @@ fun UpdateAvailableDialog(
                         text = "REMIND ME LATER",
                         style = MaterialTheme.typography.labelMedium.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     )
                 }

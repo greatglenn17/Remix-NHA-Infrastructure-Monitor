@@ -75,7 +75,7 @@ fun OrderStatusDialog(
         title = { Text("Update status") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(com.example.util.ProjectSchedule.orderLabel(doc.documentName), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(com.example.util.ProjectSchedule.orderLabel(doc.documentName), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("Pending", "Submitted", "Signed", "Notarized", "Approved").forEach { status ->
                         FilterChip(
@@ -263,7 +263,7 @@ fun RelatedFilesList(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colors.behind, contentColor = scheme.surface)
                 ) {
-                    Text("Delete", fontWeight = FontWeight.Bold)
+                    Text("Delete", fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -484,7 +484,7 @@ private fun ContinuanceDialog(
         title = { Text("Continuance of Work Suspension") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 com.example.ui.dialogs.FullOrPartialPicker("Type of Suspension", type) { type = it }
                 OutlinedTextField(
                     value = days, onValueChange = { days = it.filter(Char::isDigit) }, label = { Text("No. of Days") }, singleLine = true,

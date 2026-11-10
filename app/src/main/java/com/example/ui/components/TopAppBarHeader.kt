@@ -80,8 +80,8 @@ fun HeaderBadge(
                 text = text,
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = textColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
                     letterSpacing = 0.4.sp
                 ),
                 maxLines = 1,
@@ -229,10 +229,10 @@ fun TopAppBarHeader(
                             text = currentUser.office.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.Normal,
                                 letterSpacing = 0.6.sp,
-                                fontSize = 10.sp,
-                                lineHeight = 12.sp
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
                             )
                         )
                         Spacer(modifier = Modifier.height(3.dp))
@@ -348,7 +348,7 @@ fun TopAppBarHeader(
                                 UserRole.SUPER_VIEWER -> "SV"
                             },
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -368,7 +368,7 @@ fun TopAppBarHeader(
                             text = "LOGGED IN ACCOUNT",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
@@ -376,7 +376,7 @@ fun TopAppBarHeader(
                             Text(
                                 text = currentUser.name,
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
@@ -388,7 +388,7 @@ fun TopAppBarHeader(
 
                         if (onEditProfileClick != null) {
                             DropdownMenuItem(
-                                text = { Text("Update Position & Office", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold) },
+                                text = { Text("Update Position & Office", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold) },
                                 leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                                 onClick = {
                                     showUserMenu = false
@@ -402,7 +402,7 @@ fun TopAppBarHeader(
                             text = "APPEARANCE / THEME",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
@@ -445,8 +445,8 @@ fun TopAppBarHeader(
                                             },
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 10.5.sp
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                fontSize = 12.sp
                                             )
                                         )
                                     }
@@ -457,7 +457,7 @@ fun TopAppBarHeader(
                         if (onManageUsers != null && currentUser.role == UserRole.SUPER_ADMIN) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             DropdownMenuItem(
-                                text = { Text("Manage users & roles", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold) },
+                                text = { Text("Manage users & roles", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.SemiBold) },
                                 leadingIcon = { Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                                 onClick = {
                                     showUserMenu = false
@@ -473,7 +473,7 @@ fun TopAppBarHeader(
                                 Text(
                                     text = "About NHA Monitor",
                                     style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 )
@@ -498,7 +498,7 @@ fun TopAppBarHeader(
                                     Text(
                                         text = "Sign Out",
                                         style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.error
                                         )
                                     )
@@ -529,7 +529,7 @@ fun TopAppBarHeader(
             onDismissRequest = { showAboutDialog = false },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) {
-                    Text("CLOSE", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text("CLOSE", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
             },
             title = {
@@ -544,7 +544,7 @@ fun TopAppBarHeader(
                     Text(
                         text = "About NHA Monitor",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -563,7 +563,7 @@ fun TopAppBarHeader(
                                 text = "ABOUT THIS APP",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
@@ -592,7 +592,7 @@ fun TopAppBarHeader(
                                 text = "APPLICATION CREATOR",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
@@ -600,7 +600,7 @@ fun TopAppBarHeader(
                                 text = "ENGR. GLENN C. APROVECHADO",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             Text(
@@ -623,7 +623,7 @@ fun TopAppBarHeader(
                                 text = "BUILD & SYSTEM INFO",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = LocalNHAColors.current.onTrack,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             Spacer(modifier = Modifier.height(2.dp))
@@ -631,7 +631,7 @@ fun TopAppBarHeader(
                                 text = "Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             Text(
@@ -686,7 +686,7 @@ fun TopAppBarHeader(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (isCheckingUpdate) "CHECKING FOR UPDATES..." else "CHECK FOR LIVE UPDATES",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
                                 )
                             }
                         }

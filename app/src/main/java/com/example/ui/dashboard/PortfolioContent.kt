@@ -358,14 +358,14 @@ private fun OptionsMenu(
         Text(
             title.uppercase(),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = scheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         HorizontalDivider(color = scheme.outlineVariant)
         options.forEach { option ->
             DropdownMenuItem(
-                text = { Text(option, fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal) },
+                text = { Text(option, fontWeight = if (option == selected) FontWeight.SemiBold else FontWeight.Normal) },
                 onClick = { onSelect(option); onDismiss() },
                 leadingIcon = { if (option == selected) Icon(Icons.Default.Check, contentDescription = "Selected", tint = scheme.primary) }
             )
@@ -382,7 +382,7 @@ private fun EmptyState(message: Pair<String, String>, actions: @Composable () ->
     ) {
         Icon(Icons.Default.FolderOff, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(56.dp))
         Spacer(Modifier.height(16.dp))
-        Text(message.first, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = scheme.onSurface, textAlign = TextAlign.Center)
+        Text(message.first, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(message.second, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))

@@ -188,7 +188,7 @@ fun AddPaymentDialog(
                 ) {
                     Text(
                         "SCANNED COPY OF DV",
-                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -202,10 +202,10 @@ fun AddPaymentDialog(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = nha.onTrack, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = nha.onTrack, fontWeight = FontWeight.Bold))
+                                    Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = nha.onTrack, fontWeight = FontWeight.SemiBold))
                                 }
                                 TextButton(onClick = { fileUrl = "" }) {
-                                    Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+                                    Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -238,7 +238,7 @@ fun AddPaymentDialog(
                 enabled = amountErr == null && unitsErr == null && priceErr == null,
                 shape = RoundedCornerShape(50.dp)
             ) {
-                Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.Bold)
+                Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
@@ -267,7 +267,7 @@ fun ViewDvScanDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Scanned Disbursement Voucher", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text("Scanned Disbursement Voucher", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
                     Text("${payment.dvNo.ifBlank { "N/A" }} - ${payment.name}", style = MaterialTheme.typography.labelMedium.copy(color = cs.primary))
                 }
                 IconButton(onClick = onDismiss) {
@@ -312,7 +312,7 @@ fun ViewDvScanDialog(
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Disbursement Voucher No:", style = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant))
-                            Text(payment.dvNo.ifBlank { "N/A" }, style = MaterialTheme.typography.bodySmall.copy(color = cs.primary, fontWeight = FontWeight.Bold))
+                            Text(payment.dvNo.ifBlank { "N/A" }, style = MaterialTheme.typography.bodySmall.copy(color = cs.primary, fontWeight = FontWeight.SemiBold))
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Date:", style = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant))
@@ -324,7 +324,7 @@ fun ViewDvScanDialog(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Gross Amount Paid:", style = MaterialTheme.typography.labelSmall.copy(color = cs.onSurfaceVariant))
-                            Text(phpFormat.format(payment.grossAmount), style = MaterialTheme.typography.bodySmall.copy(color = nha.onTrack, fontWeight = FontWeight.Bold))
+                            Text(phpFormat.format(payment.grossAmount), style = MaterialTheme.typography.bodySmall.copy(color = nha.onTrack, fontWeight = FontWeight.SemiBold))
                         }
                     }
                 }

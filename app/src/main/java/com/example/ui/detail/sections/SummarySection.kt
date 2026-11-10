@@ -350,8 +350,8 @@ private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<Project
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
         // Lined up with the band names and counts above.
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp).testTag("construction_grand_total")) {
-            Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            Text("${summary.saleable.count} units", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            Text("${summary.saleable.count} units", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
         BillingStatus(payments, summary.saleable.count)
     }

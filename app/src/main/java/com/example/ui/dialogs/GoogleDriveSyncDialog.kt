@@ -53,7 +53,7 @@ fun GoogleDriveSyncDialog(
                     Text(
                         text = "Google Drive Database Sync",
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -61,7 +61,7 @@ fun GoogleDriveSyncDialog(
                         text = "Cloud Backup & Restore",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     )
                 }
@@ -103,13 +103,13 @@ fun GoogleDriveSyncDialog(
                                 text = "Connected Google Account",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 10.sp
+                                    fontSize = 12.sp
                                 )
                             )
                             Text(
                                 text = accountEmail,
                                 style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
@@ -117,7 +117,7 @@ fun GoogleDriveSyncDialog(
                                 text = "Scope: drive.file (NHA_Project_Monitoring_Backup.json)",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = LocalNHAColors.current.onTrack,
-                                    fontSize = 9.sp
+                                    fontSize = 12.sp
                                 )
                             )
                         }
@@ -130,8 +130,8 @@ fun GoogleDriveSyncDialog(
                                 text = "ACTIVE",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = LocalNHAColors.current.onTrack,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 9.sp
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
                                 ),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -185,13 +185,13 @@ fun GoogleDriveSyncDialog(
                                     text = if (isSyncing) "Syncing with Google Drive..." else "Last Backup to Drive",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 10.sp
+                                        fontSize = 12.sp
                                     )
                                 )
                                 Text(
                                     text = lastSyncTime ?: "Never synced",
                                     style = MaterialTheme.typography.bodySmall.copy(
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 )
@@ -212,7 +212,7 @@ fun GoogleDriveSyncDialog(
                         Text(
                             text = "Auto-Sync to Google Drive",
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -220,7 +220,7 @@ fun GoogleDriveSyncDialog(
                             text = "Automatically back up project records, reports, and weather logs.",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 11.sp
+                                fontSize = 12.sp
                             )
                         )
                     }
@@ -248,7 +248,7 @@ fun GoogleDriveSyncDialog(
                     ) {
                         Text(
                             text = statusMessage,
-                            style = MaterialTheme.typography.bodySmall.copy(color = textColor, fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.bodySmall.copy(color = textColor, fontWeight = FontWeight.SemiBold),
                             modifier = Modifier.padding(10.dp)
                         )
                     }

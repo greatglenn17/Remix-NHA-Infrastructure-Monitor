@@ -89,7 +89,7 @@ fun MonthlyReportsTab(
                 Text(
                     text = "NHA MONTHLY PROJECT ENGINEER'S REPORTS",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -113,7 +113,7 @@ fun MonthlyReportsTab(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         ),
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                     ExposedDropdownMenu(
                         expanded = dropdownExpanded,
@@ -172,7 +172,7 @@ private fun MonthlyReportSingleTableCard(
                 Text(
                     text = "Monthly Accomplishment Report - $selectedMonth",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -187,7 +187,7 @@ private fun MonthlyReportSingleTableCard(
                         text = if (isAhead) "AHEAD (+${"%.2f".format(sumVariance)}%)" else "SLIPPAGE (${"%.2f".format(sumVariance)}%)",
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = varianceColor(sumVariance, LocalNHAColors.current),
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         ),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
@@ -212,13 +212,13 @@ private fun MonthlyReportSingleTableCard(
                             .height(IntrinsicSize.Min),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Reporting Week", modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        Text("Reporting Week", modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold))
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                        Text("Target %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        Text("Target %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold))
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                        Text("Actual %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        Text("Actual %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold))
                         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
-                        Text("Variance %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold))
+                        Text("Variance %", modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold))
                     }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
@@ -244,7 +244,7 @@ private fun MonthlyReportSingleTableCard(
                                 Text(
                                     text = rep.reportingWeek,
                                     modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Normal)
                                 )
                                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                                 Text(
@@ -264,7 +264,7 @@ private fun MonthlyReportSingleTableCard(
                                     modifier = Modifier.weight(1f).padding(horizontal = 6.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = varianceColor(varVal, LocalNHAColors.current),
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 )
                             }
@@ -281,19 +281,19 @@ private fun MonthlyReportSingleTableCard(
                             Text(
                                 text = "AS OF MONTH END",
                                 modifier = Modifier.weight(2.2f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                             )
                             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumTarget)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                             )
                             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                             Text(
                                 text = "${"%.2f".format(sumActual)}%",
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                             )
                             VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.fillMaxHeight())
                             Text(
@@ -301,7 +301,7 @@ private fun MonthlyReportSingleTableCard(
                                 modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = varianceColor(sumVariance, LocalNHAColors.current),
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                         }

@@ -135,7 +135,7 @@ fun IssuesTab(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = if (searchQuery.isNotEmpty() || selectedFilter != "All") "No matching issues found" else "No Issues Logged",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         )
                     }
                 }
@@ -211,7 +211,7 @@ fun IssueCard(
                     Text(
                         text = issue.date,
                         style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         maxLines = 1,
@@ -222,7 +222,7 @@ fun IssueCard(
                         Text(
                             text = "  ·  Target ${issue.targetDate}" + if (overdue) " (OVERDUE)" else "",
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (overdue) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (overdue) FontWeight.SemiBold else FontWeight.Normal,
                                 color = if (overdue) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             maxLines = 1,
@@ -244,9 +244,9 @@ fun IssueCard(
                             Text(
                                 text = "CRITICAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = LocalNHAColors.current.behind,
-                                    fontSize = 10.sp
+                                    fontSize = 12.sp
                                 ),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
@@ -267,9 +267,9 @@ fun IssueCard(
                         Text(
                             text = issue.status.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = statusText,
-                                fontSize = 10.sp
+                                fontSize = 12.sp
                             ),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -286,7 +286,7 @@ fun IssueCard(
             Text(
                 text = "ISSUE DESCRIPTION",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
@@ -309,7 +309,7 @@ fun IssueCard(
                 Text(
                     text = "ACTION TAKEN" + if (issue.actionBy.isBlank()) "" else " BY ${issue.actionBy.uppercase()}",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 )
@@ -332,7 +332,7 @@ fun IssueCard(
                 Text(
                     text = "REMARKS / NOTES",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
@@ -401,7 +401,7 @@ fun IssueCard(
             text = { Text("Are you sure you want to delete this issue entry? This action cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = { showDeleteConfirm = false; onDeleteClick() }) {
-                    Text("Delete", color = LocalNHAColors.current.behind, fontWeight = FontWeight.Bold)
+                    Text("Delete", color = LocalNHAColors.current.behind, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {

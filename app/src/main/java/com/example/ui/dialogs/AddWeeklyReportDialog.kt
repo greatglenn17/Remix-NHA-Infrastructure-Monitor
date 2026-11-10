@@ -474,7 +474,7 @@ private fun WeeklyReportForm(
                         }
                     )
                 }
-                Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
                 if (chartTargets != null) Text(
                     "Target % is from the approved bar chart as of ${com.example.util.ProjectSchedule.displayDate(chartAsOf.orEmpty())}.",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -497,7 +497,7 @@ private fun WeeklyReportForm(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(2f)) {
-                            Text(item.name, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(item.name, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text("Wt: ${"%.2f".format(item.weightPct)}%", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
                         OutlinedTextField(
@@ -526,7 +526,7 @@ private fun WeeklyReportForm(
                         Text(
                             text = "${if(variance>0) "+" else ""}${"%.2f".format(variance)}",
                             modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall.copy(color = varColor, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            style = MaterialTheme.typography.bodySmall.copy(color = varColor, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
                         )
                     }
                 }
@@ -534,12 +534,12 @@ private fun WeeklyReportForm(
                 // Grand Total Row
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    Text("GRAND TOTAL:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                        Text("Target: ${"%.2f".format(overallTarget)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
+                        Text("Actual: ${"%.2f".format(overallActual)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
                         val ovColor = varianceColor(overallVariance, LocalNHAColors.current)
-                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ovColor))
+                        Text("Var: ${if(overallVariance>0) "+" else ""}${"%.2f".format(overallVariance)}%", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = ovColor))
                     }
                 }
                 // 4. DAILY WEATHER LOG BY DAY OF WEEK (INTERACTIVE 24-SLICE PIE GRAPH)
@@ -557,11 +557,11 @@ private fun WeeklyReportForm(
                             Column {
                                 Text(
                                     "DAILY WEATHER LOG (24-HR PIE GRAPH)",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 Text(
                                     "Click pie slice to cycle: Fair (Grn) → Cloudy (Yel) → Showers (Cyan) → Rainy (Blu) → Stormy (Red) → Reset",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                             }
                         }
@@ -583,8 +583,8 @@ private fun WeeklyReportForm(
                                     label = {
                                         Text(
                                             text = "$dayName - $dateStr",
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                         )
                                     },
                                     shape = RoundedCornerShape(50.dp),
@@ -718,15 +718,15 @@ private fun WeeklyReportForm(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "$selectedWeatherDayName",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                                 )
                                 Text(
                                     text = "$activeDateStr",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                                 )
                                 Text(
                                     text = "Tap slice to log",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 )
                             }
                         }
@@ -766,7 +766,7 @@ private fun WeeklyReportForm(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Hour $formattedHourText:",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
@@ -774,7 +774,7 @@ private fun WeeklyReportForm(
                                             "RAIN_SHOWERS" -> "RAIN SHOWERS"
                                             else -> activeHourCond
                                         },
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                                     )
                                 }
 
@@ -782,7 +782,7 @@ private fun WeeklyReportForm(
 
                                 Text(
                                     text = "(Tap slice again to cycle)",
-                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
+                                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                                 )
                             }
                         }
@@ -797,21 +797,21 @@ private fun WeeklyReportForm(
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text("All Fair", fontSize = 10.sp, color = WeatherFairGreen)
+                                Text("All Fair", fontSize = 12.sp)
                             }
                             OutlinedButton(shape = MaterialTheme.shapes.small, 
                                 onClick = { for (i in 8..17) currentDayHours[i] = "RAINY" },
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text("Rain (8am-5pm)", fontSize = 10.sp, color = WeatherRainyBlue)
+                                Text("Rain (8am-5pm)", fontSize = 12.sp)
                             }
                             OutlinedButton(shape = MaterialTheme.shapes.small, 
                                 onClick = { for (i in 0 until 24) currentDayHours[i] = "CLOUDY" },
                                 modifier = Modifier.weight(1f).height(32.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text("All Cloudy", fontSize = 10.sp, color = WeatherCloudyYellow)
+                                Text("All Cloudy", fontSize = 12.sp)
                             }
                         }
                     }
@@ -832,7 +832,7 @@ private fun WeeklyReportForm(
                         ) {
                             Text(
                                 "MANPOWER SUMMARY TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                             )
                             TextButton(
                                 onClick = {
@@ -877,8 +877,8 @@ private fun WeeklyReportForm(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant))
-                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                                Text("GRAND TOTAL WEEKLY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant))
+                                Text("$grandTotalManpower Personnel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary))
                             }
                         }
                     }
@@ -897,7 +897,7 @@ private fun WeeklyReportForm(
                         ) {
                             Text(
                                 "EQUIPMENT SUMMARY TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                             )
                             TextButton(
                                 onClick = {
@@ -947,7 +947,7 @@ private fun WeeklyReportForm(
                         ) {
                             Text(
                                 "ACTIVITIES OF THE WEEK TABLE",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                             )
                             TextButton(
                                 onClick = {
@@ -990,7 +990,7 @@ private fun WeeklyReportForm(
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text(
                             "ISSUES ENCOUNTERED / ACTION TAKEN",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1010,7 +1010,7 @@ private fun WeeklyReportForm(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Add Issue / Action Taken", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Add Issue / Action Taken", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1050,7 +1050,7 @@ private fun WeeklyReportForm(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 "ATTACH SITE PROGRESS PHOTO",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                             )
                         }
 
@@ -1073,12 +1073,12 @@ private fun WeeklyReportForm(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Add Photos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Add Photos", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
                             Column(Modifier.weight(1f)) {
-                                Text("Geo-tag new photos", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                Text("Geo-tag new photos", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                                 Text("Prints the date, time and GPS location on each photo", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             }
                             Switch(
@@ -1154,7 +1154,7 @@ private fun WeeklyReportForm(
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         "Tap to attach site photo (Camera or Gallery)",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Normal)
                                     )
                                 }
                             }
@@ -1176,7 +1176,7 @@ private fun WeeklyReportForm(
                 ).forEach { (label, value) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                     }
                 }
                 errors.forEach { (errStep, message) ->
@@ -1227,7 +1227,7 @@ private fun WeeklyReportForm(
             title = {
                 Text(
                     "SELECT SITE PHOTO SOURCE",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 )
             },
             text = {
@@ -1256,8 +1256,8 @@ private fun WeeklyReportForm(
                             Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("Take Photo with Camera", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                                Text("Capture real-time construction site photo", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp))
+                                Text("Take Photo with Camera", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("Capture real-time construction site photo", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp))
                             }
                         }
                     }
@@ -1284,8 +1284,8 @@ private fun WeeklyReportForm(
                             Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text("Choose from Phone Gallery", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
-                                Text("Select an existing picture from your device gallery", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp))
+                                Text("Choose from Phone Gallery", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
+                                Text("Select an existing picture from your device gallery", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp))
                             }
                         }
                     }

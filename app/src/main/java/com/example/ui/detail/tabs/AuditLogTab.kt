@@ -218,7 +218,7 @@ fun AuditLogCard(log: AuditLog) {
                         Text(
                             text = log.actionType,
                             color = badgeColor,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp
                         )
                     }
@@ -227,7 +227,7 @@ fun AuditLogCard(log: AuditLog) {
                 Text(
                     text = formattedDate,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 12.sp
                 )
             }
 
@@ -292,7 +292,7 @@ fun AuditLogCard(log: AuditLog) {
                             Text(
                                 text = "Old Value: ",
                                 color = LocalNHAColors.current.neutral,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp
                             )
                             Text(
@@ -312,7 +312,7 @@ fun AuditLogCard(log: AuditLog) {
                             Text(
                                 text = "New Value: ",
                                 color = LocalNHAColors.current.onTrack,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp
                             )
                             Text(

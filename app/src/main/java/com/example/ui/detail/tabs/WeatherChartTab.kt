@@ -69,7 +69,7 @@ fun WeatherChartTab(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "No Weather Logs Recorded Yet",
-                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -189,7 +189,7 @@ fun WeatherChartTab(
         Text(
             text = "24-HOUR WEATHER LOGS",
             style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 letterSpacing = 1.5.sp
             ),
@@ -269,7 +269,7 @@ fun WeatherChartTab(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         ),
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                     ExposedDropdownMenu(
                         expanded = weeklyReportDropdownExpanded,
@@ -280,8 +280,8 @@ fun WeatherChartTab(
                             DropdownMenuItem(
                                 text = {
                                     Column {
-                                        Text("Week ${weeklyReports.size - idx}: ${rep.reportingWeek}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                                        Text("Target: ${rep.targetAccomplishmentPct}% | Actual: ${rep.actualAccomplishmentPct}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                                        Text("Week ${weeklyReports.size - idx}: ${rep.reportingWeek}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                        Text("Target: ${rep.targetAccomplishmentPct}% | Actual: ${rep.actualAccomplishmentPct}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                                     }
                                 },
                                 onClick = {
@@ -314,7 +314,7 @@ fun WeatherChartTab(
                         ) {
                             Text(
                                 text = "WEEKLY REPORT WEATHER MAPPING",
-                                style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                style = MaterialTheme.typography.labelLarge.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             )
                             Text(
                                 text = "7 Days",
@@ -371,8 +371,8 @@ fun WeatherChartTab(
                                             text = "${dayInfo.dayName}, ${dayInfo.displayDate}",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 12.sp
                                             ),
                                             maxLines = 1
                                         )
@@ -429,7 +429,7 @@ fun WeatherChartTab(
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
                 ExposedDropdownMenu(
                     expanded = monthDropdownExpanded,
@@ -628,7 +628,7 @@ private fun WeatherClock(
         // Draw Day Number in center
         val dayResult = textMeasurer.measure(
             text = dayText,
-            style = TextStyle(color = canvasTextPri, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            style = TextStyle(color = canvasTextPri, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         )
         drawText(
             textLayoutResult = dayResult,
@@ -646,6 +646,6 @@ private fun LegendItem(label: String, color: Color) {
                 .background(color, shape = RoundedCornerShape(3.dp))
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
     }
 }

@@ -69,7 +69,7 @@ fun AddRelatedDocumentDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Related Project Document", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold))
+                Text("Add Related Project Document", style = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold))
             }
         },
         text = {
@@ -102,7 +102,7 @@ fun AddRelatedDocumentDialog(
                                     Text(
                                         text = option,
                                         color = if (option == selectedPreset) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        fontWeight = if (option == selectedPreset) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (option == selectedPreset) FontWeight.SemiBold else FontWeight.Normal
                                     )
                                 },
                                 onClick = {
@@ -181,7 +181,7 @@ fun AddRelatedDocumentDialog(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Scanned Copy Attachment",
-                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -200,10 +200,10 @@ fun AddRelatedDocumentDialog(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.CheckCircle, contentDescription = null, tint = LocalNHAColors.current.onTrack, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontWeight = FontWeight.Bold))
+                                        Text("Scanned Copy Attached", style = MaterialTheme.typography.labelSmall.copy(color = LocalNHAColors.current.onTrack, fontWeight = FontWeight.SemiBold))
                                     }
                                     TextButton(onClick = { fileUrl = "" }) {
-                                        Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
+                                        Text("Remove", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -248,7 +248,7 @@ fun AddRelatedDocumentDialog(
                 },
                 enabled = finalDocName.isNotBlank(),
             ) {
-                Text("Save Document", fontWeight = FontWeight.Bold)
+                Text("Save Document", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
@@ -288,7 +288,7 @@ fun ViewScannedCopyDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = doc.documentName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         )
                         Text(
                             text = "Status: ${doc.status} | ${doc.remarks.ifBlank { "No remarks" }}",
@@ -304,7 +304,7 @@ fun ViewScannedCopyDialog(
 
                 Text(
                     text = "SCANNED COPY PREVIEW",
-                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -350,7 +350,7 @@ fun ViewScannedCopyDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text("Attach or replace scan:", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp))
+                Text("Attach or replace scan:", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -364,13 +364,13 @@ fun ViewScannedCopyDialog(
                     ) {
                         Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Upload File from Device", fontSize = 11.sp)
+                        Text("Upload File from Device", fontSize = 12.sp)
                     }
 
                     Button(shape = MaterialTheme.shapes.small, 
                         onClick = onDismiss
                     ) {
-                        Text("Close", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("Close", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     }
                 }
             }

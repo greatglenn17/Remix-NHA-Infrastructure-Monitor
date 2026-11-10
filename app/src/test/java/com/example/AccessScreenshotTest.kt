@@ -36,6 +36,8 @@ class AccessScreenshotTest {
                 )
             }
         }
+        // Larger (12sp minimum) text puts the Super Viewer below the fold on the test screen.
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("Dir. Ben Santos"))
         rule.onNodeWithText("Dir. Ben Santos").assertExists()
         captureScreenRoboImage("src/test/screenshots/manage_users_super_viewer_light.png")
     }

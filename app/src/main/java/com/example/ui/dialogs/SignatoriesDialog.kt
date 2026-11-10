@@ -68,7 +68,7 @@ fun SignatoriesDialog(
         title: String, name: String, onName: (String) -> Unit, position: String, onPosition: (String) -> Unit, positions: List<String>,
         office: String, onOffice: (String) -> Unit
     ) {
-        Text(title, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), modifier = Modifier.padding(top = 8.dp))
+        Text(title, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(top = 8.dp))
         OutlinedTextField(value = name, onValueChange = onName, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Choice("Position", position, onPosition, positions)
         Choice("Office", office, onOffice, OFFICES)

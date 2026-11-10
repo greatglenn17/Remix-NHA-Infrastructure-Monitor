@@ -39,7 +39,7 @@ fun ManageUsersDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
         icon = { Icon(Icons.Default.ManageAccounts, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-        title = { Text("Manage users & roles", fontWeight = FontWeight.Bold) },
+        title = { Text("Manage users & roles", fontWeight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -67,7 +67,7 @@ fun ManageUsersDialog(
                                         Text(
                                             "Waiting for approval: can only view",
                                             style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium,
+                                            fontWeight = FontWeight.Normal,
                                             color = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.weight(1f)
                                         )
@@ -95,7 +95,7 @@ fun ManageUsersDialog(
                                         modifier = Modifier.fillMaxWidth().testTag("sees_all_${user.uid}")
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("See all projects", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                            Text("See all projects", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Normal)
                                             Text(
                                                 "Others' projects open view only",
                                                 style = MaterialTheme.typography.labelSmall,

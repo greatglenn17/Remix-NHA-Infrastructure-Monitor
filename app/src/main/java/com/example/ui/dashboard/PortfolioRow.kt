@@ -319,7 +319,7 @@ internal fun Badge(text: String, color: Color, container: Color) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall.merge(TabularNumbers),
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = color,
             maxLines = 1,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)

@@ -102,7 +102,7 @@ fun AddMonthlyReportDialog(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Auto-generated Monthly Summary", fontWeight = FontWeight.Bold, color = cs.onSurface)
+                Text("Auto-generated Monthly Summary", fontWeight = FontWeight.SemiBold, color = cs.onSurface)
                 Text("Values derived from Weekly Reports in this month.", style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurfaceVariant))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -127,10 +127,10 @@ fun AddMonthlyReportDialog(
                 val varTotal = sumActual - sumTarget
                 HorizontalDivider(color = cs.outlineVariant, modifier = Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("AS OF MONTH END", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
-                    Text("${"%.2f".format(sumTarget)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
-                    Text("${"%.2f".format(sumActual)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = cs.onSurface, fontSize = 12.sp)
-                    Text("${"%.2f".format(varTotal)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, color = varianceColor(varTotal, nha), fontSize = 12.sp)
+                    Text("AS OF MONTH END", modifier = Modifier.weight(2f), fontWeight = FontWeight.SemiBold, color = cs.onSurface, fontSize = 12.sp)
+                    Text("${"%.2f".format(sumTarget)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = cs.onSurface, fontSize = 12.sp)
+                    Text("${"%.2f".format(sumActual)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = cs.onSurface, fontSize = 12.sp)
+                    Text("${"%.2f".format(varTotal)}%", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = varianceColor(varTotal, nha), fontSize = 12.sp)
                 }
             }
         }
