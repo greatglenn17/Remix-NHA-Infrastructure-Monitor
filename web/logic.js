@@ -840,3 +840,32 @@ export function newProfile(uid, f, now) {
     position: f.position.trim(), office: f.office.trim(),
   };
 }
+
+/* ---------- Users (ManageUsersDialog, ProjectViewModel.approveUser / setUserRole / setUserSeesAll) ---------- */
+
+/** The roles the Super Admin can give; Super Admin itself is only the designated account's. */
+export const ASSIGNABLE_ROLES = ['ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER', 'SUPER_VIEWER'];
+
+/** One users/{uid} doc as refreshRegisteredUsers reads it: a profile from before approvals counts as approved. */
+export const userRow = (uid, d) => ({
+  uid, name: d.displayName?.trim() || d.email?.trim() || uid, email: d.email || '', role: d.role || '',
+  position: d.position || '', office: d.office || '', seesAllProjects: d.seesAllProjects === true, approved: d.approved !== false,
+});
+
+/** Everyone but the Super Admin, accounts waiting for approval first, then by name. */
+export const manageableUsers = rows => rows.filter(u => u.role !== 'SUPER_ADMIN')
+  .sort((a, b) => a.approved - b.approved || a.name.localeCompare(b.name));
+
+/**
+ * The users/{uid} update for one change. The rules want a role on every Super Admin edit, so a profile without one
+ * gets Field Engineer, as the claims function reads it.
+ */
+export function userChange(user, change) {
+  const role = user.role || 'FIELD_ENGINEER';
+  if ('approved' in change) return { approved: true, role };
+  if ('role' in change) {
+    if (!ASSIGNABLE_ROLES.includes(change.role)) throw new Error('That role cannot be given here.');
+    return { role: change.role };
+  }
+  return { seesAllProjects: change.seesAllProjects === true, role };
+}

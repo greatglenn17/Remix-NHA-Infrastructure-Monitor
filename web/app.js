@@ -1,12 +1,13 @@
 // Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only an issue edit (saveIssue),
-// made the way RecordSync writes so the phones take it, and a new account's profile (signUp).
+// made the way RecordSync writes so the phones take it, a new account's profile (signUp), and the Super Admin's
+// approvals and roles on the Users page (setUser).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, query, where, onSnapshot, runTransaction,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -124,6 +125,7 @@ onAuthStateChanged(auth, async user => {
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit issues' : 'read only'}</span>
+    ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}Users</a>` : ''}
     <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
   document.getElementById('out').onclick = () => signOut(auth);
   s.unsub.push(onSnapshot(scoped('projects'), snap => {
@@ -152,6 +154,7 @@ function route() {
     return drawProject(s.page);
   }
   s.unsubPage.forEach(u => u()); s.unsubPage = []; s.page = null;
+  if (location.hash === '#/users' && s.claims.role === 'SUPER_ADMIN') return renderUsers();
   if (m) renderProject(m[1], m[2] || 'summary', m[3] || null); else renderDashboard();
 }
 
@@ -295,6 +298,72 @@ async function signUp(f) {
           : authTrouble(err) || 'Registration failed. Check your details and try again.';
   } finally {
     signingUp = false;
+  }
+}
+
+/* ---------- Users (ManageUsersDialog), Super Admin only ---------- */
+
+function renderUsers() {
+  document.title = 'Users · NHA Monitor';
+  main.innerHTML = `
+    <a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>
+    <div class="users-head"><h1>Manage users &amp; roles</h1>
+      <p class="muted">A new role or approval applies the next time that person opens the app or this website.</p></div>
+    <p class="note users-msg" role="status" hidden></p>
+    <ul class="user-cards" id="users"><li class="empty">Loading users…</li></ul>`;
+  const list = document.getElementById('users'), msg = main.querySelector('.users-msg');
+  let users = [];
+  const say = text => { msg.textContent = text; msg.hidden = !text; };
+  s.unsubPage.push(onSnapshot(collection(db, 'users'), snap => {
+    users = L.manageableUsers(snap.docs.map(d => L.userRow(d.id, d.data())));
+    list.innerHTML = users.length ? users.map(userCard).join('') : '<li class="empty">No other users have registered yet.</li>';
+  }, e => { list.innerHTML = `<li class="error">Could not load users: ${esc(e.message)}</li>`; }));
+  list.onclick = e => {
+    const b = e.target.closest('button[data-uid]');
+    const user = b && users.find(u => u.uid === b.dataset.uid);
+    if (!user || b.getAttribute('aria-pressed') === 'true') return;
+    if (b.dataset.approve !== undefined) setUser(user, { approved: true }, `${user.name} is approved. It applies the next time they open the app.`, say);
+    else setUser(user, { role: b.dataset.role }, `${user.name} is now ${ROLE_LABELS[b.dataset.role]}. It applies the next time they open the app.`, say);
+  };
+  list.onchange = e => {
+    const user = users.find(u => u.uid === e.target.dataset.seesAll);
+    if (!user) return;
+    const on = e.target.checked;
+    setUser(user, { seesAllProjects: on }, on ? `${user.name} can now open every project, view only. It applies the next time they open the app.`
+      : `${user.name} now sees only their own projects. It applies the next time they open the app.`, say);
+  };
+}
+
+/** One account: approval, the four roles and "See all projects" (not for a Super Viewer, who already sees all). */
+function userCard(u) {
+  const role = u.role || 'FIELD_ENGINEER'; // as the claims function reads a profile without one
+  const about = [u.position, u.office].filter(Boolean).join(' · ');
+  return `<li class="card user-card">
+    <div class="uc-who"><b>${esc(u.name)}</b>
+      ${u.email && u.email !== u.name ? `<span class="muted small">${esc(u.email)}</span>` : ''}
+      ${about ? `<span class="muted small">${esc(about)}</span>` : ''}</div>
+    ${u.approved ? '' : `<div class="uc-approve"><span class="waiting">Waiting for approval: can only view</span>
+      <button class="btn" data-uid="${esc(u.uid)}" data-approve>Approve</button></div>`}
+    <div class="seg" role="group" aria-label="Role of ${esc(u.name)}">${L.ASSIGNABLE_ROLES.map(r =>
+      `<button data-uid="${esc(u.uid)}" data-role="${r}" aria-pressed="${r === role}">${ROLE_LABELS[r]}</button>`).join('')}</div>
+    ${role === 'SUPER_VIEWER' ? '' : `<label class="check"><input type="checkbox" data-sees-all="${esc(u.uid)}"${u.seesAllProjects ? ' checked' : ''}>
+      <span>See all projects <small class="muted">Others' projects open view only</small></span></label>`}
+  </li>`;
+}
+
+/** ProjectViewModel.approveUser / setUserRole / setUserSeesAll: one users/{uid} update; syncUserCustomClaims does the rest. */
+async function setUser(user, change, done, say) {
+  if (!navigator.onLine) return say('You are offline. Connect to the internet, then try again.');
+  main.querySelectorAll(`[data-uid="${CSS.escape(user.uid)}"], [data-sees-all="${CSS.escape(user.uid)}"]`).forEach(el => { el.disabled = true; });
+  try {
+    await updateDoc(doc(db, 'users', user.uid), L.userChange(user, change));
+    say(done);
+  } catch (err) {
+    say(`Could not change it: ${err.message}`);
+    // The listener only redraws on a change, so put the controls back as they were.
+    main.querySelectorAll(`[data-uid="${CSS.escape(user.uid)}"], [data-sees-all="${CSS.escape(user.uid)}"]`).forEach(el => { el.disabled = false; });
+    const box = main.querySelector(`[data-sees-all="${CSS.escape(user.uid)}"]`);
+    if (box) box.checked = user.seesAllProjects;
   }
 }
 

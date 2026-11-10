@@ -14,6 +14,9 @@ is read only.
   its `users/{uid}` profile (name, position, office, and Field Engineer or Viewer). `syncUserCustomClaims` sets the
   role and alerts the Super Admin, the account waits for approval before it can edit, and the page goes back to
   sign in like the app. Trying again with the same email and password finishes a profile that never saved.
+- **Users** (Super Admin only, in the header) is the app's "Manage users & roles": approve a new account, give one of
+  Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
+  `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).

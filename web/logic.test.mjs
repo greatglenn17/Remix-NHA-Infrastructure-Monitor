@@ -232,3 +232,17 @@ test('sign up: name, checks and the profile match the app', () => {
   assert.deepEqual(L.newProfile('u1', f, 5), { uid: 'u1', email: 'ana@example.ph', updatedAt: 5, displayName: 'Ana B. Reyes', role: 'VIEWER', position: 'Engineer II', office: '' });
   assert.equal(L.newProfile('u1', { ...f, role: 'SUPER_ADMIN' }, 5).role, 'FIELD_ENGINEER');
 });
+
+test('users: rows, order and the update for each change match ManageUsersDialog', () => {
+  const old = L.userRow('u0', { email: 'old@x.ph', role: 'FIELD_ENGINEER' });
+  assert.equal(old.approved, true, 'a profile from before approvals counts as approved');
+  assert.equal(old.name, 'old@x.ph');
+  const rows = [old, L.userRow('u1', { displayName: 'Zed', approved: false }), L.userRow('u2', { displayName: 'Ana', approved: false, role: 'VIEWER' }),
+    L.userRow('me', { displayName: 'Boss', role: 'SUPER_ADMIN' })];
+  assert.deepEqual(L.manageableUsers(rows).map(u => u.uid), ['u2', 'u1', 'u0']);
+  assert.deepEqual(L.userChange(rows[1], { approved: true }), { approved: true, role: 'FIELD_ENGINEER' });
+  assert.deepEqual(L.userChange(rows[2], { approved: true }), { approved: true, role: 'VIEWER' });
+  assert.deepEqual(L.userChange(rows[2], { role: 'ENGINEER_ADMIN' }), { role: 'ENGINEER_ADMIN' });
+  assert.deepEqual(L.userChange(rows[1], { seesAllProjects: true }), { seesAllProjects: true, role: 'FIELD_ENGINEER' });
+  assert.throws(() => L.userChange(rows[1], { role: 'SUPER_ADMIN' }), /cannot be given/);
+});
