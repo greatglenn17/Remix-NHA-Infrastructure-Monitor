@@ -4,8 +4,10 @@ import java.util.Locale
 
 /** The legend of the SDP print: saleable lots by progress band. */
 object SdpSummary {
-    /** Same bands as the lot colours on the plan. */
-    val BANDS = listOf("Not yet started", "1–25%", "26–50%", "51–75%", "76–99%", "100% / RFO")
+    /** Same bands as the lot colours on the plan, and the choices for a lot's physical progress. RFO is 81 to 100%. */
+    val BANDS = listOf("Not yet started", "1-20%", "21% to 40%", "41% to 60%", "61% to 80%", "RFO")
+    /** The % a choice of [BANDS] saves: the top of its band. */
+    val BAND_VALUES = listOf(0, 20, 40, 60, 80, 100)
 
     /** Road lots are marked, not tracked by %: none (0%), concreting (1-99%, saved as [ROAD_CONCRETING]) or completed (100%). */
     val ROAD_STATES = listOf("Not completed", "Concreting", "Completed")
@@ -18,10 +20,10 @@ object SdpSummary {
     }
 
     fun band(progress: Int): Int = when {
-        progress >= 100 -> 5
-        progress >= 76 -> 4
-        progress >= 51 -> 3
-        progress >= 26 -> 2
+        progress > 80 -> 5
+        progress > 60 -> 4
+        progress > 40 -> 3
+        progress > 20 -> 2
         progress > 0 -> 1
         else -> 0
     }

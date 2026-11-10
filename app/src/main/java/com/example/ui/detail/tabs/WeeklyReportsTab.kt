@@ -668,7 +668,10 @@ internal fun parseActivitiesList(jsonStr: String): List<DailyActivity> {
 }
 
 
-internal fun parseAccomplishmentItemsList(jsonStr: String): List<AccomplishmentItem> {
+/** A report's accomplishment as the three lines (see accomplishmentLines). */
+internal fun parseAccomplishmentItemsList(jsonStr: String): List<AccomplishmentItem> = com.example.data.model.accomplishmentLines(parseSavedItems(jsonStr))
+
+private fun parseSavedItems(jsonStr: String): List<AccomplishmentItem> {
     if (jsonStr.isBlank()) return emptyList()
     val list = mutableListOf<AccomplishmentItem>()
     try {

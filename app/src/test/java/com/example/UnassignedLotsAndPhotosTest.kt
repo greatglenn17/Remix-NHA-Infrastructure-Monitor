@@ -5,6 +5,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -64,6 +66,31 @@ class UnassignedLotsAndPhotosTest {
         rule.onNodeWithTag("lot_lot_name").performTextInput("4")
         rule.onNodeWithText("SAVE PROGRESS").assertIsEnabled().performClick()
         assertEquals("7" to "4", renamedTo)
+    }
+
+    // Progress is picked from the bands and saves the top of the band; contractor and dates are not asked but kept.
+    @Test
+    fun progressIsADropdownOfBands_andContractorAndDatesStay() {
+        var saved: List<Any?>? = null
+        val current = com.example.data.model.SdpLotProgress(
+            projectId = 1, sdpPlanId = 1, sdpLotId = 1, physicalProgress = 85, startDate = "2026-09-01",
+            targetCompletionDate = "2027-01-31", contractor = "JRC Builders"
+        )
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                UpdateLotProgressDialog(
+                    lot = lot("3", "12"), currentProgress = current, defaultContractor = "", canManageBilling = false,
+                    onDismiss = {}, onSubmitProgress = { p, _, _, start, target, contractor, _, _, _, _ -> saved = listOf(p, start, target, contractor) },
+                    onToggleBillingRequested = { _, _ -> }
+                )
+            }
+        }
+        for (gone in listOf("Contractor", "Start Date", "Target Date")) rule.onNodeWithText(gone).assertDoesNotExist()
+        rule.onAllNodesWithText("RFO").onFirst().assertExists() // 85% falls in RFO (81 to 100%)
+        rule.onNodeWithTag("lot_progress_input").performClick()
+        rule.onNodeWithTag("lot_progress_2").performClick()
+        rule.onNodeWithText("SAVE PROGRESS").performClick()
+        assertEquals(listOf(40, "2026-09-01", "2027-01-31", "JRC Builders"), saved)
     }
 
     private val report = WeeklyReport(

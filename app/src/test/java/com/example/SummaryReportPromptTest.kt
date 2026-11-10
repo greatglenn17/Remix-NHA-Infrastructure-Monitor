@@ -103,7 +103,7 @@ class SummaryReportPromptTest {
             }
         }
         rule.onNodeWithText("120 units").assertExists()
-        rule.onNodeWithText("100% / RFO").assertExists()
+        rule.onNodeWithText("RFO").assertExists()
         rule.onNodeWithText("Not yet started").assertExists()
         rule.onNodeWithText("40").assertExists()
         rule.onNodeWithText("As of Oct 27, 2026", substring = true).assertExists()

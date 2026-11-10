@@ -270,7 +270,7 @@ object BlueBookForms {
 
         b.append("<table><tr><th colspan='5' class='sec'>II. PROJECT STATUS</th></tr><tr><th colspan='5' class='sub'>STATUS OF ACCOMPLISHMENT</th></tr>")
         b.append("<tr><th>ITEM</th><th>% WEIGHT</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>TOTAL</th></tr>")
-        val items = accomplishment.ifEmpty { listOf(AccomplishmentItem("Land Development", 0.0, 0.0, 0.0), AccomplishmentItem("Housing Construction", 0.0, 0.0, 0.0)) }
+        val items = accomplishment.ifEmpty { com.example.data.model.ACCOMPLISHMENT_LINES.map { AccomplishmentItem(it, 0.0, 0.0, 0.0) } }
         items.forEach { a ->
             b.append("<tr><td>${esc(a.itemDescription)}</td><td class='n'>${pct(a.weightPct)}</td><td class='n'>${pct(a.targetPct)}</td><td class='n'>${pct(a.actualPct)}</td><td class='n'>${pct(a.weightPct * a.actualPct / 100)}</td></tr>")
         }

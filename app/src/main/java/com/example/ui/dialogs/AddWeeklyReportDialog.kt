@@ -172,18 +172,14 @@ private fun WeeklyReportForm(
     }
 
             
-    // With an approved bar chart the rows are the chart's own items, weighted by amount, and their targets its plan;
-    // a report saved earlier with rows the chart does not have keeps its Scope of Works rows and typed targets.
-    // shortcut: the chart in force on the week's last day when the form opens sets the rows; a week that crosses a revision keeps them.
+    // The rows are the three accomplishment lines. Their items of work are the approved bar chart's, weighted by amount,
+    // and the targets its plan; without a chart they are the Scope of Works items and the targets are typed.
+    // shortcut: the chart in force on the week's last day when the form opens sets the weights; a week that crosses a revision keeps them.
     val chartVersion = remember {
         val asOf = daysOfWeekWithDates.lastOrNull()?.third?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
-        val saved = seed?.let { s ->
-            runCatching { JSONArray(s.accomplishmentItemsJson).let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("itemDescription") } } }.getOrNull()
-        }
-        project?.let { p -> asOf?.let { BarChart.planOn(p, documents, it)?.version } }
-            ?.takeIf { v -> v.total > 0 && (saved == null || v.items.map { it.name }.containsAll(saved)) }
+        project?.let { p -> asOf?.let { BarChart.planOn(p, documents, it)?.version } }?.takeIf { it.total > 0 }
     }
-    val scopeItems = remember { mutableStateListOf<com.example.data.model.ScopeItem>().apply {
+    val workItems = remember { mutableListOf<com.example.data.model.ScopeItem>().apply {
         if (chartVersion != null) {
             chartVersion.items.forEach { add(com.example.data.model.ScopeItem(it.name, it.amount, it.amount / chartVersion.total * 100)) }
         } else if (project != null && project.scopeOfWork.isNotBlank()) {
@@ -198,18 +194,16 @@ private fun WeeklyReportForm(
             }
         }
     } }
+    val scopeItems = remember { com.example.data.model.accomplishmentScope(workItems) }
     
     // Accomps = Map of Scope Name to Pair<Target, Actual>
     val accomplishmentMap = remember { 
         mutableStateMapOf<String, Pair<String, String>>().apply {
             if (seed != null) {
-                try {
-                    val arr = JSONArray(seed.accomplishmentItemsJson)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        put(obj.getString("itemDescription"), Pair(obj.getDouble("targetPct").toString(), obj.getDouble("actualPct").toString()))
-                    }
-                } catch(e: Exception) {}
+                // A report saved item by item opens as its three lines.
+                com.example.ui.detail.tabs.parseAccomplishmentItemsList(seed.accomplishmentItemsJson).forEach {
+                    put(it.itemDescription, Pair(it.targetPct.toString(), it.actualPct.toString()))
+                }
             } else {
                 scopeItems.forEach { put(it.name, Pair("0.0", "0.0")) }
             }
@@ -220,6 +214,7 @@ private fun WeeklyReportForm(
     val chartAsOf = daysOfWeekWithDates.lastOrNull()?.third
     val chartTargets = remember(chartAsOf, project?.barChartJson, documents) {
         project?.takeIf { chartVersion != null }?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
+            ?.let { t -> com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 }) }
     }
     fun targetText(name: String) = chartTargets?.let { (it[name] ?: 0.0).toString() } ?: accomplishmentMap[name]?.first ?: "0.0"
     val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
@@ -474,7 +469,7 @@ private fun WeeklyReportForm(
                         }
                     )
                 }
-                Text("ACCOMPLISHMENT STATUS (Scope of Works)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
+                Text("ACCOMPLISHMENT STATUS", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface))
                 if (chartTargets != null) Text(
                     "Target % is from the approved bar chart as of ${com.example.util.ProjectSchedule.displayDate(chartAsOf.orEmpty())}.",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
