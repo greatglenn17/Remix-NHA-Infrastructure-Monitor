@@ -187,3 +187,37 @@ test('suspension End: the effectivity date is day 1, old one-day-late Ends read 
   assert.equal(L.isSuspendedOn([ws], '2026-08-23'), true);
   assert.equal(L.isSuspendedOn([ws], '2026-08-24'), false);
 });
+
+test('website edits: who may edit, matching firestore.rules', () => {
+  const p = { assignedUids: ['me'] };
+  assert.equal(L.canEdit(p, 'me', { role: 'FIELD_ENGINEER', approved: true }), true);
+  assert.equal(L.canEdit(p, 'me', { role: 'ENGINEER_ADMIN' }), true, 'from before approvals: role, no approved claim');
+  assert.equal(L.canEdit(p, 'me', { role: 'FIELD_ENGINEER', approved: false }), false, 'waiting for approval');
+  assert.equal(L.canEdit(p, 'me', { role: 'VIEWER', approved: true }), false);
+  assert.equal(L.canEdit(p, 'other', { role: 'FIELD_ENGINEER', approved: true, allProjects: true }), false, 'sees all, not assigned');
+  assert.equal(L.canEdit(p, 'other', { role: 'SUPER_VIEWER', approved: true }), false);
+  assert.equal(L.canEdit(p, 'other', { role: 'SUPER_ADMIN' }), true);
+  assert.equal(L.canEdit(p, 'me', {}), false, 'no role yet');
+});
+
+test('website edits: the record keeps its other fields and moves to the next revision', () => {
+  const stored = { revision: 4, data: JSON.stringify({ date: '2026-10-01', description: 'Old', remarks: 'Keep me', timestamp: 7, loggedBy: 'Ana' }) };
+  const out = L.editedRecord(stored, { description: 'New', status: 'Approved' }, { uid: 'me', now: 99, assignedUids: ['me'] });
+  assert.deepEqual({ ...out, data: JSON.parse(out.data) }, {
+    revision: 5, updatedAt: 99, updatedByUid: 'me', assignedUids: ['me'],
+    data: { date: '2026-10-01', description: 'New', remarks: 'Keep me', timestamp: 7, loggedBy: 'Ana', status: 'Approved' },
+  });
+  assert.throws(() => L.editedRecord({ revision: 1, data: 'oops' }, {}, { uid: 'me', now: 1, assignedUids: [] }), /could not be read/);
+  const audit = L.auditRecord({ uuid: 'a1', projectUuid: 'p', assignedUids: ['me'], uid: 'me', now: 99, user: 'Ana', actionType: 'Issue Creation', details: 'd' });
+  assert.equal(audit.type, 'audit_logs');
+  assert.equal(audit.revision, 1);
+  assert.deepEqual(JSON.parse(audit.data), { timestamp: 99, user: 'Ana', device: 'Website', actionType: 'Issue Creation', oldValue: '', newValue: '', details: 'd' });
+});
+
+test('website edits: the issue form checks what AddIssueDialog checks', () => {
+  const ok = { date: '2026-11-10', description: 'Rain', actionTaken: 'Pumped', targetDate: '' };
+  assert.deepEqual(L.issueErrors(ok), []);
+  assert.equal(L.issueErrors({ ...ok, description: ' ', actionTaken: '' }).length, 2);
+  assert.equal(L.issueErrors({ ...ok, date: '' }).length, 1);
+  assert.equal(L.issueErrors({ ...ok, targetDate: '11/10/2026' }).length, 1);
+});

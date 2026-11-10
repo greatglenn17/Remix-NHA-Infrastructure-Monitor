@@ -1,11 +1,11 @@
-// Read-only web viewer. It never imports a Firestore or Storage write function, so it cannot
-// change what the phones sync. Screens mirror the Android app (ui/dashboard, ui/detail).
+// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). Its one write is an issue edit (saveIssue),
+// made the way RecordSync writes so the phones take it; nothing else here writes to Firestore or Storage.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
   initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, query, where, onSnapshot, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -114,7 +114,7 @@ onAuthStateChanged(auth, async user => {
   getDoc(doc(db, 'users', user.uid)).then(d => { s.profile = { name: d.get('displayName') || '', title: d.get('position') || '', office: d.get('office') || '' }; }).catch(() => {});
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
-    <span class="badge view">${icon('visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · read only</span>
+    <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit issues' : 'read only'}</span>
     <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
   document.getElementById('out').onclick = () => signOut(auth);
   s.unsub.push(onSnapshot(scoped('projects'), snap => {
@@ -960,7 +960,7 @@ function bindAudit(c) {
   });
 }
 
-/* ---------- Issues (IssuesTab, IssueCard), read-only ---------- */
+/* ---------- Issues (IssuesTab, IssueCard); writers can edit one (AddIssueDialog) ---------- */
 
 const issueState = page => (page.issues ||= { query: '', filter: 'All' });
 
@@ -976,10 +976,11 @@ function issueResults(c, st) {
   const issues = c.of('project_issues').sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0))
     .filter(i => L.issueMatches(i, st.query, st.filter, c.now));
   if (!issues.length) return `<div class="card empty">${icon('warning')}<p>${st.query || st.filter !== 'All' ? 'No matching issues found' : 'No Issues Logged'}</p></div>`;
-  return `<ul class="issue-cards">${issues.map(i => issueCard(i, c.now)).join('')}</ul>`;
+  const editable = L.canEdit(c.project, s.user.uid, s.claims);
+  return `<ul class="issue-cards">${issues.map(i => issueCard(i, c.now, editable)).join('')}</ul>`;
 }
 
-function issueCard(i, now) {
+function issueCard(i, now, editable = false) {
   const overdue = L.isOverdueIssue(i, now), critical = L.isCriticalIssue(i), status = i.status || 'Pending';
   const level = /resolved/i.test(status) ? 'ok' : /critical/i.test(status) ? 'behind' : 'watch';
   const block = (label, text, cls = '') => (text?.trim() ? `<h4 class="${cls}">${esc(label)}</h4><p>${esc(text)}</p>` : '');
@@ -991,6 +992,7 @@ function issueCard(i, now) {
     ${block(`Action taken${i.actionBy?.trim() ? ` by ${i.actionBy.trim()}` : ''}`, i.actionTaken, 'link')}
     ${block('Remarks / notes', i.remarks)}
     ${i.loggedBy?.trim() ? `<p class="muted small logged">Logged by: ${esc(i.loggedBy)}</p>` : ''}
+    ${editable ? `<div class="ic-actions"><button class="text-btn" data-edit-issue="${esc(i.uuid)}">${icon('edit', 'sm')}Edit</button></div>` : ''}
   </li>`;
 }
 
@@ -999,6 +1001,11 @@ function bindIssues(c) {
   const results = document.getElementById('issue-results');
   // Only the results redraw while typing, so the search box keeps its focus.
   const redraw = () => { results.innerHTML = issueResults(c, st); };
+  results.onclick = e => {
+    const uuid = e.target.closest('[data-edit-issue]')?.dataset.editIssue;
+    const issue = uuid && c.of('project_issues').find(i => i.uuid === uuid);
+    if (issue) editIssue(c, issue);
+  };
   document.getElementById('issue-q').oninput = e => { st.query = e.target.value; redraw(); };
   main.querySelectorAll('[data-issue-filter]').forEach(b => {
     b.onclick = () => {
@@ -1006,6 +1013,76 @@ function bindIssues(c) {
       main.querySelectorAll('[data-issue-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
       redraw();
     };
+  });
+}
+
+/** AddIssueDialog in edit mode: the same fields and checks; Save writes the issue and an audit log entry. */
+function editIssue(c, issue) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const status = issue.status || 'Pending';
+  const statuses = L.ISSUE_STATUSES.includes(status) ? L.ISSUE_STATUSES : [status, ...L.ISSUE_STATUSES];
+  const opt = (v, cur, label = v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  d.innerHTML = `<form novalidate>
+    <h2>Edit issue</h2>
+    <label class="field">Date<input type="date" name="date" value="${esc(issue.date)}" required></label>
+    <label class="field">Issue / Concern<textarea name="description" rows="3" required>${esc(issue.description)}</textarea></label>
+    <label class="field">Action taken<textarea name="actionTaken" rows="3" required>${esc(issue.actionTaken)}</textarea></label>
+    <label class="field">Action taken by<select name="actionBy">${opt('', issue.actionBy || '', 'Not set')}${L.ISSUE_ACTION_BY.map(v => opt(v, issue.actionBy || '')).join('')}</select></label>
+    <label class="field">Target date (optional)<input type="date" name="targetDate" value="${esc(issue.targetDate || '')}"></label>
+    <label class="check"><input type="checkbox" name="isCritical"${L.isCriticalIssue(issue) ? ' checked' : ''}>Critical issue</label>
+    <label class="field">Status<select name="status">${statuses.map(v => opt(v, status)).join('')}</select></label>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => {
+    const f = Object.fromEntries(new FormData(form));
+    return { date: f.date, description: f.description.trim(), actionTaken: f.actionTaken.trim(), actionBy: f.actionBy, targetDate: f.targetDate, isCritical: form.isCritical.checked ? 1 : 0, status: f.status }; // 1/0, as Room's rows sync
+  };
+  const initial = JSON.stringify(values());
+  // rememberDiscardGuard: closing with unsaved changes asks first.
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this issue?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.issueErrors(f);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try { await saveIssue(c, issue, f); done(); } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
+ * Writes an issue edit and its audit log entry in one transaction, the way RecordSync uploads: revision + 1, this
+ * edit's time and editor, the project's assignedUids. It refuses when the issue changed since the form opened.
+ */
+async function saveIssue(c, issue, f) {
+  const ref = doc(db, 'records', issue.uuid), uid = s.user.uid;
+  await runTransaction(db, async t => {
+    const [stored, project] = await Promise.all([t.get(ref), t.get(doc(db, 'projects', c.page.id))]);
+    if (!stored.exists() || stored.get('isDeleted') === true) throw new Error('This issue was deleted on another device.');
+    if (stored.get('revision') !== issue.revision || stored.get('updatedAt') !== issue.updatedAt) {
+      throw new Error('This issue was just changed on another device. Close this form and edit it again.');
+    }
+    const now = Date.now(), assignedUids = project.get('assignedUids') ?? stored.get('assignedUids') ?? [];
+    t.update(ref, L.editedRecord(stored.data(), f, { uid, now, assignedUids }));
+    const audit = L.auditRecord({
+      uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email,
+      // ProjectViewModel.updateProjectIssue's entry, word for word.
+      actionType: 'Issue Creation', details: `Updated issue from ${f.date}`, oldValue: 'Previous issue state',
+      newValue: `Status: ${f.status}, Remarks: ${issue.remarks || ''}`,
+    });
+    t.set(doc(db, 'records', audit.uuid), audit);
   });
 }
 
