@@ -28,6 +28,8 @@ version keep working.
 - **Print** (from a weekly report, or a month on the Monthly view): the A4 weekly or monthly
   Project Engineer's Report laid out as the phone prints it (`BlueBookPrint.kt`,
   `BlueBookForms.kt`). Choose "Save as PDF" in the print window to keep it.
+- **Project Profile** print (Print on the Summary's profile card): the A4 Project Profile sheet as the phone prints it,
+  with the orders under their headings and the person printing as "Prepared By".
 - **Status of Construction** print (Print on the Lots view): the plan PDF's first page inside its frame, each lot
   coloured by progress, and the legend of units per band, for one site or all sites on one landscape or portrait
   page, as the phone prints it. The PDF is drawn by pdf.js 4.10.38, bundled in `web/vendor/pdfjs/` (Apache 2.0, see
