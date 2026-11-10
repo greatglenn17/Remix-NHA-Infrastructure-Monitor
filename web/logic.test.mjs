@@ -246,3 +246,12 @@ test('users: rows, order and the update for each change match ManageUsersDialog'
   assert.deepEqual(L.userChange(rows[1], { seesAllProjects: true }), { seesAllProjects: true, role: 'FIELD_ENGINEER' });
   assert.throws(() => L.userChange(rows[1], { role: 'SUPER_ADMIN' }), /cannot be given/);
 });
+
+test('website edits: a new issue is the record and audit entry the app uploads', () => {
+  const f = { date: '2026-11-10', description: 'Flooded access road near Block 4 gate', actionTaken: 'Asked for a pump', status: 'Pending', isCritical: 1, targetDate: '', actionBy: 'Contractor/Developer' };
+  const r = L.newIssueRecord({ uuid: 'i1', projectUuid: 'p', assignedUids: ['me'], uid: 'me', now: 7, loggedBy: 'Engr. Ana' }, f);
+  assert.deepEqual({ ...r, data: undefined }, { uuid: 'i1', type: 'project_issues', projectUuid: 'p', assignedUids: ['me'], revision: 1, updatedAt: 7, updatedByUid: 'me', isDeleted: false, data: undefined });
+  assert.deepEqual(JSON.parse(r.data), { date: '2026-11-10', description: f.description, actionTaken: 'Asked for a pump', remarks: '', loggedBy: 'Engr. Ana', timestamp: 7, status: 'Pending', isCritical: 1, targetDate: '', actionBy: 'Contractor/Developer' });
+  assert.deepEqual(L.newIssueAudit(f), { actionType: 'Issue Creation', details: 'Logged issue: Flooded access road near Block...', oldValue: '',
+    newValue: `Description: ${f.description}, Status: Pending, Critical: true` });
+});

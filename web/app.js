@@ -1,4 +1,4 @@
-// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only an issue edit (saveIssue),
+// Web viewer. Screens mirror the Android app (ui/dashboard, ui/detail). It writes only a new or edited issue (saveIssue),
 // made the way RecordSync writes so the phones take it, a new account's profile (signUp), and the Super Admin's
 // approvals and roles on the Users page (setUser).
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, runTransaction,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -1126,13 +1126,14 @@ function bindAudit(c) {
   });
 }
 
-/* ---------- Issues (IssuesTab, IssueCard); writers can edit one (AddIssueDialog) ---------- */
+/* ---------- Issues (IssuesTab, IssueCard); writers log and edit them (AddIssueDialog) ---------- */
 
 const issueState = page => (page.issues ||= { query: '', filter: 'All' });
 
 function issuesView(c) {
   const st = issueState(c.page);
-  return `<label class="field issue-q">Search<input type="search" id="issue-q" placeholder="Search issues or actions taken..." value="${esc(st.query)}" autocomplete="off"></label>
+  const add = L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="btn issue-add" id="issue-add">${icon('add_circle', 'sm')}Log issue</button>` : '';
+  return `${add}<label class="field issue-q">Search<input type="search" id="issue-q" placeholder="Search issues or actions taken..." value="${esc(st.query)}" autocomplete="off"></label>
     <div class="chips" role="group" aria-label="Filter issues">${L.ISSUE_FILTERS.map(f => `<button data-issue-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div>
     <div id="issue-results">${issueResults(c, st)}</div>`;
 }
@@ -1172,6 +1173,8 @@ function bindIssues(c) {
     const issue = uuid && c.of('project_issues').find(i => i.uuid === uuid);
     if (issue) editIssue(c, issue);
   };
+  const add = document.getElementById('issue-add');
+  if (add) add.onclick = () => editIssue(c, null);
   document.getElementById('issue-q').oninput = e => { st.query = e.target.value; redraw(); };
   main.querySelectorAll('[data-issue-filter]').forEach(b => {
     b.onclick = () => {
@@ -1182,15 +1185,17 @@ function bindIssues(c) {
   });
 }
 
-/** AddIssueDialog in edit mode: the same fields and checks; Save writes the issue and an audit log entry. */
+/** AddIssueDialog: a new issue (`issue` null) or an edit, with the same fields and checks; Save writes it and an audit log entry. */
 function editIssue(c, issue) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
+  const isNew = !issue;
+  issue ||= { date: today(), description: '', actionTaken: '', actionBy: '', targetDate: '', isCritical: 0, status: 'Pending' };
   const status = issue.status || 'Pending';
   const statuses = L.ISSUE_STATUSES.includes(status) ? L.ISSUE_STATUSES : [status, ...L.ISSUE_STATUSES];
   const opt = (v, cur, label = v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   d.innerHTML = `<form novalidate>
-    <h2>Edit issue</h2>
+    <h2>${isNew ? 'Log issue' : 'Edit issue'}</h2>
     <label class="field">Date<input type="date" name="date" value="${esc(issue.date)}" required></label>
     <label class="field">Issue / Concern<textarea name="description" rows="3" required>${esc(issue.description)}</textarea></label>
     <label class="field">Action taken<textarea name="actionTaken" rows="3" required>${esc(issue.actionTaken)}</textarea></label>
@@ -1209,17 +1214,17 @@ function editIssue(c, issue) {
   const initial = JSON.stringify(values());
   // rememberDiscardGuard: closing with unsaved changes asks first.
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this issue?')) && done();
+  const close = () => (JSON.stringify(values()) === initial || confirm(isNew ? 'Discard this new issue?' : 'Discard your changes to this issue?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.issueErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!isNew && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
-    try { await saveIssue(c, issue, f); done(); } catch (x) {
+    try { await (isNew ? addIssue(c, f) : saveIssue(c, issue, f)); done(); } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
       save.disabled = false;
     }
@@ -1250,6 +1255,20 @@ async function saveIssue(c, issue, f) {
     });
     t.set(doc(db, 'records', audit.uuid), audit);
   });
+}
+
+/** MainActivity's addProjectIssue: a new issue logged by this account, and ProjectViewModel's audit entry, in one batch. */
+async function addIssue(c, f) {
+  const uid = s.user.uid, now = Date.now();
+  const project = await getDoc(doc(db, 'projects', c.page.id));
+  const assignedUids = project.get('assignedUids') ?? [];
+  const user = s.profile.name || s.user.email;
+  const issue = L.newIssueRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, loggedBy: user }, f);
+  const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user, ...L.newIssueAudit(f) });
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'records', issue.uuid), issue);
+  batch.set(doc(db, 'records', audit.uuid), audit);
+  await batch.commit();
 }
 
 /** PhotoGalleryTab: one album per reporting week, in report order. */

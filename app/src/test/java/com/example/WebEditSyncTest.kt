@@ -82,4 +82,34 @@ class WebEditSyncTest {
         assertEquals(projectId, long("SELECT projectId FROM audit_logs WHERE uuid = ?", audit["uuid"]))
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/logic.js newIssueRecord: a brand-new issue the phone has never seen. */
+    @Test
+    fun websiteNewIssue_isAddedToTheProject() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val uuid = "6f1c2a9e-3b7d-4c55-9a0e-1d2f3a4b5c6d"
+        val issue = mapOf(
+            "uuid" to uuid, "type" to "project_issues", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to 1L, "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to JSONObject().put("date", "2026-11-10").put("description", "Flooded access road").put("actionTaken", "Asked for a pump")
+                .put("remarks", "").put("loggedBy", "Engr. Web").put("timestamp", 1_794_292_093_231L).put("status", "Pending")
+                .put("isCritical", 1).put("targetDate", "").put("actionBy", "Contractor/Developer").toString()
+        )
+
+        recordSync.applyRemote(listOf(issue))
+
+        assertEquals(projectId, long("SELECT projectId FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals("Flooded access road", string("SELECT description FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals("Engr. Web", string("SELECT loggedBy FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals(1L, long("SELECT isCritical FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals("Contractor/Developer", string("SELECT actionBy FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }

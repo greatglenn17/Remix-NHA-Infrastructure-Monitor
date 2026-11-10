@@ -799,6 +799,26 @@ export function auditRecord({ uuid, projectUuid, assignedUids, uid, now, user, a
   };
 }
 
+/**
+ * A new project_issues record as RecordSync.buildDocument uploads one: the ProjectIssue row without its local ids
+ * (MainActivity's addProjectIssue: no remarks, logged by the signed-in name), revision 1, booleans as 1/0.
+ */
+export function newIssueRecord({ uuid, projectUuid, assignedUids, uid, now, loggedBy }, f) {
+  return {
+    uuid, type: 'project_issues', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+    data: JSON.stringify({
+      date: f.date, description: f.description, actionTaken: f.actionTaken, remarks: '', loggedBy, timestamp: now,
+      status: f.status, isCritical: f.isCritical ? 1 : 0, targetDate: f.targetDate || '', actionBy: f.actionBy || '',
+    }),
+  };
+}
+
+/** ProjectViewModel.addProjectIssue's audit entry, word for word. */
+export const newIssueAudit = f => ({
+  actionType: 'Issue Creation', details: `Logged issue: ${f.description.slice(0, 30)}...`, oldValue: '',
+  newValue: `Description: ${f.description}, Status: ${f.status}, Critical: ${Boolean(f.isCritical)}`,
+});
+
 /** AddIssueDialog's checks: a date, the issue and the action taken are required; dates are yyyy-MM-dd. */
 export function issueErrors(f) {
   const iso = /^\d{4}-\d{2}-\d{2}$/;
