@@ -259,7 +259,7 @@ private fun WeeklyReportCard(
                             if (parsedAccItems.isNotEmpty()) {
                                 parsedAccItems.forEach { acc ->
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(acc.itemDescription + " (" + acc.weightPct + "%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
+                                        Text("${acc.itemDescription} (${"%.2f".format(java.util.Locale.US, acc.weightPct)}%)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(2f))
                                         Text("T: ${"%.2f".format(acc.targetPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("A: ${"%.2f".format(acc.actualPct)}%", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                                         Text("V: ${"%.2f".format(acc.variancePct)}%", color = varianceColor(acc.variancePct, LocalNHAColors.current), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.8f))
