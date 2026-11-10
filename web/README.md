@@ -6,7 +6,7 @@ for the people the app lets edit: approved Engineer Admins and Field Engineers a
 Admin. The edit is written the way the phones write a record (revision up by one, a new edit time, every other field
 kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
 A phone with its own unsent edit of the same issue keeps its version. The Cloud Function
-`notifySuperAdminsOnAudit` pushes that audit entry to the Super Admin's phones, as it does for app edits. Everything else
+`notifySuperAdminsOnAudit` pushes that audit entry to the Super Admin's phones while the project is on-going, as it does for app edits. Everything else
 is read only.
 
 - Sign-in uses the same email and password as the app.

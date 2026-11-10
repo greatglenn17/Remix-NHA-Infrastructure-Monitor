@@ -277,7 +277,7 @@ async function superAdminTokens(exceptUid = "") {
 
 /**
  * Triggered when a record is created. A new audit log entry (written by the app or the website with each change)
- * by anyone but the Super Admin is pushed to the Super Admin's devices, with the alert the app builds in
+ * on an on-going (unfinished) project by anyone but the Super Admin is pushed to the Super Admin's devices, with the alert the app builds in
  * ProjectViewModel.logAuditAction. Other record types return at once.
  */
 exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
@@ -287,19 +287,21 @@ exports.notifySuperAdminsOnAudit = functions.region(REGION).firestore
     if (record.type !== "audit_logs") return null;
     try {
       const uid = record.updatedByUid || "";
-      const actor = uid ? await getFirestore().collection("users").doc(uid).get() : null;
-      const alert = auditAlert(record, actor && actor.exists ? actor.get("role") : "", Date.now());
+      const [actor, project] = await Promise.all([
+        uid ? getFirestore().collection("users").doc(uid).get() : null,
+        getFirestore().collection("projects").doc(record.projectUuid || "-").get(),
+      ]);
+      const alert = auditAlert(record, actor && actor.exists ? actor.get("role") : "", Date.now(), project.exists ? project.data() : null);
       if (!alert) return null;
       const tokens = await superAdminTokens(uid);
       if (tokens.length === 0) return null;
-      const project = await getFirestore().collection("projects").doc(record.projectUuid || "-").get();
-      const projectName = (project.exists && project.get("name")) || "";
+      const projectName = project.get("name") || "";
       const response = await getMessaging().sendEachForMulticast({
         tokens,
         data: {
           type: "AUDIT_ALERT",
           title: alert.title,
-          message: projectName ? `${alert.message} (${projectName})` : alert.message,
+          message: alert.message,
           projectName,
           eventId: `audit_${context.params.recordId}`,
         },
