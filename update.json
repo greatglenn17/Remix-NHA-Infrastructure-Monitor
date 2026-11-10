@@ -1,8 +1,8 @@
 {
-  "versionCode": 286,
-  "versionName": "2.8.6",
-  "releaseNotes": "v2.8.6: Super Admin alerts now reach only the Super Admin's phones and also appear in the bell list. Signing out stops a phone's alerts for that account. The weather clocks have larger, easier-to-read numbers.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.6/NHA_Monitor_v2.8.6_Build286.apk",
-  "apkSha256": "82c869bc0d772ba572585db39806f5c524eb7a666bf02bc33033d55ea7105983",
+  "versionCode": 287,
+  "versionName": "2.8.7",
+  "releaseNotes": "v2.8.7: Six one-tap weather presets in the weekly report: All Fair, All Cloudy, Cloudy AM / Showers PM, All Rainy, Rainy AM / Stormy PM and All Stormy.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.7/NHA_Monitor_v2.8.7_Build287.apk",
+  "apkSha256": "145fdc52347d43a70fec3cf4f5a5813eb5cc3a22149745e2448f82132903dc75",
   "isMandatory": true
 }
