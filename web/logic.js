@@ -893,6 +893,13 @@ export function userChange(user, change) {
 /* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
 
 export const WEATHER_KEYS = ['FAIR', 'CLOUDY', 'RAIN_SHOWERS', 'RAINY', 'STORMY'];
+/** AddWeeklyReportDialog's one-tap day weather (Reports.kt WEATHER_PRESETS): half-and-half is 12 AM-11 AM, then 12 PM-11 PM. */
+const halves = (am, pm) => Array.from({ length: 24 }, (_, h) => (h < 12 ? am : pm));
+export const WEATHER_PRESETS = [
+  ['All Fair', halves('FAIR', 'FAIR')], ['All Cloudy', halves('CLOUDY', 'CLOUDY')],
+  ['Cloudy AM / Showers PM', halves('CLOUDY', 'RAIN_SHOWERS')], ['All Rainy', halves('RAINY', 'RAINY')],
+  ['Rainy AM / Stormy PM', halves('RAINY', 'STORMY')], ['All Stormy', halves('STORMY', 'STORMY')],
+];
 const weatherKey = v => { const k = String(v ?? '').trim().toUpperCase().replace(/ /g, '_'); return WEATHER_KEYS.includes(k) ? k : 'FAIR'; };
 
 /** The 7 days of a weekly report for the weather form: its stored hours, or Fair all day for a day with no log. */

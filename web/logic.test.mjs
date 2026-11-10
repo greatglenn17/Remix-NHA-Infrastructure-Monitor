@@ -274,3 +274,13 @@ test('weather edit: the form reads a report\'s week, and only changed days are r
   assert.equal(out[1], report._weather[1], 'an untouched day stays exactly as stored');
   assert.deepEqual(out[2], { date: '2026-11-03', dayOfWeek: 'Tuesday', hourlyConditionsCsv: [...Array(14).fill('FAIR'), 'STORMY', ...Array(9).fill('FAIR')].join(',') });
 });
+
+test('weather presets match the app\'s (Reports.kt WEATHER_PRESETS)', () => {
+  assert.deepEqual(L.WEATHER_PRESETS.map(([n]) => n), ['All Fair', 'All Cloudy', 'Cloudy AM / Showers PM', 'All Rainy', 'Rainy AM / Stormy PM', 'All Stormy']);
+  for (const [n, hours] of L.WEATHER_PRESETS) {
+    assert.equal(hours.length, 24, n);
+    assert.ok(hours.every(h => L.WEATHER_KEYS.includes(h)), n);
+  }
+  const [, rs] = L.WEATHER_PRESETS[4];
+  assert.deepEqual([rs[0], rs[11], rs[12], rs[23]], ['RAINY', 'RAINY', 'STORMY', 'STORMY']);
+});

@@ -699,3 +699,5 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-hours > span { font-size: 11px; }
 .wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 11px Inter, sans-serif; color: #0B0F17; cursor: pointer; user-select: none; }
 .wx-h:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.wx-row legend { flex-wrap: wrap; }
+.wx-row legend select { font: 400 12px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 32px; }

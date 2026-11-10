@@ -99,6 +99,19 @@ enum class WeatherCondition(val label: String, val isWorkable: Boolean) {
     STORMY("Stormy", false)
 }
 
+/**
+ * The weekly report form's one-tap weather for a day: its label and 24 hourly conditions, 12 AM first. A half-and-half
+ * preset gives the first condition to 12 AM-11 AM and the second to 12 PM-11 PM. web/logic.js WEATHER_PRESETS matches.
+ */
+val WEATHER_PRESETS: List<Pair<String, List<String>>> = listOf(
+    "All Fair" to List(24) { "FAIR" },
+    "All Cloudy" to List(24) { "CLOUDY" },
+    "Cloudy AM / Showers PM" to List(24) { if (it < 12) "CLOUDY" else "RAIN_SHOWERS" },
+    "All Rainy" to List(24) { "RAINY" },
+    "Rainy AM / Stormy PM" to List(24) { if (it < 12) "RAINY" else "STORMY" },
+    "All Stormy" to List(24) { "STORMY" }
+)
+
 @Entity(
     tableName = "daily_hourly_weather",
     foreignKeys = [
