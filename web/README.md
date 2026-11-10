@@ -10,6 +10,10 @@ A phone with its own unsent edit of the same issue keeps its version. The Cloud 
 is read only.
 
 - Sign-in uses the same email and password as the app.
+- **Create account** on the sign-in screen registers the way the app's sign-up does: a Firebase Auth account, then
+  its `users/{uid}` profile (name, position, office, and Field Engineer or Viewer). `syncUserCustomClaims` sets the
+  role and alerts the Super Admin, the account waits for approval before it can edit, and the page goes back to
+  sign in like the app. Trying again with the same email and password finishes a profile that never saved.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
@@ -107,4 +111,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing of any kind.
+Editing anything other than issues.

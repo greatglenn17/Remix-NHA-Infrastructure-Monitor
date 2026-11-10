@@ -809,3 +809,34 @@ export function issueErrors(f) {
     f.targetDate && !iso.test(f.targetDate) && 'Pick a valid target date.',
   ].filter(Boolean);
 }
+
+/* ---------- Sign up (LoginScreen in sign-up mode, ProjectViewModel.authenticateWithFirebase) ---------- */
+
+/** AuthManager.personName: "Juan C. Dela Cruz" from its parts; the middle initial is optional and gets its dot. */
+export const personName = (first, mi, last) =>
+  [first.trim(), mi.trim().replace(/\.+$/, '').toUpperCase(), last.trim()].map((p, i) => (i === 1 && p ? `${p}.` : p)).filter(Boolean).join(' ');
+
+/** New accounts start as Field Engineer or Viewer; the Super Admin promotes and approves them. */
+export const SIGN_UP_ROLES = ['FIELD_ENGINEER', 'VIEWER'];
+
+/** The sign-up form's checks: the app's (first and last name, an email, 6+ characters) plus a matching retype. */
+export function signUpErrors(f) {
+  const email = f.email.trim();
+  return [
+    (!f.firstName.trim() || !f.lastName.trim()) && 'Type your first and last name.',
+    (!email.includes('@') || !email.includes('.')) && 'Please enter a valid email address.',
+    f.password.trim().length < 6 && 'Password must be at least 6 characters long.',
+    f.password !== f.confirm && 'The two passwords do not match.',
+  ].filter(Boolean);
+}
+
+/** users/{uid} as FirestoreSyncManager.syncUserProfile writes it at sign-up; firestore.rules allow exactly this. */
+export function newProfile(uid, f, now) {
+  const email = f.email.trim().toLowerCase();
+  return {
+    uid, email, updatedAt: now,
+    displayName: personName(f.firstName, f.middleInitial, f.lastName) || email.split('@')[0],
+    role: SIGN_UP_ROLES.includes(f.role) ? f.role : 'FIELD_ENGINEER',
+    position: f.position.trim(), office: f.office.trim(),
+  };
+}
