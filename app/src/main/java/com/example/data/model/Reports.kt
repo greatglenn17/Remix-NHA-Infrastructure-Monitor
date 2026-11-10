@@ -84,6 +84,39 @@ data class AccomplishmentItem(
         get() = actualPct - targetPct
 }
 
+/** The weekly report's only accomplishment lines; Scope of Works and bar chart items fold into them by name. */
+val ACCOMPLISHMENT_LINES = listOf("Land Acquisition", "Land Development", "Housing Construction")
+private val HOUSING_WORDS = Regex("\\b(house|houses|housing|units?)\\b", RegexOption.IGNORE_CASE)
+
+/** "acquisition" is Land Acquisition, a house, housing or unit is Housing Construction, any other item of work is Land Development. */
+fun accomplishmentLine(itemName: String): String = when {
+    itemName.contains("acquisition", ignoreCase = true) -> ACCOMPLISHMENT_LINES[0]
+    HOUSING_WORDS.containsMatchIn(itemName) -> ACCOMPLISHMENT_LINES[2]
+    else -> ACCOMPLISHMENT_LINES[1]
+}
+
+/** The three lines' weights: each is the sum of its items'. */
+fun accomplishmentScope(items: List<ScopeItem>): List<ScopeItem> = ACCOMPLISHMENT_LINES.map { line ->
+    items.filter { accomplishmentLine(it.name) == line }.let { ScopeItem(line, it.sumOf(ScopeItem::amount), it.sumOf(ScopeItem::weightPct)) }
+}
+
+/** [value] of the items by line, each line its items' weighted average (a plain one when they have no weights). */
+fun <T> lineAverages(items: List<T>, name: (T) -> String, weight: (T) -> Double, value: (T) -> Double): Map<String, Double> =
+    items.groupBy { accomplishmentLine(name(it)) }.mapValues { (_, rows) ->
+        val w = rows.sumOf(weight)
+        rows.singleOrNull()?.let(value) ?: if (w > 0) rows.sumOf { value(it) * weight(it) } / w else rows.sumOf(value) / rows.size
+    }
+
+/** A saved report's rows as the three lines, so reports saved item by item read the same as new ones. */
+fun accomplishmentLines(items: List<AccomplishmentItem>): List<AccomplishmentItem> {
+    if (items.isEmpty()) return items
+    val target = lineAverages(items, AccomplishmentItem::itemDescription, AccomplishmentItem::weightPct, AccomplishmentItem::targetPct)
+    val actual = lineAverages(items, AccomplishmentItem::itemDescription, AccomplishmentItem::weightPct, AccomplishmentItem::actualPct)
+    return ACCOMPLISHMENT_LINES.map { line ->
+        AccomplishmentItem(line, items.filter { accomplishmentLine(it.itemDescription) == line }.sumOf { it.weightPct }, target[line] ?: 0.0, actual[line] ?: 0.0)
+    }
+}
+
 data class DocumentActionItem(
     val document: String,
     val date: String,

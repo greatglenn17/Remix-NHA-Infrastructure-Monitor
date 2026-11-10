@@ -79,11 +79,16 @@ class WeeklyReportStepsTest {
         }
         rule.onNodeWithTag("submit_weekly_report_button").performClick()
         val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        // The two items of work were saved one by one; they come back as the one Land Development line, same totals.
+        fun line(name: String, target: Double, actual: Double, weight: Double) =
+            JSONObject().put("itemDescription", name).put("targetPct", target).put("actualPct", actual).put("weightPct", weight)
+        val lines = JSONArray().put(line("Land Acquisition", 0.0, 0.0, 0.0)).put(line("Land Development", 30.0, 20.25, 100.0))
+            .put(line("Housing Construction", 0.0, 0.0, 0.0)).toString()
         assertEquals(
             listOf(
                 report.reportingWeek, report.targetAccomplishmentPct, report.actualAccomplishmentPct, report.activitiesJson,
                 report.attachedPhotoUrlsJson, days.toSet(), (19..25).map { "2026-10-$it" },
-                report.manpowerJson, report.equipmentJson, report.issuesJson, report.accomplishmentItemsJson
+                report.manpowerJson, report.equipmentJson, report.issuesJson, lines
             ),
             got
         )
@@ -115,7 +120,7 @@ class WeeklyReportStepsTest {
         rule.onNodeWithText("Enter 0 to 100").assertExists()
         rule.onNodeWithText("Review").performClick()
         rule.onNodeWithText("Step 5 of 5: Review and save").assertExists()
-        rule.onNodeWithText("Drainage: actual must be 0 to 100%").assertExists()
+        rule.onNodeWithText("Land Development: actual must be 0 to 100%").assertExists()
         rule.onNodeWithText("Go to Week").performSemanticsAction(SemanticsActions.OnClick)
         rule.onNodeWithText("Step 1 of 5: Week and progress").assertExists()
     }

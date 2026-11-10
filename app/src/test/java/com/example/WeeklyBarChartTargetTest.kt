@@ -44,7 +44,7 @@ class WeeklyBarChartTargetTest {
         }
         // The week of Tue Oct 27 runs Sat Oct 24 to Fri Oct 30.
         val expected = BarChart.itemTargetsOn(project, emptyList(), LocalDate.of(2026, 10, 30))!!.getValue("Drainage")
-        rule.onNodeWithTag("weekly_target_Drainage").assert(hasText(expected.toString()))
+        rule.onNodeWithTag("weekly_target_Land Development").assert(hasText(expected.toString()))
         rule.onNodeWithText("Target % is from the approved bar chart", substring = true).assertExists()
     }
 
@@ -63,8 +63,9 @@ class WeeklyBarChartTargetTest {
             }
         }
         val expected = BarChart.itemTargetsOn(imported, emptyList(), LocalDate.of(2026, 10, 30))!!
-        rule.onNodeWithTag("weekly_target_Earthworks").assert(hasText(expected.getValue("Earthworks").toString()))
-        rule.onNodeWithTag("weekly_target_Housing").assert(hasText(expected.getValue("Housing").toString()))
+        rule.onNodeWithTag("weekly_target_Land Development").assert(hasText(expected.getValue("Earthworks").toString()))
+        rule.onNodeWithTag("weekly_target_Housing Construction").assert(hasText(expected.getValue("Housing").toString()))
+        rule.onNodeWithTag("weekly_target_Land Acquisition").assert(hasText("0.0"))
         rule.onNodeWithTag("weekly_target_Drainage").assertDoesNotExist()
         rule.onNodeWithText("Wt: 25.00%").assertExists()
     }

@@ -2606,10 +2606,10 @@ fun RecordInspectionSnapshotDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Inspected Progress %", style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurfaceVariant))
+                    Text("Inspected Progress", style = MaterialTheme.typography.bodySmall.copy(color = cs.onSurfaceVariant))
                     Surface(color = derivedColor, shape = RoundedCornerShape(4.dp)) {
                         Text(
-                            text = "$intProgress%",
+                            text = com.example.util.SdpSummary.BANDS[com.example.util.SdpSummary.band(intProgress)],
                             style = MaterialTheme.typography.labelSmall.copy(color = cs.surface, fontWeight = FontWeight.SemiBold),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -3483,12 +3483,9 @@ fun SdpLegendDialog(onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("CONSTRUCTION PHYSICAL PROGRESS (LOT FILL):", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold))
 
-                LegendRow(color = getLotProgressFillColor(0), label = "Not yet started (0%)")
-                LegendRow(color = getLotProgressFillColor(1), label = "1 – 25% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(26), label = "26 – 50% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(51), label = "51 – 75% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(76), label = "76 – 99% Physical Progress")
-                LegendRow(color = getLotProgressFillColor(100), label = "100% Completed / RFO")
+                com.example.util.SdpSummary.BANDS.forEachIndexed { i, band ->
+                    LegendRow(color = getLotProgressFillColor(com.example.util.SdpSummary.BAND_VALUES[i]), label = band)
+                }
                 LegendRow(color = roadLotFill(0, LocalNHAColors.current), label = "Road lot: not completed")
                 LegendRow(color = roadLotFill(com.example.util.SdpSummary.ROAD_CONCRETING, LocalNHAColors.current), label = "Road lot: concreting")
                 LegendRow(color = roadLotFill(100, LocalNHAColors.current), label = "Road lot: completed")
@@ -3560,9 +3557,10 @@ fun UpdateLotProgressDialog(
     var progressSlider by remember { mutableFloatStateOf(currentProgress?.physicalProgress?.toFloat() ?: 0f) }
     var constructionStatus by remember { mutableStateOf(currentProgress?.constructionStatus ?: "Not Started") }
     var currentActivity by remember { mutableStateOf(currentProgress?.currentActivity ?: "") }
-    var startDate by remember { mutableStateOf(currentProgress?.startDate ?: "") }
-    var targetCompletionDate by remember { mutableStateOf(currentProgress?.targetCompletionDate ?: "") }
-    var contractor by remember { mutableStateOf(currentProgress?.contractor?.ifBlank { defaultContractor } ?: defaultContractor) }
+    // Not asked for any more; what a lot already has is kept.
+    val startDate = currentProgress?.startDate ?: ""
+    val targetCompletionDate = currentProgress?.targetCompletionDate ?: ""
+    val contractor = currentProgress?.contractor?.ifBlank { defaultContractor } ?: defaultContractor
     var remarks by remember { mutableStateOf(currentProgress?.remarks ?: "") }
     var photos by remember { mutableStateOf(com.example.data.files.Attachments.parseList(currentProgress?.photosJson ?: "[]")) }
 
@@ -3651,13 +3649,13 @@ fun UpdateLotProgressDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Physical Progress %", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                            Text("Physical Progress", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                             Surface(
                                 color = derivedColor,
                                 shape = RoundedCornerShape(4.dp)
                             ) {
                                 Text(
-                                    text = "$intProgress%",
+                                    text = com.example.util.SdpSummary.BANDS[com.example.util.SdpSummary.band(intProgress)],
                                     style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.SemiBold),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
@@ -3684,28 +3682,6 @@ fun UpdateLotProgressDialog(
                     label = { Text("Current Activity (e.g., Rebar / Concreting)") },
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                OutlinedTextField(
-                    value = contractor,
-                    onValueChange = { contractor = it },
-                    label = { Text("Contractor") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startDate,
-                        onValueChange = { startDate = it },
-                        label = { Text("Start Date") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = targetCompletionDate,
-                        onValueChange = { targetCompletionDate = it },
-                        label = { Text("Target Date") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
 
                 OutlinedTextField(
                     value = remarks,
@@ -3837,7 +3813,7 @@ private fun GroupProgressDialog(count: Int, onDismiss: () -> Unit, onSubmit: (pr
         title = { Text("Update $count lots", fontWeight = FontWeight.SemiBold) },
         text = {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Physical Progress: $intProgress%", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                Text("Physical Progress", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                 ProgressPicker(progress, color) { progress = it; status = statusForProgress(it.toInt()) }
                 OutlinedTextField(value = status, onValueChange = { status = it }, label = { Text("Construction Status") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = activity, onValueChange = { activity = it }, label = { Text("Current Activity") }, modifier = Modifier.fillMaxWidth())
@@ -3862,32 +3838,30 @@ fun statusForProgress(progress: Int): String = when (progress) {
     else -> "Completed"
 }
 
-/** Progress slider with a box to type the exact %. */
+/** Physical progress as one of the bands; a lot saved with an exact % shows the band it falls in. */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun ProgressPicker(value: Float, color: Color, onChange: (Float) -> Unit) {
-    var typed by remember { mutableStateOf(value.toInt().toString()) }
-    // Keep the box in step when the slider moves.
-    LaunchedEffect(value) { if (typed.toIntOrNull() != value.toInt()) typed = value.toInt().toString() }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Slider(
-            value = value,
-            onValueChange = onChange,
-            valueRange = 0f..100f,
-            colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color, inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(Modifier.width(8.dp))
+    var open by remember { mutableStateOf(false) }
+    val bands = com.example.util.SdpSummary.BANDS
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
         OutlinedTextField(
-            value = typed,
-            onValueChange = { text ->
-                typed = text.substringBefore('.').substringBefore(',').filter(Char::isDigit).take(3)  // lot progress is whole percent
-                typed.toIntOrNull()?.coerceIn(0, 100)?.let { onChange(it.toFloat()) }
-            },
-            suffix = { Text("%") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.width(92.dp).testTag("lot_progress_input")
+            value = bands[com.example.util.SdpSummary.band(value.toInt())], onValueChange = {}, readOnly = true,
+            label = { Text("Physical progress") },
+            leadingIcon = { Box(Modifier.size(14.dp).background(color, androidx.compose.foundation.shape.CircleShape)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
+            modifier = Modifier.menuAnchor().fillMaxWidth().testTag("lot_progress_input")
         )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            bands.forEachIndexed { i, band ->
+                DropdownMenuItem(
+                    text = { Text(band) },
+                    onClick = { onChange(com.example.util.SdpSummary.BAND_VALUES[i].toFloat()); open = false },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                    modifier = Modifier.testTag("lot_progress_$i")
+                )
+            }
+        }
     }
 }
 
