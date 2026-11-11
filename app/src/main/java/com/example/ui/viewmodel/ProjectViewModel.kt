@@ -748,9 +748,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     @OptIn(ExperimentalCoroutinesApi::class)
     val allPendingDocuments: StateFlow<List<PendingDocument>> = repository.getAllPendingDocuments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** Total gross billed per project id, for the dashboard billing bars. */
+    /** Total net billed (after retention) per project id, for the dashboard billing bars. */
     val billedTotalsByProject: StateFlow<Map<Long, Double>> = projectDao.getAllPayments()
-        .map { payments -> payments.groupBy { it.projectId }.mapValues { (_, p) -> p.sumOf { it.grossAmount } } }
+        .map { payments -> payments.groupBy { it.projectId }.mapValues { (_, p) -> p.sumOf { it.netAmount } } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val _portfolioFilter = MutableStateFlow<PortfolioFilter?>(null)
