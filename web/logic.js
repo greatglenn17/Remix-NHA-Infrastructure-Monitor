@@ -884,6 +884,25 @@ export function issueErrors(f) {
   ].filter(Boolean);
 }
 
+/** ProjectAttention.REQUEST_TYPES. */
+export const REQUEST_TYPES = ['Work Suspension Order', 'Continuance of Work Suspension Order', 'Work Resumption Order', 'Variation Order', 'Time Extension'];
+
+/** DeveloperRequestDialog's checks: the date received is required; any date is yyyy-MM-dd. */
+export function requestErrors(f) {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  return [
+    !iso.test(f.dateReceived || '') && 'Pick the date received by NHA.',
+    f.dateRequested && !iso.test(f.dateRequested) && "Pick a valid date of the developer's request.",
+    f.datePackaged && !iso.test(f.datePackaged) && 'Pick a valid date packaged.',
+  ].filter(Boolean);
+}
+
+/** ProjectViewModel.saveDeveloperRequest's audit entry, word for word. */
+export const requestAudit = f => ({
+  actionType: 'Developer Request', details: `${f.requestType} request received ${f.dateReceived}${f.datePackaged ? `, packaged ${f.datePackaged}` : ''}`,
+  oldValue: '', newValue: f.details,
+});
+
 /** FormValidation.parseAmount: digits with an optional decimal part; commas and spaces are ignored. */
 export function parseAmount(text) {
   const t = String(text ?? '').replace(/[, ]/g, '');
