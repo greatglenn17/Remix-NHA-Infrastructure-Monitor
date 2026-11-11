@@ -665,7 +665,9 @@ function drawProject(page) {
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   const billingAdd = document.getElementById('billing-add');
-  if (billingAdd) billingAdd.onclick = () => addBillingForm(c);
+  if (billingAdd) billingAdd.onclick = () => billingForm(c);
+  // The saved billing, not the card's net one: an edit starts from what is stored.
+  main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
   const editWx = main.querySelector('[data-edit-weather]');
   if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
@@ -1355,18 +1357,25 @@ function editRequest(c, r) {
  * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
  * since the form opened. `noun` names the record in those messages.
  */
-async function saveEdit(c, rec, changes, noun, entry) {
-  const ref = doc(db, 'records', rec.uuid), uid = s.user.uid;
+const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
+
+/** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each), all or none. */
+async function saveEdits(c, edits, noun) {
+  const uid = s.user.uid;
   await runTransaction(db, async t => {
-    const [stored, project] = await Promise.all([t.get(ref), t.get(doc(db, 'projects', c.page.id))]);
-    if (!stored.exists() || stored.get('isDeleted') === true) throw new Error(`This ${noun} was deleted on another device.`);
-    if (stored.get('revision') !== rec.revision || stored.get('updatedAt') !== rec.updatedAt) {
-      throw new Error(`This ${noun} was just changed on another device. Close this form and edit it again.`);
-    }
-    const now = Date.now(), assignedUids = project.get('assignedUids') ?? stored.get('assignedUids') ?? [];
-    t.update(ref, L.editedRecord(stored.data(), changes, { uid, now, assignedUids }));
-    const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
-    t.set(doc(db, 'records', audit.uuid), audit);
+    const [project, ...stored] = await Promise.all([t.get(doc(db, 'projects', c.page.id)), ...edits.map(([rec]) => t.get(doc(db, 'records', rec.uuid)))]);
+    const now = Date.now();
+    edits.forEach(([rec, changes, entry], i) => {
+      const was = stored[i];
+      if (!was.exists() || was.get('isDeleted') === true) throw new Error(`This ${noun} was deleted on another device.`);
+      if (was.get('revision') !== rec.revision || was.get('updatedAt') !== rec.updatedAt) {
+        throw new Error(`This ${noun} was just changed on another device. Close this form and edit it again.`);
+      }
+      const assignedUids = project.get('assignedUids') ?? was.get('assignedUids') ?? [];
+      t.update(was.ref, L.editedRecord(was.data(), changes, { uid, now, assignedUids }));
+      const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
+      t.set(doc(db, 'records', audit.uuid), audit);
+    });
   });
 }
 
@@ -1483,36 +1492,41 @@ async function addIssue(c, f) {
 }
 
 /**
- * AddPaymentDialog for a new billing: the same fields, choices and checks, a live gross / retention / net, and Save
- * writes the billing with its share and balance and the app's audit entry in one batch.
+ * AddPaymentDialog for a new billing or, with `old`, an edit of that one: the same fields, choices and checks, a live
+ * gross / retention / net. Save writes a new billing with its share and balance, or the edit with the later balances
+ * it moves, each with the app's audit entry.
  * shortcut: no DV scan upload yet (the bucket's CORS allows only downloads); attach it on the phone.
  */
-function addBillingForm(c) {
-  const housing = /housing/i.test(c.project.projectType || '');
+function billingForm(c, old = null) {
+  // An edited billing keeps its type and retention as choices, whatever the project type is now.
+  const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType);
+  const types = !old?.billingType || L.HOUSING_BILLING_TYPES.includes(old.billingType) ? L.HOUSING_BILLING_TYPES : [old.billingType, ...L.HOUSING_BILLING_TYPES];
+  const oldRetention = Number(old?.retentionPct) || 0, retentions = L.RETENTIONS.includes(oldRetention) ? L.RETENTIONS : [...L.RETENTIONS, oldRetention];
+  const money = v => (Number(v) > 0 ? Number(v).toFixed(2) : '');
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   d.innerHTML = `<form novalidate>
-    <h2>Add billing / disbursement voucher</h2>
-    <label class="field">Billing name<input name="name" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
-    <label class="field">DV No. (Disbursement Voucher)<input name="dvNo" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
-    <label class="field">Date<input type="date" name="date" value="${esc(today())}" required></label>
-    <label class="field">Period covered<input name="periodCovered" value="${esc(L.monthPeriod(today()))}" autocomplete="off"></label>
-    ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${L.HOUSING_BILLING_TYPES.map(t => opt(t)).join('')}</select></label>` : ''}
-    <label class="field" data-by-unit style="display:none">Number of lots<input name="units" inputmode="numeric" autocomplete="off"></label>
-    <label class="field" data-by-unit style="display:none">Amount per lot (PHP)<input name="unitPrice" inputmode="decimal" autocomplete="off"></label>
-    <label class="field" data-gross>Gross amount (PHP)<input name="grossAmount" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
-    <label class="field">Retention<select name="retentionPct">${L.RETENTIONS.map(r => opt(String(r), r ? `${r}%` : 'None')).join('')}</select></label>
+    <h2>${old ? 'Edit billing' : 'Add billing / disbursement voucher'}</h2>
+    <label class="field">Billing name<input name="name" value="${esc(old?.name || '')}" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
+    <label class="field">DV No. (Disbursement Voucher)<input name="dvNo" value="${esc(old?.dvNo || '')}" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
+    <label class="field">Date<input type="date" name="date" value="${esc(old ? old.date || '' : today())}" required></label>
+    <label class="field">Period covered<input name="periodCovered" value="${esc(old ? old.periodCovered || '' : L.monthPeriod(today()))}" autocomplete="off"></label>
+    ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${types.map(t => opt(t, t, old?.billingType)).join('')}</select></label>` : ''}
+    <label class="field" data-by-unit style="display:none">Number of lots<input name="units" value="${esc(Number(old?.units) > 0 ? String(old.units) : '')}" inputmode="numeric" autocomplete="off"></label>
+    <label class="field" data-by-unit style="display:none">Amount per lot (PHP)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
+    <label class="field" data-gross>Gross amount (PHP)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
+    <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
     <div class="billing-preview" aria-live="polite"></div>
-    <p class="muted small">Attach the scanned DV on the phone after saving.</p>
+    ${old?.fileUrl ? '' : `<p class="muted small">Attach the scanned DV on the phone${old ? '' : ' after saving'}.</p>`}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save billing</button></div>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ billingType: '', ...Object.fromEntries(new FormData(form)) });
   // Picking a housing type starts its amount from the latest billing of that type.
   const lastPrice = type => [...c.payments].reverse().find(p => p.billingType === type && Number(p.unitPrice) > 0)?.unitPrice;
-  const onType = () => {
+  const showType = () => {
     const type = values().billingType, unit = L.billingUnitName(type);
     // .field sets its own display, so the hidden attribute would not hide it.
     const [units, price] = d.querySelectorAll('[data-by-unit]');
@@ -1520,7 +1534,10 @@ function addBillingForm(c) {
     d.querySelector('[data-gross]').style.display = type ? 'none' : '';
     units.firstChild.textContent = `Number of ${unit}s`;
     price.firstChild.textContent = `Amount per ${unit} (PHP)`;
-    const last = lastPrice(type);
+  };
+  const onType = () => {
+    showType();
+    const last = lastPrice(values().billingType);
     form.unitPrice.value = last ? Number(last).toFixed(2) : '';
   };
   const preview = () => {
@@ -1530,19 +1547,23 @@ function addBillingForm(c) {
   };
   if (housing) form.billingType.onchange = () => { onType(); preview(); };
   form.oninput = preview;
+  if (old) { showType(); preview(); }
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new billing?')) && done();
+  const close = () => (JSON.stringify(values()) === initial || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.billingErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (old && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      await addBilling(c, f);
+      // Each billing saved gets its own entry, as MoneySection sends each one to updateProjectPayment.
+      await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
+        : addBilling(c, f));
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
@@ -1579,13 +1600,13 @@ function photosView({ weekly }) {
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
 
 function paymentsBody({ project, payments, cost, billed }) {
-  const actual = Number(project.actualAccomplishment) || 0;
+  const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
     ${kv('Balance', L.formatPhp(cost - billed))}
     <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>
-    ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
+    ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = Number(p.units) || 0;
@@ -1599,6 +1620,7 @@ function paymentsBody({ project, payments, cost, billed }) {
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}
+      ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`;
   }).join('')}</ul></div>`;
 }

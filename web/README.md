@@ -1,7 +1,7 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding a billing (Payments → Add billing), editing a developer request
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), editing a developer request
 (Documents → Developer Requests → Edit) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
@@ -22,6 +22,10 @@ is read only.
   project bills for (units × amount per lot or unit, the amount filled in from the latest billing of that type) or the gross,
   and retention. Share and balance are saved from the gross with the current contract cost, as the app saves them, with the
   app's "Payment Creation" audit entry. The scanned DV is attached on the phone for now: the bucket's CORS allows downloads only.
+- **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
+  own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
+  with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
+  order added, which differs only for a back-dated billing. The scanned DV stays attached.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
   entry. New requests are still added on the phone, since that also files the order in Documents.
@@ -128,5 +132,5 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, weekly reports and orders; editing billings and lots; uploading files (the bucket's CORS
+Adding developer requests, weekly reports and orders; deleting billings; editing lots; uploading files (the bucket's CORS
 allows downloads only).
