@@ -14,8 +14,28 @@ test('weekly report lists read like the phone, with its defaults and older keys'
   assert.deepEqual(L.manpowerOf(''), []);
   // A row without a target stops the list; the rows before it stay.
   const acc = L.accomplishmentOf('[{"itemDescription":"A","weightPct":60,"targetPct":40,"actualPct":35.5},{"itemDescription":"B","actualPct":1},{"itemDescription":"C","targetPct":1,"actualPct":1}]');
-  assert.equal(acc.length, 1);
-  assert.equal(acc[0].variancePct, -4.5);
+  assert.deepEqual(acc.map(a => a.itemDescription), L.ACCOMPLISHMENT_LINES);
+  assert.equal(acc[1].variancePct, -4.5);
+  assert.equal(acc[1].weightPct, 60);
+  // Items saved one by one fold into the three lines: weighted, as is when one, plain when no weights.
+  const lines = L.accomplishmentOf(JSON.stringify([
+    { itemDescription: 'Land Acquisition', weightPct: 0, targetPct: 100, actualPct: 90 },
+    { itemDescription: 'Roads', weightPct: 30, targetPct: 40, actualPct: 20 }, { itemDescription: 'Drainage', weightPct: 10, targetPct: 80, actualPct: 60 },
+    { itemDescription: 'Housing units', weightPct: 0, targetPct: 10, actualPct: 4 }, { itemDescription: 'Row house', weightPct: 0, targetPct: 20, actualPct: 6 },
+  ]));
+  assert.deepEqual(lines.map(a => [a.itemDescription, a.weightPct, a.targetPct, a.actualPct]), [
+    ['Land Acquisition', 0, 100, 90], ['Land Development', 40, 50, 30], ['Housing Construction', 0, 15, 5]]);
+  assert.deepEqual(L.issuesOf('[{"description":"Rain","actionTaken":"Pumped","actionBy":"Contractor/Developer"}]')[0].actionBy, 'Contractor/Developer');
+});
+
+test('billings on the net: the total, and each share and balance after retention', () => {
+  // Contract 1,000; two billings of 100 gross, 10% retention: saved 10%/900 then 10%/800 on the gross.
+  const pays = [{ grossAmount: 100, retentionPct: 10, percentage: 10, balanceAmount: 900, balancePercentage: 90 },
+    { grossAmount: 100, retentionPct: 10, percentage: 10, balanceAmount: 800, balancePercentage: 80 }];
+  assert.equal(L.billedTotal(pays), 180);
+  const net = L.netBillings(pays);
+  assert.deepEqual(net.map(p => [p.percentage, p.balanceAmount, Math.round(p.balancePercentage * 100) / 100]), [[9, 910, 91], [9, 820, 82]]);
+  assert.equal(pays[0].balanceAmount, 900); // the saved ones are left as they are
 });
 
 test('photo lists in every shape older versions saved, and their titles', () => {
@@ -128,14 +148,8 @@ test('print: activities in Saturday-to-Friday order with blank weekdays kept', (
   assert.deepEqual(rows[3].descriptions, []);
 });
 
-test('print: week issues and documents come from the week only', () => {
-  const report = { reportingWeek: 'Oct 24, 2026 - Oct 30, 2026', issuesJson: '[{"description":"Rain","actionTaken":"Waited"}]' };
-  const issues = P.weekIssues(report, [
-    { date: '2026-10-25', description: 'Late delivery', actionTaken: 'Called', remarks: '', targetDate: '2026-11-02' },
-    { date: '2026-10-31', description: 'Next week' }, { date: '2026-10-26', description: 'rain' },
-  ]);
-  assert.deepEqual(issues.map(i => i.description), ['Rain', 'Late delivery']);
-  assert.equal(issues[1].remarks, 'Target: November 2, 2026');
+test('print: week documents come from the week only', () => {
+  const report = { reportingWeek: 'Oct 24, 2026 - Oct 30, 2026' };
   const docs = P.weekDocuments(report, [{ subject: 'Letter No. 3', dateReceived: '2026-10-27' }, { subject: 'Old', dateReceived: '2026-10-01' }],
     [{ requestType: 'Time Extension', details: '30 days', dateReceived: '2026-10-24', dateRequested: '2026-10-20', datePackaged: '' }]);
   assert.deepEqual(docs, [
@@ -151,8 +165,8 @@ test('print: the weekly form has every section, escapes text, and marks orders f
   const docs = [{ documentName: 'Time Extension No. 1 - 30 Days', status: 'Approved' }, { documentName: 'Time Extension No. 2 - 10 Days', status: 'Pending' }];
   const report = { reportingWeek: 'Week 2: Jan 3 - Jan 9, 2026', daysElapsed: 9, remainingDays: 121, targetAccomplishmentPct: 5, actualAccomplishmentPct: 4.5,
     manpowerJson: '[{"designation":"Mason","count":4}]', equipmentJson: '[{"description":"Mixer","count":1,"status":"Idle"}]',
-    activitiesJson: '[]', issuesJson: '[]', accomplishmentItemsJson: '[]', _weather: [{ date: '2026-01-05', dayOfWeek: 'Monday', hourlyConditionsCsv: 'RAINY' }] };
-  const html = P.weeklyReportHtml({ project, report, docs, issues: [], letters: [], requests: [], photos: [['https://x/p.jpg', 'Footings']],
+    activitiesJson: '[]', issuesJson: '[{"description":"Rain","actionTaken":"Pumped","actionBy":"Contractor/Developer"},{"description":"ROW","actionTaken":"Met owners"}]', accomplishmentItemsJson: '[]', _weather: [{ date: '2026-01-05', dayOfWeek: 'Monday', hourlyConditionsCsv: 'RAINY' }] };
+  const html = P.weeklyReportHtml({ project, report, docs, letters: [], requests: [], photos: [['https://x/p.jpg', 'Footings']],
     signatories: P.weeklySignatories(project, { name: 'Juan Dela Cruz' }), banner: 'blue-book-header.png' });
   for (const s of ['I. BASIC INFORMATION', 'II. DAILY WEATHER CHART', 'III. MANPOWER', 'V. ACTIVITIES OF THE WEEK', 'VI. ISSUES', 'VII. WEEKLY ACCOMPLISHMENT STATUS',
     'VIII. DOCUMENTS ISSUED', 'IX. ATTACHED PHOTOS', 'For the Week of Jan 3 - Jan 9, 2026', 'Phase &lt;1&gt;', 'No. 1: 30 c.d.<br>No. 2: 10 c.d. (for approval)',
@@ -160,6 +174,10 @@ test('print: the weekly form has every section, escapes text, and marks orders f
     assert.ok(html.includes(s), s);
   }
   assert.equal((html.match(/&#10003;/g) || []).length, 1); // the Idle mixer
+  // Each issue's action under who took it; a blank "action by" is the Implementing Office's.
+  assert.ok(html.includes('<th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th>'));
+  assert.ok(html.includes('<td>1. Rain</td><td></td><td>Pumped</td>'));
+  assert.ok(html.includes('<td>2. ROW</td><td>Met owners</td><td></td>'));
   assert.ok(!html.includes('<1>'));
   assert.equal(P.peso(1234.5), 'Php 1,234.50');
   assert.equal(P.longDate('2026-10-24'), 'October 24, 2026');
@@ -214,7 +232,7 @@ test('print: the monthly form has every section and the month\'s figures', () =>
   });
   for (const x of ['For the Month of September 2026', 'II. PROJECT STATUS', 'III. STATUS OF PAYMENT', 'IV. CONTRACT SCHEDULE STATUS',
     'V. SUMMARY OF UNWORKABLE DAYS', 'VI. STATUS OF SUBMISSION', 'VII. ISSUES / CONCERNS', 'VIII. RECOMMENDATIONS',
-    '<td>Roads</td><td class=\'n\'>100.00%</td><td class=\'n\'>20.00%</td><td class=\'n\'>18.00%</td><td class=\'n\'>18.00%</td>',
+    '<td>Land Development</td><td class=\'n\'>100.00%</td><td class=\'n\'>20.00%</td><td class=\'n\'>18.00%</td><td class=\'n\'>18.00%</td>',
     '1. 1st billing', 'Php 1,000.00', 'Php 9,000.00 (90.00%)', '130 c.d.', 'November 21, 2026',
     "<td class='c'>3</td><td>September 2026</td>", '1. Flooding', 'September 4, 2026</td><td></td><td>Pumped</td>',
     'Add crews<br>Work Sundays', 'Checked by:', 'JUAN', 'on or before end of each month']) {

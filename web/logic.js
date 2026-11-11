@@ -55,6 +55,21 @@ export function currentCost(project, documents) {
 /** ProjectPayment.netAmount: what is paid after retention. */
 export const netAmount = p => (Number(p.grossAmount) || 0) * (1 - (Number(p.retentionPct) || 0) / 100);
 
+/**
+ * netBillings: each billing's share and balance after it on the net. They are saved from the gross with that day's
+ * contract cost, so the net balance is the saved one plus the retention held by then. `payments` in the order added.
+ */
+export function netBillings(payments) {
+  let held = 0;
+  return payments.map(p => {
+    const gross = Number(p.grossAmount) || 0, share = Number(p.percentage) || 0, balanceShare = Number(p.balancePercentage) || 0;
+    held += gross - netAmount(p);
+    const cost = share > 0 ? gross * 100 / share : 0;
+    return { ...p, percentage: share * (1 - (Number(p.retentionPct) || 0) / 100), balanceAmount: (Number(p.balanceAmount) || 0) + held,
+      balancePercentage: cost > 0 ? balanceShare + held / cost * 100 : balanceShare };
+  });
+}
+
 /** Same rule as the Issues tab's "Resolved" filter. */
 export const isOpenIssue = i => !/resolved|closed/i.test(i.status || '');
 
@@ -263,7 +278,8 @@ const ORDER_TYPES = ['variation order', 'time extension', 'work suspension', 'wo
 export const waitingApproval = docs => docs.filter(d =>
   !/^approved$/i.test((d.status || '').trim()) && ORDER_TYPES.some(t => (d.documentName || '').toLowerCase().includes(t))).length;
 
-export const billedTotal = payments => payments.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
+/** Total billed on the net, after retention, as the phone shows it. */
+export const billedTotal = payments => payments.reduce((t, p) => t + netAmount(p), 0);
 
 /** BillingProgress.label. */
 export function billedLabel(billed, cost) {
@@ -353,12 +369,31 @@ export const equipmentOf = json => jsonArray(json).map(o => ({
   description: str(o?.description, 'Equipment'), count: int(o?.count, 1), status: str(o?.status, str(o?.remarks, 'Operational')), remarks: str(o?.remarks),
 }));
 /** parseIssuesList. */
-export const issuesOf = json => jsonArray(json).map(o => ({ description: str(o?.description), actionTaken: str(o?.actionTaken), remarks: str(o?.remarks) }));
-/** parseActivitiesList: older rows say dayOfWeek and activity. */
+export const issuesOf = json => jsonArray(json).map(o => ({ description: str(o?.description), actionTaken: str(o?.actionTaken), remarks: str(o?.remarks), actionBy: str(o?.actionBy) }));/** parseActivitiesList: older rows say dayOfWeek and activity. */
 export const activitiesOf = json => jsonArray(json).map(o => ({
   day: str(o?.day, str(o?.dayOfWeek)), description: str(o?.description, str(o?.activity)), remarks: str(o?.remarks),
 }));
-/** parseAccomplishmentItemsList: stops at the first row without a description, target or actual, keeping the rows before it. */
+/** ACCOMPLISHMENT_LINES: the weekly report's only accomplishment lines; items of work fold into them by name. */
+export const ACCOMPLISHMENT_LINES = ['Land Acquisition', 'Land Development', 'Housing Construction'];
+/** accomplishmentLine: "acquisition" is Land Acquisition, a house, housing or unit is Housing Construction, the rest Land Development. */
+export const accomplishmentLine = name => (/acquisition/i.test(name) ? ACCOMPLISHMENT_LINES[0]
+  : /\b(house|houses|housing|units?)\b/i.test(name) ? ACCOMPLISHMENT_LINES[2] : ACCOMPLISHMENT_LINES[1]);
+/** accomplishmentLines: rows as the three lines, each its items' weighted average (as is when one, plain when no weights). */
+export function accomplishmentLines(items) {
+  if (!items.length) return items;
+  return ACCOMPLISHMENT_LINES.map(line => {
+    const rows = items.filter(a => accomplishmentLine(a.itemDescription) === line);
+    const w = rows.reduce((t, a) => t + a.weightPct, 0);
+    const avg = f => (!rows.length ? 0 : rows.length === 1 ? f(rows[0])
+      : w > 0 ? rows.reduce((t, a) => t + f(a) * a.weightPct, 0) / w : rows.reduce((t, a) => t + f(a), 0) / rows.length);
+    const targetPct = avg(a => a.targetPct), actualPct = avg(a => a.actualPct);
+    return { itemDescription: line, weightPct: w, targetPct, actualPct, variancePct: actualPct - targetPct };
+  });
+}
+/**
+ * parseAccomplishmentItemsList: stops at the first row without a description, target or actual, keeping the rows
+ * before it; then the three lines, so reports saved item by item read like new ones.
+ */
 export function accomplishmentOf(json) {
   const out = [];
   for (const o of jsonArray(json)) {
@@ -366,7 +401,7 @@ export function accomplishmentOf(json) {
     if (typeof o?.itemDescription !== 'string' || o.targetPct == null || o.actualPct == null || !Number.isFinite(t) || !Number.isFinite(a)) break;
     out.push({ itemDescription: o.itemDescription, weightPct: Number(o.weightPct) || 0, targetPct: t, actualPct: a, variancePct: a - t });
   }
-  return out;
+  return accomplishmentLines(out);
 }
 
 /** Attachments.parseList: a weekly report's photo list, which older versions saved as an array, an array inside a string, or one uri. */

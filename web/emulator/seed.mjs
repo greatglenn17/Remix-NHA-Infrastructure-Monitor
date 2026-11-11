@@ -188,7 +188,7 @@ const weekly = (n, label, from, day, target, actual, extra) => record(rid(n), 'w
   equipmentJson: JSON.stringify([{ description: 'Concrete mixer', count: 2, status: 'Operational' }, { description: 'Backhoe', count: 1, status: 'Idle', remarks: 'Awaiting fuel' }]),
   activitiesJson: JSON.stringify([{ day: 'Saturday', description: 'Survey of Block 4' }, { day: 'Monday - Wednesday', description: 'Excavation for footings, Block 3', remarks: 'On schedule' },
     { day: 'Thursday', description: 'Rebar works', remarks: 'Rain in the afternoon' }]),
-  issuesJson: JSON.stringify([{ description: 'Rain stopped concreting on Tuesday', actionTaken: 'Moved concreting to Wednesday' }]),
+  issuesJson: JSON.stringify([{ description: 'Rain stopped concreting on Tuesday', actionTaken: 'Moved concreting to Wednesday', actionBy: 'Contractor/Developer' }]),
   accomplishmentItemsJson: JSON.stringify([{ itemDescription: 'Land development', weightPct: 60, targetPct: target + 4, actualPct: actual + 3 }, { itemDescription: 'Housing units', weightPct: 40, targetPct: target - 6, actualPct: actual - 5 }]),
   documentsIssuedReceivedJson: '[]', _weather: week(from, DAYS7), ...extra,
 });
