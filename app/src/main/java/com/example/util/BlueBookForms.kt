@@ -289,6 +289,9 @@ object BlueBookForms {
             val p = paid.getOrNull(i)
             b.append("<tr><td>${i + 1}. ${esc(p?.name ?: "")}</td><td>${esc(p?.date?.let(::date) ?: "")}</td><td>${esc(p?.periodCovered ?: "")}</td><td class='n'>${p?.let { esc(peso(it.netAmount)) } ?: ""}</td><td class='n'>${p?.let { pct(it.percentage) } ?: ""}</td><td class='n'>${p?.let { esc("${peso(it.balanceAmount)} (${pct(it.balancePercentage)})") } ?: ""}</td></tr>")
         }
+        // The balance after the last billing is what is left; the shares add up as the rows show them.
+        val lastPaid = paid.lastOrNull()
+        b.append("<tr class='tot'><td colspan='3'>GRAND TOTAL</td><td class='n'>${esc(peso(paid.sumOf { it.netAmount }))}</td><td class='n'>${pct(paid.sumOf { it.percentage })}</td><td class='n'>${lastPaid?.let { esc("${peso(it.balanceAmount)} (${pct(it.balancePercentage)})") } ?: ""}</td></tr>")
         b.append("</table>")
 
         b.append("<table><tr><th colspan='7' class='sec'>IV. CONTRACT SCHEDULE STATUS</th></tr><tr><th>TIME EXTENSION NO.</th><th>NO. OF DAYS</th><th>REVISED CONTRACT DURATION</th><th>PERIOD CONSIDERED (AS APPLICABLE)</th><th>REASON FOR TIME EXTENSION</th><th>REVISED COMPLETION DATE</th><th>REMARKS</th></tr>")

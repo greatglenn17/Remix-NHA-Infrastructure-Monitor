@@ -350,7 +350,8 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
     ${Array.from({ length: Math.max(3, paid.length) }, (_, i) => {
       const p = paid[i];
       return `<tr><td>${i + 1}. ${esc(p?.name ?? '')}</td><td>${esc(p ? longDate(p.date) : '')}</td><td>${esc(p?.periodCovered ?? '')}</td><td class='n'>${p ? esc(peso(L.netAmount(p))) : ''}</td><td class='n'>${p ? pct(p.percentage) : ''}</td><td class='n'>${p ? esc(`${peso(p.balanceAmount)} (${pct(p.balancePercentage)})`) : ''}</td></tr>`;
-    }).join('')}</table>`);
+    }).join('')}
+    <tr class='tot'><td colspan='3'>GRAND TOTAL</td><td class='n'>${esc(peso(paid.reduce((t, p) => t + L.netAmount(p), 0)))}</td><td class='n'>${pct(paid.reduce((t, p) => t + p.percentage, 0))}</td><td class='n'>${paid.length ? esc(`${peso(paid.at(-1).balanceAmount)} (${pct(paid.at(-1).balancePercentage)})`) : ''}</td></tr></table>`);
 
   // Each approved extension adds its days to the running duration, as the Key Dates card does; one still for approval
   // shows its days but no revised duration or date, so the last date matches section I.

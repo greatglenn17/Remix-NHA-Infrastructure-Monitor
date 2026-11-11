@@ -240,6 +240,7 @@ test('print: the monthly form has every section and the month\'s figures', () =>
   }
   assert.ok(!html.includes('Next') && !html.includes('Old'), 'October billing and August issue are left out');
   assert.ok(html.includes('<td>None</td>'), 'no variation or suspension orders');
+  assert.ok(html.includes("<tr class='tot'><td colspan='3'>GRAND TOTAL</td><td class='n'>Php 1,000.00</td><td class='n'>10.00%</td><td class='n'>Php 9,000.00 (90.00%)</td></tr>"), 'payment grand total');
 });
 
 test('print: extensions read either name style; one for approval does not move the schedule', () => {
@@ -251,6 +252,7 @@ test('print: extensions read either name style; one for approval does not move t
   assert.ok(html.includes("<td class='c'>2</td><td class='n'>30</td><td class='n'>570 c.d.</td>") && html.includes('July 28, 2027'));
   assert.ok(!html.includes('No weather logged'));
   assert.ok(html.includes("<td class='nw'>Php 0.00</td>"), 'contract costs stay on one line');
+  assert.ok(html.includes("<td colspan='3'>GRAND TOTAL</td><td class='n'>Php 0.00</td><td class='n'>0.00%</td><td class='n'></td>"), 'no billings: zero totals');
 });
 
 test('lots: sites, labels, KPIs, filters, colours and blocks read like the phone', () => {
