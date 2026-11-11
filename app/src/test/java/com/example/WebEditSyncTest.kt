@@ -185,4 +185,33 @@ class WebEditSyncTest {
         assertEquals(2_160_000.0, saved.grossAmount * (1 - saved.retentionPct / 100), 1e-6)
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/logic.js newLetterRecord: a new letter to the contractor, no attachments yet. */
+    @Test
+    fun websiteNewLetter_isAddedToTheProject() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val letter = mapOf(
+            "uuid" to "3f1c9a52-7b4e-4d2a-9c6f-1a2b3c4d5e6f", "type" to "contractor_letters", "projectUuid" to project.projectUuid,
+            "assignedUids" to listOf("web"), "revision" to 1L, "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to """{"dateSent":"2026-11-12","subject":"Catch-up plan for Block 5","actionTaken":"","dateReplied":"","replyFileUrl":"",""" +
+                """"dateReceived":"2026-11-13","receivedFileUrl":""}"""
+        )
+
+        recordSync.applyRemote(listOf(letter))
+
+        val saved = db.projectDao().getContractorLettersForProject(projectId).first().single()
+        assertEquals("Catch-up plan for Block 5", saved.subject)
+        assertEquals("2026-11-12", saved.dateSent)
+        assertEquals("2026-11-13", saved.dateReceived)
+        assertEquals("", saved.dateReplied)
+        assertEquals("3f1c9a52-7b4e-4d2a-9c6f-1a2b3c4d5e6f", saved.uuid)
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }

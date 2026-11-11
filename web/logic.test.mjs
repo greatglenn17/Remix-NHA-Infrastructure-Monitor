@@ -347,6 +347,13 @@ test('contractor letter edits: checks and the app audit entry', () => {
   });
 });
 
+test('a new contractor letter is the record a phone uploads', () => {
+  const f = { dateSent: '2026-11-12', subject: 'Catch-up plan', actionTaken: '', dateReplied: '', dateReceived: '2026-11-13' };
+  const r = L.newLetterRecord({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'a', now: 9 }, f);
+  assert.deepEqual({ ...r, data: undefined }, { uuid: 'u1', type: 'contractor_letters', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 9, updatedByUid: 'a', isDeleted: false, data: undefined });
+  assert.deepEqual(JSON.parse(r.data), { dateSent: '2026-11-12', subject: 'Catch-up plan', actionTaken: '', dateReplied: '', replyFileUrl: '', dateReceived: '2026-11-13', receivedFileUrl: '' });
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');

@@ -29,10 +29,10 @@ is read only.
 - **Delete billing**, in that form, asks first, then marks the record `isDeleted` (one revision up) as a phone's delete
   does. Like the phone (from v2.8.14) it also gives the deleted gross back to every later billing's balance, and
   writes the app's "Payment Deletion" audit entry.
-- **Edit** on a letter to the contractor (Documents → Letters to Contractor) is the app's Letter to contractor form for
-  a letter already logged: its date and subject, the date the contractor received it, the action the contractor took and
+- **New letter** and **Edit** on a letter to the contractor (Documents → Letters to Contractor) are the app's Letter to
+  contractor form: its date and subject, the date the contractor received it, the action the contractor took and
   the date of the reply, with the app's "Letter to Contractor" audit entry. An old "Letter to Contractor No. N" document
-  has no Edit here: the phone turns it into a letter on its first edit. New letters and the two attachments stay on the phone.
+  has no Edit here: the phone turns it into a letter on its first edit. The two attachments are added on the phone.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
   entry. New requests are still added on the phone, since that also files the order in Documents.
@@ -139,5 +139,5 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, letters, weekly reports and orders; editing lots; uploading files (the bucket's CORS
+Adding developer requests, weekly reports and orders; editing lots; uploading files (the bucket's CORS
 allows downloads only).

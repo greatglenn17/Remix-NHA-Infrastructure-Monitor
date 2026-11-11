@@ -668,6 +668,8 @@ function drawProject(page) {
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
   // The saved billing, not the card's net one: an edit starts from what is stored.
   main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
+  const letterAdd = document.getElementById('letter-add');
+  if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
   main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
   const editWx = main.querySelector('[data-edit-weather]');
@@ -1359,15 +1361,17 @@ function editRequest(c, r) {
  * since the form opened. `noun` names the record in those messages.
  */
 /**
- * ContractorLetterDialog for a letter already logged: its date and subject, when the contractor received it, what the
- * contractor did, and when the contractor replied.
- * shortcut: no new letters and no receiving copy or reply upload here (download-only CORS); those stay on the phone.
+ * ContractorLetterDialog: a new letter (`l` null) or an edit, with its date and subject, when the contractor received
+ * it, what the contractor did, and when the contractor replied.
+ * shortcut: no receiving copy or reply upload here (download-only CORS); those are attached on the phone.
  */
 function editLetter(c, l) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
+  const isNew = !l;
+  l ||= { dateSent: today() };
   d.innerHTML = `<form novalidate>
-    <h2>Letter to contractor</h2>
+    <h2>${isNew ? 'New letter to contractor' : 'Letter to contractor'}</h2>
     <label class="field">Date of letter<input type="date" name="dateSent" value="${esc(l.dateSent || '')}" required></label>
     <label class="field">Subject<input name="subject" value="${esc(l.subject || '')}" required autocomplete="off"></label>
     <label class="field">Date received by the contractor (blank: not yet)<input type="date" name="dateReceived" value="${esc(l.dateReceived || '')}"></label>
@@ -1384,18 +1388,18 @@ function editLetter(c, l) {
   };
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this letter?')) && done();
+  const close = () => (JSON.stringify(values()) === initial || confirm(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.letterErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!isNew && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      await saveEdit(c, l, f, 'letter', L.letterAudit(f));
+      await (isNew ? addRecord(c, ids => L.newLetterRecord(ids, f), L.letterAudit(f)) : saveEdit(c, l, f, 'letter', L.letterAudit(f)));
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
@@ -1404,6 +1408,19 @@ function editLetter(c, l) {
   };
   document.body.append(d);
   d.showModal();
+}
+
+/** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
+async function addRecord(c, build, entry) {
+  const uid = s.user.uid, now = Date.now();
+  const project = await getDoc(doc(db, 'projects', c.page.id));
+  const assignedUids = project.get('assignedUids') ?? [];
+  const record = build({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now });
+  const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'records', record.uuid), record);
+  batch.set(doc(db, 'records', audit.uuid), audit);
+  await batch.commit();
 }
 
 const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
@@ -1715,11 +1732,12 @@ function documentsBody(c, chip) {
 
 /**
  * ContractorLettersCard as a table: date and receipt, subject, the contractor's action, and the reply letter; `editable`
- * adds Edit to the letter records.
+ * adds New letter, and Edit on the letter records.
  * shortcut: an old "Letter to Contractor No. N" document has no Edit (the phone turns it into a letter record on its first edit).
  */
 function lettersCard(letters, editable = false) {
-  if (!letters.length) return section('Letters to contractor', 'mail', emptyLine('No letters to the contractor yet.'));
+  const add = editable ? `<button class="text-btn" id="letter-add">${icon('add_circle', 'sm')}New letter</button>` : '';
+  if (!letters.length) return section('Letters to contractor', 'mail', emptyLine('No letters to the contractor yet.'), '', add);
   return section('Letters to contractor', 'mail', table(['Date', 'Subject', 'Action taken by contractor', 'Reply', ...(editable ? [''] : [])], letters.map(l => {
     const received = l.dateReceived ? `Received ${L.displayDate(l.dateReceived)}` : null;
     const receipt = l.receivedFileUrl ? fileLink(l.receivedFileUrl, received || 'Receiving copy') : `<small class="${received ? 'muted' : 'n-watch'}">${esc(received || 'Not received')}</small>`;
@@ -1727,7 +1745,7 @@ function lettersCard(letters, editable = false) {
     return `<tr><td class="nw">${esc(L.displayDate(l.dateSent || '-'))}<br>${receipt}</td><td>${esc(l.subject || '-')}</td>
       <td>${l.actionTaken ? esc(l.actionTaken) : '<span class="n-watch">None yet</span>'}</td><td>${reply}</td>
       ${editable ? `<td>${l.type === 'contractor_letters' ? `<button class="text-btn entry-edit" data-edit-letter="${esc(l.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</td>` : ''}</tr>`;
-  }).join('')));
+  }).join('')), '', add);
 }
 
 /** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Edit. */
