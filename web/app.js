@@ -730,7 +730,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
       <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
-      <tbody>${payments.map(p => `<tr>
+      <tbody>${L.netBillings(payments).map(p => `<tr>
         <td>${esc(p.name || '-')}${p.periodCovered ? `<br><span class="muted">${esc(p.periodCovered)}</span>` : ''}<span class="pdate"><br>${esc(L.displayDate(p.date))}</span></td>
         <td>${esc(L.displayDate(p.date))}</td>
         <td class="num">${L.formatDecimal(L.netAmount(p))}</td>
@@ -738,7 +738,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
         <td class="num">${L.formatDecimal(Number(p.balanceAmount) || 0)}</td></tr>`).join('')}
       </tbody>
       <tfoot><tr><th>Total</th><th></th>
-        <th class="num">${L.formatDecimal(payments.reduce((t, p) => t + L.netAmount(p), 0))}</th>
+        <th class="num">${L.formatDecimal(billed)}</th>
         <th class="num">${cost > 0 ? pct(billed / cost * 100) : '-'}</th>
         <th class="num">${L.formatDecimal(cost - billed)}</th></tr></tfoot>
     </table></div>`, 'wide');
@@ -833,7 +833,7 @@ function reportCard(r, all, pid) {
         ${equipment.length ? table(['Name of equipment', { text: 'No.', num: 1 }, 'Remarks / status'], equipment.map(e => `<tr><td>${esc(e.description)}</td><td class="num"><b>${e.count}</b></td><td><span class="badge lv-${equipmentLevel(e.status)}">${esc(e.status)}</span></td></tr>`).join(''))
           : emptyLine('No equipment logged.')}
         <h4>5. Issues encountered / action taken</h4>
-        ${issues.length ? table(['Issues encountered', 'Action taken'], issues.map(i => `<tr><td>${esc(i.description)}</td><td><b>${esc(i.actionTaken)}</b></td></tr>`).join(''))
+        ${issues.length ? table(['Issues encountered', 'Action taken'], issues.map(i => `<tr><td>${esc(i.description)}</td><td><b>${esc([i.actionBy, i.actionTaken].filter(x => x.trim()).join(': '))}</b></td></tr>`).join(''))
           : emptyLine('No issues encountered for this reporting period.')}
         ${photos.length ? `<h4>Attached site photos (${photos.length})</h4>${photoGrid(photos, L.photoDetails(r.photoDetailsJson))}` : ''}
       </div>
@@ -1445,7 +1445,7 @@ function paymentsBody({ project, payments, cost, billed }) {
     ${kv('Balance', L.formatPhp(cost - billed))}
     <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
-  return `<div class="stack">${summary}<ul class="pay-cards">${payments.map(p => {
+  return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = Number(p.units) || 0;
     return `<li class="card pay-card">
       <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">DV ${esc(p.dvNo || 'N/A')}</p></div>
@@ -1546,7 +1546,7 @@ async function drawPrint(c) {
   if (page.printToken !== token || page !== s.page) return;
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = P.weeklyReportHtml({
-    project, report, docs: documents, issues: of('project_issues'), photos, banner: 'blue-book-header.png',
+    project, report, docs: documents, photos, banner: 'blue-book-header.png',
     letters: L.mergedLetters(of('contractor_letters'), documents), requests: of('developer_requests'),
     signatories: P.weeklySignatories(project, s.profile),
   });

@@ -1,5 +1,5 @@
 // The Blue Book forms as the phone prints them: BlueBookForms.projectProfile, the weekly and monthly Project Engineer's
-// Reports (.weeklyReport, .monthlyReport) and the pieces they use (ContractLogs, weekIssues, weekDocuments, weatherClock, workableDays). Change both
+// Reports (.weeklyReport, .monthlyReport) and the pieces they use (ContractLogs, weekDocuments, weatherClock, workableDays). Change both
 // together. Pure: no Firebase.
 import * as L from './logic.js';
 
@@ -73,19 +73,6 @@ export function activityRows(activities) {
   });
 }
 
-/** BlueBookForms.weekIssues: the report's own issues, then the logged issues dated in its week that it doesn't already list. */
-export function weekIssues(report, logged) {
-  const own = L.issuesOf(report.issuesJson);
-  const start = L.weekStart(report.reportingWeek);
-  if (start == null) return own;
-  const extra = logged.filter(i => inWeek(start, i.date)).sort((a, b) => String(a.date).localeCompare(String(b.date))).map(i => ({
-    description: i.description || '', actionTaken: i.actionTaken || '',
-    remarks: [i.remarks || null, i.targetDate ? `Target: ${longDate(i.targetDate)}` : null].filter(Boolean).join('; '),
-  }));
-  const seen = d => own.some(o => o.description.trim().toLowerCase() === d.description.trim().toLowerCase());
-  return [...own, ...extra.filter(e => !seen(e))];
-}
-
 /** BlueBookForms.weekDocuments: developer requests received and letters the contractor received in the report's week, by date. */
 export function weekDocuments(report, letters, requests) {
   const start = L.weekStart(report.reportingWeek);
@@ -130,10 +117,10 @@ function scopeText(json) {
 }
 
 /**
- * The weekly form's HTML, for a `.bb` sheet. `photos` are [src, title] pairs (images only); `docs`, `issues`, `letters`
+ * The weekly form's HTML, for a `.bb` sheet. `photos` are [src, title] pairs (images only); `docs`, `letters`
  * and `requests` are the project's records (letters already merged); `banner` is the NHA header image URL.
  */
-export function weeklyReportHtml({ project, report, docs, issues, letters, requests, photos, signatories: s, banner }) {
+export function weeklyReportHtml({ project, report, docs, letters, requests, photos, signatories: s, banner }) {
   const manpower = L.manpowerOf(report.manpowerJson), equipment = L.equipmentOf(report.equipmentJson);
   const accomplishment = L.accomplishmentOf(report.accomplishmentItemsJson);
   const weather = Array.isArray(report._weather) ? report._weather : [];
@@ -159,9 +146,13 @@ export function weeklyReportHtml({ project, report, docs, issues, letters, reque
   b.push(`<table><tr><th colspan='3' class='sec'>V. ACTIVITIES OF THE WEEK</th></tr><tr><th>DAY OF THE WEEK</th><th>DESCRIPTION</th><th>REMARKS</th></tr>
     ${activityRows(L.activitiesOf(report.activitiesJson)).map(r => `<tr><td class='day'>${esc(r.day.toUpperCase())}</td><td>${r.descriptions.map(esc).join('<br>')}</td><td>${r.remarks.map(esc).join('<br>')}</td></tr>`).join('')}</table>`);
 
-  const issueRows = weekIssues(report, issues);
-  b.push(`<table><tr><th colspan='3' class='sec'>VI. ISSUES / PROBLEMS ENCOUNTERED FOR THIS WEEK</th></tr><tr><th>DESCRIPTION</th><th>ACTION TAKEN</th><th>REMARKS</th></tr>
-    ${numbered(Math.max(5, issueRows.length), i => { const x = issueRows[i]; return [x?.description, x?.actionTaken, x?.remarks]; })}</table>`);
+  // Only the report's own (construction) issues; the Issues log is the project's as a whole. A blank "action by" is the Implementing Office's.
+  const issueRows = L.issuesOf(report.issuesJson);
+  b.push(`<table><tr><th colspan='4' class='sec'>VI. ISSUES / PROBLEMS ENCOUNTERED FOR THIS WEEK</th></tr><tr><th rowspan='2'>DESCRIPTION</th><th colspan='2'>ACTION TAKEN</th><th rowspan='2'>REMARKS</th></tr><tr><th>IMPLEMENTING OFFICE</th><th>CONTRACTOR/DEVELOPER</th></tr>
+    ${numbered(Math.max(5, issueRows.length), i => {
+      const x = issueRows[i], byContractor = x?.actionBy === L.ISSUE_ACTION_BY[1];
+      return [x?.description, byContractor ? '' : x?.actionTaken, byContractor ? x?.actionTaken : '', x?.remarks];
+    })}</table>`);
 
   b.push(`<table><tr><th colspan='4' class='sec'>VII. WEEKLY ACCOMPLISHMENT STATUS</th></tr><tr><th>ITEM DESCRIPTION</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>VARIANCE</th></tr>
     ${Array.from({ length: Math.max(5, accomplishment.length) }, (_, i) => {
@@ -346,7 +337,7 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
     basicInfo(project, docs, 'VARIATION ORDER/S', list(variations), 'WORK SUSPENSION ORDER/S', list(suspensions))];
 
   const acc = last ? L.accomplishmentOf(last.accomplishmentItemsJson) : [];
-  const items = acc.length ? acc : [{ itemDescription: 'Land Development', weightPct: 0, actualPct: 0, targetPct: 0 }, { itemDescription: 'Housing Construction', weightPct: 0, actualPct: 0, targetPct: 0 }];
+  const items = acc.length ? acc : L.ACCOMPLISHMENT_LINES.map(itemDescription => ({ itemDescription, weightPct: 0, actualPct: 0, targetPct: 0 }));
   const sum = f => items.reduce((t, a) => t + f(a), 0);
   b.push(`<table><tr><th colspan='5' class='sec'>II. PROJECT STATUS</th></tr><tr><th colspan='5' class='sub'>STATUS OF ACCOMPLISHMENT</th></tr>
     <tr><th>ITEM</th><th>% WEIGHT</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>TOTAL</th></tr>
@@ -354,7 +345,7 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
     <tr class='tot'><td>TOTAL</td><td class='n'>${pct(sum(a => a.weightPct))}</td><td class='n'>${last ? pct(last.targetAccomplishmentPct) : ''}</td><td class='n'>${last ? pct(last.actualAccomplishmentPct) : ''}</td><td class='n'>${pct(sum(a => a.weightPct * a.actualPct / 100))}</td></tr></table>`);
 
   // Billings up to month end; one with an unreadable date is kept, as on the phone.
-  const paid = payments.filter(p => { const m = monthOf(p.date); return m == null || m <= month; });
+  const paid = L.netBillings(payments).filter(p => { const m = monthOf(p.date); return m == null || m <= month; });
   b.push(`<table><tr><th colspan='6' class='sec'>III. STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>NET AMOUNT</th><th>%</th></tr>
     ${Array.from({ length: Math.max(3, paid.length) }, (_, i) => {
       const p = paid[i];
