@@ -887,6 +887,17 @@ export function issueErrors(f) {
 /** ProjectAttention.REQUEST_TYPES. */
 export const REQUEST_TYPES = ['Work Suspension Order', 'Continuance of Work Suspension Order', 'Work Resumption Order', 'Variation Order', 'Time Extension'];
 
+/**
+ * A request card's title. Details that are only an order number join the type ("Work Suspension Order No. 1");
+ * "1.2" on a continuance is suspension 1's 2nd. Any other details stay on their own line.
+ */
+export function requestTitle(r) {
+  const type = r.requestType || '-', d = (r.details || '').trim();
+  const cont = type === REQUEST_TYPES[1] && /^(\d+)\.(\d+)$/.exec(d);
+  if (cont) return `${ordinal(+cont[2])} ${type} No. ${cont[1]}`;
+  return /^\d+$/.test(d) ? `${type} No. ${d}` : type;
+}
+
 /** DeveloperRequestDialog's checks: the date received is required; any date is yyyy-MM-dd. */
 export function requestErrors(f) {
   const iso = /^\d{4}-\d{2}-\d{2}$/;
