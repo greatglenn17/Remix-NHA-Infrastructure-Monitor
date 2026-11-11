@@ -1652,7 +1652,7 @@ function requestsCard(requests, now, editable = false) {
     return entry(r.requestType || '-', [
       `Requested: ${r.dateRequested || '-'}  ·  Received: ${r.dateReceived || '-'}`,
       r.datePackaged ? `Packaged: ${r.datePackaged}` : `NOT YET PACKAGED${waiting == null ? '' : ` · ${waiting} days since received`}`,
-      r.details,
+      r.details?.trim() && `Details: ${r.details}`, // labelled here: a bare "1" under the dates reads like a stray number
     ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
       + (editable ? `<button class="text-btn entry-edit" data-edit-request="${esc(r.uuid)}">${icon('edit', 'sm')}${r.datePackaged ? 'Edit' : 'Edit or mark packaged'}</button>` : ''),
     r.datePackaged ? '' : 'waiting');
