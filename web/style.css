@@ -80,6 +80,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .text-btn { font: 600 14px Inter, sans-serif; background: none; border: 0; color: var(--link); cursor: pointer;
   display: inline-flex; align-items: center; gap: 4px; padding: 8px; border-radius: 6px; text-decoration: none; }
 .text-btn:hover { background: var(--primary-container); }
+.text-btn.danger { color: var(--behind); margin-right: auto; }
 .field { display: grid; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-2); }
 .field input, .search input {
   font: 15px Inter, sans-serif; color: var(--text); background: var(--field);

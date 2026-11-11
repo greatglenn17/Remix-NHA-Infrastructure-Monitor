@@ -963,11 +963,32 @@ function billingFields(f) {
 export function editedBillings(payments, old, f, cost) {
   const fields = billingFields(f), delta = fields.grossAmount - (Number(old.grossAmount) || 0);
   if (delta === 0) return [[old, fields]];
-  const share = amount => (cost > 0 ? amount / cost * 100 : 0);
-  const shift = p => ({ balanceAmount: (Number(p.balanceAmount) || 0) - delta, balancePercentage: (Number(p.balancePercentage) || 0) - share(delta) });
-  const later = payments.slice(payments.findIndex(p => p.uuid === old.uuid) + 1);
-  return [[old, { ...fields, ...shift(old), percentage: share(fields.grossAmount) }], ...later.map(p => [p, shift(p)])];
+  const shift = balanceShift(delta, cost);
+  return [[old, { ...fields, ...shift(old), percentage: cost > 0 ? fields.grossAmount / cost * 100 : 0 }], ...laterBillings(payments, old).map(p => [p, shift(p)])];
 }
+
+const laterBillings = (payments, old) => payments.slice(payments.findIndex(p => p.uuid === old.uuid) + 1);
+/** A billing's balance once the gross billed up to it has grown by `delta`. */
+const balanceShift = (delta, cost) => p => ({
+  balanceAmount: (Number(p.balanceAmount) || 0) - delta, balancePercentage: (Number(p.balancePercentage) || 0) - (cost > 0 ? delta / cost * 100 : 0),
+});
+
+/**
+ * The pairs to save when `old` is deleted: itself (null changes) and every later billing with its balance given back
+ * the deleted gross. The phone's delete leaves the later balances as they were, which then no longer add up.
+ */
+export function deletedBillingEdits(payments, old, cost) {
+  const shift = balanceShift(-(Number(old.grossAmount) || 0), cost);
+  return [[old, null], ...laterBillings(payments, old).map(p => [p, shift(p)])];
+}
+
+/** A record marked deleted the way FirestoreSyncManager uploads a delete: the tombstone, one revision up. */
+export const deletedRecord = (stored, { uid, now, assignedUids }) => ({ isDeleted: true, revision: (Number(stored.revision) || 1) + 1, updatedAt: now, updatedByUid: uid, assignedUids });
+
+/** The phone logs nothing for a deleted billing; the site does, named like its other deletions. */
+export const deletedPaymentAudit = p => ({
+  actionType: 'Payment Deletion', details: `Deleted billing: ${p.name}${p.dvNo ? ` (${p.dvNo})` : ''}`, oldValue: `DV: ${p.dvNo}, Gross: ₱${p.grossAmount}`, newValue: '',
+});
 
 /** ProjectViewModel.updateProjectPayment's audit entry, for a billing as it will be saved. */
 export const editedPaymentAudit = p => ({
