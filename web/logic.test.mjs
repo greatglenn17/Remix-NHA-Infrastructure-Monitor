@@ -59,6 +59,18 @@ test('status levels, view-only tag and attention flags follow the app', () => {
   assert.deepEqual(kinds, ['behind:critical', 'billingAhead:warning', 'waiting:warning', 'dueSoon:warning']);
   assert.equal(L.attentionFlags({ ...project, completionDateOriginal: '2026-11-01' }, [], 0, '2026-11-08')[1].message, 'Overdue by 7 days');
   assert.deepEqual(L.attentionFlags({ ...project, actualAccomplishment: 100, targetAccomplishment: 100 }, [], 0, '2026-11-08'), []);
+  // Developer requests not packaged (oldest received), and no field update in 14 days: since the newest report, else the start.
+  const quiet = { status: 'On-going', actualAccomplishment: 30, targetAccomplishment: 30, completionDateOriginal: '2027-06-30', dateStarted: '2026-10-01' };
+  const requests = [{ dateReceived: '2026-11-01', datePackaged: '' }, { dateReceived: '2026-10-29', datePackaged: '' }, { dateReceived: '2026-10-01', datePackaged: '2026-10-05' }];
+  assert.deepEqual(L.attentionFlags(quiet, [], 0, '2026-11-08', requests, '2026-10-20').map(f => [f.kind, f.level, f.message]), [
+    ['requests', 'warning', '2 developer requests not yet packaged (oldest received 10 days ago)'],
+    ['stale', 'stale', 'No field update in 19 days']]);
+  assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08', [], '2026-10-26').length, 0, '13 days is still recent');
+  assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08')[0].message, 'No field update in 38 days', 'no report yet: from the start date');
+  assert.equal(L.attentionFlags({ ...quiet, status: 'Suspended' }, [], 0, '2026-11-08').length, 0, 'a suspended project is not expected to report');
+  assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08', [{ dateReceived: 'soon' }])[0].message, '1 developer request not yet packaged');
+  assert.equal(L.latestReportDay([{ createdAtTimestamp: new Date(2026, 9, 20, 9).getTime() }, { createdAtTimestamp: new Date(2026, 9, 3).getTime() }]), '2026-10-20');
+  assert.equal(L.latestReportDay([]), null);
   assert.equal(L.billedLabel(0, 100), 'No billings yet');
   assert.equal(L.billedLabel(25, 100), '25.00%');
 });

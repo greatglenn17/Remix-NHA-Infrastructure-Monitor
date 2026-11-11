@@ -57,7 +57,7 @@ const main = document.getElementById('app');
 const who = document.getElementById('who');
 const s = {
   user: null, claims: {}, profile: {}, projects: null, projectsError: null,
-  payments: new Map(), docs: new Map(), unsub: [], unsubPage: [], page: null,
+  payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), unsub: [], unsubPage: [], page: null,
   filter: null, mineOnly: false, q: '',
 };
 
@@ -108,7 +108,7 @@ onAuthStateChanged(auth, async user => {
   if (user && signingUp) return;
   s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear(); s.page = null; s.profile = {};
+  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear(); s.requests.clear(); s.weekly.clear(); s.page = null; s.profile = {};
   document.body.classList.toggle('signed-out', !user);
   if (!user) {
     who.innerHTML = '';
@@ -135,7 +135,9 @@ onAuthStateChanged(auth, async user => {
       .filter(p => p.isDeleted !== true && p.name);
     redrawDashboard();
   }, e => { s.projectsError = e.message; redrawDashboard(); }));
-  s.unsub.push(listenRecords('project_payments', s.payments), listenRecords('pending_documents', s.docs));
+  s.unsub.push(listenRecords('project_payments', s.payments), listenRecords('pending_documents', s.docs),
+    // For the attention flags: requests not yet packaged, and the newest weekly report (no field update in 14 days).
+    listenRecords('developer_requests', s.requests), listenRecords('weekly_reports', s.weekly));
   route();
 });
 
@@ -424,7 +426,7 @@ function itemOf(project) {
   const p = L.withSchedule(project, docs, today());
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
-  return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today()), waiting: L.waitingApproval(docs) };
+  return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], L.latestReportDay(s.weekly.get(p.projectUuid) || [])), waiting: L.waitingApproval(docs) };
 }
 
 /** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. */
@@ -672,7 +674,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const latest = weekly[0];
   const openIssues = of('project_issues').filter(L.isOpenIssue).length;
   const orders = L.chained(documents.filter(d => SCHEDULE_ORDER.test(d.documentName || '')));
-  const flags = L.attentionFlags(project, documents, billed, now);
+  const flags = L.attentionFlags(project, documents, billed, now, of('developer_requests'), L.latestReportDay(weekly));
   const housing = /housing/i.test(project.projectType || '');
   const finished = L.isCompleted(project);
   // KeyDatesCard: approved time extensions first, else the stored revised date; Days left counts down to the same date.
@@ -684,7 +686,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
 
   // Needs attention: one alert box per flag; critical ones (overdue, 15%+ behind) carry a pulsing dot.
   const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => `
-    <p class="alert ${f.level}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon('warning', 'sm')}<b>${esc(f.message)}</b></p>`).join('')}</div>`) : '';
+    <p class="alert ${f.level}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon(f.level === 'stale' ? 'schedule' : 'warning', 'sm')}<b>${esc(f.message)}</b></p>`).join('')}</div>`) : '';
   const profile = section('Project profile', 'apartment', `
     <div class="site-photo" id="site-photo">${icon('architecture')}<span>No site photo yet</span></div>
     <div class="attrs">

@@ -290,12 +290,19 @@ export function billedLabel(billed, cost) {
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+/** The day the project's newest weekly report was added (getLatestWeeklyReportTimes), yyyy-MM-dd in local time; null with none. */
+export function latestReportDay(weekly) {
+  const at = Math.max(0, ...weekly.map(r => Number(r.createdAtTimestamp) || 0));
+  return at ? new Date(at).toLocaleDateString('en-CA') : null;
+}
+
+const LEVEL_RANK = { critical: 0, warning: 1, stale: 2 };
+
 /**
- * ProjectAttention.flags, critical first. `today` is yyyy-MM-dd.
- * shortcut: leaves out "developer requests not packaged" and "no field update in N days", which need
- * every project's requests and weekly reports; add them when the dashboard reads those records.
+ * ProjectAttention.flags: critical, then warning, then stale. `today` and `latestReportAt` are yyyy-MM-dd;
+ * `requests` are the project's developer requests.
  */
-export function attentionFlags(project, docs, billed, today) {
+export function attentionFlags(project, docs, billed, today, requests = [], latestReportAt = null) {
   const flags = [];
   const finished = isCompleted(project);
   const slip = slippage(project);
@@ -313,14 +320,26 @@ export function attentionFlags(project, docs, billed, today) {
   }
   const waiting = waitingApproval(docs);
   if (waiting > 0) flags.push({ kind: 'waiting', level: 'warning', message: `${plural(waiting, 'order', 'orders')} waiting approval` });
-  const due = isoDay(effectiveCompletion(project));
   const now = isoDay(today);
+  const daysSince = s => { const t = isoDay(s); return t == null || now == null ? null : Math.round((now - t) / DAY); };
+  const unpackaged = requests.filter(r => !String(r.datePackaged ?? '').trim());
+  if (unpackaged.length) {
+    const ages = unpackaged.map(r => daysSince(r.dateReceived)).filter(d => d != null);
+    const age = ages.length ? ` (oldest received ${plural(Math.max(0, ...ages), 'day', 'days')} ago)` : '';
+    flags.push({ kind: 'requests', level: 'warning', message: `${plural(unpackaged.length, 'developer request', 'developer requests')} not yet packaged${age}` });
+  }
+  const due = isoDay(effectiveCompletion(project));
   if (!finished && due != null && now != null) {
-    const days = Math.round((due - now) / 86400000);
+    const days = Math.round((due - now) / DAY);
     if (days < 0) flags.push({ kind: 'overdue', level: 'critical', message: `Overdue by ${plural(-days, 'day', 'days')}` });
     else if (days <= 30) flags.push({ kind: 'dueSoon', level: 'warning', message: `Due in ${plural(days, 'day', 'days')}` });
   }
-  return flags.sort((a, b) => (a.level === b.level ? 0 : a.level === 'critical' ? -1 : 1));
+  // A suspended project is not expected to report; the start date counts until the first report.
+  const stale = daysSince(latestReportAt ?? project.dateStarted);
+  if (!finished && project.status !== 'Suspended' && stale != null && stale >= 14) {
+    flags.push({ kind: 'stale', level: 'stale', message: `No field update in ${plural(stale, 'day', 'days')}` });
+  }
+  return flags.sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level]);
 }
 
 /**

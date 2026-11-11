@@ -110,7 +110,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .badge.view { border-radius: 4px; padding: 2px 6px; font-weight: 400; background: var(--surface-variant); color: var(--text-2); }
 .lv-ok { color: var(--ok); background: var(--ok-c); } .lv-watch { color: var(--watch); background: var(--watch-c); }
 .lv-behind { color: var(--behind); background: var(--behind-c); } .lv-neutral { color: var(--neutral); background: var(--neutral-c); }
-.t-critical { color: var(--behind); } .t-warning { color: var(--watch); }
+.t-critical { color: var(--behind); } .t-warning { color: var(--watch); } .t-stale { color: var(--neutral); }
 
 /* Progress line: label left; value and note right; an 8px bar beneath. The one motion: bars fill in on arrival. */
 .pl-head { display: flex; gap: 8px; align-items: baseline; font-size: 14px; min-width: 0; }
@@ -264,6 +264,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .alert { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; font-size: 14px; border: 1px solid; }
 .alert.critical { color: var(--behind-text); background: var(--behind-c); border-color: var(--behind-line); }
 .alert.warning { color: var(--watch-text); background: var(--watch-c); border-color: var(--watch-line); }
+.alert.stale { color: var(--neutral); background: var(--neutral-c); border-color: var(--border); }
 .pulse { width: 8px; height: 8px; margin: 0 4px; border-radius: 50%; background: var(--behind); flex: none; animation: pulse 1.6s ease-out infinite; }
 @keyframes pulse { from { box-shadow: 0 0 0 0 rgb(244 63 94 / 0.6); } to { box-shadow: 0 0 0 8px rgb(244 63 94 / 0); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; box-shadow: 0 0 0 3px var(--behind-c); } }
