@@ -1,8 +1,8 @@
 {
-  "versionCode": 293,
-  "versionName": "2.8.13",
-  "releaseNotes": "v2.8.13: The dashboard card's Billed amount now shows two decimals, for example 64.00% · ₱6,400,000.00.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.13/NHA_Monitor_v2.8.13_Build293.apk",
-  "apkSha256": "2a3335d6460a18183f3f7742ca4ef6079ab77c666d4ce8bdbd7d77290733fba9",
+  "versionCode": 294,
+  "versionName": "2.8.14",
+  "releaseNotes": "v2.8.14: Deleting a billing now adds its amount back to the balance of every later billing, and is recorded in the audit log.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.14/NHA_Monitor_v2.8.14_Build294.apk",
+  "apkSha256": "f405ea934b1ae557d5161f970dd97169d878b6282834c1dfa8c09931ae7326f9",
   "isMandatory": true
 }
