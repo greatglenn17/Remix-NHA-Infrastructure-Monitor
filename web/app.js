@@ -66,7 +66,6 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const icon = (name, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${name}</span>`;
 const today = () => new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd in the viewer's time zone
 const pct = n => `${(Number(n) || 0).toFixed(2)}%`;
-const pesoWhole = n => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(n);
 const clamp = f => Math.max(0, Math.min(1, f || 0));
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -446,7 +445,7 @@ function workDone(p, big) {
   return progressLine('Work done', pct(p.actualAccomplishment), note, noteTone, (Number(p.actualAccomplishment) || 0) / 100, tone, big);
 }
 const billedLine = (it, big) => progressLine('Billed', L.billedLabel(it.billed, it.cost),
-  it.billed > 0 ? esc(pesoWhole(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big);
+  it.billed > 0 ? esc(L.formatPhp(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big);
 /** The status badge on cards and the project header; an overdue project says so instead of "On-going". */
 function statusBadge(p) {
   const late = L.daysOverdue(p, today());

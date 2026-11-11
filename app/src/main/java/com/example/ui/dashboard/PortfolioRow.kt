@@ -42,8 +42,6 @@ import com.example.util.AttentionLevel
 import com.example.util.PortfolioItem
 import com.example.util.ProjectAttention
 import com.example.util.ProjectSchedule
-import java.text.NumberFormat
-import java.util.Locale
 
 /** One project in the "All projects" list. The two bars sit side by side when [wide]. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -124,7 +122,7 @@ fun PortfolioRow(
                 val fraction = item.billedFraction ?: 0f
                 ProgressLine(
                     label = "Billed",
-                    value = if (noBillings) "No billings yet" else "%.2f%% · %s".format(fraction * 100, peso(item.billedTotal)),
+                    value = if (noBillings) "No billings yet" else "%.2f%% · %s".format(fraction * 100, com.example.utils.CurrencyFormatter.formatPhp(item.billedTotal)),
                     fraction = if (noBillings) 0f else fraction,
                     color = scheme.primary,
                     modifier = m
@@ -361,6 +359,3 @@ internal fun workDoneColor(project: Project, overdue: Boolean, colors: NHAColors
 internal fun workDoneText(project: Project, overdue: Boolean = false) =
     "%.2f%% · %s".format(project.actualAccomplishment, if (overdue && !project.isCompleted) "past completion date" else scheduleText(ProjectAttention.slippage(project)))
 
-/** Whole pesos: centavos on a multi-million contract are noise at card size. */
-internal fun peso(amount: Double): String =
-    NumberFormat.getCurrencyInstance(Locale("en", "PH")).apply { maximumFractionDigits = 0 }.format(amount)
