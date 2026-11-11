@@ -1649,10 +1649,11 @@ function lettersCard(letters) {
 function requestsCard(requests, now, editable = false) {
   return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
-    return entry(r.requestType || '-', [
+    const title = L.requestTitle(r);
+    return entry(title, [
       `Requested: ${r.dateRequested || '-'}  ·  Received: ${r.dateReceived || '-'}`,
       r.datePackaged ? `Packaged: ${r.datePackaged}` : `NOT YET PACKAGED${waiting == null ? '' : ` · ${waiting} days since received`}`,
-      r.details?.trim() && `Details: ${r.details}`, // labelled here: a bare "1" under the dates reads like a stray number
+      title === (r.requestType || '-') && r.details?.trim() && `Details: ${r.details}`, // an order number is in the title instead
     ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
       + (editable ? `<button class="text-btn entry-edit" data-edit-request="${esc(r.uuid)}">${icon('edit', 'sm')}${r.datePackaged ? 'Edit' : 'Edit or mark packaged'}</button>` : ''),
     r.datePackaged ? '' : 'waiting');

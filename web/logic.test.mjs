@@ -335,3 +335,15 @@ test('developer request edits: checks and the app audit entry', () => {
     actionType: 'Developer Request', details: 'Time Extension request received 2026-11-01, packaged 2026-11-12', oldValue: '', newValue: 'Letter 12',
   });
 });
+
+test('developer request title: a number in the details becomes the order number', () => {
+  const t = (requestType, details) => L.requestTitle({ requestType, details });
+  assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');
+  assert.equal(t('Work Suspension Order', ' 2 '), 'Work Suspension Order No. 2');
+  assert.equal(t('Continuance of Work Suspension Order', '1.1'), '1st Continuance of Work Suspension Order No. 1');
+  assert.equal(t('Continuance of Work Suspension Order', '2.3'), '3rd Continuance of Work Suspension Order No. 2');
+  assert.equal(t('Continuance of Work Suspension Order', '1'), 'Continuance of Work Suspension Order No. 1');
+  assert.equal(t('Time Extension', '30 days for rain'), 'Time Extension');
+  assert.equal(t('Variation Order', '1.1'), 'Variation Order');
+  assert.equal(t('Variation Order', ''), 'Variation Order');
+});
