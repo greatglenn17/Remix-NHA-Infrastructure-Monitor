@@ -1,8 +1,8 @@
 {
-  "versionCode": 291,
-  "versionName": "2.8.11",
-  "releaseNotes": "v2.8.11: Billed amounts use the net after retention everywhere, so the dashboard, the project header, the Billing summary and the Summary tab's Status of billing table now agree.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.11/NHA_Monitor_v2.8.11_Build291.apk",
-  "apkSha256": "d989419adf1b7193df4f00ac463fcb96d617c92967d12e71c794d45c5a347fad",
+  "versionCode": 292,
+  "versionName": "2.8.12",
+  "releaseNotes": "v2.8.12: The printed monthly form's Status of Payment now ends with a grand total row: the net paid, the shares added, and the balance after the last billing.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.12/NHA_Monitor_v2.8.12_Build292.apk",
+  "apkSha256": "f4ac8e3b346e184f1eef7508714c8b4c549422cd9e999f55a98592032eeaee63",
   "isMandatory": true
 }
