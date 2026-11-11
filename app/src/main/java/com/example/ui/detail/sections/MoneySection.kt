@@ -70,7 +70,11 @@ fun MoneySection(
                                 onViewScan = { viewingDvPayment = payment },
                                 // The DV dialog offers Scan, Take photo and Upload.
                                 onAttachScan = { viewingDvPayment = payment },
-                                onDelete = { onDeletePayment(payment) },
+                                onDelete = {
+                                    // The later billings get the deleted amount back in their balances.
+                                    billingsAfterDelete(payments, payment, contractCost).forEach(onUpdatePayment)
+                                    onDeletePayment(payment)
+                                },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 canEdit = canManagePayments,
                                 onEdit = { paymentToEdit = payment }
@@ -179,7 +183,16 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
 internal fun editedBillings(payments: List<ProjectPayment>, old: ProjectPayment, new: ProjectPayment, contractCost: Double): List<ProjectPayment> {
     val delta = new.grossAmount - old.grossAmount
     if (delta == 0.0) return listOf(new)
-    fun share(amount: Double) = if (contractCost > 0) amount / contractCost * 100 else 0.0
-    fun shift(p: ProjectPayment) = p.copy(balanceAmount = p.balanceAmount - delta, balancePercentage = p.balancePercentage - share(delta))
-    return listOf(shift(new).copy(percentage = share(new.grossAmount))) + payments.filter { it.id > old.id }.map(::shift)
+    return listOf(new.shifted(delta, contractCost).copy(percentage = share(new.grossAmount, contractCost))) +
+        payments.filter { it.id > old.id }.map { it.shifted(delta, contractCost) }
 }
+
+/** The billings to save when [old] is deleted: every later one, with the deleted amount back in its balance. */
+internal fun billingsAfterDelete(payments: List<ProjectPayment>, old: ProjectPayment, contractCost: Double): List<ProjectPayment> =
+    payments.filter { it.id > old.id }.map { it.shifted(-old.grossAmount, contractCost) }
+
+private fun share(amount: Double, contractCost: Double) = if (contractCost > 0) amount / contractCost * 100 else 0.0
+
+/** This billing's balance once the gross billed up to it has grown by [delta]. */
+private fun ProjectPayment.shifted(delta: Double, contractCost: Double) =
+    copy(balanceAmount = balanceAmount - delta, balancePercentage = balancePercentage - share(delta, contractCost))

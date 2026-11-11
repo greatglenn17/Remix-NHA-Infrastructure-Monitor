@@ -27,8 +27,8 @@ is read only.
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
   order added, which differs only for a back-dated billing. The scanned DV stays attached.
 - **Delete billing**, in that form, asks first, then marks the record `isDeleted` (one revision up) as a phone's delete
-  does. Unlike the phone it also gives the deleted gross back to every later billing's balance, and writes a
-  "Payment Deletion" audit entry.
+  does. Like the phone (from v2.8.14) it also gives the deleted gross back to every later billing's balance, and
+  writes the app's "Payment Deletion" audit entry.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
   entry. New requests are still added on the phone, since that also files the order in Documents.

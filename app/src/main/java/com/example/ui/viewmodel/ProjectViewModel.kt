@@ -2582,9 +2582,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     
-    fun deleteProjectPayment(id: Long) {
+    fun deleteProjectPayment(payment: ProjectPayment) {
         viewModelScope.launch(missingProjectGuard) {
-            projectDao.deleteProjectPayment(id)
+            projectDao.deleteProjectPayment(payment.id)
+            logAuditAction(
+                projectId = payment.projectId,
+                actionType = "Payment Deletion",
+                details = "Deleted billing: ${payment.name}" + if (payment.dvNo.isNotBlank()) " (${payment.dvNo})" else "",
+                oldValue = "DV: ${payment.dvNo}, Gross: ${com.example.utils.CurrencyFormatter.formatPhp(payment.grossAmount)}",
+                newValue = ""
+            )
         }
     }
 

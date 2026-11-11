@@ -374,5 +374,5 @@ test('deleting a billing: the tombstone, later balances given back, and the audi
   assert.deepEqual(L.deletedRecord({ revision: 3, data: '{}' }, { uid: 'u', now: 5, assignedUids: ['u'] }),
     { isDeleted: true, revision: 4, updatedAt: 5, updatedByUid: 'u', assignedUids: ['u'] });
   assert.deepEqual(L.deletedPaymentAudit(payments[1]),
-    { actionType: 'Payment Deletion', details: 'Deleted billing: b (DV)', oldValue: 'DV: DV, Gross: ₱200', newValue: '' });
+    { actionType: 'Payment Deletion', details: 'Deleted billing: b (DV)', oldValue: 'DV: DV, Gross: ₱200.00', newValue: '' });
 });
