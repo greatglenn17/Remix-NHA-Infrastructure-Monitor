@@ -362,3 +362,17 @@ test('editing a billing: fields only, or a changed gross that moves its own and 
   assert.deepEqual(L.editedPaymentAudit({ name: 'B fixed', dvNo: 'DV-2', grossAmount: 250 }),
     { actionType: 'Payment Creation', details: 'Updated billing: B fixed', oldValue: 'Previous payment info', newValue: 'DV: DV-2, Gross: ₱250' });
 });
+
+test('deleting a billing: the tombstone, later balances given back, and the audit entry', () => {
+  const pay = (uuid, grossAmount, balanceAmount) => ({ uuid, name: uuid, dvNo: 'DV', grossAmount, balanceAmount, balancePercentage: balanceAmount / 10 });
+  const payments = [pay('a', 100, 900), pay('b', 200, 700), pay('c', 300, 400)];
+  const edits = L.deletedBillingEdits(payments, payments[1], 1000);
+  assert.deepEqual(edits.map(([p]) => p.uuid), ['b', 'c']);
+  assert.equal(edits[0][1], null);
+  assert.deepEqual(edits[1][1], { balanceAmount: 600, balancePercentage: 60 });
+  assert.deepEqual(L.deletedBillingEdits(payments, payments[2], 1000).map(([p]) => p.uuid), ['c']);
+  assert.deepEqual(L.deletedRecord({ revision: 3, data: '{}' }, { uid: 'u', now: 5, assignedUids: ['u'] }),
+    { isDeleted: true, revision: 4, updatedAt: 5, updatedByUid: 'u', assignedUids: ['u'] });
+  assert.deepEqual(L.deletedPaymentAudit(payments[1]),
+    { actionType: 'Payment Deletion', details: 'Deleted billing: b (DV)', oldValue: 'DV: DV, Gross: ₱200', newValue: '' });
+});

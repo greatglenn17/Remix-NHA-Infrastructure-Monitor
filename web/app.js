@@ -1359,7 +1359,7 @@ function editRequest(c, r) {
  */
 const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
 
-/** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each), all or none. */
+/** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes delete it), all or none. */
 async function saveEdits(c, edits, noun) {
   const uid = s.user.uid;
   await runTransaction(db, async t => {
@@ -1372,7 +1372,7 @@ async function saveEdits(c, edits, noun) {
         throw new Error(`This ${noun} was just changed on another device. Close this form and edit it again.`);
       }
       const assignedUids = project.get('assignedUids') ?? was.get('assignedUids') ?? [];
-      t.update(was.ref, L.editedRecord(was.data(), changes, { uid, now, assignedUids }));
+      t.update(was.ref, changes ? L.editedRecord(was.data(), changes, { uid, now, assignedUids }) : L.deletedRecord(was.data(), { uid, now, assignedUids }));
       const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
       t.set(doc(db, 'records', audit.uuid), audit);
     });
@@ -1520,7 +1520,7 @@ function billingForm(c, old = null) {
     <div class="billing-preview" aria-live="polite"></div>
     ${old?.fileUrl ? '' : `<p class="muted small">Attach the scanned DV on the phone${old ? '' : ' after saving'}.</p>`}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div>
+    <div class="actions">${old ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete billing</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ billingType: '', ...Object.fromEntries(new FormData(form)) });
@@ -1553,6 +1553,18 @@ function billingForm(c, old = null) {
   const close = () => (JSON.stringify(values()) === initial || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  const failed = x => { err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.'; };
+  const del = d.querySelector('[data-delete]');
+  if (del) del.onclick = async () => {
+    const edits = L.deletedBillingEdits(c.payments, old, c.cost), later = edits.length - 1;
+    if (!confirm(`Delete "${old.name || 'this billing'}"? This cannot be undone.${later ? ` The balance of ${plural(later, 'later billing')} will be recalculated.` : ''}`)) return;
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then delete again.'; return; }
+    del.disabled = save.disabled = true; err.textContent = '';
+    try {
+      await saveEdits(c, edits.map(([p, changes]) => [p, changes, changes ? L.editedPaymentAudit({ ...p, ...changes }) : L.deletedPaymentAudit(p)]), 'billing');
+      done();
+    } catch (x) { failed(x); del.disabled = save.disabled = false; }
+  };
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.billingErrors(f);
@@ -1565,10 +1577,7 @@ function billingForm(c, old = null) {
       await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
         : addBilling(c, f));
       done();
-    } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
-      save.disabled = false;
-    }
+    } catch (x) { failed(x); save.disabled = false; }
   };
   document.body.append(d);
   d.showModal();

@@ -26,6 +26,9 @@ is read only.
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
   order added, which differs only for a back-dated billing. The scanned DV stays attached.
+- **Delete billing**, in that form, asks first, then marks the record `isDeleted` (one revision up) as a phone's delete
+  does. Unlike the phone it also gives the deleted gross back to every later billing's balance, and writes a
+  "Payment Deletion" audit entry.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
   entry. New requests are still added on the phone, since that also files the order in Documents.
@@ -132,5 +135,5 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, weekly reports and orders; deleting billings; editing lots; uploading files (the bucket's CORS
+Adding developer requests, weekly reports and orders; editing lots; uploading files (the bucket's CORS
 allows downloads only).
