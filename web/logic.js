@@ -908,6 +908,23 @@ export function requestErrors(f) {
   ].filter(Boolean);
 }
 
+/** ContractorLetterDialog's checks: the date of the letter and the subject are required; any date is yyyy-MM-dd. */
+export function letterErrors(f) {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  return [
+    !iso.test(f.dateSent || '') && 'Pick the date of the letter.',
+    !f.subject?.trim() && 'Type the subject.',
+    f.dateReceived && !iso.test(f.dateReceived) && 'Pick a valid date received.',
+    f.dateReplied && !iso.test(f.dateReplied) && 'Pick a valid date of reply.',
+  ].filter(Boolean);
+}
+
+/** ProjectViewModel.saveContractorLetter's audit entry, word for word. */
+export const letterAudit = f => ({
+  actionType: 'Letter to Contractor', details: `Letter of ${f.dateSent}: ${f.subject}${f.dateReplied ? `, replied ${f.dateReplied}` : ''}`,
+  oldValue: '', newValue: f.actionTaken,
+});
+
 /** ProjectViewModel.saveDeveloperRequest's audit entry, word for word. */
 export const requestAudit = f => ({
   actionType: 'Developer Request', details: `${f.requestType} request received ${f.dateReceived}${f.datePackaged ? `, packaged ${f.datePackaged}` : ''}`,

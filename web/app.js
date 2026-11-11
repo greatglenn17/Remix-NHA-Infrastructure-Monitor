@@ -668,6 +668,7 @@ function drawProject(page) {
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
   // The saved billing, not the card's net one: an edit starts from what is stored.
   main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
+  main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
   const editWx = main.querySelector('[data-edit-weather]');
   if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
@@ -1357,6 +1358,54 @@ function editRequest(c, r) {
  * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
  * since the form opened. `noun` names the record in those messages.
  */
+/**
+ * ContractorLetterDialog for a letter already logged: its date and subject, when the contractor received it, what the
+ * contractor did, and when the contractor replied.
+ * shortcut: no new letters and no receiving copy or reply upload here (download-only CORS); those stay on the phone.
+ */
+function editLetter(c, l) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Letter to contractor</h2>
+    <label class="field">Date of letter<input type="date" name="dateSent" value="${esc(l.dateSent || '')}" required></label>
+    <label class="field">Subject<input name="subject" value="${esc(l.subject || '')}" required autocomplete="off"></label>
+    <label class="field">Date received by the contractor (blank: not yet)<input type="date" name="dateReceived" value="${esc(l.dateReceived || '')}"></label>
+    <label class="field">Action taken by contractor<textarea name="actionTaken" rows="3">${esc(l.actionTaken || '')}</textarea></label>
+    <label class="field">Date of reply (blank: no reply yet)<input type="date" name="dateReplied" value="${esc(l.dateReplied || '')}"></label>
+    <p class="muted small">Attach the receiving copy and the reply letter on the phone.</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => {
+    const f = Object.fromEntries(new FormData(form));
+    return { dateSent: f.dateSent, subject: f.subject.trim(), actionTaken: f.actionTaken.trim(), dateReplied: f.dateReplied, dateReceived: f.dateReceived };
+  };
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this letter?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.letterErrors(f);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await saveEdit(c, l, f, 'letter', L.letterAudit(f));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
 const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
 
 /** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes delete it), all or none. */
@@ -1650,7 +1699,7 @@ function documentsBody(c, chip) {
     const vos = named('variation order');
     return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(vo => entry(vo.documentName, L.variationLines(vo), vo.fileUrl ? fileLink(vo.fileUrl, 'Attached copy') : '')).join(''), 'No variation orders recorded.');
   }
-  if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents));
+  if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), L.canEdit(c.project, s.user.uid, s.claims));
   if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, L.canEdit(c.project, s.user.uid, s.claims));
   if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents));
   const suspensions = documents.filter(L.isSuspension);
@@ -1664,15 +1713,20 @@ function documentsBody(c, chip) {
   </div>`;
 }
 
-/** ContractorLettersCard as a table: date and receipt, subject, the contractor's action, and the reply letter. */
-function lettersCard(letters) {
+/**
+ * ContractorLettersCard as a table: date and receipt, subject, the contractor's action, and the reply letter; `editable`
+ * adds Edit to the letter records.
+ * shortcut: an old "Letter to Contractor No. N" document has no Edit (the phone turns it into a letter record on its first edit).
+ */
+function lettersCard(letters, editable = false) {
   if (!letters.length) return section('Letters to contractor', 'mail', emptyLine('No letters to the contractor yet.'));
-  return section('Letters to contractor', 'mail', table(['Date', 'Subject', 'Action taken by contractor', 'Reply'], letters.map(l => {
+  return section('Letters to contractor', 'mail', table(['Date', 'Subject', 'Action taken by contractor', 'Reply', ...(editable ? [''] : [])], letters.map(l => {
     const received = l.dateReceived ? `Received ${L.displayDate(l.dateReceived)}` : null;
     const receipt = l.receivedFileUrl ? fileLink(l.receivedFileUrl, received || 'Receiving copy') : `<small class="${received ? 'muted' : 'n-watch'}">${esc(received || 'Not received')}</small>`;
     const reply = l.replyFileUrl ? fileLink(l.replyFileUrl, 'Reply') : l.dateReplied ? '<small class="muted">Replied</small>' : '<span class="muted">-</span>';
     return `<tr><td class="nw">${esc(L.displayDate(l.dateSent || '-'))}<br>${receipt}</td><td>${esc(l.subject || '-')}</td>
-      <td>${l.actionTaken ? esc(l.actionTaken) : '<span class="n-watch">None yet</span>'}</td><td>${reply}</td></tr>`;
+      <td>${l.actionTaken ? esc(l.actionTaken) : '<span class="n-watch">None yet</span>'}</td><td>${reply}</td>
+      ${editable ? `<td>${l.type === 'contractor_letters' ? `<button class="text-btn entry-edit" data-edit-letter="${esc(l.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</td>` : ''}</tr>`;
   }).join('')));
 }
 

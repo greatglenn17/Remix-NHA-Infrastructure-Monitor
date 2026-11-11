@@ -336,6 +336,17 @@ test('developer request edits: checks and the app audit entry', () => {
   });
 });
 
+test('contractor letter edits: checks and the app audit entry', () => {
+  assert.deepEqual(L.letterErrors({ dateSent: '', subject: ' ' }), ['Pick the date of the letter.', 'Type the subject.']);
+  assert.deepEqual(L.letterErrors({ dateSent: '2026-10-27', subject: 'Manpower', dateReceived: '', dateReplied: '' }), []);
+  assert.deepEqual(L.letterErrors({ dateSent: '2026-10-27', subject: 'Manpower', dateReplied: 'soon' }), ['Pick a valid date of reply.']);
+  const f = { dateSent: '2026-10-27', subject: 'Manpower', actionTaken: 'Added 10 workers', dateReplied: '' };
+  assert.equal(L.letterAudit(f).details, 'Letter of 2026-10-27: Manpower');
+  assert.deepEqual(L.letterAudit({ ...f, dateReplied: '2026-11-03' }), {
+    actionType: 'Letter to Contractor', details: 'Letter of 2026-10-27: Manpower, replied 2026-11-03', oldValue: '', newValue: 'Added 10 workers',
+  });
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');
