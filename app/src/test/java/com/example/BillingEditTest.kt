@@ -9,6 +9,7 @@ import com.example.data.model.ProjectPayment
 import com.example.data.model.netAmount
 import com.example.data.model.netBillings
 import com.example.ui.detail.sections.PaymentCard
+import com.example.ui.detail.sections.billingsAfterDelete
 import com.example.ui.detail.sections.editedBillings
 import com.example.ui.theme.NHATheme
 import org.junit.Assert.assertEquals
@@ -63,6 +64,15 @@ class BillingEditTest {
         assertEquals(25.0, saved[0].percentage, 1e-9)
         assertEquals(listOf(6500.0, 3500.0), saved.map { it.balanceAmount })
         assertEquals(listOf(65.0, 35.0), saved.map { it.balancePercentage })
+    }
+
+    @Test
+    fun delete_givesTheAmountBackToLaterBalances() {
+        val saved = billingsAfterDelete(all, second, 10_000.0)
+        assertEquals(listOf(3L), saved.map { it.id })
+        assertEquals(6000.0, saved[0].balanceAmount, 1e-9)
+        assertEquals(60.0, saved[0].balancePercentage, 1e-9)
+        assertEquals("the last billing has none after it", emptyList<ProjectPayment>(), billingsAfterDelete(all, third, 10_000.0))
     }
 
     @Test

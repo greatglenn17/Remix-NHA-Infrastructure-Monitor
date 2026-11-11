@@ -441,7 +441,7 @@ fun ProjectDetailScreen(
                         onUpdatePayment = { payment ->
                             viewModel.updateProjectPayment(payment)
                         },
-                        onDeletePayment = { viewModel.deleteProjectPayment(it.id) }
+                        onDeletePayment = { viewModel.deleteProjectPayment(it) }
                     )
                     ProjectSection.DOCUMENTS -> Column {
                         val chips = SectionChips.documents(canViewAuditLogs)

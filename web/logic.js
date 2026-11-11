@@ -975,7 +975,7 @@ const balanceShift = (delta, cost) => p => ({
 
 /**
  * The pairs to save when `old` is deleted: itself (null changes) and every later billing with its balance given back
- * the deleted gross. The phone's delete leaves the later balances as they were, which then no longer add up.
+ * the deleted gross (MoneySection.billingsAfterDelete).
  */
 export function deletedBillingEdits(payments, old, cost) {
   const shift = balanceShift(-(Number(old.grossAmount) || 0), cost);
@@ -985,9 +985,9 @@ export function deletedBillingEdits(payments, old, cost) {
 /** A record marked deleted the way FirestoreSyncManager uploads a delete: the tombstone, one revision up. */
 export const deletedRecord = (stored, { uid, now, assignedUids }) => ({ isDeleted: true, revision: (Number(stored.revision) || 1) + 1, updatedAt: now, updatedByUid: uid, assignedUids });
 
-/** The phone logs nothing for a deleted billing; the site does, named like its other deletions. */
+/** ProjectViewModel.deleteProjectPayment's audit entry, word for word. */
 export const deletedPaymentAudit = p => ({
-  actionType: 'Payment Deletion', details: `Deleted billing: ${p.name}${p.dvNo ? ` (${p.dvNo})` : ''}`, oldValue: `DV: ${p.dvNo}, Gross: ₱${p.grossAmount}`, newValue: '',
+  actionType: 'Payment Deletion', details: `Deleted billing: ${p.name}${p.dvNo ? ` (${p.dvNo})` : ''}`, oldValue: `DV: ${p.dvNo}, Gross: ${formatPhp(Number(p.grossAmount) || 0)}`, newValue: '',
 });
 
 /** ProjectViewModel.updateProjectPayment's audit entry, for a billing as it will be saved. */
