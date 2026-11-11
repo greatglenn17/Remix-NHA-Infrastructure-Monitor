@@ -1,8 +1,8 @@
 {
-  "versionCode": 290,
-  "versionName": "2.8.10",
-  "releaseNotes": "v2.8.10: The weekly report card shows each accomplishment line's weight in two decimals, e.g. Land Acquisition (9.15%).",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.10/NHA_Monitor_v2.8.10_Build290.apk",
-  "apkSha256": "c66fc25cdad0f72702e66ab22e04988dfb4df2c39f01d8e2eca512cd6b33e7f0",
+  "versionCode": 291,
+  "versionName": "2.8.11",
+  "releaseNotes": "v2.8.11: Billed amounts use the net after retention everywhere, so the dashboard, the project header, the Billing summary and the Summary tab's Status of billing table now agree.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.11/NHA_Monitor_v2.8.11_Build291.apk",
+  "apkSha256": "d989419adf1b7193df4f00ac463fcb96d617c92967d12e71c794d45c5a347fad",
   "isMandatory": true
 }
