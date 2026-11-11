@@ -10,6 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.data.model.netAmount
+import com.example.data.model.netBillings
 import com.example.data.model.ProjectPayment
 import com.example.data.model.Permission
 import com.example.data.model.UserRole
@@ -58,12 +60,13 @@ fun MoneySection(
             modifier = Modifier.fillMaxSize()
         ) {
             item { BillingSummary(payments, contractCost, actualPercent) }
+            val net = netBillings(payments).associateBy { it.id }
             payments.chunked(perRow).forEach { row ->
                 item(key = row.first().id) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
                         row.forEach { payment ->
                             PaymentCard(
-                                payment = payment,
+                                payment = net.getValue(payment.id), // shown on the net; edits start from the saved one
                                 onViewScan = { viewingDvPayment = payment },
                                 // The DV dialog offers Scan, Take photo and Upload.
                                 onAttachScan = { viewingDvPayment = payment },
@@ -137,7 +140,7 @@ fun MoneySection(
 @Composable
 fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualPercent: Double) {
     val scheme = MaterialTheme.colorScheme
-    val totalBilled = payments.sumOf { it.grossAmount }
+    val totalBilled = payments.sumOf { it.netAmount }
     SectionCard(
         "Billing summary",
         Icons.Default.Payments,

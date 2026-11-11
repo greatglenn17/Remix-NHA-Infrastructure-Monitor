@@ -24,6 +24,7 @@ import com.example.ui.dialogs.WeekRange
 import com.example.data.model.UserRole
 import com.example.data.model.WeeklyReport
 import com.example.data.model.netAmount
+import com.example.data.model.netBillings
 import com.example.data.model.hasPermission
 import com.example.ui.dashboard.SitePhoto
 import com.example.ui.detail.tabs.lotProgressFill
@@ -262,7 +263,7 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
             Column {
                 Cells(row("Billing / period covered", "Date", "Net amount (PHP)", "%", "Balance (PHP)"), bold = true, color = scheme.onSurfaceVariant)
                 HorizontalDivider(color = scheme.outlineVariant)
-                payments.forEach { p ->
+                netBillings(payments).forEach { p ->
                     Cells(
                         row(
                             listOf(p.name, p.periodCovered).filter { it.isNotBlank() }.joinToString("\n").ifBlank { "-" },
@@ -274,12 +275,12 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
                     )
                     HorizontalDivider(color = scheme.outlineVariant)
                 }
-                // Share and balance stay on the gross; only the paid amount drops the retention.
-                val total = payments.sumOf { it.grossAmount }
+                // Everything on the net, after retention, as the dashboard shows it.
+                val total = payments.sumOf { it.netAmount }
                 Cells(
                     row(
                         "Total", "",
-                        CurrencyFormatter.formatDecimal(payments.sumOf { it.netAmount }),
+                        CurrencyFormatter.formatDecimal(total),
                         if (contractCost > 0) "%.2f%%".format(total / contractCost * 100) else "-",
                         CurrencyFormatter.formatDecimal(contractCost - total)
                     ),

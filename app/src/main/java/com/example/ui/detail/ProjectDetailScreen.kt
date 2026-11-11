@@ -16,6 +16,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.data.model.netAmount
 import com.example.data.model.Permission
 import com.example.data.model.use
 import com.example.data.model.Project
@@ -141,7 +142,7 @@ fun ProjectDetailScreen(
     var showNotificationsDialog by remember { mutableStateOf(false) }
 
     val contractCost = ContractCost.current(currentProject.scopeOfWork, currentProject.contractCostOriginal, pendingDocuments)
-    val billedTotal = projectPayments.sumOf { it.grossAmount }
+    val billedTotal = projectPayments.sumOf { it.netAmount }
 
     // The header folds to one line while the section scrolls up and opens again at the top.
     var headerCollapsed by remember(currentProject.id, section) { mutableStateOf(false) }

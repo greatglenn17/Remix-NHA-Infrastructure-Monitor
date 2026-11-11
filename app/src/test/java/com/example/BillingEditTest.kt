@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performClick
 import com.example.data.model.AppThemeMode
 import com.example.data.model.ProjectPayment
 import com.example.data.model.netAmount
+import com.example.data.model.netBillings
 import com.example.ui.detail.sections.PaymentCard
 import com.example.ui.detail.sections.editedBillings
 import com.example.ui.theme.NHATheme
@@ -72,5 +73,15 @@ class BillingEditTest {
         rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { PaymentCard(held, {}, {}, {}) } }
         rule.onNodeWithText("M1 - Housing unit · 4 housing units × ₱250.00").assertExists()
         rule.onNodeWithText("Retention (10%)").assertExists()
+    }
+    // Shares and balances on the net: a billing with retention lowers its share, and its balance and every later one rise by what is held.
+    @Test
+    fun netBillings_putShareAndBalanceOnTheNet() {
+        val held = listOf(first, second.copy(retentionPct = 10.0), third)
+        val net = netBillings(held.reversed()).associateBy { it.id }
+        assertEquals(listOf(10.0, 18.0, 30.0), listOf(1L, 2L, 3L).map { net.getValue(it).percentage })
+        assertEquals(listOf(9000.0, 7200.0, 4200.0), listOf(1L, 2L, 3L).map { net.getValue(it).balanceAmount })
+        assertEquals(listOf(90.0, 72.0, 42.0), listOf(1L, 2L, 3L).map { net.getValue(it).balancePercentage })
+        assertEquals("the gross stays", 2000.0, net.getValue(2L).grossAmount, 1e-9)
     }
 }

@@ -114,6 +114,25 @@ data class ProjectPayment(
 /** What is paid after retention. */
 val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 100)
 
+/**
+ * [payments] with each billing's share and balance after it on the net. A billing saves them from the gross, with
+ * the contract cost of that day and every billing before it (in the order added), so the net balance after it is
+ * the saved one plus the retention held so far.
+ */
+fun netBillings(payments: List<ProjectPayment>): List<ProjectPayment> {
+    var held = 0.0
+    val byId = payments.sortedBy { it.id }.associate { p ->
+        held += p.grossAmount - p.netAmount
+        val cost = if (p.percentage > 0) p.grossAmount * 100 / p.percentage else 0.0
+        p.id to p.copy(
+            percentage = p.percentage * (1 - p.retentionPct / 100),
+            balanceAmount = p.balanceAmount + held,
+            balancePercentage = if (cost > 0) p.balancePercentage + held / cost * 100 else p.balancePercentage
+        )
+    }
+    return payments.map { byId.getValue(it.id) }
+}
+
 /** What a housing project bills for; land is billed per lot, M1 and M2 per housing unit. */
 val HOUSING_BILLING_TYPES = listOf("Land acquisition", "Land development", "M1 - Housing unit", "M2 - Housing unit")
 
