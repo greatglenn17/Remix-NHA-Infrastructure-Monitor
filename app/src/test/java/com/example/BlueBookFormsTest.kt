@@ -131,6 +131,8 @@ class BlueBookFormsTest {
         assertTrue(html.contains("<th>NET AMOUNT</th>"))
         assertTrue(html.contains("900,000.00"))
         assertFalse(html.contains("1,000,000.00"))
+        // The grand total: the net paid, the shares added, and the balance after the last billing.
+        assertTrue(html.contains("<tr class='tot'><td colspan='3'>GRAND TOTAL</td><td class='n'>Php 900,000.00</td><td class='n'>0.18%</td><td class='n'>Php 494,723,331.00 (99.82%)</td></tr>"))
         // Every section after II. Project Status is numbered, through VIII. Recommendations.
         listOf("III. STATUS OF PAYMENT", "IV. CONTRACT SCHEDULE STATUS", "V. SUMMARY OF UNWORKABLE DAYS", "VI. STATUS OF SUBMISSION",
             "VII. ISSUES / CONCERNS", "VIII. RECOMMENDATIONS").forEach { assertTrue(it, html.contains(it)) }
