@@ -664,6 +664,8 @@ function drawProject(page) {
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  const billingAdd = document.getElementById('billing-add');
+  if (billingAdd) billingAdd.onclick = () => addBillingForm(c);
   const editWx = main.querySelector('[data-edit-weather]');
   if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
   if (document.getElementById('audit-results')) bindAudit(c);
@@ -1428,6 +1430,90 @@ async function addIssue(c, f) {
   await batch.commit();
 }
 
+/**
+ * AddPaymentDialog for a new billing: the same fields, choices and checks, a live gross / retention / net, and Save
+ * writes the billing with its share and balance and the app's audit entry in one batch.
+ * shortcut: no DV scan upload yet (the bucket's CORS allows only downloads); attach it on the phone.
+ */
+function addBillingForm(c) {
+  const housing = /housing/i.test(c.project.projectType || '');
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  d.innerHTML = `<form novalidate>
+    <h2>Add billing / disbursement voucher</h2>
+    <label class="field">Billing name<input name="name" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
+    <label class="field">DV No. (Disbursement Voucher)<input name="dvNo" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
+    <label class="field">Date<input type="date" name="date" value="${esc(today())}" required></label>
+    <label class="field">Period covered<input name="periodCovered" value="${esc(L.monthPeriod(today()))}" autocomplete="off"></label>
+    ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${L.HOUSING_BILLING_TYPES.map(t => opt(t)).join('')}</select></label>` : ''}
+    <label class="field" data-by-unit style="display:none">Number of lots<input name="units" inputmode="numeric" autocomplete="off"></label>
+    <label class="field" data-by-unit style="display:none">Amount per lot (PHP)<input name="unitPrice" inputmode="decimal" autocomplete="off"></label>
+    <label class="field" data-gross>Gross amount (PHP)<input name="grossAmount" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
+    <label class="field">Retention<select name="retentionPct">${L.RETENTIONS.map(r => opt(String(r), r ? `${r}%` : 'None')).join('')}</select></label>
+    <div class="billing-preview" aria-live="polite"></div>
+    <p class="muted small">Attach the scanned DV on the phone after saving.</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save billing</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => ({ billingType: '', ...Object.fromEntries(new FormData(form)) });
+  // Picking a housing type starts its amount from the latest billing of that type.
+  const lastPrice = type => [...c.payments].reverse().find(p => p.billingType === type && Number(p.unitPrice) > 0)?.unitPrice;
+  const onType = () => {
+    const type = values().billingType, unit = L.billingUnitName(type);
+    // .field sets its own display, so the hidden attribute would not hide it.
+    const [units, price] = d.querySelectorAll('[data-by-unit]');
+    for (const el of [units, price]) el.style.display = type ? '' : 'none';
+    d.querySelector('[data-gross]').style.display = type ? 'none' : '';
+    units.firstChild.textContent = `Number of ${unit}s`;
+    price.firstChild.textContent = `Amount per ${unit} (PHP)`;
+    const last = lastPrice(type);
+    form.unitPrice.value = last ? Number(last).toFixed(2) : '';
+  };
+  const preview = () => {
+    const f = values(), gross = L.billingGross(f), r = Number(f.retentionPct) || 0;
+    d.querySelector('.billing-preview').innerHTML = gross > 0
+      ? `${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${kv('Net amount', L.formatPhp(gross * (1 - r / 100)))}` : '';
+  };
+  if (housing) form.billingType.onchange = () => { onType(); preview(); };
+  form.oninput = preview;
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new billing?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.billingErrors(f);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await addBilling(c, f);
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/** ProjectViewModel.addProjectPayment: the billing and its audit entry in one batch, against the billings shown now. */
+async function addBilling(c, f) {
+  const uid = s.user.uid, now = Date.now();
+  const project = await getDoc(doc(db, 'projects', c.page.id));
+  const assignedUids = project.get('assignedUids') ?? [];
+  const payment = L.newPaymentRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now }, f, c.payments, c.cost);
+  const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...L.newPaymentAudit(payment) });
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'records', payment.uuid), payment);
+  batch.set(doc(db, 'records', audit.uuid), audit);
+  await batch.commit();
+}
+
 /** PhotoGalleryTab: one album per reporting week, in report order. */
 function photosView({ weekly }) {
   const albums = weekly.map(r => [r, L.attachmentList(r.attachedPhotoUrlsJson)]).filter(([, p]) => p.length);
@@ -1446,7 +1532,8 @@ function paymentsBody({ project, payments, cost, billed }) {
     ${kv('Current contract cost', L.formatPhp(cost))}
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
     ${kv('Balance', L.formatPhp(cost - billed))}
-    <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>`);
+    <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>
+    ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = Number(p.units) || 0;
