@@ -426,7 +426,8 @@ function itemOf(project) {
   const p = L.withSchedule(project, docs, today());
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
-  return { p, docs, billed, cost, flags: L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], L.latestReportDay(s.weekly.get(p.projectUuid) || [])), waiting: L.waitingApproval(docs) };
+  const lastUpdate = L.latestReportDay(s.weekly.get(p.projectUuid) || []);
+  return { p, docs, billed, cost, lastUpdate, flags: L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate), waiting: L.waitingApproval(docs) };
 }
 
 /** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. */
@@ -571,6 +572,7 @@ function tile(it) {
     <div class="meta">
       <span>${icon('event', 'sm')}Completion ${esc(completion)}</span>
       ${it.waiting ? `<span class="badge lv-watch">${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
+      <span>${icon('update', 'sm')}${it.lastUpdate ? `Field update ${esc(L.displayDate(it.lastUpdate))}` : 'No field update yet'}</span>
     </div>
   </a></li>`;
 }
