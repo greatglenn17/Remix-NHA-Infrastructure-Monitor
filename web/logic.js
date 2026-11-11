@@ -919,6 +919,17 @@ export function letterErrors(f) {
   ].filter(Boolean);
 }
 
+/** A new contractor_letters record as RecordSync uploads one: the ContractorLetter row without its local ids, no attachments yet. */
+export function newLetterRecord({ uuid, projectUuid, assignedUids, uid, now }, f) {
+  return {
+    uuid, type: 'contractor_letters', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+    data: JSON.stringify({
+      dateSent: f.dateSent, subject: f.subject, actionTaken: f.actionTaken, dateReplied: f.dateReplied, replyFileUrl: '',
+      dateReceived: f.dateReceived, receivedFileUrl: '',
+    }),
+  };
+}
+
 /** ProjectViewModel.saveContractorLetter's audit entry, word for word. */
 export const letterAudit = f => ({
   actionType: 'Letter to Contractor', details: `Letter of ${f.dateSent}: ${f.subject}${f.dateReplied ? `, replied ${f.dateReplied}` : ''}`,
