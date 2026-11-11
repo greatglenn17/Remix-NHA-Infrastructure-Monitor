@@ -268,6 +268,34 @@ test('website edits: a new issue is the record and audit entry the app uploads',
     newValue: `Description: ${f.description}, Status: Pending, Critical: true` });
 });
 
+test('website edits: a new billing is the record the app uploads, with share and balance on the gross', () => {
+  const ctx = { uuid: 'b1', projectUuid: 'p', assignedUids: ['me'], uid: 'me', now: 7 };
+  // A 10,000,000 contract with 500,000 already billed (gross); this billing is 1,500,000 gross.
+  const earlier = [{ grossAmount: 100000 }, { grossAmount: '400000' }];
+  const f = { name: ' 3rd Progress Billing ', dvNo: 'DV-1', date: '2026-11-10', periodCovered: 'November 1 - 30, 2026', billingType: '', grossAmount: '1,500,000', units: '', unitPrice: '', retentionPct: '10' };
+  const r = L.newPaymentRecord(ctx, f, earlier, 10_000_000);
+  assert.deepEqual({ ...r, data: undefined }, { uuid: 'b1', type: 'project_payments', projectUuid: 'p', assignedUids: ['me'], revision: 1, updatedAt: 7, updatedByUid: 'me', isDeleted: false, data: undefined });
+  assert.deepEqual(JSON.parse(r.data), { name: '3rd Progress Billing', dvNo: 'DV-1', date: '2026-11-10', periodCovered: 'November 1 - 30, 2026', grossAmount: 1500000,
+    percentage: 15, balanceAmount: 8000000, balancePercentage: 80, fileUrl: '', billingType: '', units: 0, unitPrice: 0, retentionPct: 10 });
+  assert.deepEqual(L.newPaymentAudit(r), { actionType: 'Payment Creation', details: 'Created payment billing: 3rd Progress Billing (DV-1)', oldValue: '',
+    newValue: 'Billing: 3rd Progress Billing, DV: DV-1, Gross: ₱1500000, Retention: 10%' });
+  // A housing billing: units × amount per unit, named after its type when the name is blank.
+  const unit = { ...f, name: '', billingType: 'M1 - Housing unit', units: '5', unitPrice: '800,000.00', grossAmount: '' };
+  assert.equal(L.billingGross(unit), 4000000);
+  assert.deepEqual(L.billingErrors(unit), []);
+  const d = JSON.parse(L.newPaymentRecord(ctx, unit, [], 0).data);
+  assert.deepEqual([d.name, d.units, d.unitPrice, d.percentage, d.balanceAmount, d.balancePercentage], ['M1 - Housing unit', 5, 800000, 0, -4000000, 0]);
+  // Checks, as the phone's form gives them.
+  assert.deepEqual(L.billingErrors({ ...f, grossAmount: '' }), ['Type the gross amount.']);
+  assert.deepEqual(L.billingErrors({ ...f, grossAmount: '12a', date: '' }), ['Pick the date.', 'The gross amount must be a number.']);
+  assert.deepEqual(L.billingErrors({ ...unit, units: '2.5', unitPrice: '' }), ['The number must be a whole number.', 'Type the amount per housing unit.']);
+  assert.deepEqual(L.billingErrors({ ...unit, billingType: 'Land development', units: '' }), ['Type the number of lots.']);
+  assert.equal(L.parseAmount(' 1,234.5 '), 1234.5);
+  assert.equal(L.parseAmount('-5'), null);
+  assert.equal(L.monthPeriod('2026-02-14'), 'February 1 - 28, 2026');
+  assert.equal(L.monthPeriod('2026-11-11'), 'November 1 - 30, 2026');
+});
+
 test('weather edit: the form reads a report\'s week, and only changed days are rewritten', () => {
   const report = { reportingWeek: 'November 01, 2026 - November 07, 2026', _weather: [
     { date: '2026-11-01', dayOfWeek: 'Sunday', hourlyConditionsCsv: Array(24).fill('CLOUDY').join(',') },

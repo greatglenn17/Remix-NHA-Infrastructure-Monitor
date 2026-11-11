@@ -884,6 +884,62 @@ export function issueErrors(f) {
   ].filter(Boolean);
 }
 
+/** FormValidation.parseAmount: digits with an optional decimal part; commas and spaces are ignored. */
+export function parseAmount(text) {
+  const t = String(text ?? '').replace(/[, ]/g, '');
+  return /^(\d+(\.\d*)?|\.\d+)$/.test(t) ? Number(t) : null;
+}
+
+/** AddPaymentDialog's retention choices. */
+export const RETENTIONS = [0, 5, 10];
+
+/** PaymentDialogs.currentMonthPeriod: "November 1 - 30, 2026" for a yyyy-MM-dd day. */
+export function monthPeriod(day) {
+  const [y, m] = day.split('-').map(Number);
+  const month = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  return `${month} 1 - ${new Date(Date.UTC(y, m, 0)).getUTCDate()}, ${y}`;
+}
+
+/** AddPaymentDialog's gross: units × amount per lot or unit for a housing billing type, else the gross typed. */
+export const billingGross = f => (f.billingType ? (Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) : parseAmount(f.grossAmount) ?? 0);
+
+/** AddPaymentDialog's checks (FormValidation.amountError), plus a valid date. */
+export function billingErrors(f) {
+  const byUnit = Boolean(f.billingType);
+  const units = String(f.units ?? '').trim();
+  return [
+    !/^\d{4}-\d{2}-\d{2}$/.test(f.date || '') && 'Pick the date.',
+    !byUnit && (!String(f.grossAmount ?? '').trim() ? 'Type the gross amount.' : parseAmount(f.grossAmount) == null && 'The gross amount must be a number.'),
+    byUnit && (!units ? `Type the number of ${billingUnitName(f.billingType)}s.` : !/^\d+$/.test(units) || Number(units) < 1 ? 'The number must be a whole number.' : false),
+    byUnit && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
+  ].filter(Boolean);
+}
+
+/**
+ * A new project_payments record as RecordSync uploads one: the ProjectPayment row without its local ids. Share and
+ * balance are on the gross, with the contract cost of today and every billing before it (MoneySection's onSubmit).
+ */
+export function newPaymentRecord({ uuid, projectUuid, assignedUids, uid, now }, f, payments, cost) {
+  const byUnit = Boolean(f.billingType), grossAmount = billingGross(f);
+  const balanceAmount = cost - (payments.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0) + grossAmount);
+  return {
+    uuid, type: 'project_payments', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+    data: JSON.stringify({
+      name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount,
+      percentage: cost > 0 ? grossAmount / cost * 100 : 0, balanceAmount, balancePercentage: cost > 0 ? balanceAmount / cost * 100 : 0,
+      fileUrl: '', billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: byUnit ? parseAmount(f.unitPrice) : 0,
+      retentionPct: Number(f.retentionPct) || 0,
+    }),
+  };
+}
+
+/** ProjectViewModel.addProjectPayment's audit entry (amounts written plainly, not in Kotlin's 1.5E7 form). */
+export function newPaymentAudit(record) {
+  const p = JSON.parse(record.data);
+  return { actionType: 'Payment Creation', details: `Created payment billing: ${p.name} (${p.dvNo})`, oldValue: '',
+    newValue: `Billing: ${p.name}, DV: ${p.dvNo}, Gross: ₱${p.grossAmount}, Retention: ${p.retentionPct}%` };
+}
+
 /* ---------- Sign up (LoginScreen in sign-up mode, ProjectViewModel.authenticateWithFirebase) ---------- */
 
 /** AuthManager.personName: "Juan C. Dela Cruz" from its parts; the middle initial is optional and gets its dot. */

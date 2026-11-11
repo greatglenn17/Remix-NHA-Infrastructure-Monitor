@@ -1,7 +1,7 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit) and a weekly report's
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding a billing (Payments → Add billing) and a weekly report's
 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
@@ -18,6 +18,10 @@ is read only.
 - **Profile** (in the header) is the app's "Update Profile & Position": full name, position and office, all required.
   It updates only those fields of your existing `users/{uid}` profile (an account without one sets it up in the app
   first); printed forms here use the new values at once, and phones pick them up when they next sync the profile.
+- **Add billing** is the app's Add Billing / Disbursement Voucher form: name, DV No., date, period covered, what a housing
+  project bills for (units × amount per lot or unit, the amount filled in from the latest billing of that type) or the gross,
+  and retention. Share and balance are saved from the gross with the current contract cost, as the app saves them, with the
+  app's "Payment Creation" audit entry. The scanned DV is attached on the phone for now: the bucket's CORS allows downloads only.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.

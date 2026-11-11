@@ -7,6 +7,7 @@ import com.example.data.local.RecordSyncSchema
 import com.example.data.model.Project
 import com.example.data.model.ProjectIssue
 import com.example.data.remote.RecordSync
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -149,6 +150,39 @@ class WebEditSyncTest {
         assertEquals("Engr. Web", string("SELECT loggedBy FROM project_issues WHERE uuid = ?", uuid))
         assertEquals(1L, long("SELECT isCritical FROM project_issues WHERE uuid = ?", uuid))
         assertEquals("Contractor/Developer", string("SELECT actionBy FROM project_issues WHERE uuid = ?", uuid))
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
+
+    /** web/logic.js newPaymentRecord: a new housing billing, with JSON's whole numbers (2400000, not 2400000.0). */
+    @Test
+    fun websiteNewBilling_isAddedToTheProject() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val uuid = "9b2e7c41-5d3a-4f6e-8a1b-2c3d4e5f6a7b"
+        val billing = mapOf(
+            "uuid" to uuid, "type" to "project_payments", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to 1L, "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to """{"name":"3rd partial billing","dvNo":"DV-2026-11-0007","date":"2026-11-11","periodCovered":"November 1 - 30, 2026",""" +
+                """"grossAmount":2400000,"percentage":4.660194174757281,"balanceAmount":35100000,"balancePercentage":68.15533980582524,""" +
+                """"fileUrl":"","billingType":"M1 - Housing unit","units":3,"unitPrice":800000,"retentionPct":10}"""
+        )
+
+        recordSync.applyRemote(listOf(billing))
+
+        val saved = db.projectDao().getProjectPaymentsForProject(projectId).first().single()
+        assertEquals("3rd partial billing", saved.name)
+        assertEquals(2_400_000.0, saved.grossAmount, 0.0)
+        assertEquals(35_100_000.0, saved.balanceAmount, 0.0)
+        assertEquals(3, saved.units)
+        assertEquals(800_000.0, saved.unitPrice, 0.0)
+        assertEquals(10.0, saved.retentionPct, 0.0)
+        assertEquals(2_160_000.0, saved.grossAmount * (1 - saved.retentionPct / 100), 1e-6)
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
 }
