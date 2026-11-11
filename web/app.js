@@ -666,6 +666,7 @@ function drawProject(page) {
   if (document.getElementById('issue-results')) bindIssues(c);
   const billingAdd = document.getElementById('billing-add');
   if (billingAdd) billingAdd.onclick = () => addBillingForm(c);
+  main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
   const editWx = main.querySelector('[data-edit-weather]');
   if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
   if (document.getElementById('audit-results')) bindAudit(c);
@@ -1299,6 +1300,57 @@ function editIssue(c, issue) {
 }
 
 /**
+ * DeveloperRequestDialog for a request already logged: type, details and dates, including the date packaged.
+ * shortcut: no new requests here (the phone also files the order in Documents) and no letter upload (download-only CORS).
+ */
+function editRequest(c, r) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const type = r.requestType || L.REQUEST_TYPES[0];
+  const types = L.REQUEST_TYPES.includes(type) ? L.REQUEST_TYPES : [type, ...L.REQUEST_TYPES];
+  d.innerHTML = `<form novalidate>
+    <h2>Developer request</h2>
+    <label class="field">Request for<select name="requestType">${types.map(v => `<option${v === type ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+    <label class="field">Details (letter no., reason)<input name="details" value="${esc(r.details || '')}"></label>
+    <label class="field">Date of developer's request<input type="date" name="dateRequested" value="${esc(r.dateRequested || '')}"></label>
+    <label class="field">Date received by NHA<input type="date" name="dateReceived" value="${esc(r.dateReceived || '')}" required></label>
+    <label class="field">Date packaged (blank: not yet)<input type="date" name="datePackaged" value="${esc(r.datePackaged || '')}"></label>
+    ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => {
+    const f = Object.fromEntries(new FormData(form));
+    return { requestType: f.requestType, details: f.details.trim(), dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged };
+  };
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this request?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  const packedToday = d.querySelector('[data-today]');
+  if (packedToday) packedToday.onclick = () => { form.datePackaged.value = today(); };
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.requestErrors(f);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await saveEdit(c, r, f, 'request', L.requestAudit(f));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
  * Writes a record edit (`changes` merged into its data) and its audit log entry in one transaction, the way RecordSync
  * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
  * since the form opened. `noun` names the record in those messages.
@@ -1568,7 +1620,7 @@ function documentsBody(c, chip) {
     return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(vo => entry(vo.documentName, L.variationLines(vo), vo.fileUrl ? fileLink(vo.fileUrl, 'Attached copy') : '')).join(''), 'No variation orders recorded.');
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents));
-  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now);
+  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, L.canEdit(c.project, s.user.uid, s.claims));
   if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents));
   const suspensions = documents.filter(L.isSuspension);
   const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
@@ -1593,15 +1645,17 @@ function lettersCard(letters) {
   }).join('')));
 }
 
-/** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them. */
-function requestsCard(requests, now) {
+/** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Edit. */
+function requestsCard(requests, now, editable = false) {
   return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
     return entry(r.requestType || '-', [
       `Requested: ${r.dateRequested || '-'}  ·  Received: ${r.dateReceived || '-'}`,
       r.datePackaged ? `Packaged: ${r.datePackaged}` : `NOT YET PACKAGED${waiting == null ? '' : ` · ${waiting} days since received`}`,
       r.details,
-    ], r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '', r.datePackaged ? '' : 'waiting');
+    ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
+      + (editable ? `<button class="text-btn entry-edit" data-edit-request="${esc(r.uuid)}">${icon('edit', 'sm')}${r.datePackaged ? 'Edit' : 'Edit or mark packaged'}</button>` : ''),
+    r.datePackaged ? '' : 'waiting');
   }).join('') : emptyLine('No requests from the developer.'));
 }
 

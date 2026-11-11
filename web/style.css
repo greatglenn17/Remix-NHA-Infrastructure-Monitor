@@ -460,7 +460,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .entry b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .entry span { color: var(--text-2); overflow-wrap: anywhere; }
 .entry .badge { justify-self: start; margin-top: 4px; }
-.entry .file { justify-self: start; }
+.entry .file, .entry .entry-edit { justify-self: start; }
 .entry.nested { margin-left: 24px; }
 .entry.waiting > b { color: var(--watch); }
 .n-watch { color: var(--watch); }
@@ -636,6 +636,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .edit-form { width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow-y: auto; }
 .edit-form form { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 14px; margin: 0; }
 .edit-form h2 { margin: 0; }
+.edit-form [data-today] { justify-self: start; margin-top: -8px; }
 .field textarea, .field select { font: 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }
 .field textarea:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; cursor: pointer; }

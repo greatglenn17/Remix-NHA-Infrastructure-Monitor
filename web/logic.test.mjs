@@ -324,3 +324,14 @@ test('weather presets match the app\'s (Reports.kt WEATHER_PRESETS)', () => {
   const [, rs] = L.WEATHER_PRESETS[4];
   assert.deepEqual([rs[0], rs[11], rs[12], rs[23]], ['RAINY', 'RAINY', 'STORMY', 'STORMY']);
 });
+
+test('developer request edits: checks and the app audit entry', () => {
+  assert.deepEqual(L.requestErrors({ dateReceived: '' }), ['Pick the date received by NHA.']);
+  assert.deepEqual(L.requestErrors({ dateReceived: '2026-11-01', dateRequested: '', datePackaged: '' }), []);
+  assert.deepEqual(L.requestErrors({ dateReceived: '2026-11-01', datePackaged: 'soon' }), ['Pick a valid date packaged.']);
+  const f = { requestType: 'Time Extension', details: 'Letter 12', dateReceived: '2026-11-01', datePackaged: '' };
+  assert.equal(L.requestAudit(f).details, 'Time Extension request received 2026-11-01');
+  assert.deepEqual(L.requestAudit({ ...f, datePackaged: '2026-11-12' }), {
+    actionType: 'Developer Request', details: 'Time Extension request received 2026-11-01, packaged 2026-11-12', oldValue: '', newValue: 'Letter 12',
+  });
+});

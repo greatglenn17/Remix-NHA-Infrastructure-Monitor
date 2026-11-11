@@ -1,8 +1,8 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding a billing (Payments → Add billing) and a weekly report's
-24-hour weather (Progress → Weather → Edit weather),
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding a billing (Payments → Add billing), editing a developer request
+(Documents → Developer Requests → Edit) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -22,6 +22,9 @@ is read only.
   project bills for (units × amount per lot or unit, the amount filled in from the latest billing of that type) or the gross,
   and retention. Share and balance are saved from the gross with the current contract cost, as the app saves them, with the
   app's "Payment Creation" audit entry. The scanned DV is attached on the phone for now: the bucket's CORS allows downloads only.
+- **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
+  the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
+  entry. New requests are still added on the phone, since that also files the order in Documents.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.
@@ -125,4 +128,5 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing anything other than issues.
+Adding developer requests, weekly reports and orders; editing billings and lots; uploading files (the bucket's CORS
+allows downloads only).
