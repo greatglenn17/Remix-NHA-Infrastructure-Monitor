@@ -945,20 +945,47 @@ export function billingErrors(f) {
   ].filter(Boolean);
 }
 
+/** What AddPaymentDialog's form sets on a billing; share, balance and the scanned DV are not among them. */
+function billingFields(f) {
+  const byUnit = Boolean(f.billingType);
+  return {
+    name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount: billingGross(f),
+    billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: byUnit ? parseAmount(f.unitPrice) : 0,
+    retentionPct: Number(f.retentionPct) || 0,
+  };
+}
+
+/**
+ * MoneySection.editedBillings: the [billing, changes] pairs to save when `old` is edited with the form `f`. A changed
+ * gross recomputes its share and moves its own and every later balance by the difference; earlier billings stay.
+ * shortcut: "later" is the order shown here (by date), not the phone's order added; the same unless one was back-dated.
+ */
+export function editedBillings(payments, old, f, cost) {
+  const fields = billingFields(f), delta = fields.grossAmount - (Number(old.grossAmount) || 0);
+  if (delta === 0) return [[old, fields]];
+  const share = amount => (cost > 0 ? amount / cost * 100 : 0);
+  const shift = p => ({ balanceAmount: (Number(p.balanceAmount) || 0) - delta, balancePercentage: (Number(p.balancePercentage) || 0) - share(delta) });
+  const later = payments.slice(payments.findIndex(p => p.uuid === old.uuid) + 1);
+  return [[old, { ...fields, ...shift(old), percentage: share(fields.grossAmount) }], ...later.map(p => [p, shift(p)])];
+}
+
+/** ProjectViewModel.updateProjectPayment's audit entry, for a billing as it will be saved. */
+export const editedPaymentAudit = p => ({
+  actionType: 'Payment Creation', details: `Updated billing: ${p.name}`, oldValue: 'Previous payment info', newValue: `DV: ${p.dvNo}, Gross: ₱${p.grossAmount}`,
+});
+
 /**
  * A new project_payments record as RecordSync uploads one: the ProjectPayment row without its local ids. Share and
  * balance are on the gross, with the contract cost of today and every billing before it (MoneySection's onSubmit).
  */
 export function newPaymentRecord({ uuid, projectUuid, assignedUids, uid, now }, f, payments, cost) {
-  const byUnit = Boolean(f.billingType), grossAmount = billingGross(f);
+  const grossAmount = billingGross(f);
   const balanceAmount = cost - (payments.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0) + grossAmount);
   return {
     uuid, type: 'project_payments', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
     data: JSON.stringify({
-      name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount,
-      percentage: cost > 0 ? grossAmount / cost * 100 : 0, balanceAmount, balancePercentage: cost > 0 ? balanceAmount / cost * 100 : 0,
-      fileUrl: '', billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: byUnit ? parseAmount(f.unitPrice) : 0,
-      retentionPct: Number(f.retentionPct) || 0,
+      ...billingFields(f), percentage: cost > 0 ? grossAmount / cost * 100 : 0, balanceAmount,
+      balancePercentage: cost > 0 ? balanceAmount / cost * 100 : 0, fileUrl: '',
     }),
   };
 }

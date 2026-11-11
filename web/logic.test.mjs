@@ -347,3 +347,18 @@ test('developer request title: a number in the details becomes the order number'
   assert.equal(t('Variation Order', '1.1'), 'Variation Order');
   assert.equal(t('Variation Order', ''), 'Variation Order');
 });
+
+test('editing a billing: fields only, or a changed gross that moves its own and later balances', () => {
+  const cost = 1000, pay = (uuid, grossAmount, balanceAmount) => ({ uuid, name: uuid, dvNo: 'DV', grossAmount, percentage: grossAmount / 10, balanceAmount, balancePercentage: balanceAmount / 10, fileUrl: 'scan' });
+  const payments = [pay('a', 100, 900), pay('b', 200, 700), pay('c', 300, 400)];
+  const form = { name: ' B fixed ', dvNo: ' DV-2 ', date: '2026-11-12', periodCovered: 'Nov', billingType: '', grossAmount: '200', retentionPct: '10' };
+  const same = L.editedBillings(payments, payments[1], form, cost);
+  assert.equal(same.length, 1);
+  assert.deepEqual(same[0][1], { name: 'B fixed', dvNo: 'DV-2', date: '2026-11-12', periodCovered: 'Nov', grossAmount: 200, billingType: '', units: 0, unitPrice: 0, retentionPct: 10 });
+  const moved = L.editedBillings(payments, payments[1], { ...form, grossAmount: '250' }, cost);
+  assert.deepEqual(moved.map(([p]) => p.uuid), ['b', 'c']);
+  assert.deepEqual([moved[0][1].grossAmount, moved[0][1].percentage, moved[0][1].balanceAmount, moved[0][1].balancePercentage], [250, 25, 650, 65]);
+  assert.deepEqual(moved[1][1], { balanceAmount: 350, balancePercentage: 35 });
+  assert.deepEqual(L.editedPaymentAudit({ name: 'B fixed', dvNo: 'DV-2', grossAmount: 250 }),
+    { actionType: 'Payment Creation', details: 'Updated billing: B fixed', oldValue: 'Previous payment info', newValue: 'DV: DV-2, Gross: ₱250' });
+});
