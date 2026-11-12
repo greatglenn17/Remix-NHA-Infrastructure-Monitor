@@ -659,6 +659,61 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   assert.deepEqual(report.projectFields, { targetAccomplishment: data.targetAccomplishmentPct, actualAccomplishment: 30 });
   assert.deepEqual(report.audit, { actionType: 'Report Creation', details: 'Submitted Weekly Report for Feb 14, 2026 - Feb 20, 2026',
     newValue: `Week: Feb 14, 2026 - Feb 20, 2026, Target: ${data.targetAccomplishmentPct}%, Actual: 30%` });
+  // A report for a later week is already saved: this late entry leaves the project's figures alone.
+  assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }]).projectFields, null);
+  assert.notEqual(L.newWeeklyReport(f, project, 'x', [{ uuid: 'older', reportingWeek: 'Week 6: February 7 - February 13, 2026' }]).projectFields, null);
   // No dates on the project: day counts are 0, as on the phone.
   assert.deepEqual((({ daysElapsed, remainingDays }) => [daysElapsed, remainingDays])(JSON.parse(L.newWeeklyReport(f, {}, 'x').build({}).data)), [0, 0]);
+});
+
+test('weekly report edit: the form starts from the saved report, keeps what it does not show, and deletes like the phone', () => {
+  const project = { dateStarted: '2026-01-01', completionDateOriginal: '2026-12-31', scopeOfWork: JSON.stringify([{ name: 'Land development', amount: 1, weightPct: 70 }, { name: 'Housing units', amount: 1, weightPct: 30 }]) };
+  const fair = Array(24).fill('FAIR').join(',');
+  const report = {
+    uuid: 'r1', reportingWeek: 'Week 7: February 14 - February 20, 2026', daysElapsed: 51, remainingDays: 314, targetAccomplishmentPct: 20, actualAccomplishmentPct: 15,
+    manpowerJson: JSON.stringify([{ designation: 'Foreman', count: 2, remarks: 'night shift' }]),
+    equipmentJson: JSON.stringify([{ description: 'Crane', count: 1, status: 'On standby', remarks: 'rented' }]),
+    activitiesJson: JSON.stringify([{ day: 'Monday - Wednesday', description: 'Excavation', remarks: 'ok' }, { day: 'Whole week', description: 'Hauling' }]),
+    issuesJson: JSON.stringify([{ description: 'Rain', actionTaken: 'Moved', remarks: 'see log', actionBy: 'Contractor/Developer' }]),
+    accomplishmentItemsJson: JSON.stringify([{ itemDescription: 'Land development', weightPct: 70, targetPct: 20, actualPct: 15.5 }, { itemDescription: 'Housing units', weightPct: 30, targetPct: 20, actualPct: 10 }]),
+    attachedPhotoUrlsJson: '["nhafile:p/a.jpg"]', submittedByStaff: 'Engr. Phone',
+    _weather: ['2026-02-14', '2026-02-15', '2026-02-20'].map(date => ({ date, dayOfWeek: 'x', hourlyConditionsCsv: fair })),
+  };
+  const start = L.weeklyStart(report);
+  assert.equal(start.first, '2026-02-14');
+  assert.deepEqual(start.lines, [{ target: '0.00', actual: '0.00' }, { target: '20.00', actual: '15.50' }, { target: '20.00', actual: '10.00' }]);
+  assert.deepEqual(start.manpower, [{ designation: 'Foreman', count: 2, remarks: 'night shift' }]);
+  assert.deepEqual(start.activities, [{ from: 'Monday', to: 'Wednesday', description: 'Excavation', remarks: 'ok' }, { from: 'Whole week', to: '', description: 'Hauling', remarks: '' }]);
+  assert.equal(start.equipment[0].status, 'On standby');
+
+  // Saved as opened, with one actual changed: the older label, the hidden remarks and the odd day and status all stay.
+  const lines = L.weeklyLines(project, [], '2026-02-20').map((l, k) => ({ name: l.name, weightPct: l.weightPct, ...start.lines[k] }));
+  const f = { first: start.first, lines: lines.map((l, k) => (k === 1 ? { ...l, actual: '25' } : l)), manpower: start.manpower, equipment: start.equipment, activities: start.activities, issues: start.issues };
+  const edit = L.editedWeeklyReport(report, f, project);
+  assert.equal(edit.changes.reportingWeek, 'Week 7: February 14 - February 20, 2026');
+  assert.equal('_weather' in edit.changes, false);
+  assert.equal('attachedPhotoUrlsJson' in edit.changes || 'submittedByStaff' in edit.changes || 'createdAtTimestamp' in edit.changes, false);
+  assert.deepEqual([edit.changes.daysElapsed, edit.changes.remainingDays, edit.changes.targetAccomplishmentPct, edit.changes.actualAccomplishmentPct], [51, 314, 20, 20.5]);
+  assert.deepEqual(JSON.parse(edit.changes.manpowerJson), [{ designation: 'Foreman', count: 2, remarks: 'night shift' }]);
+  assert.deepEqual(JSON.parse(edit.changes.equipmentJson), [{ description: 'Crane', count: 1, status: 'On standby', remarks: 'rented' }]);
+  assert.deepEqual(JSON.parse(edit.changes.activitiesJson).map(a => a.day), ['Monday - Wednesday', 'Whole week']);
+  assert.deepEqual(JSON.parse(edit.changes.issuesJson), [{ description: 'Rain', actionTaken: 'Moved', remarks: 'see log', actionBy: 'Contractor/Developer' }]);
+  assert.deepEqual(edit.projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5 });
+  assert.deepEqual(edit.audit, { actionType: 'Edited Weekly Report', details: 'Modified report for Week 7: February 14 - February 20, 2026' });
+
+  // A day later: the label is rewritten, the day counts move, and weather outside the new week is dropped.
+  const moved = L.editedWeeklyReport(report, { ...f, first: '2026-02-15' }, project);
+  assert.equal(moved.changes.reportingWeek, 'Feb 15, 2026 - Feb 21, 2026');
+  assert.deepEqual([moved.changes.daysElapsed, moved.changes.remainingDays], [52, 313]);
+  assert.deepEqual(moved.changes._weather.map(w => w.date), ['2026-02-15', '2026-02-20']);
+  assert.equal(moved.audit.details, 'Modified report for Feb 15, 2026 - Feb 21, 2026');
+
+  // The project follows the edit only while no other report is for a later week; the report itself does not count.
+  const others = [report, { uuid: 'r2', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }];
+  assert.equal(L.editedWeeklyReport(report, f, project, others).projectFields, null);
+  assert.deepEqual(L.editedWeeklyReport(report, f, project, [report]).projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5 });
+  assert.notEqual(L.editedWeeklyReport(report, { ...f, first: '2026-02-28' }, project, others).projectFields, null);
+
+  assert.deepEqual(L.deletedWeeklyAudit(report), { actionType: 'Deleted Weekly Report', details: 'Deleted report for Week 7: February 14 - February 20, 2026' });
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'].map(role => L.canDeleteReport({ role })), [true, true, false, false]);
 });

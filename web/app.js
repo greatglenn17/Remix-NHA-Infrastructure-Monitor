@@ -665,7 +665,8 @@ function drawProject(page) {
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   const weeklyAdd = document.getElementById('weekly-add');
-  if (weeklyAdd) weeklyAdd.onclick = () => addWeekly(c);
+  if (weeklyAdd) weeklyAdd.onclick = () => weeklyForm(c);
+  main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
   const billingAdd = document.getElementById('billing-add');
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
   // The saved billing, not the card's net one: an edit starts from what is stored.
@@ -835,7 +836,8 @@ function reportCard(r, all, pid, editable = false) {
   return `<article class="card report">
     <div class="rep-head">
       <div><h3>${esc(r.reportingWeek)}</h3><p class="muted">${esc(r.submittedByStaff || '-')} · Day ${esc(r.daysElapsed ?? 0)}, ${esc(r.remainingDays ?? 0)} days left</p></div>
-      <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a>
+      <div class="rep-actions">${editable ? `<button class="text-btn" data-edit-weekly="${esc(r.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
+        <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
     <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
       <span class="muted">Target ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
@@ -1909,47 +1911,53 @@ function editPhotos(c, report) {
 }
 
 /**
- * AddWeeklyReportDialog's Week, Crew and Work steps as one form. The report's photos and 24-hour weather are added
- * from the saved report (Add photos, Edit weather). With an approved bar chart the targets are its plan for the week's
- * last day; they follow the week picked.
+ * AddWeeklyReportDialog's Week, Crew and Work steps as one form, for a new report or a saved one (`report`). The
+ * report's photos and 24-hour weather are changed on the saved report (Add photos, Edit weather). With an approved bar
+ * chart the targets are its plan for the week's last day; they follow the week picked.
  */
-function addWeekly(c) {
+function weeklyForm(c, report = null) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
-  const opt = (v, label = v) => `<option value="${esc(v)}">${esc(label)}</option>`;
-  const days = L.ACTIVITY_DAYS.map(v => opt(v)).join('');
-  const count = n => `<label class="field n">No.<input data-f="count" type="number" min="0" step="1" value="${n}"></label>`;
+  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: [], equipment: [], activities: [{}], issues: [],
+    manpower: L.MANPOWER_START.map(designation => ({ designation, count: 0 })) };
+  const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  // A saved value outside the list stays a choice, so opening and saving does not change it.
+  const pick = (choices, cur = '') => (cur && !choices.includes(cur) ? [cur, ...choices] : choices).map(v => opt(v, v, cur)).join('');
+  const text = (r, key) => esc(r[key] || '');
+  const count = r => `<label class="field n">No.<input data-f="count" type="number" min="0" step="1" value="${esc(r.count ?? 1)}"></label>`;
+  // Remarks the form has no box for ride along, so an edit keeps them.
+  const kept = r => `<input type="hidden" data-f="remarks" value="${text(r, 'remarks')}">`;
   const rowOf = {
-    manpower: (name = '', n = 1) => `<label class="field">Designation<input data-f="designation" list="wk-designations" value="${esc(name)}"></label>${count(n)}`,
-    equipment: () => `<label class="field">Name of equipment<input data-f="description" list="wk-equipment"></label>${count(1)}
-      <label class="field">Status<select data-f="status">${L.EQUIPMENT_STATUSES.map(v => opt(v)).join('')}</select></label>`,
-    activities: () => `<label class="field">From<select data-f="from">${days}</select></label>
-      <label class="field">To (optional)<select data-f="to">${opt('', 'Same day')}${days}</select></label>
-      <label class="field full">Activity<textarea data-f="description" rows="2"></textarea></label>
-      <label class="field full">Remarks (optional)<input data-f="remarks"></label>`,
-    issues: () => `<label class="field full">Issue encountered<textarea data-f="description" rows="2"></textarea></label>
-      <label class="field full">Action taken<textarea data-f="actionTaken" rows="2"></textarea></label>
-      <label class="field">Action taken by<select data-f="actionBy">${opt('', 'Not set')}${L.ISSUE_ACTION_BY.map(v => opt(v)).join('')}</select></label>`,
+    manpower: r => `<label class="field">Designation<input data-f="designation" list="wk-designations" value="${text(r, 'designation')}"></label>${count(r)}${kept(r)}`,
+    equipment: r => `<label class="field">Name of equipment<input data-f="description" list="wk-equipment" value="${text(r, 'description')}"></label>${count(r)}
+      <label class="field">Status<select data-f="status">${pick(L.EQUIPMENT_STATUSES, r.status)}</select></label>${kept(r)}`,
+    activities: r => `<label class="field">From<select data-f="from">${pick(L.ACTIVITY_DAYS, r.from)}</select></label>
+      <label class="field">To (optional)<select data-f="to">${opt('', 'Same day')}${pick(L.ACTIVITY_DAYS, r.to)}</select></label>
+      <label class="field full">Activity<textarea data-f="description" rows="2">${text(r, 'description')}</textarea></label>
+      <label class="field full">Remarks (optional)<input data-f="remarks" value="${text(r, 'remarks')}"></label>`,
+    issues: r => `<label class="field full">Issue encountered<textarea data-f="description" rows="2">${text(r, 'description')}</textarea></label>
+      <label class="field full">Action taken<textarea data-f="actionTaken" rows="2">${text(r, 'actionTaken')}</textarea></label>
+      <label class="field">Action taken by<select data-f="actionBy">${opt('', 'Not set')}${pick(L.ISSUE_ACTION_BY, r.actionBy)}</select></label>${kept(r)}`,
   };
-  const row = (kind, ...start) => `<div class="wk-row">${rowOf[kind](...start)}<button type="button" class="icon-btn" data-drop-row aria-label="Remove this row">${icon('close', 'sm')}</button></div>`;
-  const list = (kind, title, label, rows = '') => `<h3>${title}</h3><div class="wk-rows" data-rows="${kind}">${rows}</div>
+  const row = (kind, r = {}) => `<div class="wk-row">${rowOf[kind](r)}<button type="button" class="icon-btn" data-drop-row aria-label="Remove this row">${icon('close', 'sm')}</button></div>`;
+  const list = (kind, title, label) => `<h3>${title}</h3><div class="wk-rows" data-rows="${kind}">${start[kind].map(r => row(kind, r)).join('')}</div>
     <button type="button" class="text-btn wk-add" data-add-row="${kind}">${icon('add_circle', 'sm')}${label}</button>`;
   d.innerHTML = `<form novalidate>
-    <h2>New weekly report</h2>
-    <label class="field">First day of the week<input type="date" name="first" value="${L.weekSaturday(today())}" required></label>
+    <h2>${report ? 'Edit weekly report' : 'New weekly report'}</h2>
+    <label class="field">First day of the week<input type="date" name="first" value="${esc(start.first)}" required></label>
     <p class="muted small" id="wk-week"></p>
     <h3>Weekly accomplishment</h3>
     <p class="muted small" id="wk-note"></p>
     <div class="wk-rows" id="wk-lines"></div>
     <p class="wk-total" id="wk-total" aria-live="polite"></p>
-    ${list('manpower', 'Manpower', 'Add designation', L.MANPOWER_START.map(name => row('manpower', name, 0)).join(''))}
+    ${list('manpower', 'Manpower', 'Add designation')}
     ${list('equipment', 'Equipment', 'Add equipment')}
-    ${list('activities', 'Activities of the week', 'Add activity', row('activities'))}
+    ${list('activities', 'Activities of the week', 'Add activity')}
     ${list('issues', 'Issues encountered / action taken', 'Add issue')}
     <datalist id="wk-designations">${L.MANPOWER_DESIGNATIONS.map(v => opt(v)).join('')}</datalist>
     <datalist id="wk-equipment">${L.EQUIPMENT_NAMES.map(v => opt(v)).join('')}</datalist>
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions">${report && L.canDeleteReport(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete report</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
   const box = d.querySelector('#wk-lines');
@@ -1968,15 +1976,15 @@ function addWeekly(c) {
   // The lines follow the week: with a chart their targets are its plan for the week's last day. What was typed stays.
   const drawLines = () => {
     if (!form.first.value) return;
-    const label = L.weekLabel(form.first.value), kept = typed();
+    const label = L.weekLabel(form.first.value), was = box.children.length ? typed() : start.lines;
     lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6]);
     const charted = lines[0].targetPct != null;
     d.querySelector('#wk-week').textContent = label;
     d.querySelector('#wk-note').textContent = charted ? 'Targets are the approved bar chart\'s plan for the last day of this week.'
       : lines.some(l => l.weightPct > 0) ? 'No bar chart yet: type each target.' : 'This project has no scope of works yet, so the overall figures stay at 0%.';
     box.innerHTML = lines.map((l, k) => `<fieldset class="wk-row" data-line><legend>${esc(l.name)} (${pct(l.weightPct)})</legend>
-      <label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(charted ? l.targetPct.toFixed(2) : kept[k]?.target ?? '')}"${charted ? ' readonly' : ''}></label>
-      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(kept[k]?.actual ?? '')}"></label></fieldset>`).join('');
+      <label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(charted ? l.targetPct.toFixed(2) : was[k]?.target ?? '')}"${charted ? ' readonly' : ''}></label>
+      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(was[k]?.actual ?? '')}"></label></fieldset>`).join('');
     total();
   };
   form.first.onchange = drawLines;
@@ -1993,24 +2001,33 @@ function addWeekly(c) {
   drawLines();
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new weekly report?')) && done();
+  const close = () => (JSON.stringify(values()) === initial || confirm(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.weeklyErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (report && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      const report = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email);
-      await addRecords(c, [[report.build, report.audit]], report.projectFields);
+      if (report) {
+        const edit = L.editedWeeklyReport(report, f, c.project, c.weekly);
+        await saveEdits(c, [[report, edit.changes, edit.audit]], 'weekly report', edit.projectFields);
+      } else {
+        const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly);
+        await addRecords(c, [[added.build, added.audit]], added.projectFields);
+      }
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
       save.disabled = false;
     }
   };
+  // deleteWeeklyReport: the project's site photo becomes the newest left on the other reports.
+  if (report) bindDelete(d, `Delete the weekly report for ${report.reportingWeek}? This cannot be undone.`, () => saveEdits(c, [[report, null, L.deletedWeeklyAudit(report)]], 'weekly report',
+    { latestUpdatePhotoUrl: L.latestSitePhoto(c.weekly.filter(r => r.uuid !== report.uuid)) }));
   document.body.append(d);
   d.showModal();
 }

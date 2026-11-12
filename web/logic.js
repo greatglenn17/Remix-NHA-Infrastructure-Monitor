@@ -1429,38 +1429,91 @@ export function weeklyErrors(f) {
 export const weeklyTotals = lines => Object.fromEntries(['target', 'actual'].map(k => [k, lines.reduce((t, l) => t + (percent(l[k]) || 0) * l.weightPct / 100, 0)]));
 
 /**
- * A new weekly report from the form `f` ({ first, lines: [{ name, weightPct, target, actual }], manpower, equipment,
- * activities, issues }): `build` makes the weekly_reports record as RecordSync uploads one, `projectFields` are the
- * project's target and actual the phone sets with it, `audit` its entry. Rows without a name or description are left
- * out. Photos and weather start empty: the report's Add photos and Edit weather fill them.
+ * The columns the weekly report form `f` writes ({ first, lines: [{ name, weightPct, target, actual }], manpower,
+ * equipment, activities, issues }). Rows without a name or description are left out; a row's remarks the form does not
+ * show are kept.
  */
-export function newWeeklyReport(f, project, user) {
+function weeklyFields(f, project) {
   const reportingWeek = weekLabel(f.first), last = isoDay(f.first) + 6 * DAY;
   const { target, actual } = weeklyTotals(f.lines);
   // ProjectSchedule.elapsedAndRemaining as of the week's last day: 0 and 0 without a start and completion date.
   const start = isoDay(project.dateStarted), end = isoDay(effectiveCompletion(project)), dated = start != null && end != null;
   const rows = (list, key, row) => JSON.stringify(list.filter(r => (r[key] || '').trim()).map(row));
   const count = r => Math.max(0, int(r.count, 0));
-  const data = {
+  return {
     reportingWeek, daysElapsed: dated ? Math.max(0, (last - start) / DAY + 1) : 0, remainingDays: dated ? Math.max(0, (end - last) / DAY) : 0,
     targetAccomplishmentPct: target, actualAccomplishmentPct: actual,
-    manpowerJson: rows(f.manpower, 'designation', r => ({ designation: r.designation.trim(), count: count(r), remarks: '' })),
-    equipmentJson: rows(f.equipment, 'description', r => ({ description: r.description.trim(), count: count(r), status: r.status || 'Operational', remarks: '' })),
+    manpowerJson: rows(f.manpower, 'designation', r => ({ designation: r.designation.trim(), count: count(r), remarks: r.remarks || '' })),
+    equipmentJson: rows(f.equipment, 'description', r => ({ description: r.description.trim(), count: count(r), status: r.status || 'Operational', remarks: r.remarks || '' })),
     // ActivityDays.label: one day, or a range such as "Monday - Wednesday".
     activitiesJson: rows(f.activities, 'description', r => ({ day: r.to && r.to !== r.from ? `${r.from} - ${r.to}` : r.from, description: r.description.trim(), remarks: (r.remarks || '').trim() })),
-    issuesJson: rows(f.issues, 'description', r => ({ description: r.description.trim(), actionTaken: (r.actionTaken || '').trim(), remarks: '', actionBy: r.actionBy || '' })),
+    issuesJson: rows(f.issues, 'description', r => ({ description: r.description.trim(), actionTaken: (r.actionTaken || '').trim(), remarks: r.remarks || '', actionBy: r.actionBy || '' })),
     accomplishmentItemsJson: JSON.stringify(f.lines.map(l => ({ itemDescription: l.name, targetPct: percent(l.target), actualPct: percent(l.actual), weightPct: l.weightPct }))),
-    documentsIssuedReceivedJson: '[]', attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', submittedByStaff: user,
   };
+}
+
+/**
+ * The project's target and actual follow a saved report only when none of the `weekly` reports is for a later week, so
+ * a late entry or a fix to an older week does not set the project back. (The phone sets them from any report saved.)
+ */
+function projectFollows(weekly, uuid, reportingWeek, target, actual) {
+  const at = label => weekStart(label) ?? -Infinity;
+  return weekly.some(r => r.uuid !== uuid && at(r.reportingWeek) > at(reportingWeek)) ? null : { targetAccomplishment: target, actualAccomplishment: actual };
+}
+
+/**
+ * A new weekly report from the form: `build` makes the weekly_reports record as RecordSync uploads one,
+ * `projectFields` are the project's target and actual saved with it (projectFollows), `audit` its entry. Photos and
+ * weather start empty: the report's Add photos and Edit weather fill them.
+ */
+export function newWeeklyReport(f, project, user, weekly = []) {
+  const data = weeklyFields(f, project), { reportingWeek, targetAccomplishmentPct: target, actualAccomplishmentPct: actual } = data;
   return {
     build: ({ uuid, projectUuid, assignedUids, uid, now }) => ({
       uuid, type: 'weekly_reports', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
-      data: JSON.stringify({ ...data, createdAtTimestamp: now, _weather: [] }),
+      data: JSON.stringify({ ...data, documentsIssuedReceivedJson: '[]', attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', submittedByStaff: user,
+        createdAtTimestamp: now, _weather: [] }),
     }),
-    projectFields: { targetAccomplishment: target, actualAccomplishment: actual },
+    projectFields: projectFollows(weekly, null, reportingWeek, target, actual),
     audit: { actionType: 'Report Creation', details: `Submitted Weekly Report for ${reportingWeek}`, newValue: `Week: ${reportingWeek}, Target: ${target}%, Actual: ${actual}%` },
   };
 }
+
+/** A saved report as the form's starting values: its first day, each line's target and actual, and its rows. */
+export function weeklyStart(report) {
+  // ActivityDays.split: "Monday - Wednesday" is a range, anything else one day.
+  const span = day => { const parts = day.split('-').map(x => x.trim()); return parts.length === 2 ? { from: parts[0], to: parts[1] } : { from: day.trim(), to: '' }; };
+  return {
+    first: weekDays(report.reportingWeek)[0] || '',
+    lines: accomplishmentOf(report.accomplishmentItemsJson).map(a => ({ target: a.targetPct.toFixed(2), actual: a.actualPct.toFixed(2) })),
+    manpower: manpowerOf(report.manpowerJson), equipment: equipmentOf(report.equipmentJson),
+    activities: activitiesOf(report.activitiesJson).map(a => ({ ...span(a.day), description: a.description, remarks: a.remarks })),
+    issues: issuesOf(report.issuesJson),
+  };
+}
+
+/**
+ * The form's edit of a saved report (MainActivity's reportToEdit.copy, updateWeeklyReportWithWeather): the columns it
+ * writes, the project's target and actual (projectFollows), and the phone's audit entry. The week's label is kept unless its first day
+ * was changed (an older "Week 42: ..." label stays); then weather logged for days outside the new week is dropped.
+ * Photos and the rest of the weather are left alone.
+ */
+export function editedWeeklyReport(report, f, project, weekly = []) {
+  const fields = weeklyFields(f, project), moved = weekDays(report.reportingWeek)[0] !== f.first;
+  const days = weekDays(fields.reportingWeek);
+  const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek,
+    ...(moved && Array.isArray(report._weather) ? { _weather: report._weather.filter(w => days.includes((w.date || '').trim())) } : {}) };
+  return {
+    changes, projectFields: projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct),
+    audit: { actionType: 'Edited Weekly Report', details: `Modified report for ${changes.reportingWeek}` },
+  };
+}
+
+/** ProjectViewModel.deleteWeeklyReport's audit entry. */
+export const deletedWeeklyAudit = report => ({ actionType: 'Deleted Weekly Report', details: `Deleted report for ${report.reportingWeek}` });
+
+/** Permission.DELETE_REPORT: the Super Admin and Engineer Admins; a Field Engineer can add and edit reports, not delete them. */
+export const canDeleteReport = claims => ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
 
 /* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
 

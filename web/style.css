@@ -415,6 +415,7 @@ span.file.gone { text-decoration: none; }
 .rep-head h3 { font-size: 16px; font-weight: 600; }
 .rep-head p { font-size: 13px; margin-top: 2px; }
 .rep-head .text-btn { flex: none; margin: -6px -8px 0 0; }
+.rep-actions { display: flex; flex: none; gap: 12px; }
 .rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; }
 .report details { margin-top: 10px; border-top: 1px solid var(--border); }
 .report summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
