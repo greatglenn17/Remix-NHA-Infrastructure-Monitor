@@ -354,6 +354,22 @@ test('a new contractor letter is the record a phone uploads', () => {
   assert.deepEqual(JSON.parse(r.data), { dateSent: '2026-11-12', subject: 'Catch-up plan', actionTaken: '', dateReplied: '', replyFileUrl: '', dateReceived: '2026-11-13', receivedFileUrl: '' });
 });
 
+test('attachments: a new reference has the phone\'s shape and a scan is never enlarged', () => {
+  const refText = L.newFileRef('11111111-1111-4111-8111-111111111111', '9b2e7c41-5d3a-4f6e-8a1b-2c3d4e5f6a7b', 'pdf');
+  assert.equal(refText, 'nhafile:11111111-1111-4111-8111-111111111111/9b2e7c41-5d3a-4f6e-8a1b-2c3d4e5f6a7b.pdf');
+  assert.equal(L.storagePathOf(refText), 'attachments/11111111-1111-4111-8111-111111111111/9b2e7c41-5d3a-4f6e-8a1b-2c3d4e5f6a7b.pdf');
+  assert.deepEqual(L.scaledSize(5000, 2500, 2500), [2500, 1250]);
+  assert.deepEqual(L.scaledSize(3000, 4000, 2500), [1875, 2500]);
+  assert.deepEqual(L.scaledSize(800, 600, 2500), [800, 600]);
+  const ids = { uuid: 'u', projectUuid: 'p', assignedUids: [], uid: 'a', now: 1 };
+  const letter = { dateSent: '2026-11-12', subject: 'S', actionTaken: '', dateReplied: '', dateReceived: '', receivedFileUrl: refText };
+  assert.equal(JSON.parse(L.newLetterRecord(ids, letter).data).receivedFileUrl, refText);
+  assert.equal(JSON.parse(L.newLetterRecord(ids, letter).data).replyFileUrl, '');
+  const billing = { name: 'B', dvNo: '', date: '2026-11-12', periodCovered: '', billingType: '', grossAmount: '100', retentionPct: '0' };
+  assert.equal(JSON.parse(L.newPaymentRecord(ids, { ...billing, fileUrl: refText }, [], 1000).data).fileUrl, refText);
+  assert.equal(JSON.parse(L.newPaymentRecord(ids, billing, [], 1000).data).fileUrl, '');
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');

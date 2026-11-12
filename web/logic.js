@@ -374,6 +374,20 @@ export function storagePathOf(ref) {
   return m[1] ? `attachments/${m[1]}/${m[2]}` : `attachments/${m[2]}`;
 }
 
+/** Attachments.MAX_BYTES: files must be smaller than this, the same limit as storage.rules. */
+export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+/** Attachments.Kind.SCAN: a scanned image's longest side, in pixels. */
+export const SCAN_MAX_EDGE = 2500;
+
+/** A new attachment reference as Attachments.store makes one: `nhafile:<projectUuid>/<id>.jpg|.pdf`. */
+export const newFileRef = (projectUuid, id, ext) => `nhafile:${projectUuid}/${id}.${ext}`;
+
+/** Width and height no larger than `maxEdge` on the longest side; a smaller image keeps its size. */
+export function scaledSize(width, height, maxEdge) {
+  const k = Math.min(1, maxEdge / Math.max(width, height));
+  return [Math.round(width * k), Math.round(height * k)];
+}
+
 /* ---------- Progress: weekly and monthly reports (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
 
 const jsonArray = text => { try { const a = JSON.parse(text || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
@@ -919,13 +933,13 @@ export function letterErrors(f) {
   ].filter(Boolean);
 }
 
-/** A new contractor_letters record as RecordSync uploads one: the ContractorLetter row without its local ids, no attachments yet. */
+/** A new contractor_letters record as RecordSync uploads one: the ContractorLetter row without its local ids. */
 export function newLetterRecord({ uuid, projectUuid, assignedUids, uid, now }, f) {
   return {
     uuid, type: 'contractor_letters', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
     data: JSON.stringify({
-      dateSent: f.dateSent, subject: f.subject, actionTaken: f.actionTaken, dateReplied: f.dateReplied, replyFileUrl: '',
-      dateReceived: f.dateReceived, receivedFileUrl: '',
+      dateSent: f.dateSent, subject: f.subject, actionTaken: f.actionTaken, dateReplied: f.dateReplied, replyFileUrl: f.replyFileUrl || '',
+      dateReceived: f.dateReceived, receivedFileUrl: f.receivedFileUrl || '',
     }),
   };
 }
@@ -1034,7 +1048,7 @@ export function newPaymentRecord({ uuid, projectUuid, assignedUids, uid, now }, 
     uuid, type: 'project_payments', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
     data: JSON.stringify({
       ...billingFields(f), percentage: cost > 0 ? grossAmount / cost * 100 : 0, balanceAmount,
-      balancePercentage: cost > 0 ? balanceAmount / cost * 100 : 0, fileUrl: '',
+      balancePercentage: cost > 0 ? balanceAmount / cost * 100 : 0, fileUrl: f.fileUrl || '',
     }),
   };
 }
