@@ -1,8 +1,8 @@
 {
-  "versionCode": 294,
-  "versionName": "2.8.14",
-  "releaseNotes": "v2.8.14: Deleting a billing now adds its amount back to the balance of every later billing, and is recorded in the audit log.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.14/NHA_Monitor_v2.8.14_Build294.apk",
-  "apkSha256": "f405ea934b1ae557d5161f970dd97169d878b6282834c1dfa8c09931ae7326f9",
+  "versionCode": 295,
+  "versionName": "2.8.15",
+  "releaseNotes": "v2.8.15: Files attached to a developer request or a letter to the contractor are no longer deleted a day after they are attached. Files already deleted have to be attached again.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.15/NHA_Monitor_v2.8.15_Build295.apk",
+  "apkSha256": "d8de1517bfe7f87d73204d98e4f3877737347faa5b7c5a54b313e9fdf6f11829",
   "isMandatory": true
 }
