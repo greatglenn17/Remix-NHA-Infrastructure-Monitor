@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -58,6 +58,13 @@ is read only.
   document" audit entry. **Attach copy** / **Edit** on a file attaches, replaces or removes its scanned copy, with the
   app's "Uploaded file attachment" audit entry, or deletes the entry (no audit entry, as on the phone). As on the
   phone, a related file's status and remarks cannot be changed after it is added.
+- **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
+  name and use, which stay on the phone: the progress band (a road lot's state and its drainage), construction status,
+  current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
+  with their reference and remarks. Save writes the lot's `sdp_lot_progress` record (`L.lotSave`), or adds it when the
+  lot has none yet, with the app's "Construction Progress Update" and "Developer Billing Update" audit entries. Those
+  entries name the lot by its label; the phone's name it by an id only that phone has. A photo added here has no
+  "Block X Lot Y" stamp.
 - **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
   developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
@@ -177,4 +184,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding weekly reports; editing lots.
+Adding weekly reports; a lot's name and use, formal lot inspections, and updating several lots at once.

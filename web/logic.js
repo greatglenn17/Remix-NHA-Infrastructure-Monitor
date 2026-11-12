@@ -710,6 +710,69 @@ export function lotBillingLabel(p) {
   return m1 && m2 ? 'M1 + M2 BILLED (100%)' : m1 ? 'M1 BILLED (80%)' : m2 ? 'M2 BILLED (20%)' : 'NOT BILLED';
 }
 
+/** SdpSummary.BAND_VALUES and ROAD_CONCRETING: the % a band or a road state saves (the top of the band; concreting is 50%). */
+export const LOT_BAND_VALUES = [0, 25, 50, 75, 99, 100];
+export const ROAD_VALUES = [0, 50, 100];
+
+/** statusForProgress: the construction status that goes with a progress %. */
+export const statusForProgress = p => (p <= 0 ? 'Not Started' : p <= 20 ? 'Layout / Excavation Started' : p <= 80 ? 'Under Construction'
+  : p <= 99 ? 'Substantially Completed' : 'Completed');
+
+/** The % a pick on the lot form saves: what the lot has while the pick is still its band (or road state), else that pick's value. */
+export const pickedProgress = (pct, index, road = false) =>
+  ((road ? roadState(pct) : lotBand(pct)) === index ? pct : (road ? ROAD_VALUES : LOT_BAND_VALUES)[index]);
+
+// A lot is billed twice: M1 (80%) in the first columns, M2 (20%) in the m2 ones.
+const BILLING = [['billingStatus', 'billingDate', 'billedBy', 'billingReference', 'billingRemarks'],
+  ['m2BillingStatus', 'm2BillingDate', 'm2BilledBy', 'm2BillingReference', 'm2BillingRemarks']];
+
+/**
+ * ProjectViewModel.updateLotProgress and updateLotBillingStatus for one save of the lot form: the sdp_lot_progress
+ * columns to write and their audit entries, or null when the form changed nothing. Progress, status, activity,
+ * remarks and photos are written and logged only when one of them changed; M1 and M2 each only when toggled.
+ * `f`: { progress, drainage (road lots, else null), constructionStatus, currentActivity, remarks, photos,
+ * billing: [{ billed, reference, remarks } for M1, then M2] }; `at` is "yyyy-MM-dd HH:mm".
+ * shortcut: the phone's audit text names the lot by its local id, which the website does not have, so this uses the lot's label.
+ */
+export function lotSave(lot, f, { user, at, contractor }) {
+  const p = lot.progress || {}, label = lotLabel(lot), pct = n => Math.min(100, Math.max(0, Math.round(Number(n) || 0)));
+  const kept = (v, fallback) => ((v || '').trim() ? v : fallback); // Kotlin's ifBlank
+  const changes = {}, audits = [];
+  const next = {
+    physicalProgress: pct(f.progress), ...(f.drainage == null ? {} : { drainageProgress: pct(f.drainage) }),
+    constructionStatus: f.constructionStatus, currentActivity: f.currentActivity, remarks: f.remarks, photosJson: JSON.stringify(f.photos),
+  };
+  const stored = {
+    physicalProgress: lotProgress(lot), drainageProgress: Number(p.drainageProgress) || 0, constructionStatus: p.constructionStatus ?? 'Not Started',
+    currentActivity: p.currentActivity || '', remarks: p.remarks || '', photosJson: JSON.stringify(attachmentList(p.photosJson)),
+  };
+  if (Object.keys(next).some(k => next[k] !== stored[k])) {
+    Object.assign(changes, next, { contractor: kept(p.contractor, contractor) });
+    audits.push({
+      actionType: 'Construction Progress Update', details: `Updated Lot Progress (${label}) to ${next.physicalProgress}% (${next.constructionStatus})`,
+      oldValue: lot.progress ? `Progress: ${stored.physicalProgress}%, Status: ${stored.constructionStatus}` : 'Not Started',
+      newValue: `Progress: ${next.physicalProgress}%, Status: ${next.constructionStatus}, Activity: ${next.currentActivity}`,
+    });
+  }
+  let now = { ...p };
+  f.billing.forEach((m, i) => {
+    const [status, date, by, ref, remarks] = BILLING[i];
+    if (m.billed === billed(now, status)) return;
+    const reference = m.billed ? m.reference.trim() : '';
+    const set = m.billed ? { [status]: 'BILLED', [date]: at, [by]: user, [ref]: reference, [remarks]: m.remarks.trim() }
+      : { [status]: 'NOT BILLED', [date]: '', [by]: '', [ref]: '', [remarks]: '' };
+    const before = lotBillingLabel(now);
+    now = { ...now, ...set };
+    Object.assign(changes, set);
+    audits.push({
+      actionType: 'Developer Billing Update', details: `Updated M${i + 1} billing for ${label} to ${set[status]} (Ref: ${reference})`,
+      oldValue: before, newValue: `${lotBillingLabel(now)}, Billed By: ${user}, Date: ${at}, Ref: ${reference}`,
+    });
+  });
+  if (!audits.length) return null;
+  return { changes: { ...changes, createdBy: kept(p.createdBy, user), createdDate: kept(p.createdDate, at), lastModifiedBy: user, lastModifiedDate: at }, audits };
+}
+
 /**
  * SdpSites.current with each plan's active lots: per site (in the order its first plan was uploaded), its active plan
  * with the highest version, else its highest version. Each lot carries its latest progress row as `progress` (or null).
@@ -1044,6 +1107,19 @@ export function orderDocument(type, o, suspension, docs = []) {
 /** A new record as RecordSync uploads one: a row's columns, without its local ids, as `data`. */
 const newRecord = ({ uuid, projectUuid, assignedUids, uid, now }, type, data) =>
   ({ uuid, type, projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false, data: JSON.stringify(data) });
+
+/**
+ * A lot's first sdp_lot_progress record: the SdpLotProgress row with lotSave's changes over its defaults. Its plan and
+ * lot travel as their uuids under `_ref_`, as RecordSync sends them. A phone that already started a row for the lot
+ * takes this one onto it (RecordSync.sameLotProgress).
+ */
+export const newLotProgressRecord = (ids, lot, changes) => newRecord(ids, 'sdp_lot_progress', {
+  physicalProgress: 0, drainageProgress: 0, constructionStatus: 'Not Started', currentActivity: '', startDate: '', targetCompletionDate: '',
+  contractor: '', remarks: '', billingStatus: 'NOT BILLED', billingDate: '', billedBy: '', billingReference: '', billingRemarks: '',
+  m2BillingStatus: 'NOT BILLED', m2BillingDate: '', m2BilledBy: '', m2BillingReference: '', m2BillingRemarks: '', photosJson: '[]',
+  createdBy: '', createdDate: '', lastModifiedBy: '', lastModifiedDate: '',
+  ...changes, _ref_sdpPlanId: lot._ref_sdpPlanId, _ref_sdpLotId: lot.uuid,
+});
 
 /** A new contractor_letters record: the ContractorLetter row. */
 export const newLetterRecord = (ids, f) => newRecord(ids, 'contractor_letters', {

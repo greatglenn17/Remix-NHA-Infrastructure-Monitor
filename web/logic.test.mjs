@@ -543,3 +543,67 @@ test('related file: named, worded and logged as the phone does', () => {
     { actionType: 'Document Upload', details: 'Uploaded file attachment for ECC', oldValue: '', newValue: 'nhafile:attachments/p1/y.jpg' });
   assert.deepEqual(L.RELATED_STATUSES, ['Approved', 'Notarized', 'Signed', 'Submitted', 'Pending']);
 });
+
+test('lot form: the progress, photos and billing it saves, and the audit entries', () => {
+  assert.deepEqual([0, 1, 20, 21, 80, 81, 99, 100].map(L.statusForProgress), ['Not Started', 'Layout / Excavation Started', 'Layout / Excavation Started',
+    'Under Construction', 'Under Construction', 'Substantially Completed', 'Substantially Completed', 'Completed']);
+  // The band the lot is already in keeps its exact %; another band saves its top; a road lot is 0, 50 or 100.
+  assert.equal(L.pickedProgress(40, 2), 40);
+  assert.equal(L.pickedProgress(40, 3), 75);
+  assert.equal(L.pickedProgress(0, 5), 100);
+  assert.equal(L.pickedProgress(30, 1, true), 30);
+  assert.equal(L.pickedProgress(30, 2, true), 100);
+  assert.equal(L.pickedProgress(100, 1, true), 50);
+
+  const who = { user: 'Engr. Web', at: '2026-11-12 14:05', contractor: 'ABC Builders' };
+  const lot = { uuid: 'lot-1', _ref_sdpPlanId: 'plan-1', blockNumber: '3', lotNumber: '12', progress: null };
+  const blank = { progress: 0, drainage: null, constructionStatus: 'Not Started', currentActivity: '', remarks: '', photos: [],
+    billing: [{ billed: false, reference: '', remarks: '' }, { billed: false, reference: '', remarks: '' }] };
+  assert.equal(L.lotSave(lot, blank, who), null);
+
+  // A lot's first update: the progress part only, with the project's contractor.
+  const first = L.lotSave(lot, { ...blank, progress: 50, constructionStatus: 'Under Construction', currentActivity: 'Walls', photos: ['nhafile:p/a.jpg'] }, who);
+  assert.deepEqual(first.changes, {
+    physicalProgress: 50, constructionStatus: 'Under Construction', currentActivity: 'Walls', remarks: '', photosJson: '["nhafile:p/a.jpg"]',
+    contractor: 'ABC Builders', createdBy: 'Engr. Web', createdDate: '2026-11-12 14:05', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-12 14:05',
+  });
+  assert.deepEqual(first.audits, [{
+    actionType: 'Construction Progress Update', details: 'Updated Lot Progress (Block 3 Lot 12) to 50% (Under Construction)',
+    oldValue: 'Not Started', newValue: 'Progress: 50%, Status: Under Construction, Activity: Walls',
+  }]);
+  const record = L.newLotProgressRecord({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'a', now: 7 }, lot, first.changes);
+  assert.equal(record.type, 'sdp_lot_progress');
+  const data = JSON.parse(record.data);
+  assert.equal(data._ref_sdpPlanId, 'plan-1');
+  assert.equal(data._ref_sdpLotId, 'lot-1');
+  assert.equal(data.billingStatus, 'NOT BILLED');
+  assert.equal(data.m2BillingStatus, 'NOT BILLED');
+  assert.equal(data.physicalProgress, 50);
+  assert.equal(data.startDate, '');
+
+  // Billing only, M1 then M2 in one save: the progress columns and the first author are left alone.
+  const stored = { physicalProgress: 50, constructionStatus: 'Under Construction', currentActivity: 'Walls', remarks: '', photosJson: '["nhafile:p\/a.jpg"]',
+    contractor: 'XYZ', createdBy: 'Engr. Phone', createdDate: '2026-10-01 08:00', billingStatus: 'NOT BILLED', m2BillingStatus: 'NOT BILLED' };
+  const same = { ...blank, progress: 50, constructionStatus: 'Under Construction', currentActivity: 'Walls', photos: ['nhafile:p/a.jpg'] };
+  assert.equal(L.lotSave({ ...lot, progress: stored }, same, who), null);
+  const bill = L.lotSave({ ...lot, progress: stored }, { ...same, billing: [{ billed: true, reference: ' DV-7 ', remarks: ' ok ' }, { billed: true, reference: '', remarks: '' }] }, who);
+  assert.deepEqual(bill.changes, {
+    billingStatus: 'BILLED', billingDate: '2026-11-12 14:05', billedBy: 'Engr. Web', billingReference: 'DV-7', billingRemarks: 'ok',
+    m2BillingStatus: 'BILLED', m2BillingDate: '2026-11-12 14:05', m2BilledBy: 'Engr. Web', m2BillingReference: '', m2BillingRemarks: '',
+    createdBy: 'Engr. Phone', createdDate: '2026-10-01 08:00', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-12 14:05',
+  });
+  assert.deepEqual(bill.audits.map(a => [a.actionType, a.details, a.oldValue, a.newValue]), [
+    ['Developer Billing Update', 'Updated M1 billing for Block 3 Lot 12 to BILLED (Ref: DV-7)', 'NOT BILLED', 'M1 BILLED (80%), Billed By: Engr. Web, Date: 2026-11-12 14:05, Ref: DV-7'],
+    ['Developer Billing Update', 'Updated M2 billing for Block 3 Lot 12 to BILLED (Ref: )', 'M1 BILLED (80%)', 'M1 + M2 BILLED (100%), Billed By: Engr. Web, Date: 2026-11-12 14:05, Ref: '],
+  ]);
+
+  // Unbilling M2 clears its columns; a road lot's drainage is saved; a kept contractor stays.
+  const road = { ...lot, lotUse: 'Road Lot', blockNumber: 'RL', lotNumber: '4', progress: { ...stored, m2BillingStatus: 'BILLED', billingStatus: 'BILLED', drainageProgress: 0 } };
+  const undo = L.lotSave(road, { ...same, drainage: 100, billing: [{ billed: true, reference: '', remarks: '' }, { billed: false, reference: 'x', remarks: 'y' }] }, who);
+  assert.equal(undo.changes.drainageProgress, 100);
+  assert.equal(undo.changes.contractor, 'XYZ');
+  assert.deepEqual([undo.changes.m2BillingStatus, undo.changes.m2BillingDate, undo.changes.m2BilledBy, undo.changes.m2BillingReference], ['NOT BILLED', '', '', '']);
+  assert.equal('billingStatus' in undo.changes, false);
+  assert.deepEqual(undo.audits.map(a => a.details), ['Updated Lot Progress (Road Lot 4) to 50% (Under Construction)', 'Updated M2 billing for Road Lot 4 to NOT BILLED (Ref: )']);
+  assert.equal(undo.audits[0].oldValue, 'Progress: 50%, Status: Under Construction');
+});
