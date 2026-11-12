@@ -370,6 +370,14 @@ test('attachments: a new reference has the phone\'s shape and a scan is never en
   assert.equal(JSON.parse(L.newPaymentRecord(ids, billing, [], 1000).data).fileUrl, '');
 });
 
+test('deleting a letter or a developer request writes the app audit entry', () => {
+  assert.deepEqual(L.deletedLetterAudit({ dateSent: '2026-10-27', subject: 'Manpower', actionTaken: 'Added 10 workers' }),
+    { actionType: 'Letter to Contractor', details: 'Deleted letter of 2026-10-27: Manpower', oldValue: 'Added 10 workers', newValue: '' });
+  assert.deepEqual(L.deletedRequestAudit({ requestType: 'Time Extension', dateReceived: '2026-11-02', details: '30 days for rain' }),
+    { actionType: 'Developer Request', details: 'Deleted Time Extension request received 2026-11-02', oldValue: '30 days for rain', newValue: '' });
+  assert.equal(L.deletedRequestAudit({ requestType: 'Variation Order', dateReceived: '2026-07-03' }).oldValue, '');
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');
