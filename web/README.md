@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging, editing and deleting issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, and **Signatories** on a weekly or monthly report's print page, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -58,8 +58,22 @@ is read only.
   document" audit entry. **Attach copy** / **Edit** on a file attaches, replaces or removes its scanned copy, with the
   app's "Uploaded file attachment" audit entry, or deletes the entry (no audit entry, as on the phone). As on the
   phone, a related file's status and remarks cannot be changed after it is added.
+- **Upload plan** (Progress → Lots), for the Super Admin and an Engineer Admin who can edit the project (the app's
+  MANAGE_SDP_PLANS roles: `L.canManagePlans`), is the app's plan upload (`planForm`, `L.planUpload`): the plan PDF as
+  the next revision of the site on screen, which becomes the one in use, or as the first plan of another site under
+  the contract, naming the first site when it has no name yet. It writes the `sdp_plans` record with the app's
+  "Document Upload" audit entry. A revised plan starts with no lots. The plan must be a PDF.
+- **Add lot** (Progress → Lots), for the people who can edit the project, shows the whole plan page: click each corner
+  of the lot in order (**Undo corner** takes the last one back), then **Save lot** for the app's lot form (`lotForm`,
+  `L.newLot`): use, block, lot number, housing unit, area (worked out from the plan's scale when it has one, else the
+  app's 50) and remarks. A road lot or an easement goes by one number. It writes the `sdp_lots` record with the app's
+  "Lot Created" audit entry, and the next lot can be drawn straight away; **Done** leaves. Unlike the phone, a block
+  and lot another lot already has is refused here too. Corners are placed with a pointer only.
+- **Name & use** on a lot's card is the lot's use, block and lot from the app's lot form (`L.lotNameSave`, with the
+  app's "Lot Use Changed" and "Lot Renamed" audit entries), and **Remove lot**, which takes the lot off the plan on
+  every phone (`L.lotRemoved`, "Lot Deactivated"); its progress and billing history stay in the audit log.
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
-  name and use, which stay on the phone: the progress band (a road lot's state and its drainage), construction status,
+  name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
   current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
   with their reference and remarks. Save writes the lot's `sdp_lot_progress` record (`L.lotSave`), or adds it when the
   lot has none yet, with the app's "Construction Progress Update" and "Developer Billing Update" audit entries. Those
@@ -257,4 +271,6 @@ touched by this command.
 
 ## Not on the site yet
 
-A lot's name and use, formal lot inspections, and updating several lots at once.
+On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, roads,
+renumbering a block, the plan's scale and print frame, turning or deleting a plan, picking which revision is in use,
+and making a revision its own site. Also formal lot inspections, and updating several lots at once.
