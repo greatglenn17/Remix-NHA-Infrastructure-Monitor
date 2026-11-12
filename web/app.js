@@ -470,68 +470,85 @@ function renderDashboard() {
     <ul class="grid" id="grid"></ul>`;
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
   document.getElementById('help').onclick = showTermHelp;
-  if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = projectForm;
+  if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = () => projectForm();
   redrawDashboard();
 }
 
-/** CreateProjectDialog: a new project, written as a phone uploads one, then its "Project Creation" audit entry. */
-function projectForm() {
+/**
+ * CreateProjectDialog and EditProjectDialog. Without `c`: a new project, written as a phone uploads one, then its
+ * "Project Creation" audit entry. With the open project's `c`: its saved fields that changed, one revision up, with
+ * the "Project Edit" audit entry.
+ */
+function projectForm(c = null) {
+  const project = c?.project;
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
-  const opt = v => `<option>${esc(v)}</option>`;
-  const row = () => `<div class="wk-row"><label class="field">Item<input data-f="name"></label>
-    <label class="field">Amount<input data-f="amount" inputmode="decimal" placeholder="0.00"></label>
+  const start = project ? L.projectStart(project, today()) : { implementingOffice: 'Bulacan District Office', projectType: L.PROJECT_TYPES[0], landUnit: L.LAND_UNITS[0],
+    dateStarted: today(), assignedStaff: s.profile.name || '', completedOn: today(), final: '100', scope: [{}] };
+  const v = key => esc(start[key] ?? '');
+  const custom = !L.PROJECT_TYPES.includes(start.projectType);
+  const opt = (value, cur) => `<option${value === cur ? ' selected' : ''}>${esc(value)}</option>`;
+  // A saved item's weight rides along: with no amounts at all the items keep the weights they had.
+  const row = (r = {}) => `<div class="wk-row"><label class="field">Item<input data-f="name" value="${esc(r.name ?? '')}"></label>
+    <label class="field">Amount<input data-f="amount" inputmode="decimal" placeholder="0.00" value="${esc(r.amount ?? '')}"></label>
+    <input type="hidden" data-f="weightPct" value="${esc(r.weightPct ?? '')}">
     <button type="button" class="icon-btn" data-drop-row aria-label="Remove this item">${icon('close', 'sm')}</button></div>`;
+  const text = (label, key, attrs = '') => `<label class="field">${label}<input name="${key}" value="${v(key)}"${attrs}></label>`;
   d.innerHTML = `<form novalidate>
-    <h2>New project</h2>
-    <label class="field">Project name<input name="name" required></label>
-    <label class="field">Location<input name="location"></label>
-    <label class="field">Implementing office<input name="implementingOffice" value="Bulacan District Office"></label>
-    <label class="field">Contractor name<input name="contractor" required></label>
-    <label class="field">Project type<select name="type">${[...L.PROJECT_TYPES, 'Custom...'].map(opt).join('')}</select></label>
-    <label class="field" id="pj-custom" hidden>Custom project type<input name="customType"></label>
+    <h2>${project ? 'Edit project' : 'New project'}</h2>
+    ${text('Project name', 'name', ' required')}
+    ${text('Location', 'location')}
+    ${text('Implementing office', 'implementingOffice')}
+    ${text('Contractor name', 'contractor', ' required')}
+    <label class="field">Project type<select name="type">${[...L.PROJECT_TYPES, 'Custom...'].map(t => opt(t, custom ? 'Custom...' : start.projectType)).join('')}</select></label>
+    <label class="field" id="pj-custom" hidden>Custom project type<input name="customType" value="${custom ? v('projectType') : ''}"></label>
     <div class="wk-row">
-      <label class="field">Land area<input name="landArea" inputmode="decimal"></label>
-      <label class="field">Unit<select name="landUnit">${L.LAND_UNITS.map(opt).join('')}</select></label>
-      <label class="field">No. of units<input name="numberOfUnits" inputmode="numeric"></label>
+      ${text('Land area', 'landArea', ' inputmode="decimal"')}
+      <label class="field">Unit<select name="landUnit">${L.LAND_UNITS.map(u => opt(u, start.landUnit)).join('')}</select></label>
+      ${text('No. of units', 'numberOfUnits', ' inputmode="numeric"')}
     </div>
+    ${project ? `${text('Projected beneficiaries', 'projectedBeneficiaries')}${text('Board resolution / date', 'boardResolution')}
+      ${text('Notice of award', 'noticeOfAward')}${text('Notice to proceed', 'noticeToProceed')}` : ''}
     <h3>Scope of works</h3>
     <p class="muted small">Each item's weight is its share of the total, and the total is the original contract cost.</p>
-    <div class="wk-rows" data-rows>${row()}</div>
+    <div class="wk-rows" data-rows>${start.scope.map(row).join('')}</div>
     <button type="button" class="text-btn wk-add" data-add-row>${icon('add_circle', 'sm')}Add scope of works</button>
     <p class="wk-total" id="pj-cost" aria-live="polite"></p>
     <h3>Schedule</h3>
     <div class="wk-row">
-      <label class="field">Contract duration (days)<input name="days" inputmode="numeric" placeholder="365"></label>
-      <label class="field">Date started<input type="date" name="dateStarted" value="${today()}" required></label>
+      ${text('Contract duration (days)', 'days', ' inputmode="numeric" placeholder="365"')}
+      <label class="field">Date started<input type="date" name="dateStarted" value="${v('dateStarted')}" required></label>
     </div>
     <p class="wk-total" id="pj-end" aria-live="polite"></p>
-    <label class="field">Assigned field staff / manager<input name="assignedStaff" value="${esc(s.profile.name || '')}"></label>
-    <label class="check"><input type="checkbox" name="completed"><span>Already completed<br><small class="muted">Finished before this app; no weekly reports needed</small></span></label>
+    ${project ? '' : text('Assigned field staff / manager', 'assignedStaff')}
+    ${project && L.isCompleted(project) ? '' : `<label class="check"><input type="checkbox" name="completed"><span>${project ? 'Mark as completed' : 'Already completed'}<br>
+      <small class="muted">${project ? 'Sets work done to the final accomplishment' : 'Finished before this app; no weekly reports needed'}</small></span></label>
     <div class="wk-row" id="pj-done" hidden>
-      <label class="field">Actual completion<input type="date" name="completedOn" value="${today()}"></label>
-      <label class="field">Final accomplishment %<input name="final" inputmode="decimal" value="100"></label>
+      <label class="field">Actual completion<input type="date" name="completedOn" value="${v('completedOn')}"></label>
+      ${text('Final accomplishment %', 'final', ' inputmode="decimal"')}
     </div>
-    <p class="muted small" id="pj-final"></p>
+    <p class="muted small" id="pj-final"></p>`}
     <p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   // form.elements: a form's own `name` property would shadow the Project name box.
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
   const rows = form.querySelector('[data-rows]');
+  // Boxes this form does not show (the staff on an edit, the switch on a completed project) keep their starting value.
   const values = () => ({
     ...Object.fromEntries(['name', 'location', 'implementingOffice', 'contractor', 'landArea', 'landUnit', 'numberOfUnits', 'days', 'dateStarted',
-      'assignedStaff', 'completedOn', 'final'].map(k => [k, el[k].value])),
+      'assignedStaff', 'completedOn', 'final', 'projectedBeneficiaries', 'boardResolution', 'noticeOfAward', 'noticeToProceed'].map(k => [k, el[k]?.value ?? start[k] ?? ''])),
     projectType: el.type.value === 'Custom...' ? el.customType.value : el.type.value,
-    completed: el.completed.checked,
+    completed: el.completed?.checked ?? false,
     scope: [...rows.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value]))),
   });
   const draw = () => {
     const f = values(), end = L.projectEnd(f);
     d.querySelector('#pj-custom').hidden = el.type.value !== 'Custom...';
-    d.querySelector('#pj-done').hidden = !f.completed;
     d.querySelector('#pj-cost').textContent = `Original contract cost: ${L.formatPhp(f.scope.reduce((t, r) => t + (L.parseAmount(r.amount) || 0), 0))}`;
     d.querySelector('#pj-end').textContent = end ? `Completion date: ${L.displayDate(end)}` : '';
+    if (!el.completed) return;
+    d.querySelector('#pj-done').hidden = !f.completed;
     d.querySelector('#pj-final').textContent = f.completed && Number(f.final) < 100 ? 'Below 100% is not counted as completed.' : '';
   };
   form.oninput = draw;
@@ -545,19 +562,32 @@ function projectForm() {
   draw();
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new project?')) && done();
+  const close = () => (JSON.stringify(values()) === initial || confirm(project ? 'Discard your changes to this project?' : 'Discard this new project?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
-    const f = values(), errors = L.projectErrors(f, s.projects || [], today());
+    // The phone checks for a project of the same name and location only when one is created.
+    const f = values(), errors = L.projectErrors(f, project ? [] : s.projects || [], today());
     if (errors.length) { err.textContent = errors.join(' '); return; }
+    const edit = project && L.editedProject(project, f);
+    if (edit && !Object.keys(edit.fields).length) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     const uid = s.user.uid, now = Date.now(), uuid = crypto.randomUUID(), user = s.profile.name || s.user.email;
-    const { project, audit } = L.newProject(f, { uuid, uid, now, user });
+    if (edit) {
+      try {
+        await addRecords(c, [[ids => L.auditRecord({ ...ids, user, ...edit.audit }), []]], edit.fields);
+        done();
+      } catch (x) {
+        err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+        save.disabled = false;
+      }
+      return;
+    }
+    const { project: made, audit } = L.newProject(f, { uuid, uid, now, user });
     try {
-      await setDoc(doc(db, 'projects', uuid), project);
+      await setDoc(doc(db, 'projects', uuid), made);
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot add a project.' : x.message || 'Could not save. Try again.';
       save.disabled = false;
@@ -765,6 +795,8 @@ function drawProject(page) {
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  const projectEdit = document.getElementById('project-edit');
+  if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const weeklyAdd = document.getElementById('weekly-add');
   if (weeklyAdd) weeklyAdd.onclick = () => weeklyForm(c);
   main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
@@ -819,7 +851,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
       <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`,
-    '', `<a class="text-btn" href="#/p/${esc(page.id)}/print/profile">${icon('print', 'sm')}Print</a>`);
+    '', `${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
+      <a class="text-btn" href="#/p/${esc(page.id)}/print/profile">${icon('print', 'sm')}Print</a>`);
 
   // Key dates as a timeline: filled = passed, hollow = ahead, red (late) = a completion date passed on an unfinished project.
   const step = (label, date, completion) => {

@@ -1552,7 +1552,7 @@ export function weatherChanges(report, days, changed) {
   return { _weather: [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date))) };
 }
 
-/* ---------- New project (CreateProjectDialog and ProjectViewModel.createProject) ---------- */
+/* ---------- New project and Edit project (CreateProjectDialog, EditProjectDialog, ProjectViewModel) ---------- */
 
 /** Permission.CREATE_PROJECT: the Super Admin and Engineer Admins. A form rule only: firestore.rules lets any writer create one. */
 export const canCreateProject = claims => isWriter(claims) && ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
@@ -1579,7 +1579,9 @@ export function projectErrors(f, projects, today) {
   return [
     !f.name.trim() && 'Type the project name.',
     !f.contractor.trim() && 'Type the contractor\'s name.',
-    scopeRows(f).some(r => !r.name.trim() || !(parseAmount(r.amount) > 0)) && 'Each scope of works item needs a name and an amount above 0.',
+    // A saved item with no amount (an older project's) may stay as it is.
+    scopeRows(f).some(r => !r.name.trim() || !(parseAmount(r.amount) > 0 || (!r.amount.trim() && r.weightPct)))
+      && 'Each scope of works item needs a name and an amount above 0.',
     f.days.trim() && !/^\d{1,5}$/.test(f.days.trim()) && 'Contract duration: whole days only.',
     start == null && 'Pick the date started.',
     ...(f.completed ? [
@@ -1599,18 +1601,19 @@ const BLANK_PROJECT_FIELDS = ['projectedBeneficiaries', 'boardResolution', 'noti
 
 /**
  * The `projects` document for the form, as a phone uploads a new project (FirestoreSyncManager): the cost is the scope
- * of works' total, each item's weight its share of it, and the creator the only assigned account. With "already
+ * of works' total, each item's weight its share of it (with no amounts at all, saved items keep the weights they
+ * had: withAutoWeights), and the creator the only assigned account. With "already
  * completed" it is saved at the final accomplishment on the actual completion date (Project.markedCompleted).
  * `audit` is its "Project Creation" entry.
  */
 export function newProject(f, { uuid, uid, now, user }) {
-  const rows = scopeRows(f).map(r => ({ name: r.name.trim(), amount: parseAmount(r.amount) }));
+  const rows = scopeRows(f).map(r => ({ name: r.name.trim(), amount: parseAmount(r.amount) ?? 0, weightPct: Number(r.weightPct) || 0 }));
   const cost = rows.reduce((t, r) => t + r.amount, 0), days = projectDays(f), end = projectEnd(f);
   const final = f.completed ? Number(f.final) : 0, name = f.name.trim(), location = f.location.trim();
   return {
     project: {
       projectUuid: uuid, name, location, implementingOffice: f.implementingOffice.trim(), contractor: f.contractor.trim(),
-      scopeOfWork: JSON.stringify(rows.map(r => ({ ...r, weightPct: cost > 0 ? r.amount / cost * 100 : 0 }))),
+      scopeOfWork: JSON.stringify(rows.map(r => ({ ...r, weightPct: cost > 0 ? r.amount / cost * 100 : r.weightPct }))),
       projectType: f.projectType.trim() || PROJECT_TYPES[0],
       landArea: f.landArea.trim() ? `${f.landArea.trim()} ${f.landUnit}` : '', numberOfUnits: f.numberOfUnits.trim(),
       ...Object.fromEntries(BLANK_PROJECT_FIELDS.map(k => [k, ''])),
@@ -1622,6 +1625,55 @@ export function newProject(f, { uuid, uid, now, user }) {
     audit: {
       actionType: 'Project Creation', details: `Created new project: ${name}`,
       newValue: `Title: ${name}, Location: ${location}, Cost: ₱${cost}, Duration: ${days} days${f.completed ? `, Already completed on ${f.completedOn} at ${final}%` : ''}`,
+    },
+  };
+}
+
+/** The Project Profile fields only the edit form has. */
+const PROFILE_FIELDS = ['projectedBeneficiaries', 'boardResolution', 'noticeOfAward', 'noticeToProceed'];
+
+/**
+ * What the edit form starts with for a saved project (EditProjectDialog): the land area split into its number and
+ * unit, a type outside the list as the custom one, and "Mark as completed" off with its date at the completion date
+ * when that has passed, else today (defaultCompletedOn).
+ */
+export function projectStart(project, today) {
+  const text = key => String(project[key] ?? ''), land = text('landArea').trim(), cut = land.indexOf(' ');
+  const due = effectiveCompletion(project);
+  return {
+    ...Object.fromEntries(['name', 'location', 'implementingOffice', 'contractor', 'projectType', 'numberOfUnits', 'dateStarted', ...PROFILE_FIELDS].map(k => [k, text(k)])),
+    landArea: cut < 0 ? land : land.slice(0, cut), landUnit: cut >= 0 && /square/i.test(land.slice(cut)) ? LAND_UNITS[1] : LAND_UNITS[0],
+    days: text('contractDurationDays'), assignedStaff: text('assignedStaff'),
+    scope: (text('scopeOfWork').trim() ? scopeItems(project.scopeOfWork) : []).map(i => ({ name: i.name, amount: i.amount > 0 ? String(i.amount) : '', weightPct: String(i.weightPct) })),
+    completed: false, completedOn: isoDay(due) != null && due <= today ? due.trim() : today, final: '100',
+  };
+}
+
+/**
+ * The project fields an edit changes (the edit dialog's onEdit and Project.markedCompleted) and its "Project Edit"
+ * audit entry. Only what the form changed from its starting values is returned, so a field it did not touch (an
+ * older land area or scope the form would spell differently) is not rewritten; the revised cost, the revised
+ * completion date (unless marked completed) and the assignment are never the form's to change. `fields` is empty
+ * when nothing changed.
+ */
+export function editedProject(project, f) {
+  const fieldsOf = g => {
+    const made = newProject(g, { uuid: project.projectUuid }).project;
+    return {
+      ...Object.fromEntries(['name', 'location', 'implementingOffice', 'contractor', 'scopeOfWork', 'projectType', 'landArea', 'numberOfUnits', 'contractCostOriginal',
+        'contractDurationDays', 'dateStarted', 'completionDateOriginal'].map(k => [k, made[k]])),
+      ...Object.fromEntries(PROFILE_FIELDS.map(k => [k, g[k].trim()])),
+      ...(g.completed ? { completionDateRevised: g.completedOn, targetAccomplishment: made.actualAccomplishment, actualAccomplishment: made.actualAccomplishment } : {}),
+    };
+  };
+  const was = fieldsOf(projectStart(project, ''));
+  const fields = Object.fromEntries(Object.entries(fieldsOf(f)).filter(([k, v]) => was[k] !== v));
+  const after = { ...project, ...fields };
+  return {
+    fields,
+    audit: {
+      actionType: 'Project Edit', details: `Updated project master: ${after.name}`,
+      oldValue: `Status: ${displayStatus(project)}`, newValue: `Status: ${displayStatus(after)}, Revised Cost: ₱${Number(after.contractCostRevised) || 0}`,
     },
   };
 }

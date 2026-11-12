@@ -533,6 +533,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb td.pc { width: 3%; }
 .bb .sig1 { margin-top: 12mm; font-size: 10.5pt; }
 .section-head .text-btn { margin-left: auto; }
+.section-head .text-btn + .text-btn { margin-left: 4px; }
 .bb table.sig { margin-top: 6mm; }
 .bb table.sig td { border: none; width: 33%; }
 .bb .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
