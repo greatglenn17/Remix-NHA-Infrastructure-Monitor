@@ -670,6 +670,8 @@ function drawProject(page) {
   main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
   const letterAdd = document.getElementById('letter-add');
   if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
+  const requestAdd = document.getElementById('request-add');
+  if (requestAdd) requestAdd.onclick = () => editRequest(c, null);
   main.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editPhotos); if (r) editPhotos(c, r); }; });
   main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
@@ -1312,16 +1314,84 @@ function editIssue(c, issue) {
 }
 
 /**
- * DeveloperRequestDialog for a request already logged: type, details and dates, including the date packaged.
- * shortcut: no new requests here (the phone also files the order in Documents).
+ * OrderFieldInputs: the details of the order a new request asks for, one group for each request type (bindOrderFields
+ * shows the chosen type's). A Partial suspension picks the bar chart items it pauses.
+ */
+function orderFields(c) {
+  const text = (name, label, attrs = '') => `<label class="field">${label}<input name="${name}" autocomplete="off" ${attrs}></label>`;
+  const date = (name, label) => `<label class="field">${label}<input type="date" name="${name}"></label>`;
+  const pick = (name, label, options) => `<label class="field">${label}<select name="${name}">${options.map(o => `<option>${o}</option>`).join('')}</select></label>`;
+  // The End date has no name: it only follows the days, and is not saved on its own.
+  const span = p => `${text(`${p}Days`, 'No. of days', 'inputmode="numeric"')}${date(`${p}Effectivity`, 'Effectivity date')}<label class="field">End date<input type="date" data-end="${p}"></label>`;
+  const group = (type, body) => `<div class="order-fields" data-order="${type}">${body}</div>`;
+  const items = L.chartItemNames(c.project), suspensions = L.suspensionsByNo(c.documents);
+  const [ws, co, wr, vo, te] = L.REQUEST_TYPES;
+  return `<h3>Order requested</h3><p class="muted" data-order-note></p>
+    ${group(ws, text('wsNo', 'Suspension No.') + pick('wsType', 'Type of suspension', ['Full', 'Partial']) + span('ws') + text('wsReason', 'Reason')
+      + (items.length ? `<fieldset data-items><legend>Work items suspended (their target pauses; the rest go on)</legend>
+        ${items.map(i => `<label class="check"><input type="checkbox" name="wsItems" value="${esc(i)}">${esc(i)}</label>`).join('')}</fieldset>` : ''))}
+    ${group(co, suspensions.length ? `<label class="field">Suspension continued<select name="coOf">
+        ${suspensions.map((x, i) => `<option value="${esc(x.uuid)}"${i === suspensions.length - 1 ? ' selected' : ''}>${esc(L.orderLabel(x.documentName))}</option>`).join('')}</select></label>
+      <b data-co-name></b>${pick('coType', 'Type of suspension', ['Full', 'Partial'])}${span('co')}`
+      : '<p class="n-behind">No work suspension order is logged yet, so there is nothing to continue. Log the suspension first.</p>')}
+    ${group(wr, text('wrNo', 'Resumption No.') + pick('wrType', 'Type of resumption', ['Full', 'Partial']) + date('wrEffectivity', 'Effectivity date') + text('wrRemarks', 'Remarks'))}
+    ${group(vo, `${text('voNo', 'VO No.')}${pick('voType', 'Type of variation', ['Additive', 'Deductive'])}
+      <label class="field">Amount (PHP)<input name="voAmount" inputmode="decimal" autocomplete="off"><small class="muted" data-vo-hint></small></label>
+      ${text('voReason', 'Reason')}<label class="field">Date approved<input type="date" name="voDateApproved"><small class="muted">Leave blank if not yet approved</small></label>`)}
+    ${group(te, text('teNo', 'Extension No.', 'inputmode="numeric"') + text('teDays', 'No. of days', 'inputmode="numeric"') + text('teReason', 'Reason'))}`;
+}
+
+/** Wires orderFields: the group shown, the End date and the days following each other, and what the phone's form fills in. */
+function bindOrderFields(c, form) {
+  const show = () => {
+    const type = form.requestType.value;
+    form.querySelectorAll('[data-order]').forEach(g => { g.style.display = g.dataset.order === type ? '' : 'none'; });
+    form.querySelector('[data-order-note]').textContent = `Saved to Documents › ${type} as Pending.`;
+    const items = form.querySelector('[data-items]');
+    if (items) items.style.display = form.wsType.value === 'Partial' ? '' : 'none';
+    form.querySelector('[data-vo-hint]').textContent = form.voType.value === 'Deductive' ? 'Will be subtracted from the contract cost' : 'Will be added to the contract cost';
+  };
+  form.requestType.onchange = form.wsType.onchange = form.voType.onchange = show;
+  show();
+  for (const p of ['ws', 'co']) {
+    const days = form[`${p}Days`], eff = form[`${p}Effectivity`], end = form.querySelector(`[data-end="${p}"]`);
+    if (!days) continue; // no suspension to continue
+    // The effectivity date is day 1 (ProjectSchedule.endText, daysText).
+    days.oninput = eff.onchange = () => { const n = /^\d+$/.test(days.value.trim()) ? +days.value : 0; end.value = (n > 0 && eff.value && L.lastDay(eff.value, n)) || ''; };
+    end.onchange = () => { const n = Math.round((Date.parse(end.value) - Date.parse(eff.value)) / 86400000) + 1; if (n >= 1) days.value = n; };
+  }
+  if (form.coOf) {
+    // Named and started where the suspension picked and its continuances so far end; Partial when the suspension is.
+    const suspension = () => c.documents.find(x => x.uuid === form.coOf.value);
+    const next = () => L.nextContinuance(suspension(), c.documents, form.coType.value);
+    const name = () => { form.querySelector('[data-co-name]').textContent = next()[0]; };
+    form.coType.onchange = name;
+    form.coOf.onchange = () => {
+      form.coType.value = /^Partial/.test(L.orderLabel(suspension().documentName)) ? 'Partial' : 'Full';
+      name(); form.coEffectivity.value = next()[1]; form.coEffectivity.onchange();
+    };
+    form.coOf.onchange();
+  }
+  // A time extension for a suspension starts with the days its approved suspensions stopped work; still editable.
+  form.teReason.oninput = () => {
+    const n = L.suspensionExtensionDays(c.documents);
+    if (!form.teDays.value.trim() && n > 0 && /suspen/i.test(form.teReason.value)) form.teDays.value = n;
+  };
+}
+
+/**
+ * DeveloperRequestDialog: a new request (`r` null) or an edit: type, details and dates, including the date packaged.
+ * A new request also takes the details of the order it asks for, which is filed in Documents as Pending.
  */
 function editRequest(c, r) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
+  const isNew = !r;
+  r ||= { dateReceived: today() };
   const type = r.requestType || L.REQUEST_TYPES[0];
   const types = L.REQUEST_TYPES.includes(type) ? L.REQUEST_TYPES : [type, ...L.REQUEST_TYPES];
   d.innerHTML = `<form novalidate>
-    <h2>Developer request</h2>
+    <h2>${isNew ? 'New developer request' : 'Developer request'}</h2>
     <label class="field">Request for<select name="requestType">${types.map(v => `<option${v === type ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
     <label class="field">Details (letter no., reason)<input name="details" value="${esc(r.details || '')}"></label>
     <label class="field">Date of developer's request<input type="date" name="dateRequested" value="${esc(r.dateRequested || '')}"></label>
@@ -1329,17 +1399,22 @@ function editRequest(c, r) {
     <label class="field">Date packaged (blank: not yet)<input type="date" name="datePackaged" value="${esc(r.datePackaged || '')}"></label>
     ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
     ${fileField('requestFileUrl', "Developer's request letter", r.requestFileUrl)}
+    ${isNew ? orderFields(c) : ''}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  if (isNew) bindOrderFields(c, form);
   const values = () => {
     const f = Object.fromEntries(new FormData(form));
     return { requestType: f.requestType, details: f.details.trim(), dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged };
   };
-  const initial = JSON.stringify(values());
+  // The order form's fields, by name; a new request only.
+  const order = () => ({ ...textFields(form), wsItems: new FormData(form).getAll('wsItems') });
+  const snapshot = () => JSON.stringify(isNew ? order() : values());
+  const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
-  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm('Discard your changes to this request?')) && done();
+  const close = () => ((snapshot() === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new request?' : 'Discard your changes to this request?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   bindDelete(d, `Delete this ${r.requestType || ''} request? This cannot be undone.`, () => saveEdits(c, [[r, null, L.deletedRequestAudit(r)]], 'request'));
   const packedToday = d.querySelector('[data-today]');
@@ -1347,13 +1422,19 @@ function editRequest(c, r) {
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
-    const f = values(), errors = L.requestErrors(f);
+    const f = values(), o = order(), suspension = c.documents.find(x => x.uuid === o.coOf);
+    const errors = [...L.requestErrors(f), ...(isNew ? L.orderErrors(f.requestType, o, suspension) : [])];
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
+    if (!isNew && snapshot() === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      await saveEdit(c, r, { ...f, ...await uploadPicked(c, form) }, 'request', L.requestAudit(f));
+      const saved = { ...f, ...await uploadPicked(c, form) };
+      if (isNew) {
+        // The request, then the order it asks for, each with its audit entry, as the phone saves them.
+        const filed = L.orderDocument(f.requestType, o, suspension, c.documents);
+        await addRecords(c, [[ids => L.newRequestRecord(ids, saved), L.requestAudit(f)], [ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName)]]);
+      } else await saveEdit(c, r, saved, 'request', L.requestAudit(f));
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
@@ -1574,15 +1655,17 @@ function editPhotos(c, report) {
 }
 
 /** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
-async function addRecord(c, build, entry) {
+const addRecord = (c, build, entry) => addRecords(c, [[build, entry]]);
+
+/** addRecord for several records that must be added together (`items`: [build, audit entry] each), all or none. */
+async function addRecords(c, items) {
   const uid = s.user.uid, now = Date.now();
   const project = await getDoc(doc(db, 'projects', c.page.id));
-  const assignedUids = project.get('assignedUids') ?? [];
-  const record = build({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now });
-  const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
+  const ids = () => ({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids: project.get('assignedUids') ?? [], uid, now });
   const batch = writeBatch(db);
-  batch.set(doc(db, 'records', record.uuid), record);
-  batch.set(doc(db, 'records', audit.uuid), audit);
+  for (const [build, entry] of items) {
+    for (const record of [build(ids()), L.auditRecord({ ...ids(), user: s.profile.name || s.user.email, ...entry })]) batch.set(doc(db, 'records', record.uuid), record);
+  }
   await batch.commit();
 }
 
@@ -1924,8 +2007,9 @@ function lettersCard(letters, editable = false) {
   }).join('')), '', add);
 }
 
-/** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Edit. */
+/** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Add request and Edit. */
 function requestsCard(requests, now, editable = false) {
+  const add = editable ? `<button class="text-btn" id="request-add">${icon('add_circle', 'sm')}Add request</button>` : '';
   return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
     const title = L.requestTitle(r);
@@ -1936,7 +2020,7 @@ function requestsCard(requests, now, editable = false) {
     ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
       + (editable ? `<button class="text-btn entry-edit" data-edit-request="${esc(r.uuid)}">${icon('edit', 'sm')}${r.datePackaged ? 'Edit' : 'Edit or mark packaged'}</button>` : ''),
     r.datePackaged ? '' : 'waiting');
-  }).join('') : emptyLine('No requests from the developer.'));
+  }).join('') : emptyLine('No requests from the developer.'), '', add);
 }
 
 /** RelatedFilesList: other project files with their status and attached copy. */

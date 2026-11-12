@@ -1,8 +1,8 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor → Edit) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
+(Documents → Developer Requests / Letters to Contractor) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -35,7 +35,14 @@ is read only.
   has no Edit here: the phone turns it into a letter on its first edit. The receiving copy and the reply letter can be attached in the form; picking one fills its date with today when blank, as the phone does.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
-  entry. New requests are still added on the phone, since that also files the order in Documents.
+  entry.
+- **Add request** (same card) is the app's New developer request form: the request, plus the details of the order it
+  asks for (work suspension, continuance, resumption, variation order or time extension). Save adds the request and
+  files that order in Documents as Pending, named and worded as the phone does (`L.orderDocument`), with the app's
+  "Developer Request" and "Document Upload" audit entries, all in one batch. A continuance names the suspension it
+  continues (the highest-numbered one unless another is picked) and starts the day after it and its continuances end;
+  the End date follows the days typed; a Partial suspension picks the bar chart items it pauses; a time extension for
+  a suspension starts with the days the approved suspensions stopped work.
 - **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
   developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
@@ -155,4 +162,5 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, weekly reports and orders; editing lots.
+Adding weekly reports and orders (an order is filed only with a developer request); editing or approving orders;
+editing lots.

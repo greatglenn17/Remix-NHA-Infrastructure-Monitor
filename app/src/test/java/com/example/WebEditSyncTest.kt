@@ -214,4 +214,45 @@ class WebEditSyncTest {
         assertEquals("3f1c9a52-7b4e-4d2a-9c6f-1a2b3c4d5e6f", saved.uuid)
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/logic.js newRequestRecord and newDocumentRecord: a new developer request and the order it files in Documents. */
+    @Test
+    fun websiteNewRequest_isAddedWithItsPendingOrder() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        fun record(uuid: String, type: String, data: String) = mapOf(
+            "uuid" to uuid, "type" to type, "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"), "revision" to 1L,
+            "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "isDeleted" to false, "data" to data
+        )
+
+        recordSync.applyRemote(listOf(
+            record(
+                "7a2d4c10-5e3b-4f6a-8b1c-2d3e4f5a6b7c", "developer_requests",
+                """{"requestType":"Variation Order","details":"Letter 12","dateRequested":"","dateReceived":"2026-11-12","datePackaged":"","requestFileUrl":""}"""
+            ),
+            record(
+                "9c8b7a65-4d3c-4b2a-9f1e-0d9c8b7a6f5e", "pending_documents",
+                """{"documentName":"Variation Order No. 2 (Deductive) - PHP 1,500,000.50","status":"Pending",""" +
+                    """"remarks":"Reason: Less fill | Date Approved: 2026-11-05","isCoreChecklist":0,"fileUrl":""}"""
+            )
+        ))
+
+        val request = db.projectDao().getDeveloperRequestsForProject(projectId).first().single()
+        assertEquals("Variation Order", request.requestType)
+        assertEquals("Letter 12", request.details)
+        assertEquals("2026-11-12", request.dateReceived)
+        assertEquals("", request.datePackaged)
+        val order = db.projectDao().getPendingDocumentsForProject(projectId).first().single { it.uuid == "9c8b7a65-4d3c-4b2a-9f1e-0d9c8b7a6f5e" }
+        assertEquals("Variation Order No. 2 (Deductive) - PHP 1,500,000.50", order.documentName)
+        assertEquals("Pending", order.status)
+        assertEquals("Reason: Less fill | Date Approved: 2026-11-05", order.remarks)
+        assertEquals("off the core checklist", false, order.isCoreChecklist)
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }
