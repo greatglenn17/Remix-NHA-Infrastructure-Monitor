@@ -835,3 +835,27 @@ test('project edit: the form starts from the saved project, writes only what cha
   // A plain-text scope from before the list reads as one item at 100%.
   assert.deepEqual(L.projectStart({ ...project, scopeOfWork: 'Land development and housing' }, '2026-11-12').scope, [{ name: 'Land development and housing', amount: '', weightPct: '100' }]);
 });
+
+test('signatories: the project fields a weekly or a monthly report saves, only where they differ, and the audit entry', () => {
+  const project = { name: 'Pandi Heights', status: 'On-going', actualAccomplishment: 35, contractCostRevised: 4500000,
+    preparedByName: 'Engr. Cruz', preparedByPosition: 'Senior Engineer A', preparedByOffice: 'Bulacan District Office', weeklyCheckedByName: 'Engr. Reyes' };
+  const form = { preparedName: ' Engr. Cruz ', preparedPosition: 'Senior Engineer A', preparedOffice: 'Bulacan District Office',
+    checkedName: 'Engr. Reyes', checkedPosition: 'Principal Engineer A', checkedOffice: 'Bulacan District Office',
+    notedName: 'Engr. Santos', notedPosition: 'District Manager', notedOffice: ' Bulacan District Office ' };
+  // Weekly: its own checker and noter; what is already saved (after trimming) is not written again.
+  assert.deepEqual(L.signatoryFields(project, form, true), {
+    weeklyCheckedByPosition: 'Principal Engineer A', weeklyCheckedByOffice: 'Bulacan District Office',
+    weeklyNotedByName: 'Engr. Santos', weeklyNotedByPosition: 'District Manager', weeklyNotedByOffice: 'Bulacan District Office',
+  });
+  // Monthly: the same form goes to the monthly checker and noter; Prepared by is shared.
+  assert.deepEqual(L.signatoryFields(project, { ...form, preparedPosition: 'Principal Engineer C' }, false), {
+    preparedByPosition: 'Principal Engineer C', checkedByName: 'Engr. Reyes', checkedByPosition: 'Principal Engineer A', checkedByOffice: 'Bulacan District Office',
+    notedByName: 'Engr. Santos', notedByPosition: 'District Manager', notedByOffice: 'Bulacan District Office',
+  });
+  // A name cleared is saved as blank; nothing different is nothing to save.
+  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, true) }, { ...form, checkedName: '' }, true), { weeklyCheckedByName: '' });
+  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, true) }, form, true), {});
+  assert.deepEqual(L.projectEditAudit(project, { weeklyNotedByName: 'Engr. Santos' }),
+    { actionType: 'Project Edit', details: 'Updated project master: Pandi Heights', oldValue: 'Status: On-going', newValue: 'Status: On-going, Revised Cost: ₱4500000' });
+  assert.deepEqual(Object.keys(L.SIGNATORY_POSITIONS), ['prepared', 'weeklyChecked', 'weeklyNoted', 'checked', 'noted']);
+});

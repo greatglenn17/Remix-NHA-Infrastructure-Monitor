@@ -2565,6 +2565,59 @@ function relatedCard(files, editable = false) {
   editable ? `<button class="text-btn" id="related-add">${icon('add_circle', 'sm')}Add file</button>` : '');
 }
 
+/**
+ * SignatoriesDialog: who signs the weekly (or monthly) report. Save remembers them on the project for every printout,
+ * as the phone does when it prints (saveSignatories), with the "Project Edit" audit entry.
+ */
+function signatoriesForm(c, weekly) {
+  const start = (weekly ? P.weeklySignatories : P.monthlySignatories)(c.project, s.profile);
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const list = (id, values) => `<datalist id="${id}">${values.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  const signer = (title, key, positions) => `<h3>${title}</h3>
+    <label class="field">Name<input name="${key}Name" value="${esc(start[`${key}Name`])}"></label>
+    <label class="field">Position<input name="${key}Position" list="sg-${key}" value="${esc(start[`${key}Position`])}"></label>${list(`sg-${key}`, positions)}
+    <label class="field">Office<input name="${key}Office" list="sg-offices" value="${esc(start[`${key}Office`])}"></label>`;
+  const at = L.SIGNATORY_POSITIONS;
+  d.innerHTML = `<form novalidate>
+    <h2>${weekly ? 'Weekly' : 'Monthly'} report signatories</h2>
+    ${signer('Prepared by', 'prepared', at.prepared)}
+    ${signer(weekly ? 'Checked and reviewed by' : 'Checked by', 'checked', weekly ? at.weeklyChecked : at.checked)}
+    ${signer('Noted by', 'noted', weekly ? at.weeklyNoted : at.noted)}
+    ${list('sg-offices', L.SIGNATORY_OFFICES)}
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const values = () => Object.fromEntries(new FormData(form));
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the signatories?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fields = L.signatoryFields(c.project, values(), weekly);
+    if (!Object.keys(fields).length) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/** The print bar's right side: Signatories (for those who can edit the project) and the Print button. */
+const printActions = (c, label) => `<span class="print-actions">${L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="signatories">${icon('edit', 'sm')}Signatories</button>` : ''}
+  <button class="btn" id="do-print" disabled>${icon('print', 'sm')}${label}</button></span>`;
+const bindSignatories = (c, weekly) => { const b = document.getElementById('signatories'); if (b) b.onclick = () => signatoriesForm(c, weekly); };
+
 /* ---------- Weekly report print (BlueBookForms.weeklyReport on an A4 sheet) ---------- */
 
 async function drawPrint(c) {
@@ -2578,9 +2631,10 @@ async function drawPrint(c) {
   // The file name "Save as PDF" offers, as the phone names it (BlueBookPrint.pdfName).
   document.title = `Weekly Report - ${(report.reportingWeek || '').replace(/^Week \d+: /, '')}`;
   const token = page.printToken = {};
-  main.innerHTML = `<div class="print-bar no-print">${back}<button class="btn" id="do-print" disabled>${icon('print', 'sm')}Preparing photos…</button></div>
+  main.innerHTML = `<div class="print-bar no-print">${back}${printActions(c, 'Preparing photos…')}</div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
+  bindSignatories(c, true);
   // Photos are the report's uploaded images (PDFs and files not uploaded yet are left out, as on the phone).
   const titles = L.photoDetails(report.photoDetailsJson);
   const refs = L.attachmentList(report.attachedPhotoUrlsJson).filter(x => !L.isPdf(x));
@@ -2616,15 +2670,17 @@ function drawProfilePrint({ page, project, documents }) {
 }
 
 /** The monthly form (BlueBookForms.monthlyReport) for `#/p/<id>/print/2026-09`. */
-async function drawMonthlyPrint({ page, project, of, documents, payments, weekly }) {
+async function drawMonthlyPrint(c) {
+  const { page, project, of, documents, payments, weekly } = c;
   const month = P.monthName(page.sub);
   page.month = month; page.chips.progress = 'Monthly'; // the back link returns to this month
   document.title = `Monthly Report - ${month}`;
   const token = page.printToken = {};
   main.innerHTML = `<div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Monthly reports</a>
-      <button class="btn" id="do-print" disabled>${icon('print', 'sm')}Preparing…</button></div>
+      ${printActions(c, 'Preparing…')}</div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
+  bindSignatories(c, false);
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = P.monthlyReportHtml({
     project, month: page.sub, weeks: L.monthReports(weekly, month), payments, issues: of('project_issues'), docs: documents,
