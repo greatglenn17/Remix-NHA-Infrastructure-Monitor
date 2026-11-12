@@ -106,7 +106,15 @@ is read only.
   and saving with nothing changed writes nothing. The revised cost and the revised completion date are not the
   form's to change. **Mark as completed** (shown until work done reaches 100%) sets the target and actual to the
   final accomplishment and the revised completion date to the actual completion date. There is no duplicate name
-  check on an edit, as on the phone. The bar chart stays on the phone.
+  check on an edit, as on the phone.
+- **Edit** on the Approved bar chart card (Summary), for the Super Admin and an Engineer Admin who can edit the
+  project (the app's MANAGE_BAR_CHART roles and the rules: `L.canEditChart`), is the app's bar chart form
+  (`barChartForm`): a tab per chart and **Revised chart** to add one, and per Scope of Works item its bar(s) as From
+  month and cell, To month and cell. The errors that keep Save off are the app's (`L.chartErrors`): a name, the
+  contract total, a revised chart's date, and bars that read. Save writes `barChartJson` in the phone's shape
+  (`L.chartJson`), one revision up, with the app's "Bar Chart" audit entry; deleting the only chart removes it.
+  The Excel import is not here yet, so a chart whose items differ from the Scope of Works is still imported on the
+  phone, and a chart with no items is refused.
 - **Delete project** in that form, for the Super Admin and an Engineer Admin who can edit the project (the app's
   DELETE_PROJECT roles, on a project that is not view-only: `L.canDeleteProject`). It asks first, then marks the
   project document deleted the way a phone uploads a delete (`L.deletedProject`); the document and its records stay

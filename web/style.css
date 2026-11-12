@@ -662,6 +662,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wk-row .icon-btn { margin-left: auto; }
 .wk-add { justify-self: start; margin-top: -6px; }
 .wk-total { margin: 0; font-weight: 600; }
+.bc-body { display: grid; gap: 14px; }
+.bc-errors { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--behind); font-size: 13px; }
+.bc-errors:empty { display: none; }
+.bc-item { display: grid; gap: 8px; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.bc-item legend { padding: 0 4px; font-weight: 600; }
+.bc-item p { margin: 0; }
+.bc-item .wk-row { padding: 0; border: 0; }
+.bc-item .wk-row .field.n { flex: 1 1 56px; min-width: 0; } /* the four boxes of a bar stay on one line on a phone */
+.bc-item .wk-add { margin-top: 0; }
 .order-fields fieldset, fieldset.lot-billing { margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .order-fields legend, .lot-billing legend { padding: 0 4px; font-size: 13px; color: var(--text-2); }
 .field textarea, .field select { font: 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }

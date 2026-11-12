@@ -857,6 +857,8 @@ function drawProject(page) {
   if (document.getElementById('issue-results')) bindIssues(c);
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
+  const chartEdit = document.getElementById('chart-edit');
+  if (chartEdit) chartEdit.onclick = () => barChartForm(c);
   const projectAssign = document.getElementById('project-assign');
   if (projectAssign) projectAssign.onclick = () => assignForm(c);
   const weeklyAdd = document.getElementById('weekly-add');
@@ -971,10 +973,122 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     </div>`;
 }
 
-/** BarChartCard: the chart in force, today's planned % and its S-curve by month. */
+const curveTable = version => table(['Month', { text: 'Monthly', num: true }, { text: 'Cumulative', num: true }], L.chartMonths(version).map(m =>
+  `<tr><td>${m.no}</td><td class="num">${m.monthlyPct.toFixed(2)}%</td><td class="num">${m.cumulativePct.toFixed(2)}%</td></tr>`).join(''));
+
+/**
+ * BarChartDialog: the approved bar chart, per Scope of Works item the bar(s) from month and cell to month and cell. A
+ * revised chart is added with the date it takes effect; the earlier ones stay. Save writes the project's barChartJson,
+ * one revision up, with the app's "Bar Chart" audit entry.
+ * shortcut: no Excel import here, the items come from the Scope of Works or the saved chart; import on the phone until it is added.
+ */
+function barChartForm(c) {
+  const { project, documents } = c;
+  const drafts = L.chartDrafts(project);
+  if (!drafts) { alert('Set the project\'s start date first; the bar chart counts its days from it.'); return; }
+  let selected = drafts.length - 1;
+  const initial = L.chartJson(drafts);
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form wk-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Approved bar chart</h2>
+    <div class="chips" role="group" aria-label="Chart" data-tabs></div>
+    <p class="muted small">Enter each item's bar as drawn: From month and cell, To month and cell. A month is 30 days; its cells are 5, 10, 15, 20, 25 and 30,
+      counted from the start date. The chart must total the contract amount. The target % then follows this chart every day.</p>
+    <ul class="bc-errors" data-errors aria-live="polite"></ul>
+    <div class="bc-body" data-body></div>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), tabs = d.querySelector('[data-tabs]'), body = d.querySelector('[data-body]'), errs = d.querySelector('[data-errors]');
+  const err = d.querySelector('p.error'), save = d.querySelector('.actions .btn');
+  const tabName = i => drafts[i].label.trim() || `Chart ${i + 1}`;
+  const cells = cur => ['', 5, 10, 15, 20, 25, 30].map(n => `<option${String(n) === cur ? ' selected' : ''}>${n}</option>`).join('');
+  const barRow = (b, key, many) => `<div class="wk-row" data-bar="${key}">
+    <label class="field n">From month<input data-k="sm" inputmode="numeric" value="${esc(b.sm)}"></label>
+    <label class="field n">Cell<select data-k="sc">${cells(b.sc)}</select></label>
+    <label class="field n">To month<input data-k="em" inputmode="numeric" value="${esc(b.em)}"></label>
+    <label class="field n">Cell<select data-k="ec">${cells(b.ec)}</select></label>
+    ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
+  // What typing changes: the errors, each item's line, the S-curve and the tab's name. The boxes are left alone, so the cursor stays.
+  const drawNumbers = () => {
+    const errors = L.chartErrors(drafts, project, documents);
+    errs.innerHTML = errors.map(e => `<li>${esc(e)}</li>`).join('');
+    save.disabled = errors.length > 0;
+    const v = drafts[selected];
+    if (!v) return;
+    const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
+    body.querySelectorAll('[data-item]').forEach((el, i) => {
+      const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
+      el.querySelector('[data-sum]').textContent = `${L.formatPhp(v.items[i].amount)} · ${(total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3)}% · ${days} c.d.`;
+    });
+    body.querySelector('[data-curve]').innerHTML = curveTable(made);
+    tabs.querySelector(`[data-tab="${selected}"]`).textContent = tabName(selected);
+  };
+  const draw = () => {
+    tabs.innerHTML = drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === selected}">${esc(tabName(i))}</button>`).join('')
+      + `<button type="button" data-add-chart>${icon('add_circle', 'sm')}${drafts.length ? 'Revised chart' : 'Add the chart'}</button>`;
+    const v = drafts[selected];
+    body.innerHTML = !v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>' : `
+      <label class="field">Name<input data-label value="${esc(v.label)}"></label>
+      ${selected === 0 ? `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`
+        : `<label class="field">Takes effect on<input type="date" data-effective value="${esc(v.effective)}"></label>
+          <p class="muted small">Draw the revised chart from the start date, with suspended months left empty, as approved.</p>`}
+      ${v.items.map((item, i) => `<fieldset class="bc-item" data-item="${i}"><legend>${esc(item.name)}</legend>
+        <p class="muted small" data-sum></p>
+        ${item.bars.map((b, j) => barRow(b, `${i}:${j}`, item.bars.length > 1)).join('')}
+        <button type="button" class="text-btn wk-add" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></fieldset>`).join('')}
+      <p class="sub">S-curve</p><div data-curve></div>
+      <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button>`;
+    drawNumbers();
+  };
+  body.oninput = e => {
+    const v = drafts[selected], t = e.target;
+    if (t.matches('[data-label]')) v.label = t.value;
+    else if (t.matches('[data-effective]')) v.effective = t.value;
+    else if (t.dataset.k) { const [i, j] = t.closest('[data-bar]').dataset.bar.split(':'); v.items[i].bars[j][t.dataset.k] = t.value; }
+    drawNumbers();
+  };
+  form.onclick = e => {
+    const on = sel => e.target.closest(sel), tab = on('[data-tab]'), drop = on('[data-drop-bar]');
+    if (tab) selected = +tab.dataset.tab;
+    else if (on('[data-add-chart]')) { drafts.push(drafts.length ? L.revisedDraft(drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); selected = drafts.length - 1; }
+    else if (on('[data-add-bar]')) drafts[selected].items[on('[data-item]').dataset.item].bars.push(L.emptyBar());
+    else if (drop) { const [i, j] = drop.closest('[data-bar]').dataset.bar.split(':'); drafts[selected].items[i].bars.splice(j, 1); }
+    // The first chart left always runs from the start date.
+    else if (on('[data-drop-chart]')) { drafts.splice(selected, 1); selected = Math.max(selected - 1, 0); if (drafts[0]) drafts[0].effective = project.dateStarted; }
+    else return;
+    draw();
+  };
+  draw();
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (L.chartJson(drafts) === initial || confirm('Discard your changes to the bar chart?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (L.chartErrors(drafts, project, documents).length) return;
+    const json = L.chartJson(drafts);
+    if (json === initial) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.chartAudit(json) }), []]], { barChartJson: json });
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this project\'s bar chart.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/** BarChartCard: the chart in force, today's planned % and its S-curve by month; Edit for those who manage the chart. */
 function barChartCard(project, documents, now) {
+  const edit = L.canEditChart(project, s.user.uid, s.claims) ? `<button class="text-btn" id="chart-edit">${icon('edit', 'sm')}Edit</button>` : '';
   const plan = L.planOn(project, documents, now);
-  if (!plan) return section('Approved bar chart', 'stacked_line_chart', emptyLine('No bar chart yet. The target % is typed in each weekly report.'));
+  if (!plan) return section('Approved bar chart', 'stacked_line_chart', emptyLine('No bar chart yet. The target % is typed in each weekly report.'), '', edit);
   const { version, day } = plan, last = L.chartLastDay(version), [month, cell] = L.cellOf(Math.min(Math.max(day, 1), last));
   const inForce = v => `${v.label} · from ${L.displayDate(v.effective)}`;
   return section('Approved bar chart', 'stacked_line_chart', `
@@ -983,8 +1097,7 @@ function barChartCard(project, documents, now) {
     ${kv('Chart length', `${last} calendar days`)}
     ${plan.versions.filter(v => v !== version).map(v => kv('Also on file', inForce(v))).join('')}
     <p class="sub">S-curve</p>
-    ${table(['Month', { text: 'Monthly', num: true }, { text: 'Cumulative', num: true }], L.chartMonths(version).map(m =>
-      `<tr><td>${m.no}</td><td class="num">${m.monthlyPct.toFixed(2)}%</td><td class="num">${m.cumulativePct.toFixed(2)}%</td></tr>`).join(''))}`);
+    ${curveTable(version)}`, '', edit);
 }
 
 /** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */

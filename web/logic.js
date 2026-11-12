@@ -1767,3 +1767,70 @@ export const canDeleteProject = (project, uid, claims) => canCreateProject(claim
  * stay, marked deleted, and every phone and this website drop the project.
  */
 export const deletedProject = (project, { uid, now }) => ({ projectUuid: project.projectUuid, isDeleted: true, updatedAt: now, updatedByUid: uid });
+
+/** MANAGE_BAR_CHART (the Super Admin and Engineer Admins) on a project the account can edit, as firestore.rules allows. */
+export const canEditChart = canDeleteProject;
+
+const EMPTY_BAR = () => ({ sm: '', sc: '', em: '', ec: '' });
+
+/**
+ * BarChartDialog's drafts: the saved charts as the form edits them, each bar as its From and To month and cell, or
+ * one "Original" chart of the Scope of Works items with an empty bar each. The first chart always runs from the
+ * start date. Null without a start date: the chart counts its days from it.
+ */
+export function chartDrafts(project) {
+  if (isoDay(project.dateStarted) == null) return null;
+  const bar = ([a, b]) => { const [sm, sc] = cellOf(a), [em, ec] = cellOf(b); return { sm: String(sm), sc: String(sc), em: String(em), ec: String(ec) }; };
+  const items = list => list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()] }));
+  const saved = chartVersions(project.barChartJson).map(v => ({ label: String(v.label ?? ''), effective: String(v.effective ?? ''), items: items(v.items || []) }));
+  const drafts = saved.length ? saved : [{ label: 'Original', effective: '', items: items(scopeItems(project.scopeOfWork)) }];
+  drafts[0].effective = project.dateStarted;
+  return drafts;
+}
+
+/** The "+ Revised chart" tab: the next chart starts as a copy of the last one, with no date yet. */
+export const revisedDraft = drafts => ({ label: `Revised No. ${drafts.length}`, effective: '', items: drafts.at(-1).items.map(i => ({ ...i, bars: i.bars.map(b => ({ ...b })) })) });
+export const emptyBar = EMPTY_BAR;
+
+/** BarDraft.bar: the bar in contract days, or null when a box is not a month (1+) and a cell (5, 10 … 30), or it ends before it starts. */
+export function draftBar(b) {
+  const whole = t => (/^\d+$/.test(String(t).trim()) && Number(t) >= 1 ? Number(t) : null);
+  const cell = t => { const n = whole(t); return n != null && n <= MONTH_DAYS && n % CELL_DAYS === 0 ? n : null; };
+  const sm = whole(b.sm), sc = cell(b.sc), em = whole(b.em), ec = cell(b.ec);
+  if ([sm, sc, em, ec].includes(null)) return null;
+  const bar = [(sm - 1) * MONTH_DAYS + sc - CELL_DAYS + 1, (em - 1) * MONTH_DAYS + ec];
+  return barDays(bar) > 0 ? bar : null;
+}
+
+/** VersionDraft.version: the chart as saved; a bar that does not read is left out (chartErrors names its item). */
+export const draftVersion = d => ({ label: d.label.trim(), effective: d.effective, items: d.items.map(i => ({ name: i.name, amount: i.amount, bars: i.bars.map(draftBar).filter(Boolean) })) });
+
+/** BarChart.toJson for the drafts, keys in the phone's order; no chart at all is blank, which removes it. */
+export const chartJson = drafts => (drafts.length ? JSON.stringify(drafts.map(draftVersion)) : '');
+
+/**
+ * BarChartDialog's errors, which keep Save off. The original chart must total the original contract amount, a revised
+ * one the original or the current (after Variation Orders); a revised chart takes effect after the start date and
+ * after the chart before it. A chart with no items (a project with no Scope of Works) is refused here, where there is
+ * no Excel import to fill it.
+ */
+export function chartErrors(drafts, project, docs) {
+  const start = isoDay(project.dateStarted), original = originalCost(project), current = currentCost(project, docs);
+  return drafts.flatMap((d, i) => {
+    const name = d.label.trim() || `Chart ${i + 1}`, date = isoDay(d.effective), total = d.items.reduce((t, x) => t + x.amount, 0);
+    const matches = Math.abs(total - original) < 0.015 || (i > 0 && Math.abs(total - current) < 0.015);
+    const bad = d.items.filter(x => !x.bars.every(draftBar));
+    return [
+      !d.label.trim() && `${name}: enter a name`,
+      !d.items.length && `${name}: add the Scope of Works items to the project first`,
+      d.items.length && !matches && `${name}: the chart totals ${formatPhp(total)} but the contract amount is ${formatPhp(i > 0 ? current : original)}`,
+      i > 0 && date == null && `${name}: pick the date it takes effect`,
+      i > 0 && date != null && start != null && date < start && `${name}: takes effect before the start date`,
+      i > 0 && date != null && drafts[i - 1].effective >= d.effective && `${name}: takes effect on or before the previous chart`,
+      bad.length && `${name}: check the bars of ${bad.map(x => x.name).join(', ')} (month 1+, cell 5, 10 … 30)`,
+    ].filter(Boolean);
+  });
+}
+
+/** saveBarChart's audit entry. */
+export const chartAudit = json => ({ actionType: 'Bar Chart', details: json ? 'Saved the approved bar chart' : 'Removed the approved bar chart' });
