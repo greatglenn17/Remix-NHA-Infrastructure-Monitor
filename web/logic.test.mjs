@@ -523,3 +523,23 @@ test('order status: the remarks keep their schedule fields, the End moves the da
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER', undefined].map(role => L.canApprove({ role })), [true, true, false, false, false]);
   assert.equal(L.ORDER_STATUSES.at(-1), 'Approved');
 });
+
+test('related file: named, worded and logged as the phone does', () => {
+  const other = L.RELATED_TYPES.at(-1);
+  assert.deepEqual(L.relatedDocument({ docType: 'Notice to Proceed', title: 'ignored', reference: 'Ref: NHA-2026-001', status: 'Signed', remarks: 'Original' }),
+    { documentName: 'Notice to Proceed', status: 'Signed', remarks: 'Ref: NHA-2026-001 | Original' });
+  assert.deepEqual(L.relatedDocument({ docType: other, title: ' ECC ', reference: ' ', status: 'Pending', remarks: 'DENR' }), { documentName: 'ECC', status: 'Pending', remarks: 'DENR' });
+  assert.equal(L.relatedDocument({ docType: other, title: ' ', reference: '', status: 'Pending', remarks: '' }).documentName, '');
+  const ids = { uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'a', now: 7 };
+  const record = L.newDocumentRecord(ids, { documentName: 'ECC', status: 'Approved', remarks: 'DENR', fileUrl: 'nhafile:attachments/p1/x.pdf' });
+  assert.equal(record.type, 'pending_documents');
+  assert.deepEqual(JSON.parse(record.data), { documentName: 'ECC', status: 'Approved', remarks: 'DENR', isCoreChecklist: 0, fileUrl: 'nhafile:attachments/p1/x.pdf' });
+  // An order still starts Pending with no file.
+  assert.deepEqual(JSON.parse(L.newDocumentRecord(ids, { documentName: 'Time Extension No. 1 - 4 Days', remarks: 'Reason: Rain' }).data),
+    { documentName: 'Time Extension No. 1 - 4 Days', status: 'Pending', remarks: 'Reason: Rain', isCoreChecklist: 0, fileUrl: '' });
+  assert.deepEqual(L.relatedAddedAudit('ECC', 'nhafile:attachments/p1/x.pdf'),
+    { actionType: 'Document Upload', details: 'Uploaded project document: ECC', oldValue: '', newValue: 'Doc: ECC, URL: nhafile:attachments/p1/x.pdf' });
+  assert.deepEqual(L.fileAttachedAudit({ documentName: 'ECC' }, 'nhafile:attachments/p1/y.jpg'),
+    { actionType: 'Document Upload', details: 'Uploaded file attachment for ECC', oldValue: '', newValue: 'nhafile:attachments/p1/y.jpg' });
+  assert.deepEqual(L.RELATED_STATUSES, ['Approved', 'Notarized', 'Signed', 'Submitted', 'Pending']);
+});

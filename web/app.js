@@ -672,6 +672,9 @@ function drawProject(page) {
   if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
   const requestAdd = document.getElementById('request-add');
   if (requestAdd) requestAdd.onclick = () => editRequest(c, null);
+  const relatedAdd = document.getElementById('related-add');
+  if (relatedAdd) relatedAdd.onclick = () => relatedFile(c, null);
+  main.querySelectorAll('[data-edit-related]').forEach(b => { b.onclick = () => { const f = documents.find(x => x.uuid === b.dataset.editRelated); if (f) relatedFile(c, f); }; });
   main.querySelectorAll('[data-add-order]').forEach(b => { b.onclick = () => addOrder(c, b.dataset.addOrder); });
   main.querySelectorAll('[data-edit-order]').forEach(b => { b.onclick = () => { const o = documents.find(x => x.uuid === b.dataset.editOrder); if (o) editOrder(c, o); }; });
   main.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editPhotos); if (r) editPhotos(c, r); }; });
@@ -1483,6 +1486,58 @@ function editOrder(c, o) {
 }
 
 /**
+ * AddRelatedDocumentDialog (`file` null): a related file's type or title, reference, status, remarks and scanned copy.
+ * For one already listed it is ViewScannedCopyDialog, with the list's delete: attach or replace its scanned copy, or
+ * delete the entry. The phone does not edit a related file's status or remarks, so neither does this.
+ */
+function relatedFile(c, file) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const isNew = !file;
+  d.innerHTML = `<form novalidate>
+    <h2>${isNew ? 'Add related project document' : esc(file.documentName)}</h2>
+    ${isNew ? `<label class="field">Document type<select name="docType">${L.RELATED_TYPES.map(o => `<option>${esc(o)}</option>`).join('')}</select></label>
+    <label class="field" data-title>Specific document title<input name="title" placeholder="e.g. Environmental Compliance Certificate" autocomplete="off"></label>
+    <label class="field">Reference / serial no. / date<input name="reference" placeholder="e.g. Ref: NHA-2026-001 | Date: 2026-01-15" autocomplete="off"></label>
+    <label class="field">Document status<select name="status">${L.RELATED_STATUSES.map(o => `<option${o === 'Pending' ? ' selected' : ''}>${o}</option>`).join('')}</select></label>
+    <label class="field">Remarks / description<input name="remarks" autocomplete="off"></label>`
+    : `<p class="muted">Status: ${esc(file.status || 'Pending')} | ${esc(file.remarks || 'No remarks')}</p>`}
+    ${fileField('fileUrl', 'Scanned copy', file?.fileUrl)}
+    <p class="error" role="alert"></p>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete file</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  if (isNew) (form.docType.onchange = () => { form.querySelector('[data-title]').style.display = form.docType.value === L.RELATED_TYPES.at(-1) ? '' : 'none'; })();
+  const snapshot = () => JSON.stringify(textFields(form));
+  const initial = snapshot();
+  const done = () => { d.close(); d.remove(); };
+  const close = () => ((snapshot() === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new document?' : 'Discard your changes to this file?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  // The phone logs nothing for a deleted document.
+  bindDelete(d, `Delete "${file?.documentName || ''}"? This cannot be undone.`, () => saveEdits(c, [[file, null, null]], 'file'));
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const filed = isNew && L.relatedDocument(textFields(form));
+    if (isNew && !filed.documentName) { err.textContent = 'Type the document title.'; return; }
+    if (!isNew && !hasPicked(form)) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      const { fileUrl = '' } = await uploadPicked(c, form);
+      await (isNew ? addRecord(c, ids => L.newDocumentRecord(ids, { ...filed, fileUrl }), L.relatedAddedAudit(filed.documentName, fileUrl))
+        : saveEdit(c, file, { fileUrl }, 'file', L.fileAttachedAudit(file, fileUrl)));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
  * DeveloperRequestDialog: a new request (`r` null) or an edit: type, details and dates, including the date packaged.
  * A new request also takes the details of the order it asks for, which is filed in Documents as Pending.
  */
@@ -2086,7 +2141,7 @@ function documentsBody(c, chip) {
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
   if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable);
-  if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents));
+  if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents), editable);
   const suspensions = documents.filter(L.isSuspension);
   const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
   // A continuance whose suspension was deleted still shows, at the end.
@@ -2132,12 +2187,14 @@ function requestsCard(requests, now, editable = false) {
   }).join('') : emptyLine('No requests from the developer.'), '', add);
 }
 
-/** RelatedFilesList: other project files with their status and attached copy. */
-function relatedCard(files) {
+/** RelatedFilesList: other project files with their status and attached copy; `editable` adds Add file, and the button that attaches a copy or deletes. */
+function relatedCard(files, editable = false) {
   const level = st => (st === 'Approved' ? 'ok' : st === 'Notarized' || st === 'Signed' ? 'primary' : st === 'Submitted' ? 'watch' : 'neutral');
   return section(`Related files (${files.length})`, 'folder_open', files.length ? files.map(d => entry(d.documentName, [d.remarks || 'N/A'],
-    `<span class="badge lv-${level(d.status)}">${esc(d.status || 'Pending')}</span>${d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '<small class="muted">No copy attached</small>'}`)).join('')
-    : emptyLine('No related project files or scanned documents uploaded yet.'));
+    `<span class="badge lv-${level(d.status)}">${esc(d.status || 'Pending')}</span>${d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '<small class="muted">No copy attached</small>'}`
+    + (editable ? `<button class="text-btn entry-edit" data-edit-related="${esc(d.uuid)}">${icon(d.fileUrl ? 'edit' : 'upload_file', 'sm')}${d.fileUrl ? 'Edit' : 'Attach copy'}</button>` : ''))).join('')
+    : emptyLine('No related project files or scanned documents uploaded yet.'), '',
+  editable ? `<button class="text-btn" id="related-add">${icon('add_circle', 'sm')}Add file</button>` : '');
 }
 
 /* ---------- Weekly report print (BlueBookForms.weeklyReport on an A4 sheet) ---------- */

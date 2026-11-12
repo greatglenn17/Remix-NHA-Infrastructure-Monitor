@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status (Documents) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -53,6 +53,11 @@ is read only.
   updates one that is not yet approved. A changed status gets the app's "Updated document status" audit entry; a
   remarks-only edit and a delete get none, as on the phone. A suspension's form also has **Add continuance of work
   suspension**. The phone has no scan on an order, so none is attached here.
+- **Add file** on Documents → Related Files is the app's Add Related Project Document form: one of its document types
+  or a title typed in, a reference, the status, remarks and the scanned copy, with the app's "Uploaded project
+  document" audit entry. **Attach copy** / **Edit** on a file attaches, replaces or removes its scanned copy, with the
+  app's "Uploaded file attachment" audit entry, or deletes the entry (no audit entry, as on the phone). As on the
+  phone, a related file's status and remarks cannot be changed after it is added.
 - **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
   developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
@@ -172,4 +177,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding weekly reports; adding or editing a related file; editing lots.
+Adding weekly reports; editing lots.
