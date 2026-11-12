@@ -320,7 +320,10 @@ object Attachments {
         "pending_documents" to "fileUrl",
         "project_payments" to "fileUrl",
         "projects" to "latestUpdatePhotoUrl",
-        "sdp_plans" to "pdfFileUrl"
+        "sdp_plans" to "pdfFileUrl",
+        "developer_requests" to "requestFileUrl",
+        "contractor_letters" to "replyFileUrl",
+        "contractor_letters" to "receivedFileUrl"
     )
 
     /**
