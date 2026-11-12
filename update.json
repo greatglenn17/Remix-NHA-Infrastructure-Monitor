@@ -1,8 +1,8 @@
 {
-  "versionCode": 295,
-  "versionName": "2.8.15",
-  "releaseNotes": "v2.8.15: Files attached to a developer request or a letter to the contractor are no longer deleted a day after they are attached. Files already deleted have to be attached again.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.15/NHA_Monitor_v2.8.15_Build295.apk",
-  "apkSha256": "d8de1517bfe7f87d73204d98e4f3877737347faa5b7c5a54b313e9fdf6f11829",
+  "versionCode": 296,
+  "versionName": "2.8.16",
+  "releaseNotes": "v2.8.16: Saving or editing a weekly report for an older week no longer sets the project's target and actual accomplishment back to that week's figures.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.16/NHA_Monitor_v2.8.16_Build296.apk",
+  "apkSha256": "a95ef2cdfdc4015db1ec31f8f30d8f79e63c724e53de596f23f9088023e5d6c1",
   "isMandatory": true
 }
