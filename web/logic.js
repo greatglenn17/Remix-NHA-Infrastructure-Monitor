@@ -1057,9 +1057,36 @@ export const newRequestRecord = (ids, f) => newRecord(ids, 'developer_requests',
   requestFileUrl: f.requestFileUrl || '',
 });
 
-/** A new pending_documents record as ProjectViewModel.addPendingDocument saves one: Pending, off the core checklist, no file. */
-export const newDocumentRecord = (ids, { documentName, remarks }) =>
-  newRecord(ids, 'pending_documents', { documentName, status: 'Pending', remarks, isCoreChecklist: 0, fileUrl: '' });
+/**
+ * A new pending_documents record, off the core checklist: an order as ProjectViewModel.addPendingDocument saves one
+ * (Pending, no file), or a related file as addRelatedDocument does, with its status and scanned copy.
+ */
+export const newDocumentRecord = (ids, { documentName, remarks, status = 'Pending', fileUrl = '' }) =>
+  newRecord(ids, 'pending_documents', { documentName, status, remarks, isCoreChecklist: 0, fileUrl });
+
+/** AddRelatedDocumentDialog's document types (the last takes a title typed in) and statuses. */
+export const RELATED_TYPES = ['Notice of Award', 'Notice to Proceed', 'Contract Agreement', 'Memorandum of Agreement', 'RFA / CAF', 'NHA Board Resolution',
+  'Other / Specific Custom Document...'];
+export const RELATED_STATUSES = ['Approved', 'Notarized', 'Signed', 'Submitted', 'Pending'];
+
+/**
+ * AddRelatedDocumentDialog's document: named by the type picked, or by the title typed for the last type ('' when
+ * that is blank, which the form refuses); the remarks are the reference, then the description.
+ */
+export const relatedDocument = f => ({
+  documentName: f.docType === RELATED_TYPES.at(-1) ? (f.title || '').trim() : f.docType,
+  status: f.status, remarks: [f.reference, f.remarks].filter(x => (x || '').trim()).join(' | '),
+});
+
+/** ProjectViewModel.addRelatedDocument's audit entry, word for word. */
+export const relatedAddedAudit = (name, fileUrl) => ({
+  actionType: 'Document Upload', details: `Uploaded project document: ${name}`, oldValue: '', newValue: `Doc: ${name}, URL: ${fileUrl}`,
+});
+
+/** ProjectViewModel.updatePendingDocumentFileUrl's audit entry, word for word. */
+export const fileAttachedAudit = (d, fileUrl) => ({
+  actionType: 'Document Upload', details: `Uploaded file attachment for ${d.documentName}`, oldValue: d.fileUrl || '', newValue: fileUrl,
+});
 
 /** ProjectViewModel.addPendingDocument's audit entry, word for word. */
 export const addedDocumentAudit = name => ({
