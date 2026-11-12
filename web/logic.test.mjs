@@ -717,3 +717,61 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   assert.deepEqual(L.deletedWeeklyAudit(report), { actionType: 'Deleted Weekly Report', details: 'Deleted report for Week 7: February 14 - February 20, 2026' });
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'].map(role => L.canDeleteReport({ role })), [true, true, false, false]);
 });
+
+test('new project: who may add one, what stops the form, the document a phone would upload and the audit entry', async () => {
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'].map(role => L.canCreateProject({ role })), [true, true, false, false]);
+  assert.equal(L.canCreateProject({ role: 'ENGINEER_ADMIN', approved: false }), false);
+
+  const f = {
+    name: ' Pandi Heights ', location: 'Pandi, Bulacan', implementingOffice: 'Bulacan District Office', contractor: 'ABC Builders', projectType: 'Housing Project',
+    landArea: '2.5', landUnit: 'Hectares', numberOfUnits: '120', days: '', dateStarted: '2026-01-01', assignedStaff: '', completed: false, completedOn: '2026-11-12', final: '100',
+    scope: [{ name: 'Land Development', amount: '1,000,000' }, { name: ' Housing ', amount: '3000000.50' }, { name: '', amount: '' }],
+  };
+  const seen = [{ name: 'pandi  HEIGHTS', location: 'Pandi, Bulacan' }];
+  assert.deepEqual(L.projectErrors(f, [], '2026-11-12'), []);
+  assert.deepEqual(L.projectErrors(f, seen, '2026-11-12'), ['A project with this name and location already exists.']);
+  assert.deepEqual(L.projectErrors({ ...f, location: 'Bocaue' }, seen, '2026-11-12'), []);
+  assert.deepEqual(L.projectErrors({ ...f, name: ' ', contractor: '', days: '90.5', dateStarted: '', scope: [{ name: 'Roads', amount: '0' }] }, [], '2026-11-12'),
+    ['Type the project name.', "Type the contractor's name.", 'Each scope of works item needs a name and an amount above 0.', 'Contract duration: whole days only.', 'Pick the date started.']);
+  assert.deepEqual(L.projectErrors({ ...f, scope: [{ name: '', amount: '500' }] }, [], '2026-11-12'), ['Each scope of works item needs a name and an amount above 0.']);
+  // Already completed: a date from the start up to today, and 0 to 100.
+  const done = { ...f, completed: true };
+  assert.deepEqual(L.projectErrors(done, [], '2026-11-12'), []);
+  assert.deepEqual(L.projectErrors({ ...done, completedOn: '2026-11-13', final: '' }, [], '2026-11-12'), ["The actual completion date can't be in the future.", 'Type the final accomplishment.']);
+  assert.deepEqual(L.projectErrors({ ...done, completedOn: '2025-12-31', final: '101' }, [], '2026-11-12'), ['The actual completion date is before the date started.', 'Final accomplishment: enter 0 to 100.']);
+  assert.deepEqual(L.projectErrors({ ...done, completedOn: '' }, [], '2026-11-12'), ['Pick the actual completion date.']);
+
+  // The contract's last day counts the start as day 1; blank is 365 days and 0 days ends on the start.
+  assert.equal(L.projectEnd(f), '2026-12-31');
+  assert.equal(L.projectEnd({ ...f, days: '30' }), '2026-01-30');
+  assert.equal(L.projectEnd({ ...f, days: '0' }), '2026-01-01');
+  assert.equal(L.projectEnd({ ...f, days: 'abc' }), '2026-12-31');
+  assert.equal(L.projectEnd({ ...f, dateStarted: '' }), null);
+
+  const { project, audit } = L.newProject(f, { uuid: 'p9', uid: 'u1', now: 1700000000000, user: 'Engr. Cruz' });
+  assert.deepEqual(L.scopeItems(project.scopeOfWork), [{ name: 'Land Development', amount: 1000000, weightPct: 1000000 / 4000000.5 * 100 }, { name: 'Housing', amount: 3000000.5, weightPct: 3000000.5 / 4000000.5 * 100 }]);
+  assert.deepEqual({ ...project, scopeOfWork: '' }, {
+    projectUuid: 'p9', name: 'Pandi Heights', location: 'Pandi, Bulacan', implementingOffice: 'Bulacan District Office', contractor: 'ABC Builders', scopeOfWork: '',
+    projectType: 'Housing Project', landArea: '2.5 Hectares', numberOfUnits: '120', projectedBeneficiaries: '', boardResolution: '', noticeOfAward: '', noticeToProceed: '',
+    preparedByName: '', preparedByPosition: '', preparedByOffice: '', checkedByName: '', checkedByPosition: '', checkedByOffice: '', notedByName: '', notedByPosition: '', notedByOffice: '',
+    weeklyCheckedByName: '', weeklyCheckedByPosition: '', weeklyCheckedByOffice: '', weeklyNotedByName: '', weeklyNotedByPosition: '', weeklyNotedByOffice: '',
+    latestUpdatePhotoUrl: '', barChartJson: '', contractCostOriginal: 4000000.5, contractCostRevised: 4000000.5, contractDurationDays: 365,
+    dateStarted: '2026-01-01', completionDateOriginal: '2026-12-31', completionDateRevised: '2026-12-31', status: 'On-going', targetAccomplishment: 0, actualAccomplishment: 0,
+    assignedStaff: 'Engr. Cruz', revision: 1, createdAt: 1700000000000, updatedAt: 1700000000000, createdByUid: 'u1', updatedByUid: 'u1', isDeleted: false, assignedUids: ['u1'],
+  });
+  assert.deepEqual(audit, { actionType: 'Project Creation', details: 'Created new project: Pandi Heights',
+    newValue: 'Title: Pandi Heights, Location: Pandi, Bulacan, Cost: ₱4000000.5, Duration: 365 days' });
+  assert.equal(L.isCompleted(project), false);
+
+  // The same fields a phone uploads for a project (FirestoreSyncManager), plus the two it adds for a new one.
+  const kt = (await import('node:fs')).readFileSync(new URL('../app/src/main/java/com/example/data/remote/FirestoreSyncManager.kt', import.meta.url), 'utf8');
+  const upload = kt.slice(kt.indexOf('"projectUuid" to project.projectUuid'), kt.indexOf('"isDeleted" to (event.operation'));
+  assert.deepEqual(Object.keys(project).sort(), [...[...upload.matchAll(/"(\w+)" to/g)].map(m => m[1]), 'isDeleted', 'assignedUids', 'barChartJson'].sort());
+
+  // Finished before the app: saved at the final accomplishment on the actual date; no scope leaves the cost at 0.
+  const old = L.newProject({ ...done, completedOn: '2026-06-30', final: '98.5', scope: [], projectType: ' ', landArea: '', assignedStaff: 'Engr. Reyes', days: '180' }, { uuid: 'p8', uid: 'u1', now: 1, user: 'Engr. Cruz' });
+  assert.deepEqual([old.project.completionDateOriginal, old.project.completionDateRevised, old.project.targetAccomplishment, old.project.actualAccomplishment], ['2026-06-29', '2026-06-30', 98.5, 98.5]);
+  assert.deepEqual([old.project.scopeOfWork, old.project.contractCostOriginal, old.project.projectType, old.project.landArea, old.project.assignedStaff], ['[]', 0, 'Housing Project', '', 'Engr. Reyes']);
+  assert.equal(old.audit.newValue, 'Title: Pandi Heights, Location: Pandi, Bulacan, Cost: ₱0, Duration: 180 days, Already completed on 2026-06-30 at 98.5%');
+  assert.equal(L.isCompleted(L.newProject(done, { uuid: 'p7', uid: 'u1', now: 1, user: 'x' }).project), true);
+});

@@ -4,7 +4,7 @@ A web version of the NHA Monitor app. It reads the same Firestore data as the ph
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
 (Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
-Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
+Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
 A phone with its own unsent edit of the same issue keeps its version. The Cloud Function
 `notifySuperAdminsOnAudit` pushes that audit entry to the Super Admin's phones while the project is on-going, as it does for app edits. Everything else
@@ -86,6 +86,18 @@ is read only.
   is dropped. Photos, the rest of the weather, and remarks the form has no box for are left as saved. **Delete
   report** (Super Admin and Engineer Admins, as on the phone) asks first, marks the record deleted with the app's
   "Deleted Weekly Report" audit entry, and moves the project's site photo to the newest one left.
+- **New project** (dashboard, for the Super Admin and Engineer Admins: the app's CREATE_PROJECT roles,
+  `L.canCreateProject`) is the app's New project form: name, location, implementing office, contractor, type, land
+  area, number of units, the scope of works (the total is the original contract cost and each item's weight its
+  share), the contract duration, the date started, the assigned staff, and "Already completed" with the actual
+  completion date and final accomplishment. Save writes the `projects` document a phone would upload
+  (`L.newProject`: revision 1, the creator the only assigned account, as firestore.rules requires of anyone but the
+  Super Admin), then the app's "Project Creation" audit entry, and opens the project. The audit entry goes second
+  because the rules read the saved project before they let a record in; if it fails the project stands without it.
+  A project with the same name and location (ignoring case and spacing) among those the account can see is refused,
+  as on the phone. A blank duration is 365 days here for both the saved duration and the completion date (the phone
+  saves 365 days but shows the start date as the completion date). The role rule is in the form only:
+  firestore.rules lets any approved writer create a project. Assigning other people stays on the phone.
 - **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with

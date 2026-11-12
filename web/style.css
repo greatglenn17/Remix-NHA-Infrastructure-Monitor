@@ -649,6 +649,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .edit-form h3 + p { margin: 0; font-size: 13px; }
 .order-fields { display: grid; gap: 14px; }
 .weekly-add { margin: 16px 0 12px; }
+.edit-form [hidden] { display: none; }
 .wk-form { width: min(680px, calc(100vw - 32px)); }
 .wk-rows { display: grid; gap: 8px; }
 .wk-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }

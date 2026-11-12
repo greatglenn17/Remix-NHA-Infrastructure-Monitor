@@ -464,12 +464,113 @@ function renderDashboard() {
       <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
       <div class="seg" id="scope" role="group" aria-label="Which projects"></div>
       <span class="count" id="shown" role="status"></span>
+      ${L.canCreateProject(s.claims) ? `<button class="btn" id="project-add">${icon('add_circle', 'sm')}New project</button>` : ''}
       <button class="text-btn help-btn" id="help">${icon('info')}What these mean</button>
     </div>
     <ul class="grid" id="grid"></ul>`;
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
   document.getElementById('help').onclick = showTermHelp;
+  if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = projectForm;
   redrawDashboard();
+}
+
+/** CreateProjectDialog: a new project, written as a phone uploads one, then its "Project Creation" audit entry. */
+function projectForm() {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form wk-form';
+  const opt = v => `<option>${esc(v)}</option>`;
+  const row = () => `<div class="wk-row"><label class="field">Item<input data-f="name"></label>
+    <label class="field">Amount<input data-f="amount" inputmode="decimal" placeholder="0.00"></label>
+    <button type="button" class="icon-btn" data-drop-row aria-label="Remove this item">${icon('close', 'sm')}</button></div>`;
+  d.innerHTML = `<form novalidate>
+    <h2>New project</h2>
+    <label class="field">Project name<input name="name" required></label>
+    <label class="field">Location<input name="location"></label>
+    <label class="field">Implementing office<input name="implementingOffice" value="Bulacan District Office"></label>
+    <label class="field">Contractor name<input name="contractor" required></label>
+    <label class="field">Project type<select name="type">${[...L.PROJECT_TYPES, 'Custom...'].map(opt).join('')}</select></label>
+    <label class="field" id="pj-custom" hidden>Custom project type<input name="customType"></label>
+    <div class="wk-row">
+      <label class="field">Land area<input name="landArea" inputmode="decimal"></label>
+      <label class="field">Unit<select name="landUnit">${L.LAND_UNITS.map(opt).join('')}</select></label>
+      <label class="field">No. of units<input name="numberOfUnits" inputmode="numeric"></label>
+    </div>
+    <h3>Scope of works</h3>
+    <p class="muted small">Each item's weight is its share of the total, and the total is the original contract cost.</p>
+    <div class="wk-rows" data-rows>${row()}</div>
+    <button type="button" class="text-btn wk-add" data-add-row>${icon('add_circle', 'sm')}Add scope of works</button>
+    <p class="wk-total" id="pj-cost" aria-live="polite"></p>
+    <h3>Schedule</h3>
+    <div class="wk-row">
+      <label class="field">Contract duration (days)<input name="days" inputmode="numeric" placeholder="365"></label>
+      <label class="field">Date started<input type="date" name="dateStarted" value="${today()}" required></label>
+    </div>
+    <p class="wk-total" id="pj-end" aria-live="polite"></p>
+    <label class="field">Assigned field staff / manager<input name="assignedStaff" value="${esc(s.profile.name || '')}"></label>
+    <label class="check"><input type="checkbox" name="completed"><span>Already completed<br><small class="muted">Finished before this app; no weekly reports needed</small></span></label>
+    <div class="wk-row" id="pj-done" hidden>
+      <label class="field">Actual completion<input type="date" name="completedOn" value="${today()}"></label>
+      <label class="field">Final accomplishment %<input name="final" inputmode="decimal" value="100"></label>
+    </div>
+    <p class="muted small" id="pj-final"></p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  // form.elements: a form's own `name` property would shadow the Project name box.
+  const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
+  const rows = form.querySelector('[data-rows]');
+  const values = () => ({
+    ...Object.fromEntries(['name', 'location', 'implementingOffice', 'contractor', 'landArea', 'landUnit', 'numberOfUnits', 'days', 'dateStarted',
+      'assignedStaff', 'completedOn', 'final'].map(k => [k, el[k].value])),
+    projectType: el.type.value === 'Custom...' ? el.customType.value : el.type.value,
+    completed: el.completed.checked,
+    scope: [...rows.children].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value]))),
+  });
+  const draw = () => {
+    const f = values(), end = L.projectEnd(f);
+    d.querySelector('#pj-custom').hidden = el.type.value !== 'Custom...';
+    d.querySelector('#pj-done').hidden = !f.completed;
+    d.querySelector('#pj-cost').textContent = `Original contract cost: ${L.formatPhp(f.scope.reduce((t, r) => t + (L.parseAmount(r.amount) || 0), 0))}`;
+    d.querySelector('#pj-end').textContent = end ? `Completion date: ${L.displayDate(end)}` : '';
+    d.querySelector('#pj-final').textContent = f.completed && Number(f.final) < 100 ? 'Below 100% is not counted as completed.' : '';
+  };
+  form.oninput = draw;
+  form.onclick = e => {
+    if (e.target.closest('[data-add-row]')) {
+      rows.insertAdjacentHTML('beforeend', row());
+      rows.lastElementChild.querySelector('input').focus();
+    }
+    if (e.target.closest('[data-drop-row]')) { e.target.closest('.wk-row').remove(); draw(); }
+  };
+  draw();
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new project?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.projectErrors(f, s.projects || [], today());
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    const uid = s.user.uid, now = Date.now(), uuid = crypto.randomUUID(), user = s.profile.name || s.user.email;
+    const { project, audit } = L.newProject(f, { uuid, uid, now, user });
+    try {
+      await setDoc(doc(db, 'projects', uuid), project);
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot add a project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+      return;
+    }
+    // firestore.rules reads the saved project before it lets a record in, so the audit entry goes second; the project stands without it.
+    const entry = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: uuid, assignedUids: [uid], uid, now, user, ...audit });
+    await setDoc(doc(db, 'records', entry.uuid), entry).catch(x => console.warn('The project was saved; its audit entry was not.', x));
+    done();
+    location.hash = `#/p/${uuid}`;
+  };
+  document.body.append(d);
+  d.showModal();
 }
 
 function redrawDashboard() {

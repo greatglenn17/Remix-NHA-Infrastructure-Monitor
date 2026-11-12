@@ -5,6 +5,7 @@
 // Test accounts (emulator only), all with password test-pass-123:
 //   superviewer@test.local  Super Viewer: sees both projects, B shows "View only"
 //   engineer@test.local     Field Engineer assigned to project A only
+//   engadmin@test.local     Engineer Admin with no project yet (for New project)
 //   admin@test.local        Super Admin
 const PROJECT = 'demo-nha';
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
@@ -43,6 +44,7 @@ const put = (path, obj) =>
 
 const engineer = await account('engineer@test.local', { role: 'FIELD_ENGINEER' });
 await account('superviewer@test.local', { role: 'SUPER_VIEWER' });
+await account('engadmin@test.local', { role: 'ENGINEER_ADMIN' });
 await account('admin@test.local', { role: 'SUPER_ADMIN' });
 
 const now = Date.now();
@@ -244,4 +246,4 @@ for (const [i, p] of lotProgress.entries()) {
 await record(rid(130), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(31), blockNumber: 'RL', lotNumber: '1', polygonNormalizedJson: JSON.stringify(ROAD), isActive: 1, lotUse: 'Road Lot' });
 await record(rid(230), 'sdp_lot_progress', A, [engineer], { _ref_sdpPlanId: rid(31), _ref_sdpLotId: rid(130), physicalProgress: 50 });
 await record(rid(131), 'sdp_lots', A, [engineer], { _ref_sdpPlanId: rid(30), blockNumber: '9', lotNumber: '9', polygonNormalizedJson: '[]', isActive: 1, lotUse: 'Saleable' });
-console.log('Seeded demo-nha: 3 accounts, 5 projects, records and 10 files.');
+console.log('Seeded demo-nha: 4 accounts, 5 projects, records and 10 files.');
