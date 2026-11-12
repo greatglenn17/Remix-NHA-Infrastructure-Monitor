@@ -106,7 +106,12 @@ is read only.
   and saving with nothing changed writes nothing. The revised cost and the revised completion date are not the
   form's to change. **Mark as completed** (shown until work done reaches 100%) sets the target and actual to the
   final accomplishment and the revised completion date to the actual completion date. There is no duplicate name
-  check on an edit, as on the phone. Assigning people, deleting a project and the bar chart stay on the phone.
+  check on an edit, as on the phone. The bar chart stays on the phone.
+- **Delete project** in that form, for the Super Admin and an Engineer Admin who can edit the project (the app's
+  DELETE_PROJECT roles, on a project that is not view-only: `L.canDeleteProject`). It asks first, then marks the
+  project document deleted the way a phone uploads a delete (`L.deletedProject`); the document and its records stay
+  in the cloud, and every phone and this website drop the project. No audit entry is written: the phone's names no
+  project, so it never reaches the cloud either; the document keeps who deleted it and when.
 - **Delete issue** in the Edit issue form (Progress → Issues), for the Super Admin and Engineer Admins, the app's
   DELETE_ISSUE roles (`L.canDeleteIssue`; a form rule only, like Delete report). It asks first, marks the record
   deleted, as the phones sync a delete, and writes the app's "Issue Deletion" audit entry (`L.deletedIssueAudit`).

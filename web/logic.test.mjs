@@ -898,3 +898,12 @@ test('assign people: the options, the list and names saved, and nothing saved wh
   assert.deepEqual(L.assignmentFields({}, ['u1'], users), { assignedUids: ['u1'], assignedStaff: 'Engr. Cruz' });
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'SUPER_VIEWER'].map(role => L.canAssign({ role })), [true, false, false, false]);
 });
+
+test('delete project: the Super Admin, or an Engineer Admin assigned to it, and the tombstone a phone uploads', () => {
+  const project = { projectUuid: 'p1', name: 'Pandi Heights', assignedUids: ['u1'], revision: 4 };
+  const can = (role, uid) => L.canDeleteProject(project, uid, { role });
+  assert.deepEqual([can('SUPER_ADMIN', 'x'), can('ENGINEER_ADMIN', 'u1'), can('ENGINEER_ADMIN', 'x'), can('FIELD_ENGINEER', 'u1'), can('SUPER_VIEWER', 'u1')],
+    [true, true, false, false, false]);
+  assert.deepEqual(L.deletedProject(project, { uid: 'u1', now: 1794292093231 }),
+    { projectUuid: 'p1', isDeleted: true, updatedAt: 1794292093231, updatedByUid: 'u1' });
+});

@@ -529,7 +529,7 @@ function projectForm(c = null) {
     </div>
     <p class="muted small" id="pj-final"></p>`}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions">${project && L.canDeleteProject(project, s.user.uid, s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete project</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   // form.elements: a form's own `name` property would shadow the Project name box.
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
@@ -599,6 +599,11 @@ function projectForm(c = null) {
     done();
     location.hash = `#/p/${uuid}`;
   };
+  // deleteProject: the phone's own audit entry names no project, so it never reaches the cloud; the tombstone keeps who and when.
+  if (project) bindDelete(d, `Delete “${project.name}”? It will be removed from this website and from every phone. This cannot be undone.`, async () => {
+    await updateDoc(doc(db, 'projects', c.page.id), L.deletedProject(project, { uid: s.user.uid, now: Date.now() }));
+    location.hash = '#/';
+  });
   document.body.append(d);
   d.showModal();
 }
