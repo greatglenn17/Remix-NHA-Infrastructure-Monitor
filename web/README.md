@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging, editing and deleting issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, setting a plan's scale, turning or deleting it, picking the revision in use, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, and **Signatories** on a weekly or monthly report's print page, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -72,6 +72,22 @@ is read only.
 - **Name & use** on a lot's card is the lot's use, block and lot from the app's lot form (`L.lotNameSave`, with the
   app's "Lot Use Changed" and "Lot Renamed" audit entries), and **Remove lot**, which takes the lot off the plan on
   every phone (`L.lotRemoved`, "Lot Deactivated"); its progress and billing history stay in the audit log.
+- **The plan's own tools** (Progress → Lots, under the plan's name; put away while a lot is being drawn) are the
+  phone's plan header and plan menu (`bindPlanTools`):
+  - **Scale**, for the people who can edit the project (`scaleForm`, `L.planScale`): the number printed after
+    "SCALE 1:" (10 to 100000). The areas of the lots nobody typed an area for (blank, the add form's 50, or what the
+    last scale gave) are worked out from it, with the app's "Project Edit" audit entry. When the PDF cannot be read
+    only the scale is saved. Everyone else sees the scale once it is set.
+  - **Turn plan**, for the same people (`L.planTurned`): a quarter turn clockwise on every phone and here; the lots
+    keep their place on the page, and nothing is logged, as on the phone.
+  - **The revision in use** (the menu in place of the plan's name when the site has more than one revision), for the
+    `L.canManagePlans` roles (`L.planInUse`): the one picked is switched on and the site's others off, with a
+    "Project Edit" audit entry that names the version (the phone's names its local id).
+  - **Delete plan**, for the same roles (`deletePlan`, `L.planDeleted`): after a confirmation, the plan and the lots,
+    roads, lot progress and inspections under it are marked deleted, as the phone's delete uploads them, with the
+    app's "Document Deletion" audit entry. The records under the plan go first, in batches, then the plan, so a delete
+    that stops partway leaves the plan listed and Delete plan again finishes it. The PDF stays in the bucket. A site
+    with an earlier revision then shows that one.
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
   name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
   current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
@@ -272,5 +288,4 @@ touched by this command.
 ## Not on the site yet
 
 On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, roads,
-renumbering a block, the plan's scale and print frame, turning or deleting a plan, picking which revision is in use,
-and making a revision its own site. Also formal lot inspections, and updating several lots at once.
+renumbering a block, the plan's print frame, and making a revision its own site. Also formal lot inspections, and updating several lots at once.

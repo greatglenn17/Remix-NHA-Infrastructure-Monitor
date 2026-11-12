@@ -778,6 +778,7 @@ export function lotSave(lot, f, { user, at, contractor }) {
 /**
  * SdpSites.current with each plan's active lots: per site (in the order its first plan was uploaded), its active plan
  * with the highest version, else its highest version. Each lot carries its latest progress row as `progress` (or null).
+ * `plans` are the site's revisions, latest first.
  */
 export function sdpSites(records) {
   const sites = new Map();
@@ -792,7 +793,7 @@ export function sdpSites(records) {
   const lots = records.filter(r => r.type === 'sdp_lots' && on(r.isActive));
   return [...sites].map(([site, list]) => {
     const plan = top(list.filter(p => on(p.isActive))) || top(list);
-    return { site, plan, lots: lots.filter(l => l._ref_sdpPlanId === plan.uuid).map(l => ({ ...l, progress: progress.get(l.uuid) || null })) };
+    return { site, plan, plans: [...list].sort((a, b) => (Number(b.version) || 0) - (Number(a.version) || 0)), lots: lots.filter(l => l._ref_sdpPlanId === plan.uuid).map(l => ({ ...l, progress: progress.get(l.uuid) || null })) };
   });
 }
 
@@ -1949,4 +1950,50 @@ export function lotNameSave(lot, f, { user, at }) {
 export const lotRemoved = (lot, { user, at }) => ({
   changes: { isActive: 0, lastModifiedBy: user, lastModifiedDate: at },
   audit: { actionType: 'Lot Deactivated', details: `Deactivated Lot ${lotTag(lot)}`, oldValue: 'Active', newValue: 'Deactivated' },
+});
+
+/* ---------- Plan tools: its scale, a quarter turn, the revision in use, deleting it (SubdivisionPlanTab, ProjectViewModel) ---------- */
+
+/** The plan scale dialog's rule: the whole number printed after "SCALE 1:", 10 to 100000, or null. */
+export const planScaleOf = text => { const n = /^\d+$/.test(text.trim()) ? Number(text.trim()) : 0; return n >= 10 && n <= 100000 ? n : null; };
+
+/**
+ * ProjectViewModel.setSdpPlanScale: the plan's printed scale, and the areas worked out from it for its lots nobody typed
+ * an area for (blank, the add form's 50, or the area the last scale gave). `page` is the PDF page's [width, height] in
+ * points, or null when the PDF cannot be read: then only the scale is saved. Returns saveEdits' [[record, changes, audit]].
+ */
+export function planScale(plan, lots, page, scale, { user, at }) {
+  const was = Number(plan.scaleDenominator) || 0;
+  const worked = page ? lots.flatMap(l => {
+    const polygon = lotPolygon(l), area = lotAreaSqM(polygon, ...page, scale), has = Number(l.lotAreaSqM) || 0;
+    const untyped = has === 0 || has === 50 || (was > 0 && Math.abs(has - lotAreaSqM(polygon, ...page, was)) < 0.01);
+    return untyped && area !== has ? [[l, { lotAreaSqM: area, lastModifiedBy: user, lastModifiedDate: at }, null]] : [];
+  }) : [];
+  return [[plan, { scaleDenominator: scale }, { actionType: 'Project Edit', details: `Set SDP Plan v${plan.version} scale to 1:${scale} and worked out ${worked.length} lot areas`,
+    oldValue: was > 0 ? `1:${was}` : 'No scale', newValue: `1:${scale}` }], ...worked];
+}
+
+/** PlanRotation.next: the plan a quarter turn clockwise on screen; its lots keep their page coordinates. */
+export const planTurned = plan => ({ rotation: ((Number(plan.rotation) || 0) + 90) % 360 });
+
+/**
+ * ProjectViewModel.setActiveSdpPlan: `plan` becomes its site's plan in use and the site's other plans are switched off.
+ * `plans` are that site's sdp_plans records. Returns saveEdits' [[record, changes, audit]]; empty when nothing changes.
+ * shortcut: the phone's audit text names the plan by its local id, which the website does not have; it names the version.
+ */
+export function planInUse(plans, plan) {
+  const audit = { actionType: 'Project Edit', details: `Set active SDP Plan${siteNote(plan)} Version ${plan.version}: ${plan.planName}`, newValue: `Active SDP Plan Version ${plan.version}` };
+  return plans.filter(p => on(p.isActive) !== (p.uuid === plan.uuid)).map((p, i) => [p, { isActive: p.uuid === plan.uuid ? 1 : 0 }, i ? null : audit]);
+}
+
+const siteNote = plan => ((plan.siteName || '').trim() ? ` (${plan.siteName})` : '');
+
+/**
+ * ProjectViewModel.deleteSdpPlan: the plan's audit entry, and `children`: the project's records under the plan (its
+ * lots, roads, lot progress and inspections), which the phone's delete removes with it.
+ */
+export const planDeleted = (plan, records) => ({
+  children: records.filter(r => r._ref_sdpPlanId === plan.uuid),
+  audit: { actionType: 'Document Deletion', details: `Deleted SDP Plan${siteNote(plan)} Version ${plan.version}: ${plan.planName}, with its lots and progress`,
+    oldValue: `Plan: ${plan.planName}, Version: ${plan.version}` },
 });

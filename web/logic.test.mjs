@@ -1026,3 +1026,42 @@ test('plans and lots: a plan upload, a drawn lot, its name and use, and removing
   assert.deepEqual(L.sdpSites(records)[0].lots.map(l => l.uuid), ['l3']);
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].map(role => L.canManagePlans({ assignedUids: ['u1'] }, 'u1', { role })), [true, true, false]);
 });
+
+test('plan tools: the scale and the areas it works out, a quarter turn, the revision in use, and deleting a plan are written like the phone', () => {
+  const who = { user: 'Engr. Cruz', at: '2026-11-13 10:00' };
+  assert.deepEqual(['1000', ' 500 ', '9', '100001', '1:1000', '12.5', ''].map(L.planScaleOf), [1000, 500, null, null, null, null, null]);
+
+  // 10% x 10% of an A1 sheet (2384 x 1684 pt): 4996.33 sq.m at 1:1000, 1249.08 at 1:500.
+  const square = '[[0.1,0.1],[0.2,0.1],[0.2,0.2],[0.1,0.2]]', page = [2384, 1684];
+  const lot = (uuid, lotAreaSqM) => ({ uuid, lotAreaSqM, polygonNormalizedJson: square });
+  const lots = [lot('blank', 0), lot('fifty', 50), lot('typed', 62.5), lot('worked', 1249.08), lot('same', 4996.33)];
+  const plan = { uuid: 'a2', version: 2, planName: 'SDP rev 1', siteName: '', scaleDenominator: 500, rotation: 270, isActive: 1 };
+  const area = { lotAreaSqM: 4996.33, lastModifiedBy: 'Engr. Cruz', lastModifiedDate: '2026-11-13 10:00' };
+  // Blank, the add form's 50 and the area the last scale gave are worked out again; a typed area and one already right stay.
+  assert.deepEqual(L.planScale(plan, lots, page, 1000, who), [
+    [plan, { scaleDenominator: 1000 }, { actionType: 'Project Edit', details: 'Set SDP Plan v2 scale to 1:1000 and worked out 3 lot areas', oldValue: '1:500', newValue: '1:1000' }],
+    [lots[0], area, null], [lots[1], area, null], [lots[3], area, null]]);
+  // A first scale on a plan whose PDF cannot be read: only the scale.
+  assert.deepEqual(L.planScale({ ...plan, scaleDenominator: 0 }, lots, null, 1000, who).map(e => e[2]),
+    [{ actionType: 'Project Edit', details: 'Set SDP Plan v2 scale to 1:1000 and worked out 0 lot areas', oldValue: 'No scale', newValue: '1:1000' }]);
+
+  assert.deepEqual([L.planTurned({}), L.planTurned({ rotation: 90 }), L.planTurned(plan)], [{ rotation: 90 }, { rotation: 180 }, { rotation: 0 }]);
+
+  // The revision in use: the one picked goes on, the site's others off, with one audit entry; picking it again writes nothing.
+  const v1 = { uuid: 'a1', version: 1, planName: 'SDP rev 0', siteName: '', isActive: 0 }, v3 = { uuid: 'a3', version: 3, planName: 'SDP rev 2', siteName: '', isActive: 0 };
+  assert.deepEqual(L.planInUse([v3, plan, v1], v1), [[plan, { isActive: 0 }, { actionType: 'Project Edit', details: 'Set active SDP Plan Version 1: SDP rev 0', newValue: 'Active SDP Plan Version 1' }], [v1, { isActive: 1 }, null]]);
+  assert.deepEqual(L.planInUse([v3, plan, v1], plan), []);
+  assert.equal(L.planInUse([{ ...v1, siteName: 'Phase 2' }], { ...v1, siteName: 'Phase 2' })[0][2].details, 'Set active SDP Plan (Phase 2) Version 1: SDP rev 0');
+
+  // Deleting a plan takes the records under it, and no other plan's.
+  const records = [plan, v1, { type: 'sdp_lots', uuid: 'l1', _ref_sdpPlanId: 'a2', isActive: 0 }, { type: 'sdp_lot_progress', uuid: 'g1', _ref_sdpPlanId: 'a2', _ref_sdpLotId: 'l1' },
+    { type: 'sdp_roads', uuid: 'r1', _ref_sdpPlanId: 'a2' }, { type: 'sdp_lot_inspections', uuid: 'i1', _ref_sdpPlanId: 'a2' }, { type: 'sdp_lots', uuid: 'l9', _ref_sdpPlanId: 'a1' }];
+  const gone = L.planDeleted(plan, records);
+  assert.deepEqual([gone.children.map(r => r.uuid), gone.audit], [['l1', 'g1', 'r1', 'i1'],
+    { actionType: 'Document Deletion', details: 'Deleted SDP Plan Version 2: SDP rev 1, with its lots and progress', oldValue: 'Plan: SDP rev 1, Version: 2' }]);
+  assert.equal(L.planDeleted({ ...plan, siteName: 'Phase 2' }, []).audit.details, 'Deleted SDP Plan (Phase 2) Version 2: SDP rev 1, with its lots and progress');
+
+  // A site's revisions, latest first, for the revision menu; with the plan deleted the site falls back to the one left.
+  const typed = [{ ...v1, type: 'sdp_plans' }, { ...plan, type: 'sdp_plans' }];
+  assert.deepEqual([L.sdpSites(typed)[0].plans.map(p => p.uuid), L.sdpSites(typed)[0].plan.uuid, L.sdpSites(typed.slice(0, 1))[0].plan.uuid], [['a2', 'a1'], 'a2', 'a1']);
+});

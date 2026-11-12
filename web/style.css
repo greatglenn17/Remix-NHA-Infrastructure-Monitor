@@ -572,6 +572,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-n { background: #A3A3A3; }
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lots-head h3 { margin: 0; font-size: 16px; }
+.lots-head select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
+.plan-tools { display: flex; margin: -4px 0 12px; }
+.plan-tools .danger { margin-right: 0; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
 .kpi { background: var(--surface-variant); border-radius: 8px; padding: 8px 10px; }
 .kpi span { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }

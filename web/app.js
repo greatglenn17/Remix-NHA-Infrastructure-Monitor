@@ -857,6 +857,7 @@ function drawProject(page) {
   if (document.getElementById('lot-results')) bindLots(c);
   const planUpload = document.getElementById('plan-upload');
   if (planUpload) planUpload.onclick = () => planForm(c);
+  bindPlanTools(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
@@ -1260,15 +1261,28 @@ function lotsView(c) {
   const { sites, site } = lotSite(c, st);
   const upload = L.canManagePlans(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="plan-upload">${icon('cloud_upload', 'sm')}Upload plan</button>` : '';
   if (!site) return `<div class="card empty">${icon('home_work')}<p>No subdivision plan uploaded yet</p>${upload}</div>`;
-  const addLot = !st.draw && site.plan.pdfFileUrl && L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
+  const edit = L.canEdit(c.project, s.user.uid, s.claims), manage = L.canManagePlans(c.project, s.user.uid, s.claims);
+  const addLot = !st.draw && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
+  // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn.
+  const scale = Number(site.plan.scaleDenominator) || 0;
+  const tools = st.draw ? '' : [
+    edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '',
+    edit ? `<button class="text-btn" id="plan-turn">${icon('rotate_90_degrees_cw', 'sm')}Turn plan</button>` : '',
+    manage ? `<button class="text-btn danger" id="plan-delete">${icon('delete', 'sm')}Delete plan</button>` : '',
+  ].join('');
+  const name = p => `${p.planName || 'Subdivision plan'} · v${p.version ?? 1}`;
+  const title = manage && !st.draw && site.plans.length > 1
+    ? `<select id="plan-rev" aria-label="Revision in use">${site.plans.map(p => `<option value="${esc(p.uuid)}"${p === site.plan ? ' selected' : ''}>${esc(name(p))}</option>`).join('')}</select>`
+    : `${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span>`;
   const k = L.lotStats(site.lots);
   const tile = (label, value, cls = '') => `<div class="kpi ${cls}"><span>${label}</span><b>${value}</b></div>`;
   const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option${o === st[key] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
-    <div class="lots-head"><h3>${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span></h3>
+    <div class="lots-head"><h3>${title}</h3>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${upload}</span></div>
+    ${tools ? `<div class="lots-links plan-tools">${tools}</div>` : ''}
     <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
@@ -1547,6 +1561,85 @@ function planForm(c) {
   };
   document.body.append(d);
   d.showModal();
+}
+
+/** The plan scale dialog: the number printed after "SCALE 1:"; the areas nobody typed in are worked out from it. */
+function scaleForm(c, site) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Plan scale</h2>
+    <p class="muted small">Type the scale printed on the plan, e.g. SCALE 1:1000. Lot areas are worked out from it; areas someone typed in stay.</p>
+    <label class="field">Scale 1 :<input name="scale" inputmode="numeric" maxlength="6" autocomplete="off" value="${Number(site.plan.scaleDenominator) || ''}"></label>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const done = () => { d.close(); d.remove(); };
+  d.querySelector('[data-cancel]').onclick = done;
+  d.addEventListener('cancel', e => { e.preventDefault(); done(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const scale = L.planScaleOf(form.elements.scale.value);
+    if (!scale) { err.textContent = 'Enter the number after 1: on the plan, from 10 to 100000'; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // The areas need the PDF page's size; when the PDF cannot be read only the scale is saved, as on the phone.
+      const drawn = site.lots.length ? await planBase(site) : null;
+      // shortcut: the plan and every lot whose area changes go in one write; split it if a plan passes a few thousand lots.
+      await saveEdits(c, L.planScale(site.plan, site.lots, drawn && !drawn.problem ? drawn.page : null, scale, { user: s.profile.name || s.user.email, at: nowStamp() }), 'plan');
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
+ * Deletes a plan with its lots, roads, lot progress and inspections, as the phone's delete does: each is marked
+ * deleted, and its PDF stays in the bucket.
+ * shortcut: the records under the plan go first, in batches, then the plan with its audit entry, not one write; if it
+ * stops partway the plan is still listed, and Delete plan again finishes it.
+ */
+async function deletePlan(c, plan) {
+  const gone = L.planDeleted(plan, c.records), stamp = { uid: s.user.uid, now: Date.now(), assignedUids: c.project.assignedUids ?? [] };
+  for (let i = 0; i < gone.children.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const r of gone.children.slice(i, i + 400)) batch.update(doc(db, 'records', r.uuid), L.deletedRecord(r, stamp));
+    await batch.commit();
+  }
+  await saveEdits(c, [[plan, null, gone.audit]], 'plan');
+}
+
+/** The plan's own tools on Progress → Lots: its scale, a quarter turn, the revision in use, and deleting it. */
+function bindPlanTools(c) {
+  const st = lotState(c.page), { sites, site } = lotSite(c, st);
+  const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
+  // One click each with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
+  const act = async (el, run) => {
+    if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); drawProject(c.page); return; }
+    el.disabled = true;
+    try {
+      await run();
+      Object.assign(st, { sel: null, more: false, view: null });
+    } catch (x) {
+      alert(x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.');
+    }
+    drawProject(c.page);
+  };
+  bind('plan-scale', 'onclick', () => scaleForm(c, site));
+  bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
+  bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
+  bind('plan-delete', 'onclick', el => {
+    const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
+    if (confirm(`Delete SDP v${site.plan.version ?? 1}${of}? This removes the plan and its ${plural(site.lots.length, 'lot')}, with their progress, billing and inspection records, from every phone and the website. This cannot be undone.`)) {
+      act(el, () => deletePlan(c, site.plan));
+    }
+  });
 }
 
 const planDrawings = new Map();
