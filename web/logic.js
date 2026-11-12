@@ -1551,3 +1551,77 @@ export function weatherChanges(report, days, changed) {
   }
   return { _weather: [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date))) };
 }
+
+/* ---------- New project (CreateProjectDialog and ProjectViewModel.createProject) ---------- */
+
+/** Permission.CREATE_PROJECT: the Super Admin and Engineer Admins. A form rule only: firestore.rules lets any writer create one. */
+export const canCreateProject = claims => isWriter(claims) && ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
+
+/** CreateProjectDialog's choices; the type also takes any other text ("Custom..."). */
+export const PROJECT_TYPES = ['Housing Project', 'Community Facility'];
+export const LAND_UNITS = ['Hectares', 'Square Meters'];
+
+/** normalizeProjectKey: how a name or a location is compared for the duplicate check. */
+const projectKey = text => String(text ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/** The form's scope of works rows with anything typed. */
+const scopeRows = f => f.scope.filter(r => r.name.trim() || r.amount.trim());
+
+/** The form's contract duration in days: blank (or not yet a whole number) is 365, as the phone saves it. */
+const projectDays = f => (/^\d{1,5}$/.test(f.days.trim()) ? Number(f.days) : 365);
+
+/** The contract's last day (ProjectSchedule.lastDay); a duration of 0 ends on the start date. Null without a start date. */
+export const projectEnd = f => lastDay(f.dateStarted, Math.max(projectDays(f), 1));
+
+/** What keeps the new project form from saving; `projects` are the ones this account can see, `today` is yyyy-MM-dd. */
+export function projectErrors(f, projects, today) {
+  const start = isoDay(f.dateStarted), done = isoDay(f.completedOn);
+  return [
+    !f.name.trim() && 'Type the project name.',
+    !f.contractor.trim() && 'Type the contractor\'s name.',
+    scopeRows(f).some(r => !r.name.trim() || !(parseAmount(r.amount) > 0)) && 'Each scope of works item needs a name and an amount above 0.',
+    f.days.trim() && !/^\d{1,5}$/.test(f.days.trim()) && 'Contract duration: whole days only.',
+    start == null && 'Pick the date started.',
+    ...(f.completed ? [
+      done == null ? 'Pick the actual completion date.' : done > isoDay(today) ? 'The actual completion date can\'t be in the future.'
+        : start != null && done < start && 'The actual completion date is before the date started.',
+      !f.final.trim() ? 'Type the final accomplishment.' : Number.isNaN(percent(f.final)) && 'Final accomplishment: enter 0 to 100.',
+    ] : []),
+    projects.some(p => projectKey(p.name) === projectKey(f.name) && projectKey(p.location) === projectKey(f.location))
+      && 'A project with this name and location already exists.',
+  ].filter(Boolean);
+}
+
+/** The Project fields a phone uploads that the new project form leaves blank. */
+const BLANK_PROJECT_FIELDS = ['projectedBeneficiaries', 'boardResolution', 'noticeOfAward', 'noticeToProceed',
+  ...['prepared', 'checked', 'noted', 'weeklyChecked', 'weeklyNoted'].flatMap(k => [`${k}ByName`, `${k}ByPosition`, `${k}ByOffice`]),
+  'latestUpdatePhotoUrl', 'barChartJson'];
+
+/**
+ * The `projects` document for the form, as a phone uploads a new project (FirestoreSyncManager): the cost is the scope
+ * of works' total, each item's weight its share of it, and the creator the only assigned account. With "already
+ * completed" it is saved at the final accomplishment on the actual completion date (Project.markedCompleted).
+ * `audit` is its "Project Creation" entry.
+ */
+export function newProject(f, { uuid, uid, now, user }) {
+  const rows = scopeRows(f).map(r => ({ name: r.name.trim(), amount: parseAmount(r.amount) }));
+  const cost = rows.reduce((t, r) => t + r.amount, 0), days = projectDays(f), end = projectEnd(f);
+  const final = f.completed ? Number(f.final) : 0, name = f.name.trim(), location = f.location.trim();
+  return {
+    project: {
+      projectUuid: uuid, name, location, implementingOffice: f.implementingOffice.trim(), contractor: f.contractor.trim(),
+      scopeOfWork: JSON.stringify(rows.map(r => ({ ...r, weightPct: cost > 0 ? r.amount / cost * 100 : 0 }))),
+      projectType: f.projectType.trim() || PROJECT_TYPES[0],
+      landArea: f.landArea.trim() ? `${f.landArea.trim()} ${f.landUnit}` : '', numberOfUnits: f.numberOfUnits.trim(),
+      ...Object.fromEntries(BLANK_PROJECT_FIELDS.map(k => [k, ''])),
+      contractCostOriginal: cost, contractCostRevised: cost, contractDurationDays: days,
+      dateStarted: f.dateStarted, completionDateOriginal: end, completionDateRevised: f.completed ? f.completedOn : end,
+      status: 'On-going', targetAccomplishment: final, actualAccomplishment: final, assignedStaff: f.assignedStaff.trim() || user,
+      revision: 1, createdAt: now, updatedAt: now, createdByUid: uid, updatedByUid: uid, isDeleted: false, assignedUids: [uid],
+    },
+    audit: {
+      actionType: 'Project Creation', details: `Created new project: ${name}`,
+      newValue: `Title: ${name}, Location: ${location}, Cost: ₱${cost}, Duration: ${days} days${f.completed ? `, Already completed on ${f.completedOn} at ${final}%` : ''}`,
+    },
+  };
+}
