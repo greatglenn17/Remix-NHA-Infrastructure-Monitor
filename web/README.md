@@ -86,7 +86,7 @@ is read only.
   - **Delete plan**, for the same roles (`deletePlan`, `L.planDeleted`): after a confirmation, the plan and the lots,
     roads, lot progress and inspections under it are marked deleted, as the phone's delete uploads them, with the
     app's "Document Deletion" audit entry. The records under the plan go first, in batches, then the plan, so a delete
-    that stops partway leaves the plan listed and Delete plan again finishes it. The PDF stays in the bucket. A site
+    that stops partway leaves the plan listed and Delete plan again finishes it. A site
     with an earlier revision then shows that one.
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
   name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
@@ -101,7 +101,16 @@ is read only.
   is (under 20 MB), anything else as a JPEG no larger than 2500 px on its longest side, as the phone stores a scan.
   storage.rules already lets an assigned writer add these, and uploads through the Firebase SDK need no bucket CORS
   setting (that is only for reading file bytes). An attached file can be replaced, or removed with the "Remove the
-  attached file" box; either way the old file stays in the bucket.
+  attached file" box.
+- **Files no record holds any more leave the bucket** (`dropFiles`, `L.unusedFiles`). After a delete or an edit is
+  saved (`saveEdits`, Delete plan, Delete project), the files the records held before and nothing holds now are
+  deleted from Storage: a deleted record's scans and photos, a replaced or removed attachment, a photo taken off a
+  weekly report, a deleted plan's PDF and its lots' photos, and every file of a deleted project. A file another
+  record or the project's card photo still holds stays; a mention in the audit log does not keep one. This is the
+  phone's own cleanup (`Attachments`), which only reaches the files that phone uploaded and waits a day; the website
+  does it at once. storage.rules already lets an assigned writer delete a project's files. The delete is not waited
+  for: a file that cannot be removed (offline, no access) just stays, and a file uploaded for a record that then
+  fails to save still stays too.
 - **New weekly report** (Progress → Weekly) is the app's weekly report form without its photo and weather steps:
   the week (7 days from the first day picked, the Saturday of this week to start), the three accomplishment lines,
   manpower, equipment, activities and issues. With an approved bar chart the targets are its plan for the week's last
