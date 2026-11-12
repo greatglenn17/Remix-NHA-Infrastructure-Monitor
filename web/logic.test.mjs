@@ -775,3 +775,57 @@ test('new project: who may add one, what stops the form, the document a phone wo
   assert.equal(old.audit.newValue, 'Title: Pandi Heights, Location: Pandi, Bulacan, Cost: ₱0, Duration: 180 days, Already completed on 2026-06-30 at 98.5%');
   assert.equal(L.isCompleted(L.newProject(done, { uuid: 'p7', uid: 'u1', now: 1, user: 'x' }).project), true);
 });
+
+test('project edit: the form starts from the saved project, writes only what changed, and marks it completed like the phone', () => {
+  const project = {
+    projectUuid: 'p1', name: 'Pandi Heights', location: 'Pandi, Bulacan', implementingOffice: 'Bulacan District Office', contractor: 'ABC Builders',
+    scopeOfWork: '[{"name":"Land Development","amount":1000000.0,"weightPct":25.0},{"name":"Housing","amount":3000000.0,"weightPct":75.0}]',
+    projectType: 'Resettlement', landArea: '25000 sq.m.', numberOfUnits: '120 units', projectedBeneficiaries: '', boardResolution: 'BR 12', noticeOfAward: '', noticeToProceed: '',
+    contractCostOriginal: 4000000, contractCostRevised: 4500000, contractDurationDays: 180, dateStarted: '2026-07-01', completionDateOriginal: '2026-12-27',
+    completionDateRevised: '2027-01-31', status: 'On-going', targetAccomplishment: 40, actualAccomplishment: 35, assignedStaff: 'Engr. Cruz', assignedUids: ['u1'],
+  };
+  const start = L.projectStart(project, '2026-11-12');
+  assert.deepEqual(start, {
+    name: 'Pandi Heights', location: 'Pandi, Bulacan', implementingOffice: 'Bulacan District Office', contractor: 'ABC Builders', projectType: 'Resettlement',
+    numberOfUnits: '120 units', dateStarted: '2026-07-01', projectedBeneficiaries: '', boardResolution: 'BR 12', noticeOfAward: '', noticeToProceed: '',
+    landArea: '25000', landUnit: 'Hectares', days: '180', assignedStaff: 'Engr. Cruz',
+    scope: [{ name: 'Land Development', amount: '1000000', weightPct: '25' }, { name: 'Housing', amount: '3000000', weightPct: '75' }],
+    completed: false, completedOn: '2026-11-12', final: '100',
+  });
+  // "Mark as completed" starts at the completion date once it has passed (the revised one when set), else today.
+  assert.equal(L.projectStart(project, '2027-03-01').completedOn, '2027-01-31');
+  assert.equal(L.projectStart({ ...project, completionDateRevised: '' }, '2027-03-01').completedOn, '2026-12-27');
+  assert.equal(L.projectStart({ ...project, landArea: '2.5 Square Meters' }, '2026-11-12').landUnit, 'Square Meters');
+  assert.deepEqual(L.projectErrors(start, [project], '2026-11-12').length, 1); // the duplicate check is the caller's to skip on an edit
+  assert.deepEqual(L.projectErrors(start, [], '2026-11-12'), []);
+
+  // Untouched: nothing is written, not even the land area and scope the form would spell differently.
+  assert.deepEqual(L.editedProject(project, start).fields, {});
+  // Only the boxes changed are written; the revised cost and date are left alone.
+  const edit = L.editedProject(project, { ...start, name: ' Pandi Heights Phase 2 ', days: '200', noticeToProceed: ' NTP 2026-06-20 ' });
+  assert.deepEqual(edit.fields, { name: 'Pandi Heights Phase 2', contractDurationDays: 200, completionDateOriginal: '2027-01-16', noticeToProceed: 'NTP 2026-06-20' });
+  assert.deepEqual(edit.audit, { actionType: 'Project Edit', details: 'Updated project master: Pandi Heights Phase 2', oldValue: 'Status: On-going', newValue: 'Status: On-going, Revised Cost: ₱4500000' });
+  // A new scope item: the cost is the new total and every weight its share.
+  const scoped = L.editedProject(project, { ...start, scope: [...start.scope, { name: 'Roads', amount: '1,000,000' }] }).fields;
+  assert.deepEqual(Object.keys(scoped), ['scopeOfWork', 'contractCostOriginal']);
+  assert.equal(scoped.contractCostOriginal, 5000000);
+  assert.deepEqual(L.scopeItems(scoped.scopeOfWork).map(i => i.weightPct), [20, 60, 20]);
+  // The land area is rewritten once its box is touched.
+  assert.deepEqual(L.editedProject(project, { ...start, landUnit: 'Square Meters' }).fields, { landArea: '25000 Square Meters' });
+
+  // Marked completed: work done becomes the final accomplishment and the actual date the revised completion.
+  const done = L.editedProject(project, { ...start, completed: true, completedOn: '2026-11-10', final: '100' });
+  assert.deepEqual(done.fields, { completionDateRevised: '2026-11-10', targetAccomplishment: 100, actualAccomplishment: 100 });
+  assert.equal(done.audit.newValue, 'Status: Completed, Revised Cost: ₱4500000');
+  assert.equal(L.editedProject({ ...project, contractCostRevised: undefined }, { ...start, location: 'Bocaue' }).audit.newValue, 'Status: On-going, Revised Cost: ₱0');
+
+  // An older project's scope with no amounts: its items may stay, and keep their weights when one is renamed.
+  const old = { ...project, scopeOfWork: '[{"name":"Land Development","amount":0,"weightPct":40},{"name":"Housing","amount":0,"weightPct":60}]', contractCostOriginal: 0 };
+  const oldStart = L.projectStart(old, '2026-11-12');
+  assert.deepEqual(oldStart.scope, [{ name: 'Land Development', amount: '', weightPct: '40' }, { name: 'Housing', amount: '', weightPct: '60' }]);
+  assert.deepEqual(L.projectErrors(oldStart, [], '2026-11-12'), []);
+  const renamed = L.editedProject(old, { ...oldStart, scope: [{ ...oldStart.scope[0], name: 'Site Development' }, oldStart.scope[1]] }).fields;
+  assert.deepEqual(L.scopeItems(renamed.scopeOfWork), [{ name: 'Site Development', amount: 0, weightPct: 40 }, { name: 'Housing', amount: 0, weightPct: 60 }]);
+  // A plain-text scope from before the list reads as one item at 100%.
+  assert.deepEqual(L.projectStart({ ...project, scopeOfWork: 'Land development and housing' }, '2026-11-12').scope, [{ name: 'Land development and housing', amount: '', weightPct: '100' }]);
+});

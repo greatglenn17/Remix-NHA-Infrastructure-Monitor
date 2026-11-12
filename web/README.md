@@ -4,7 +4,7 @@ A web version of the NHA Monitor app. It reads the same Firestore data as the ph
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
 (Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
-Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
+Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
 A phone with its own unsent edit of the same issue keeps its version. The Cloud Function
 `notifySuperAdminsOnAudit` pushes that audit entry to the Super Admin's phones while the project is on-going, as it does for app edits. Everything else
@@ -98,6 +98,15 @@ is read only.
   as on the phone. A blank duration is 365 days here for both the saved duration and the completion date (the phone
   saves 365 days but shows the start date as the completion date). The role rule is in the form only:
   firestore.rules lets any approved writer create a project. Assigning other people stays on the phone.
+- **Edit** on the Project profile card (Summary), for the people who can edit the project (the app's EDIT_PROJECT
+  roles), opens the same form on the saved project (`L.projectStart`), with the Project Profile's projected
+  beneficiaries, board resolution, notice of award and notice to proceed, and without the assigned staff. Save
+  writes only the fields the form changed (`L.editedProject`), one revision up, with the app's "Project Edit" audit
+  entry; a land area or scope of works the form would spell differently is left as saved until its box is changed,
+  and saving with nothing changed writes nothing. The revised cost and the revised completion date are not the
+  form's to change. **Mark as completed** (shown until work done reaches 100%) sets the target and actual to the
+  final accomplishment and the revised completion date to the actual completion date. There is no duplicate name
+  check on an edit, as on the phone. Assigning people, deleting a project and the bar chart stay on the phone.
 - **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
