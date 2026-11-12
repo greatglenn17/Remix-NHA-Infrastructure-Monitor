@@ -117,6 +117,12 @@ is read only.
   (`L.signatoryFields`), one revision up, with the app's "Project Edit" audit entry, and the sheet redraws. Prepared
   by is shared by both reports; the weekly report has its own checker and noter. The phone asks for them each time
   it prints and saves them then; here they are saved with the button, and a viewer prints what is saved.
+- **Recommendations** on a monthly report's print page, for the people who can edit the project, is the text printed
+  under VIII. Recommendations. It is kept in the month's `monthly_reports` record, which the phones print from too:
+  the first save makes the record as the app's `submitMonthlyReport` does (`L.newMonthlyRecord`: the month's last
+  weekly figures, prepared by the signed-in name), a later one changes only the text; each writes the app's audit
+  entry (`L.monthlyAudit`). The phone's own monthly form (`AddMonthlyReportDialog`) has no button that opens it and
+  no recommendations box, and its workable-day counts are printed nowhere, so the rest of that form is not here.
 - **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with

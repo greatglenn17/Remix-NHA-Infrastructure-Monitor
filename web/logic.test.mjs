@@ -859,3 +859,25 @@ test('signatories: the project fields a weekly or a monthly report saves, only w
     { actionType: 'Project Edit', details: 'Updated project master: Pandi Heights', oldValue: 'Status: On-going', newValue: 'Status: On-going, Revised Cost: ₱4500000' });
   assert.deepEqual(Object.keys(L.SIGNATORY_POSITIONS), ['prepared', 'weeklyChecked', 'weeklyNoted', 'checked', 'noted']);
 });
+
+test('monthly report: the record a first save of recommendations makes, and the phone\'s two audit entries', () => {
+  const ids = { uuid: 'm1', projectUuid: 'p1', assignedUids: ['u1'], uid: 'u1', now: 1794292093231, preparedBy: 'Engr. Cruz' };
+  const weeks = [{ targetAccomplishmentPct: 30, actualAccomplishmentPct: 28 }, { targetAccomplishmentPct: 38, actualAccomplishmentPct: '36.5' }];
+  const rec = L.newMonthlyRecord(ids, 'September 2026', weeks, 'Fast-track the drainage works.');
+  assert.deepEqual({ ...rec, data: JSON.parse(rec.data) }, {
+    uuid: 'm1', type: 'monthly_reports', projectUuid: 'p1', assignedUids: ['u1'], revision: 1, updatedAt: 1794292093231, updatedByUid: 'u1', isDeleted: false,
+    data: {
+      reportingMonth: 'September 2026', scopeWeightPct: 100, scopeTargetPct: 38, scopeActualPct: 36.5, paymentsJson: '[]',
+      unworkableDaysCount: 0, workableDaysCount: 0, cpesIssuesJson: '[]', recommendations: 'Fast-track the drainage works.',
+      preparedByName: 'Engr. Cruz', preparedByStatus: 'Reviewed', checkedByName: '', checkedByStatus: 'Pending Review',
+      notedByName: '', notedByStatus: 'Pending Review', auditTrailJson: '', accomplishmentItemsJson: '[]',
+    },
+  });
+  // A month with no weekly report stands at 0.
+  const empty = JSON.parse(L.newMonthlyRecord(ids, 'June 2026', [], 'x').data);
+  assert.deepEqual([empty.scopeTargetPct, empty.scopeActualPct], [0, 0]);
+  assert.deepEqual(L.monthlyAudit('September 2026', weeks, false),
+    { actionType: 'Report Creation', details: 'Submitted Monthly Report for September 2026', oldValue: '', newValue: 'Month: September 2026, Target: 38%, Actual: 36.5%' });
+  assert.deepEqual(L.monthlyAudit('September 2026', weeks, true),
+    { actionType: 'Report Creation', details: 'Modified report for September 2026', oldValue: 'Previous report data', newValue: 'Updated report data' });
+});
