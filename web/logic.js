@@ -944,6 +944,16 @@ export function newLetterRecord({ uuid, projectUuid, assignedUids, uid, now }, f
   };
 }
 
+/** ProjectViewModel.deleteContractorLetter's audit entry, word for word. */
+export const deletedLetterAudit = l => ({
+  actionType: 'Letter to Contractor', details: `Deleted letter of ${l.dateSent}: ${l.subject}`, oldValue: l.actionTaken || '', newValue: '',
+});
+
+/** ProjectViewModel.deleteDeveloperRequest's audit entry, word for word. */
+export const deletedRequestAudit = r => ({
+  actionType: 'Developer Request', details: `Deleted ${r.requestType} request received ${r.dateReceived}`, oldValue: r.details || '', newValue: '',
+});
+
 /** ProjectViewModel.saveContractorLetter's audit entry, word for word. */
 export const letterAudit = f => ({
   actionType: 'Letter to Contractor', details: `Letter of ${f.dateSent}: ${f.subject}${f.dateReplied ? `, replied ${f.dateReplied}` : ''}`,

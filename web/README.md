@@ -41,7 +41,10 @@ is read only.
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
   is (under 20 MB), anything else as a JPEG no larger than 2500 px on its longest side, as the phone stores a scan.
   storage.rules already lets an assigned writer add these, and uploads through the Firebase SDK need no bucket CORS
-  setting (that is only for reading file bytes). A replaced file stays in the bucket.
+  setting (that is only for reading file bytes). An attached file can be replaced, or removed with the "Remove the
+  attached file" box; either way the old file stays in the bucket.
+- **Delete request** and **Delete letter**, in those forms, ask first, then mark the record `isDeleted` (one revision up)
+  as a phone's delete is uploaded, with the app's audit entry for that deletion.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.

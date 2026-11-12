@@ -1323,7 +1323,7 @@ function editRequest(c, r) {
     ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
     ${fileField('requestFileUrl', "Developer's request letter", r.requestFileUrl)}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions"><button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => {
@@ -1334,6 +1334,7 @@ function editRequest(c, r) {
   const done = () => { d.close(); d.remove(); };
   const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm('Discard your changes to this request?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
+  bindDelete(d, `Delete this ${r.requestType || ''} request? This cannot be undone.`, () => saveEdits(c, [[r, null, L.deletedRequestAudit(r)]], 'request'));
   const packedToday = d.querySelector('[data-today]');
   if (packedToday) packedToday.onclick = () => { form.datePackaged.value = today(); };
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
@@ -1375,7 +1376,7 @@ function editLetter(c, l) {
     <label class="field">Date of reply (blank: no reply yet)<input type="date" name="dateReplied" value="${esc(l.dateReplied || '')}"></label>
     ${fileField('replyFileUrl', "Contractor's reply letter", l.replyFileUrl)}
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete letter</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => {
@@ -1385,6 +1386,7 @@ function editLetter(c, l) {
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
   const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?')) && done();
+  bindDelete(d, `Delete the letter "${l.subject || ''}"? This cannot be undone.`, () => saveEdits(c, [[l, null, L.deletedLetterAudit(l)]], 'letter'));
   // A signed receiving copy means the contractor has it; a reply letter in hand means the contractor replied.
   for (const [file, date] of [['receivedFileUrl', 'dateReceived'], ['replyFileUrl', 'dateReplied']]) {
     form[file].onchange = () => { if (form[file].files[0] && !form[date].value) form[date].value = today(); };
@@ -1411,15 +1413,41 @@ function editLetter(c, l) {
   d.showModal();
 }
 
+/**
+ * Wires a form's Delete button: asks `question` first, then runs `remove` with the form's buttons off and closes the
+ * form. The record is marked deleted, as a phone's delete is uploaded; its files stay in the bucket.
+ */
+function bindDelete(d, question, remove) {
+  const del = d.querySelector('[data-delete]'), save = d.querySelector('.btn'), err = d.querySelector('.error');
+  if (!del) return;
+  del.onclick = async () => {
+    if (!confirm(question)) return;
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then delete again.'; return; }
+    del.disabled = save.disabled = true; err.textContent = '';
+    try {
+      await remove();
+      d.close(); d.remove();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not delete. Try again.';
+      del.disabled = save.disabled = false;
+    }
+  };
+}
+
 /* ---------- Attaching files (Attachments.store and upload) ---------- */
 
-/** A form's file input for an attachment column; `attached` is the reference the record holds now, if any. */
+/**
+ * A form's file input for an attachment column; `attached` is the reference the record holds now, if any, and then a
+ * box to remove it follows (no name, so it stays out of the form's fields).
+ */
 const fileField = (name, label, attached) => `<label class="field">${esc(label)} (photo or PDF)<input type="file" name="${name}" accept="image/*,application/pdf">
-  ${attached ? '<small class="muted">A file is attached. Choosing one here replaces it.</small>' : ''}</label>`;
+  ${attached ? '<small class="muted">A file is attached. Choosing one here replaces it.</small>' : ''}</label>
+  ${attached ? `<label class="check"><input type="checkbox" data-remove="${name}">Remove the attached file</label>` : ''}`;
 
 /** A form's text fields, without the files picked in it. */
 const textFields = form => Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string'));
-const hasPicked = form => [...form.querySelectorAll('input[type=file]')].some(i => i.files[0]);
+/** True when a file was picked in the form or an attached one is ticked for removal. */
+const hasPicked = form => [...form.querySelectorAll('input[type=file]')].some(i => i.files[0]) || Boolean(form.querySelector('input[data-remove]:checked'));
 
 /** What the phone keeps of a picked file: a PDF as it is, anything else as a JPEG no larger than a scan. [blob, extension, content type]. */
 async function attachmentBlob(file) {
@@ -1445,11 +1473,12 @@ async function attachmentBlob(file) {
 
 /**
  * Uploads the files picked in a form to attachments/<projectUuid>/<id>.jpg|.pdf, where the phones look for them, and
- * returns { input name: its `nhafile:` reference } to save on the record.
+ * returns { input name: its `nhafile:` reference } to save on the record ('' for a column whose Remove box is ticked).
  * shortcut: a replaced file, or one whose record then fails to save, stays in the bucket (only the phone that added a file cleans it up).
  */
 async function uploadPicked(c, form) {
-  const refs = {};
+  // A ticked Remove box clears its column; a file picked for the same column wins.
+  const refs = Object.fromEntries([...form.querySelectorAll('input[data-remove]:checked')].map(i => [i.dataset.remove, '']));
   for (const input of form.querySelectorAll('input[type=file]')) {
     if (!input.files[0]) continue;
     const [blob, ext, contentType] = await attachmentBlob(input.files[0]);
