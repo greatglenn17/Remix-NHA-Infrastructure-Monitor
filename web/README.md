@@ -1,7 +1,7 @@
 # NHA Monitor Web
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
-(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
+(`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging, editing and deleting issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
 (Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
@@ -107,6 +107,9 @@ is read only.
   form's to change. **Mark as completed** (shown until work done reaches 100%) sets the target and actual to the
   final accomplishment and the revised completion date to the actual completion date. There is no duplicate name
   check on an edit, as on the phone. Assigning people, deleting a project and the bar chart stay on the phone.
+- **Delete issue** in the Edit issue form (Progress → Issues), for the Super Admin and Engineer Admins, the app's
+  DELETE_ISSUE roles (`L.canDeleteIssue`; a form rule only, like Delete report). It asks first, marks the record
+  deleted, as the phones sync a delete, and writes the app's "Issue Deletion" audit entry (`L.deletedIssueAudit`).
 - **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with

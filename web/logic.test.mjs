@@ -716,6 +716,12 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
 
   assert.deepEqual(L.deletedWeeklyAudit(report), { actionType: 'Deleted Weekly Report', details: 'Deleted report for Week 7: February 14 - February 20, 2026' });
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'].map(role => L.canDeleteReport({ role })), [true, true, false, false]);
+
+  // Deleting an issue: the same roles, and the phone's entry with the record's id.
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER'].map(role => L.canDeleteIssue({ role })), [true, true, false, false]);
+  assert.deepEqual(L.deletedIssueAudit({ uuid: 'i1', description: 'Delayed delivery of reinforcing steel bars to the site' }),
+    { actionType: 'Issue Deletion', details: 'Deleted issue: Delayed delivery of reinforcin...', oldValue: 'Issue ID: i1', newValue: '' });
+  assert.equal(L.deletedIssueAudit({ uuid: 'i2' }).details, 'Deleted issue: ...');
 });
 
 test('new project: who may add one, what stops the form, the document a phone would upload and the audit entry', async () => {
