@@ -907,3 +907,48 @@ test('delete project: the Super Admin, or an Engineer Admin assigned to it, and 
   assert.deepEqual(L.deletedProject(project, { uid: 'u1', now: 1794292093231 }),
     { projectUuid: 'p1', isDeleted: true, updatedAt: 1794292093231, updatedByUid: 'u1' });
 });
+
+test('bar chart editor: drafts from the scope or the saved chart, bars as month and cell, the errors and what is saved', () => {
+  const scope = JSON.stringify([{ name: 'Land development', amount: 3000000, weightPct: 60 }, { name: 'Housing units', amount: 2000000, weightPct: 40 }]);
+  const project = { projectUuid: 'p1', assignedUids: ['u1'], dateStarted: '2026-01-05', scopeOfWork: scope, contractCostOriginal: 5000000, barChartJson: '' };
+  // No chart yet: one "Original" chart of the scope items from the start date, each with an empty bar; nothing to save until the bars read.
+  const fresh = L.chartDrafts(project);
+  assert.deepEqual(fresh, [{ label: 'Original', effective: '2026-01-05', items: [
+    { name: 'Land development', amount: 3000000, bars: [{ sm: '', sc: '', em: '', ec: '' }] }, { name: 'Housing units', amount: 2000000, bars: [{ sm: '', sc: '', em: '', ec: '' }] }] }]);
+  assert.deepEqual(L.chartErrors(fresh, project, []), ['Original: check the bars of Land development, Housing units (month 1+, cell 5, 10 … 30)']);
+  assert.equal(L.chartDrafts({ ...project, dateStarted: '' }), null);
+  // A bar: From month 1 cell 5 is day 1; To month 8 cell 30 is day 240.
+  assert.deepEqual(L.draftBar({ sm: '1', sc: '5', em: '8', ec: '30' }), [1, 240]);
+  assert.deepEqual(L.draftBar({ sm: ' 5 ', sc: '5', em: '18', ec: '30' }), [121, 540]);
+  assert.deepEqual([{ sm: '0', sc: '5', em: '2', ec: '30' }, { sm: '1', sc: '7', em: '2', ec: '30' }, { sm: '3', sc: '5', em: '2', ec: '30' }, { sm: '1', sc: '5', em: 'x', ec: '30' },
+    { sm: '1', sc: '35', em: '2', ec: '30' }, { sm: '1.5', sc: '5', em: '2', ec: '30' }].map(L.draftBar), [null, null, null, null, null, null]);
+  fresh[0].items[0].bars[0] = { sm: '1', sc: '5', em: '8', ec: '30' };
+  fresh[0].items[1].bars = [{ sm: '5', sc: '5', em: '18', ec: '30' }];
+  assert.deepEqual(L.chartErrors(fresh, project, []), []);
+  const json = L.chartJson(fresh);
+  assert.equal(json, '[{"label":"Original","effective":"2026-01-05","items":[{"name":"Land development","amount":3000000,"bars":[[1,240]]},{"name":"Housing units","amount":2000000,"bars":[[121,540]]}]}]');
+  // The saved chart opens as it was entered, and saving it untouched makes the same JSON.
+  const saved = { ...project, barChartJson: json };
+  assert.deepEqual(L.chartDrafts(saved), fresh);
+  assert.equal(L.chartJson(L.chartDrafts(saved)), json);
+  // A revised chart copies the last one; it needs a date after the start and the previous chart, and the contract total.
+  const two = [...L.chartDrafts(saved), L.revisedDraft(L.chartDrafts(saved))];
+  assert.equal(two[1].label, 'Revised No. 1');
+  assert.notEqual(two[1].items[0].bars[0], two[0].items[0].bars[0]);
+  assert.deepEqual(L.chartErrors(two, saved, []), ['Revised No. 1: pick the date it takes effect']);
+  two[1].effective = '2025-12-01';
+  assert.deepEqual(L.chartErrors(two, saved, []), ['Revised No. 1: takes effect before the start date', 'Revised No. 1: takes effect on or before the previous chart']);
+  two[1].effective = '2026-06-01';
+  two[1].label = ' ';
+  two[1].items[1].amount = 2500000;
+  assert.deepEqual(L.chartErrors(two, saved, []), ['Chart 2: enter a name', 'Chart 2: the chart totals ₱5,500,000.00 but the contract amount is ₱5,000,000.00']);
+  // An approved Variation Order raises the amount a revised chart may total; the original chart still totals the original.
+  const vo = [{ documentName: 'Variation Order No. 1 (Additive) - PHP 500,000.00', status: 'Approved' }];
+  two[1].label = 'Revised No. 1';
+  assert.deepEqual(L.chartErrors(two, saved, vo), []);
+  assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: add the Scope of Works items to the project first']);
+  assert.equal(L.chartJson([]), '');
+  assert.deepEqual([L.chartAudit(json), L.chartAudit('')], [{ actionType: 'Bar Chart', details: 'Saved the approved bar chart' }, { actionType: 'Bar Chart', details: 'Removed the approved bar chart' }]);
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].map(role => L.canEditChart(project, 'u1', { role })), [true, true, false]);
+  assert.equal(L.canEditChart(project, 'x', { role: 'ENGINEER_ADMIN' }), false);
+});
