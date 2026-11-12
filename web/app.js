@@ -9,7 +9,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
 import * as P from './print.js';
@@ -603,6 +603,7 @@ function projectForm(c = null) {
   // deleteProject: the phone's own audit entry names no project, so it never reaches the cloud; the tombstone keeps who and when.
   if (project) bindDelete(d, `Delete “${project.name}”? It will be removed from this website and from every phone. This cannot be undone.`, async () => {
     await updateDoc(doc(db, 'projects', c.page.id), L.deletedProject(project, { uid: s.user.uid, now: Date.now() }));
+    dropFiles(L.unusedFiles([...c.records, project], [], [], null));
     location.hash = '#/';
   });
   document.body.append(d);
@@ -1601,7 +1602,7 @@ function scaleForm(c, site) {
 
 /**
  * Deletes a plan with its lots, roads, lot progress and inspections, as the phone's delete does: each is marked
- * deleted, and its PDF stays in the bucket.
+ * deleted, and their files leave the bucket.
  * shortcut: the records under the plan go first, in batches, then the plan with its audit entry, not one write; if it
  * stops partway the plan is still listed, and Delete plan again finishes it.
  */
@@ -1613,6 +1614,7 @@ async function deletePlan(c, plan) {
     await batch.commit();
   }
   await saveEdits(c, [[plan, null, gone.audit]], 'plan');
+  dropFiles(L.unusedFiles(gone.children, [], c.records.filter(r => r.uuid !== plan.uuid), c.project));
 }
 
 /** The plan's own tools on Progress → Lots: its scale, a quarter turn, the revision in use, and deleting it. */
@@ -2362,7 +2364,7 @@ function editLetter(c, l) {
 
 /**
  * Wires a form's Delete button: asks `question` first, then runs `remove` with the form's buttons off and closes the
- * form. The record is marked deleted, as a phone's delete is uploaded; its files stay in the bucket.
+ * form. The record is marked deleted, as a phone's delete is uploaded; saveEdits takes its files out of the bucket.
  */
 function bindDelete(d, question, remove) {
   const del = d.querySelector('[data-delete]'), save = d.querySelector('.btn'), err = d.querySelector('.error');
@@ -2421,7 +2423,7 @@ async function attachmentBlob(file, maxEdge = L.SCAN_MAX_EDGE) {
 /**
  * Uploads the files picked in a form to attachments/<projectUuid>/<id>.jpg|.pdf, where the phones look for them, and
  * returns { input name: its `nhafile:` reference } to save on the record ('' for a column whose Remove box is ticked).
- * shortcut: a replaced file, or one whose record then fails to save, stays in the bucket (only the phone that added a file cleans it up).
+ * shortcut: a file whose record then fails to save stays in the bucket; a replaced or removed one leaves it once the record is saved (saveEdits).
  */
 async function uploadPicked(c, form) {
   // A ticked Remove box clears its column; a file picked for the same column wins.
@@ -2447,7 +2449,7 @@ async function uploadFile(c, [blob, ext, contentType]) {
  * A weekly report's site photos, as AddWeeklyReportDialog's photo strip: a title for each, take one off, add more.
  * Save rewrites only the report's two photo columns, with the app's "Edited Weekly Report" entry, and points the
  * project's card photo at the newest report photo left (ProjectViewModel.refreshSitePhoto).
- * shortcut: no geo-tag stamp, and a removed photo's file stays in the bucket.
+ * shortcut: no geo-tag stamp.
  */
 function editPhotos(c, report) {
   const refs = L.attachmentList(report.attachedPhotoUrlsJson), details = L.photoDetails(report.photoDetailsJson);
@@ -2694,6 +2696,16 @@ async function saveEdits(c, edits, noun, projectFields = null) {
     });
     saveProject(t, project, projectFields, uid, now);
   });
+  const after = edits.filter(([, changes]) => changes).map(([rec, changes]) => ({ ...rec, ...changes }));
+  dropFiles(L.unusedFiles(edits.map(([rec]) => rec), after, c.records, { ...c.project, ...projectFields }));
+}
+
+/**
+ * Takes out of the bucket the files a saved delete or edit left unused, as a phone's cleanup does for the files it
+ * uploaded. Not waited for: the record is saved either way, and a file that cannot be removed just stays.
+ */
+function dropFiles(refs) {
+  for (const r of refs) deleteObject(ref(storage, L.storagePathOf(r))).catch(x => console.warn('A deleted record\'s file stays in the bucket', r, x.code || x));
 }
 
 /**
