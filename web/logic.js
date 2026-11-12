@@ -1758,3 +1758,12 @@ export function assignmentFields(project, uids, users) {
   if (list.length === was.length && list.every((uid, i) => uid === was[i])) return {};
   return { assignedUids: list, assignedStaff: list.map(uid => users.find(u => u.uid === uid)?.name ?? uid).join(', ') };
 }
+
+/** DELETE_PROJECT on a project the account can edit: the phone's dashboard has no Delete on a view-only project. */
+export const canDeleteProject = (project, uid, claims) => canCreateProject(claims) && canEdit(project, uid, claims);
+
+/**
+ * The tombstone a phone uploads for a deleted project (FirestoreSyncManager's DELETE): the document and its records
+ * stay, marked deleted, and every phone and this website drop the project.
+ */
+export const deletedProject = (project, { uid, now }) => ({ projectUuid: project.projectUuid, isDeleted: true, updatedAt: now, updatedByUid: uid });
