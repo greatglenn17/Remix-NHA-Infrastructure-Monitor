@@ -664,6 +664,8 @@ function drawProject(page) {
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  const weeklyAdd = document.getElementById('weekly-add');
+  if (weeklyAdd) weeklyAdd.onclick = () => addWeekly(c);
   const billingAdd = document.getElementById('billing-add');
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
   // The saved billing, not the card's net one: an edit starts from what is stored.
@@ -808,9 +810,10 @@ function progressBody(c, chip) {
   if (chip === 'Photos') return photosView(c);
   if (chip === 'Weather') return weatherView(c);
   if (chip === 'Issues') return issuesView(c);
-  if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
   const editable = L.canEdit(c.project, s.user.uid, s.claims);
-  return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
+  const add = editable ? `<button class="btn weekly-add" id="weekly-add">${icon('add_circle', 'sm')}New weekly report</button>` : '';
+  if (!c.weekly.length) return `${add}<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
+  return `${add}<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
 }
 
 const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
@@ -1905,20 +1908,138 @@ function editPhotos(c, report) {
   d.showModal();
 }
 
-/** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
+/**
+ * AddWeeklyReportDialog's Week, Crew and Work steps as one form. The report's photos and 24-hour weather are added
+ * from the saved report (Add photos, Edit weather). With an approved bar chart the targets are its plan for the week's
+ * last day; they follow the week picked.
+ */
+function addWeekly(c) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form wk-form';
+  const opt = (v, label = v) => `<option value="${esc(v)}">${esc(label)}</option>`;
+  const days = L.ACTIVITY_DAYS.map(v => opt(v)).join('');
+  const count = n => `<label class="field n">No.<input data-f="count" type="number" min="0" step="1" value="${n}"></label>`;
+  const rowOf = {
+    manpower: (name = '', n = 1) => `<label class="field">Designation<input data-f="designation" list="wk-designations" value="${esc(name)}"></label>${count(n)}`,
+    equipment: () => `<label class="field">Name of equipment<input data-f="description" list="wk-equipment"></label>${count(1)}
+      <label class="field">Status<select data-f="status">${L.EQUIPMENT_STATUSES.map(v => opt(v)).join('')}</select></label>`,
+    activities: () => `<label class="field">From<select data-f="from">${days}</select></label>
+      <label class="field">To (optional)<select data-f="to">${opt('', 'Same day')}${days}</select></label>
+      <label class="field full">Activity<textarea data-f="description" rows="2"></textarea></label>
+      <label class="field full">Remarks (optional)<input data-f="remarks"></label>`,
+    issues: () => `<label class="field full">Issue encountered<textarea data-f="description" rows="2"></textarea></label>
+      <label class="field full">Action taken<textarea data-f="actionTaken" rows="2"></textarea></label>
+      <label class="field">Action taken by<select data-f="actionBy">${opt('', 'Not set')}${L.ISSUE_ACTION_BY.map(v => opt(v)).join('')}</select></label>`,
+  };
+  const row = (kind, ...start) => `<div class="wk-row">${rowOf[kind](...start)}<button type="button" class="icon-btn" data-drop-row aria-label="Remove this row">${icon('close', 'sm')}</button></div>`;
+  const list = (kind, title, label, rows = '') => `<h3>${title}</h3><div class="wk-rows" data-rows="${kind}">${rows}</div>
+    <button type="button" class="text-btn wk-add" data-add-row="${kind}">${icon('add_circle', 'sm')}${label}</button>`;
+  d.innerHTML = `<form novalidate>
+    <h2>New weekly report</h2>
+    <label class="field">First day of the week<input type="date" name="first" value="${L.weekSaturday(today())}" required></label>
+    <p class="muted small" id="wk-week"></p>
+    <h3>Weekly accomplishment</h3>
+    <p class="muted small" id="wk-note"></p>
+    <div class="wk-rows" id="wk-lines"></div>
+    <p class="wk-total" id="wk-total" aria-live="polite"></p>
+    ${list('manpower', 'Manpower', 'Add designation', L.MANPOWER_START.map(name => row('manpower', name, 0)).join(''))}
+    ${list('equipment', 'Equipment', 'Add equipment')}
+    ${list('activities', 'Activities of the week', 'Add activity', row('activities'))}
+    ${list('issues', 'Issues encountered / action taken', 'Add issue')}
+    <datalist id="wk-designations">${L.MANPOWER_DESIGNATIONS.map(v => opt(v)).join('')}</datalist>
+    <datalist id="wk-equipment">${L.EQUIPMENT_NAMES.map(v => opt(v)).join('')}</datalist>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
+  const box = d.querySelector('#wk-lines');
+  let lines = [];
+  const rowsOf = kind => [...form.querySelectorAll(`[data-rows="${kind}"] .wk-row`)].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value])));
+  const typed = () => [...box.querySelectorAll('[data-line]')].map(el => ({ target: el.querySelector('[data-target]').value, actual: el.querySelector('[data-actual]').value }));
+  const values = () => {
+    const now = typed();
+    return { first: form.first.value, lines: lines.map((l, k) => ({ name: l.name, weightPct: l.weightPct, ...now[k] })),
+      manpower: rowsOf('manpower'), equipment: rowsOf('equipment'), activities: rowsOf('activities'), issues: rowsOf('issues') };
+  };
+  const total = () => {
+    const t = L.weeklyTotals(values().lines);
+    d.querySelector('#wk-total').textContent = `Overall: target ${pct(t.target)}, actual ${pct(t.actual)}, variance ${signedPct(t.actual - t.target)}`;
+  };
+  // The lines follow the week: with a chart their targets are its plan for the week's last day. What was typed stays.
+  const drawLines = () => {
+    if (!form.first.value) return;
+    const label = L.weekLabel(form.first.value), kept = typed();
+    lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6]);
+    const charted = lines[0].targetPct != null;
+    d.querySelector('#wk-week').textContent = label;
+    d.querySelector('#wk-note').textContent = charted ? 'Targets are the approved bar chart\'s plan for the last day of this week.'
+      : lines.some(l => l.weightPct > 0) ? 'No bar chart yet: type each target.' : 'This project has no scope of works yet, so the overall figures stay at 0%.';
+    box.innerHTML = lines.map((l, k) => `<fieldset class="wk-row" data-line><legend>${esc(l.name)} (${pct(l.weightPct)})</legend>
+      <label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(charted ? l.targetPct.toFixed(2) : kept[k]?.target ?? '')}"${charted ? ' readonly' : ''}></label>
+      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(kept[k]?.actual ?? '')}"></label></fieldset>`).join('');
+    total();
+  };
+  form.first.onchange = drawLines;
+  box.oninput = total;
+  form.onclick = e => {
+    const kind = e.target.closest('[data-add-row]')?.dataset.addRow;
+    if (kind) {
+      const rows = form.querySelector(`[data-rows="${kind}"]`);
+      rows.insertAdjacentHTML('beforeend', row(kind));
+      rows.lastElementChild.querySelector('[data-f]').focus();
+    }
+    e.target.closest('[data-drop-row]')?.closest('.wk-row').remove();
+  };
+  drawLines();
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard this new weekly report?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), errors = L.weeklyErrors(f);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      const report = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email);
+      await addRecords(c, [[report.build, report.audit]], report.projectFields);
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/** A new record (`build` gets its ids and stamps) and its audit entry in one write, with the project's assignedUids. */
 const addRecord = (c, build, entry) => addRecords(c, [[build, entry]]);
 
-/** addRecord for several records that must be added together (`items`: [build, audit entry or entries] each), all or none. */
-async function addRecords(c, items) {
-  const uid = s.user.uid, now = Date.now();
-  const project = await getDoc(doc(db, 'projects', c.page.id));
-  const ids = () => ({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids: project.get('assignedUids') ?? [], uid, now });
-  const batch = writeBatch(db);
-  for (const [build, entry] of items) {
-    const audits = [entry].flat().map(e => L.auditRecord({ ...ids(), user: s.profile.name || s.user.email, ...e }));
-    for (const record of [build(ids()), ...audits]) batch.set(doc(db, 'records', record.uuid), record);
+/**
+ * addRecord for several records that must be added together (`items`: [build, audit entry or entries] each), all or
+ * none; `projectFields` are saved on the project with them (saveProject).
+ */
+async function addRecords(c, items, projectFields = null) {
+  const uid = s.user.uid;
+  await runTransaction(db, async t => {
+    const project = await t.get(doc(db, 'projects', c.page.id)), now = Date.now();
+    const ids = () => ({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids: project.get('assignedUids') ?? [], uid, now });
+    for (const [build, entry] of items) {
+      const audits = [entry].flat().map(e => L.auditRecord({ ...ids(), user: s.profile.name || s.user.email, ...e }));
+      for (const record of [build(ids()), ...audits]) t.set(doc(db, 'records', record.uuid), record);
+    }
+    saveProject(t, project, projectFields, uid, now);
+  });
+}
+
+/** In a transaction: `fields` that differ from the project's are saved on it, one revision up, the way a phone uploads a project change. */
+function saveProject(t, project, fields, uid, now) {
+  if (fields && Object.entries(fields).some(([key, value]) => (project.get(key) ?? '') !== value)) {
+    t.update(project.ref, { ...fields, revision: (Number(project.get('revision')) || 1) + 1, updatedAt: now, updatedByUid: uid });
   }
-  await batch.commit();
 }
 
 /**
@@ -1951,9 +2072,7 @@ async function saveEdits(c, edits, noun, projectFields = null) {
         t.set(doc(db, 'records', audit.uuid), audit);
       }
     });
-    if (projectFields && Object.entries(projectFields).some(([key, value]) => (project.get(key) ?? '') !== value)) {
-      t.update(project.ref, { ...projectFields, revision: (Number(project.get('revision')) || 1) + 1, updatedAt: now, updatedByUid: uid });
-    }
+    saveProject(t, project, projectFields, uid, now);
   });
 }
 

@@ -335,4 +335,43 @@ class WebEditSyncTest {
         assertEquals("the website's edit lands on the phone's own row", 75, merged.physicalProgress)
         assertEquals("2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e", merged.uuid)
     }
+
+    /** web/logic.js newWeeklyReport: a weekly report added on the website, which has no weather log yet. */
+    @Test
+    fun websiteNewWeeklyReport_isAddedToTheProject_withNoWeather() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-01-01", completionDateOriginal = "2026-12-31", completionDateRevised = "",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val uuid = "3c4d5e6f-7a8b-4c9d-8e0f-2a3b4c5d6e7f"
+
+        recordSync.applyRemote(listOf(mapOf(
+            "uuid" to uuid, "type" to "weekly_reports", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to 1L, "updatedAt" to 4_102_444_800_000L, "updatedByUid" to "web", "isDeleted" to false,
+            // Whole numbers arrive without a decimal point, as JavaScript writes them.
+            "data" to """{"reportingWeek":"Feb 14, 2026 - Feb 20, 2026","daysElapsed":51,"remainingDays":314,"targetAccomplishmentPct":31.000000000000004,""" +
+                """"actualAccomplishmentPct":30,"manpowerJson":"[{\"designation\":\"Foreman\",\"count\":2,\"remarks\":\"\"}]","equipmentJson":"[]",""" +
+                """"activitiesJson":"[{\"day\":\"Monday - Wednesday\",\"description\":\"Excavation\",\"remarks\":\"ok\"}]","issuesJson":"[]",""" +
+                """"accomplishmentItemsJson":"[{\"itemDescription\":\"Land Development\",\"targetPct\":51,\"actualPct\":50,\"weightPct\":60}]",""" +
+                """"documentsIssuedReceivedJson":"[]","attachedPhotoUrlsJson":"[]","photoDetailsJson":"{}","submittedByStaff":"Engr. Web",""" +
+                """"createdAtTimestamp":4102444800000,"_weather":[]}"""
+        )))
+
+        val report = db.reportDao().getWeeklyReportsForProject(projectId).first().single()
+        assertEquals(uuid, report.uuid)
+        assertEquals("Feb 14, 2026 - Feb 20, 2026", report.reportingWeek)
+        assertEquals(51, report.daysElapsed)
+        assertEquals(314, report.remainingDays)
+        assertEquals(30.0, report.actualAccomplishmentPct, 0.0)
+        assertEquals(31.0, report.targetAccomplishmentPct, 1e-9)
+        assertEquals("Engr. Web", report.submittedByStaff)
+        assertEquals(2, com.example.ui.detail.tabs.parseManpowerList(report.manpowerJson).single().count)
+        assertEquals("Monday - Wednesday", com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson).single().day)
+        assertEquals(50.0, com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson).single { it.itemDescription == "Land Development" }.actualPct, 0.0)
+        assertEquals("no weather until it is logged", 0, db.reportDao().getDailyWeatherForProject(projectId).first().size)
+    }
 }

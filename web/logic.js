@@ -160,7 +160,9 @@ export function planOn(project, docs, today) {
   const dayOf = item => (now - start) / DAY + 1 - suspendedDays(docs, from, now, item);
   const total = chartTotal(v);
   const plannedPct = total <= 0 ? 0 : (v.items || []).reduce((t, i) => t + (Number(i.amount) || 0) * plannedShare(i, dayOf(i.name)), 0) / total * 100;
-  return { version: v, versions, day: dayOf(undefined), plannedPct };
+  // Plan.itemTargets: each item's planned accomplishment (% of the item, 2 decimals).
+  const itemTargets = Object.fromEntries((v.items || []).map(i => [i.name, Math.round(plannedShare(i, dayOf(i.name)) * 10000) / 100]));
+  return { version: v, versions, day: dayOf(undefined), plannedPct, itemTargets };
 }
 
 /** BarChart.targetOn: the planned accomplishment (%) on `today`, or null without a chart. */
@@ -1375,6 +1377,89 @@ export function userChange(user, change) {
     return { role: change.role };
   }
   return { seesAllProjects: change.seesAllProjects === true, role };
+}
+
+/* ---------- New weekly report (AddWeeklyReportDialog, ProjectViewModel.submitWeeklyReportWithWeather) ---------- */
+
+export const MANPOWER_DESIGNATIONS = ['Project Manager', 'Project Engineer', 'Project Architect', 'Safety Officer', 'Foreman', 'Operator', 'Labor',
+  'Security Guard', 'Driver', 'Warehouseman'];
+/** The form's first manpower rows: the usual designations at zero, so no sample headcount is saved as real. */
+export const MANPOWER_START = ['Project Engineer', 'Foreman', 'Masons / Carpenters', 'Laborers'];
+export const EQUIPMENT_NAMES = ['Backhoe', 'Bulldozer', 'Road Roller', 'Forward Truck', 'Mini Dump Truck', 'Generator'];
+export const EQUIPMENT_STATUSES = ['Operational', 'Idle', 'For Repair'];
+/** ActivityDays.DAYS. */
+export const ACTIVITY_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** WeekRange.containing's first day: the Saturday on or before `day` (yyyy-MM-dd). */
+export const weekSaturday = day => new Date(isoDay(day) - ((new Date(isoDay(day)).getUTCDay() + 1) % 7) * DAY).toISOString().slice(0, 10);
+
+/** WeekRange's label for the 7 days from `first` (yyyy-MM-dd): "Oct 31, 2026 - Nov 6, 2026". */
+export function weekLabel(first) {
+  const day = ms => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return `${day(isoDay(first))} - ${day(isoDay(first) + 6 * DAY)}`;
+}
+
+/**
+ * The form's three accomplishment lines for a week ending `asOf`: a line's weight is its items' (the bar chart in force
+ * that day, by amount; without a chart the Scope of Works'). With a chart the target is its plan and is not typed;
+ * `targetPct` is null when it is typed.
+ */
+export function weeklyLines(project, docs, asOf) {
+  const plan = planOn(project, docs, asOf), total = plan ? chartTotal(plan.version) : 0;
+  const items = total > 0 ? plan.version.items.map(i => ({ name: i.name, weightPct: (Number(i.amount) || 0) / total * 100 }))
+    : String(project.scopeOfWork ?? '').trim() ? scopeItems(project.scopeOfWork) : [];
+  const lines = accomplishmentLines(items.map(i => ({ itemDescription: i.name, weightPct: i.weightPct, targetPct: total > 0 ? plan.itemTargets[i.name] ?? 0 : 0, actualPct: 0 })));
+  return ACCOMPLISHMENT_LINES.map((name, k) => ({ name, weightPct: lines[k]?.weightPct ?? 0, targetPct: total > 0 ? Math.round((lines[k]?.targetPct ?? 0) * 100) / 100 : null }));
+}
+
+/** FormValidation.percentError's reading: blank is 0, else 0 to 100; NaN for anything else. */
+const percent = text => {
+  const t = String(text ?? '').trim(), v = !t ? 0 : /^(\d+(\.\d*)?|\.\d+)$/.test(t) ? Number(t) : NaN;
+  return v >= 0 && v <= 100 ? v : NaN;
+};
+
+/** weeklyErrors: every line's target and actual is 0 to 100; the week needs its first day. */
+export function weeklyErrors(f) {
+  return [isoDay(f.first) == null && 'Pick the first day of the week.', ...f.lines.flatMap(l => [
+    Number.isNaN(percent(l.target)) && `${l.name}: target must be 0 to 100%.`, Number.isNaN(percent(l.actual)) && `${l.name}: actual must be 0 to 100%.`,
+  ])].filter(Boolean);
+}
+
+/** The overall target and actual of the form's lines: each line's percent by its weight. */
+export const weeklyTotals = lines => Object.fromEntries(['target', 'actual'].map(k => [k, lines.reduce((t, l) => t + (percent(l[k]) || 0) * l.weightPct / 100, 0)]));
+
+/**
+ * A new weekly report from the form `f` ({ first, lines: [{ name, weightPct, target, actual }], manpower, equipment,
+ * activities, issues }): `build` makes the weekly_reports record as RecordSync uploads one, `projectFields` are the
+ * project's target and actual the phone sets with it, `audit` its entry. Rows without a name or description are left
+ * out. Photos and weather start empty: the report's Add photos and Edit weather fill them.
+ */
+export function newWeeklyReport(f, project, user) {
+  const reportingWeek = weekLabel(f.first), last = isoDay(f.first) + 6 * DAY;
+  const { target, actual } = weeklyTotals(f.lines);
+  // ProjectSchedule.elapsedAndRemaining as of the week's last day: 0 and 0 without a start and completion date.
+  const start = isoDay(project.dateStarted), end = isoDay(effectiveCompletion(project)), dated = start != null && end != null;
+  const rows = (list, key, row) => JSON.stringify(list.filter(r => (r[key] || '').trim()).map(row));
+  const count = r => Math.max(0, int(r.count, 0));
+  const data = {
+    reportingWeek, daysElapsed: dated ? Math.max(0, (last - start) / DAY + 1) : 0, remainingDays: dated ? Math.max(0, (end - last) / DAY) : 0,
+    targetAccomplishmentPct: target, actualAccomplishmentPct: actual,
+    manpowerJson: rows(f.manpower, 'designation', r => ({ designation: r.designation.trim(), count: count(r), remarks: '' })),
+    equipmentJson: rows(f.equipment, 'description', r => ({ description: r.description.trim(), count: count(r), status: r.status || 'Operational', remarks: '' })),
+    // ActivityDays.label: one day, or a range such as "Monday - Wednesday".
+    activitiesJson: rows(f.activities, 'description', r => ({ day: r.to && r.to !== r.from ? `${r.from} - ${r.to}` : r.from, description: r.description.trim(), remarks: (r.remarks || '').trim() })),
+    issuesJson: rows(f.issues, 'description', r => ({ description: r.description.trim(), actionTaken: (r.actionTaken || '').trim(), remarks: '', actionBy: r.actionBy || '' })),
+    accomplishmentItemsJson: JSON.stringify(f.lines.map(l => ({ itemDescription: l.name, targetPct: percent(l.target), actualPct: percent(l.actual), weightPct: l.weightPct }))),
+    documentsIssuedReceivedJson: '[]', attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', submittedByStaff: user,
+  };
+  return {
+    build: ({ uuid, projectUuid, assignedUids, uid, now }) => ({
+      uuid, type: 'weekly_reports', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+      data: JSON.stringify({ ...data, createdAtTimestamp: now, _weather: [] }),
+    }),
+    projectFields: { targetAccomplishment: target, actualAccomplishment: actual },
+    audit: { actionType: 'Report Creation', details: `Submitted Weekly Report for ${reportingWeek}`, newValue: `Week: ${reportingWeek}, Target: ${target}%, Actual: ${actual}%` },
+  };
 }
 
 /* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
