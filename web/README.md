@@ -82,7 +82,7 @@ is read only.
 - **Edit** on a weekly report opens the same form on the saved report (`L.weeklyStart`, `L.editedWeeklyReport`), with
   the app's "Edited Weekly Report" audit entry. The project's target and actual follow a report added or edited here
   only when no other report is for a later week, so a late entry or a fix to an older week does not set the project
-  back (the phone sets them from any report saved). The week's label is kept unless its first day is changed; then weather logged for days outside the new week
+  back (the phone's rule, `WeekRange.isLatest`). The week's label is kept unless its first day is changed; then weather logged for days outside the new week
   is dropped. Photos, the rest of the weather, and remarks the form has no box for are left as saved. **Delete
   report** (Super Admin and Engineer Admins, as on the phone) asks first, marks the record deleted with the app's
   "Deleted Weekly Report" audit entry, and moves the project's site photo to the newest one left.

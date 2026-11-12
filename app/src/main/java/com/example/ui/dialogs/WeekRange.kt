@@ -19,6 +19,16 @@ object WeekRange {
         return "${saturday.format(format)} - ${saturday.plusDays(6).format(format)}"
     }
 
+    /**
+     * No other report in [all] is for a later week than [report]'s. Only then does the project's target and actual
+     * follow a report that was added or edited, so a late entry or a fix to an older week does not set the project back.
+     * Labels that don't read count as the earliest.
+     */
+    fun isLatest(report: WeeklyReport, all: List<WeeklyReport>): Boolean {
+        fun start(r: WeeklyReport) = com.example.util.BlueBookForms.weekStart(r.reportingWeek) ?: LocalDate.MIN
+        return all.none { it.uuid != report.uuid && start(it) > start(report) }
+    }
+
     /** Weekly reports in week order: by first day (labels that don't parse first), then as entered. */
     val byWeek: Comparator<WeeklyReport> = compareBy({ parse(it.reportingWeek)?.first }, { it.id })
 

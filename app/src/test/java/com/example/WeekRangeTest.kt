@@ -41,4 +41,27 @@ class WeekRangeTest {
         assertEquals(listOf(4L, 1L, 3L, 2L), reports.sortedWith(WeekRange.byWeek).map { it.id })
         assertEquals(2L, reports.maxWithOrNull(WeekRange.byWeek)?.id)
     }
+
+    @Test
+    fun isLatest_onlyWhenNoOtherReportIsForALaterWeek() {
+        fun r(week: String) = WeeklyReport(
+            projectId = 1, reportingWeek = week, daysElapsed = 0, remainingDays = 0,
+            targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0, manpowerJson = "[]", equipmentJson = "[]",
+            activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]",
+            documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]", submittedByStaff = "S"
+        )
+        val older = r("Week 42: October 17 - October 23, 2026")
+        val middle = r("Oct 24, 2026 - Oct 30, 2026")
+        val newest = r("Oct 31, 2026 - Nov 6, 2026")
+        val all = listOf(older, middle, newest)
+        assertEquals(listOf(false, false, true), all.map { WeekRange.isLatest(it, all) })
+        // The report itself does not count, before or after its week is edited.
+        assertEquals(true, WeekRange.isLatest(newest.copy(reportingWeek = "Nov 7, 2026 - Nov 13, 2026"), all))
+        assertEquals(false, WeekRange.isLatest(newest.copy(reportingWeek = "Oct 10, 2026 - Oct 16, 2026"), all))
+        // A back-filled week, a second report for the newest week, the only report, and a label that does not read.
+        assertEquals(false, WeekRange.isLatest(r("Oct 10, 2026 - Oct 16, 2026"), all))
+        assertEquals(true, WeekRange.isLatest(r("Oct 31, 2026 - Nov 6, 2026"), all))
+        assertEquals(true, WeekRange.isLatest(older, listOf(older)))
+        assertEquals(false, WeekRange.isLatest(r("Week 41: old"), all))
+    }
 }

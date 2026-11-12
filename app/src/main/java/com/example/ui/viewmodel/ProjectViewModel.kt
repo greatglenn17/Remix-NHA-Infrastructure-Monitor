@@ -2397,12 +2397,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 )
                 weeklyReportWeatherWriter.create(report, weatherDrafts)
 
-                // Update Project Master target & actual accomplishment & latest update photo.
+                // Update Project Master target & actual accomplishment (the latest week's only) & latest update photo.
                 val current = projectDao.getProjectById(projectId).first()
                 if (current != null) {
+                    val latest = isLatestWeek(report)
                     val updated = current.copy(
-                        targetAccomplishment = targetAccomplishmentPct,
-                        actualAccomplishment = actualAccomplishmentPct,
+                        targetAccomplishment = if (latest) targetAccomplishmentPct else current.targetAccomplishment,
+                        actualAccomplishment = if (latest) actualAccomplishmentPct else current.actualAccomplishment,
                         latestUpdatePhotoUrl = photos.firstOrNull() ?: current.latestUpdatePhotoUrl
                     )
                     saveProjectChange(updated)
@@ -2429,7 +2430,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             
             // Re-sync Project Master target & actual accomplishment
             selectedProject.value?.let { current ->
-                if (current.id == report.projectId) {
+                if (current.id == report.projectId && isLatestWeek(report)) {
                     val updated = current.copy(
                         targetAccomplishment = report.targetAccomplishmentPct,
                         actualAccomplishment = report.actualAccomplishmentPct
@@ -2449,7 +2450,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
                 // Keep the Project Master accomplishment in step with the edited report.
                 val current = projectDao.getProjectByIdOnce(report.projectId)
-                if (current != null && (current.targetAccomplishment != report.targetAccomplishmentPct ||
+                if (current != null && isLatestWeek(report) && (current.targetAccomplishment != report.targetAccomplishmentPct ||
                         current.actualAccomplishment != report.actualAccomplishmentPct)) {
                     saveProjectChange(current.copy(
                         targetAccomplishment = report.targetAccomplishmentPct,
@@ -2483,6 +2484,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** Points the project's card photo at the newest report photo left, after an edit or delete. */
+    /** WeekRange.isLatest among the project's saved reports. */
+    private suspend fun isLatestWeek(report: WeeklyReport) =
+        com.example.ui.dialogs.WeekRange.isLatest(report, reportDao.getWeeklyReportsForProject(report.projectId).first())
+
     private suspend fun refreshSitePhoto(projectId: Long) {
         val photo = SitePhotos.latest(reportDao.getWeeklyReportsForProject(projectId).first())
         val current = projectDao.getProjectByIdOnce(projectId) ?: return

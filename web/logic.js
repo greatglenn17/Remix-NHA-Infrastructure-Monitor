@@ -1453,8 +1453,8 @@ function weeklyFields(f, project) {
 }
 
 /**
- * The project's target and actual follow a saved report only when none of the `weekly` reports is for a later week, so
- * a late entry or a fix to an older week does not set the project back. (The phone sets them from any report saved.)
+ * WeekRange.isLatest: the project's target and actual follow a saved report only when none of the `weekly` reports is
+ * for a later week, so a late entry or a fix to an older week does not set the project back.
  */
 function projectFollows(weekly, uuid, reportingWeek, target, actual) {
   const at = label => weekStart(label) ?? -Infinity;
