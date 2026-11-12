@@ -1706,3 +1706,31 @@ export function signatoryFields(project, s, weekly) {
     ['Name', 'Position', 'Office'].map(part => [`${field}By${part}`, String(s[`${key}${part}`] ?? '').trim()]));
   return Object.fromEntries(all.filter(([k, v]) => (project[k] ?? '') !== v));
 }
+
+/** The month's standing: its last weekly report's target and actual % (`weeks` = monthReports), 0 with none. */
+const monthEnd = weeks => { const last = weeks[weeks.length - 1]; return [Number(last?.targetAccomplishmentPct) || 0, Number(last?.actualAccomplishmentPct) || 0]; };
+
+/**
+ * A new monthly_reports record as RecordSync.buildDocument uploads one (submitMonthlyReport: prepared by the signed-in
+ * name, "Reviewed"), made when the month's recommendations are first saved. The form prints its days from the weather
+ * logs, so the stored counts stay 0.
+ */
+export function newMonthlyRecord({ uuid, projectUuid, assignedUids, uid, now, preparedBy }, month, weeks, recommendations) {
+  const [target, actual] = monthEnd(weeks);
+  return {
+    uuid, type: 'monthly_reports', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
+    data: JSON.stringify({
+      reportingMonth: month, scopeWeightPct: 100, scopeTargetPct: target, scopeActualPct: actual, paymentsJson: '[]',
+      unworkableDaysCount: 0, workableDaysCount: 0, cpesIssuesJson: '[]', recommendations,
+      preparedByName: preparedBy, preparedByStatus: 'Reviewed', checkedByName: '', checkedByStatus: 'Pending Review',
+      notedByName: '', notedByStatus: 'Pending Review', auditTrailJson: '', accomplishmentItemsJson: '[]',
+    }),
+  };
+}
+
+/** submitMonthlyReport's audit entry, or updateMonthlyReportFull's for an `edit`, word for word. */
+export function monthlyAudit(month, weeks, edit) {
+  const [target, actual] = monthEnd(weeks);
+  return edit ? { actionType: 'Report Creation', details: `Modified report for ${month}`, oldValue: 'Previous report data', newValue: 'Updated report data' }
+    : { actionType: 'Report Creation', details: `Submitted Monthly Report for ${month}`, oldValue: '', newValue: `Month: ${month}, Target: ${target}%, Actual: ${actual}%` };
+}

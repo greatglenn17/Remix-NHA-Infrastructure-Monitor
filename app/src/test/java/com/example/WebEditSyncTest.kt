@@ -422,4 +422,41 @@ class WebEditSyncTest {
         assertEquals("and its weather with it", 0L, long("SELECT COUNT(*) FROM daily_hourly_weather WHERE projectId = ?", projectId))
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/logic.js newMonthlyRecord: recommendations typed on the website make the month's report; a later save changes them. */
+    @Test
+    fun websiteMonthlyRecommendations_areAdded_thenEdited() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val uuid = "0b9d6c1e-7a4f-4e2b-8c3d-5f6a7b8c9d0e"
+        fun report(revision: Long, recommendations: String) = mapOf(
+            "uuid" to uuid, "type" to "monthly_reports", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to revision, "updatedAt" to 1_794_292_093_231L + revision, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to JSONObject().put("reportingMonth", "September 2026").put("scopeWeightPct", 100).put("scopeTargetPct", 38).put("scopeActualPct", 36.5)
+                .put("paymentsJson", "[]").put("unworkableDaysCount", 0).put("workableDaysCount", 0).put("cpesIssuesJson", "[]")
+                .put("recommendations", recommendations).put("preparedByName", "Engr. Web").put("preparedByStatus", "Reviewed")
+                .put("checkedByName", "").put("checkedByStatus", "Pending Review").put("notedByName", "").put("notedByStatus", "Pending Review")
+                .put("auditTrailJson", "").put("accomplishmentItemsJson", "[]").toString()
+        )
+
+        recordSync.applyRemote(listOf(report(1, "Fast-track the drainage works.")))
+
+        val row = db.reportDao().getMonthlyReportsForProject(projectId).first().single()
+        assertEquals("September 2026", row.reportingMonth)
+        assertEquals("Fast-track the drainage works.", row.recommendations)
+        assertEquals(38.0, row.scopeTargetPct, 0.0)
+        assertEquals(36.5, row.scopeActualPct, 0.0)
+        assertEquals("Engr. Web", row.preparedByName)
+
+        recordSync.applyRemote(listOf(report(2, "Add a second shift.")))
+
+        assertEquals("Add a second shift.", db.reportDao().getMonthlyReportsForProject(projectId).first().single().recommendations)
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }

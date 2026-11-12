@@ -2613,8 +2613,48 @@ function signatoriesForm(c, weekly) {
   d.showModal();
 }
 
-/** The print bar's right side: Signatories (for those who can edit the project) and the Print button. */
-const printActions = (c, label) => `<span class="print-actions">${L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="signatories">${icon('edit', 'sm')}Signatories</button>` : ''}
+/**
+ * Section VIII of the monthly form: the month's recommendations, kept in its monthly report (BlueBookForms prints
+ * `saved.recommendations`). A month with no monthly report yet gets one, as submitMonthlyReport saves it.
+ */
+function recommendationsForm(c, month, saved) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Recommendations – ${esc(month)}</h2>
+    <label class="field">Recommendations (if any)<textarea name="recommendations" rows="6">${esc(saved?.recommendations ?? '')}</textarea></label>
+    <p class="muted">Printed under VIII. Recommendations on this month's report, here and on the phones.</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), box = form.elements.recommendations;
+  const initial = box.value;
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (box.value === initial || confirm('Discard your changes to the recommendations?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const text = box.value.trim();
+    if (text === (saved?.recommendations ?? '').trim()) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    const weeks = L.monthReports(c.weekly, month);
+    try {
+      await (saved ? saveEdit(c, saved, { recommendations: text }, 'monthly report', L.monthlyAudit(month, weeks, true))
+        : addRecord(c, ids => L.newMonthlyRecord({ ...ids, preparedBy: s.profile.name || s.user.email }, month, weeks, text), L.monthlyAudit(month, weeks, false)));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/** The print bar's right side: Recommendations (monthly) and Signatories, for those who can edit the project, and the Print button. */
+const printActions = (c, label, monthly = false) => `<span class="print-actions">${L.canEdit(c.project, s.user.uid, s.claims) ? `${monthly ? `<button class="text-btn" id="recommendations">${icon('edit', 'sm')}Recommendations</button>` : ''}<button class="text-btn" id="signatories">${icon('edit', 'sm')}Signatories</button>` : ''}
   <button class="btn" id="do-print" disabled>${icon('print', 'sm')}${label}</button></span>`;
 const bindSignatories = (c, weekly) => { const b = document.getElementById('signatories'); if (b) b.onclick = () => signatoriesForm(c, weekly); };
 
@@ -2677,16 +2717,19 @@ async function drawMonthlyPrint(c) {
   document.title = `Monthly Report - ${month}`;
   const token = page.printToken = {};
   main.innerHTML = `<div class="print-bar no-print"><a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Monthly reports</a>
-      ${printActions(c, 'Preparing…')}</div>
+      ${printActions(c, 'Preparing…', true)}</div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
   bindSignatories(c, false);
+  const saved = of('monthly_reports').find(r => (r.reportingMonth || '').trim().toLowerCase() === month.toLowerCase());
+  const recommend = document.getElementById('recommendations');
+  if (recommend) recommend.onclick = () => recommendationsForm(c, month, saved);
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = P.monthlyReportHtml({
     project, month: page.sub, weeks: L.monthReports(weekly, month), payments, issues: of('project_issues'), docs: documents,
     // shortcut: weather comes only from the logs synced with weekly reports; the phone also counts days not in a report.
     weather: weekly.flatMap(r => (Array.isArray(r._weather) ? r._weather : [])),
-    saved: of('monthly_reports').find(r => (r.reportingMonth || '').trim().toLowerCase() === month.toLowerCase()),
+    saved,
     signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
   });
   await Promise.all([...sheet.querySelectorAll('img')].map(img => img.decode().catch(() => {})));
