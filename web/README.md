@@ -95,6 +95,18 @@ is read only.
   lot has none yet, with the app's "Construction Progress Update" and "Developer Billing Update" audit entries. Those
   entries name the lot by its label; the phone's name it by an id only that phone has. A photo added here has no
   "Block X Lot Y" stamp.
+- **Record inspection** on a lot's card is the app's formal inspection (`inspectLot`, `L.lotInspection`): the progress
+  band, status, activity, contractor and field remarks. It adds an `sdp_lot_inspections` record (the snapshot, with
+  the lot's billing as it stands) and the app's "Inspection Snapshot Recorded" audit entry, and sets the lot's own
+  progress to match, its remarks reading "Snapshot recorded: ...". **History & details** lists a lot's inspections,
+  latest first, with the change since the one before (`L.lotInspections`). Unlike the phone, the lot's start and
+  target dates are kept. The progress and the snapshot are two writes: if the second fails, record it again.
+- **Select more lots** on a lot's card is the app's group select: click lots on the plan to add or remove them, then
+  **Update progress** gives them all one progress, status, activity and remarks (`groupProgress`,
+  `L.lotsProgressSave`; each lot keeps its dates, contractor, photos and billing, and gets its own audit entry), or
+  **Set use** gives them one use after a confirmation (`groupUse`, `L.lotsUseSave`, one "Lot Use Changed" entry). A
+  lot that already has the values is not written. The lots go 100 a write, so a save that stops partway leaves the
+  earlier lots saved; saving again finishes the rest.
 - **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
   developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
@@ -297,4 +309,4 @@ touched by this command.
 ## Not on the site yet
 
 On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, roads,
-renumbering a block, the plan's print frame, and making a revision its own site. Also formal lot inspections, and updating several lots at once.
+renumbering a block, the plan's print frame, and making a revision its own site.

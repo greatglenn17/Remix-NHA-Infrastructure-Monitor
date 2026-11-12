@@ -747,7 +747,8 @@ const BILLING = [['billingStatus', 'billingDate', 'billedBy', 'billingReference'
  * columns to write and their audit entries, or null when the form changed nothing. Progress, status, activity,
  * remarks and photos are written and logged only when one of them changed; M1 and M2 each only when toggled.
  * `f`: { progress, drainage (road lots, else null), constructionStatus, currentActivity, remarks, photos,
- * billing: [{ billed, reference, remarks } for M1, then M2] }; `at` is "yyyy-MM-dd HH:mm".
+ * billing: [{ billed, reference, remarks } for M1, then M2], contractor (an inspection's; without it the lot keeps
+ * its own, else the project's) }; `at` is "yyyy-MM-dd HH:mm".
  * shortcut: the phone's audit text names the lot by its local id, which the website does not have, so this uses the lot's label.
  */
 export function lotSave(lot, f, { user, at, contractor }) {
@@ -757,13 +758,15 @@ export function lotSave(lot, f, { user, at, contractor }) {
   const next = {
     physicalProgress: pct(f.progress), ...(f.drainage == null ? {} : { drainageProgress: pct(f.drainage) }),
     constructionStatus: f.constructionStatus, currentActivity: f.currentActivity, remarks: f.remarks, photosJson: JSON.stringify(f.photos),
+    ...(f.contractor == null ? {} : { contractor: f.contractor }),
   };
   const stored = {
     physicalProgress: lotProgress(lot), drainageProgress: Number(p.drainageProgress) || 0, constructionStatus: p.constructionStatus ?? 'Not Started',
     currentActivity: p.currentActivity || '', remarks: p.remarks || '', photosJson: JSON.stringify(attachmentList(p.photosJson)),
+    contractor: p.contractor || '',
   };
   if (Object.keys(next).some(k => next[k] !== stored[k])) {
-    Object.assign(changes, next, { contractor: kept(p.contractor, contractor) });
+    Object.assign(changes, next, { contractor: f.contractor ?? kept(p.contractor, contractor) });
     audits.push({
       actionType: 'Construction Progress Update', details: `Updated Lot Progress (${label}) to ${next.physicalProgress}% (${next.constructionStatus})`,
       oldValue: lot.progress ? `Progress: ${stored.physicalProgress}%, Status: ${stored.constructionStatus}` : 'Not Started',
@@ -1965,6 +1968,71 @@ export const lotRemoved = (lot, { user, at }) => ({
   changes: { isActive: 0, lastModifiedBy: user, lastModifiedDate: at },
   audit: { actionType: 'Lot Deactivated', details: `Deactivated Lot ${lotTag(lot)}`, oldValue: 'Active', newValue: 'Deactivated' },
 });
+
+/* ---------- Several lots at once, and formal inspections (GroupProgressDialog, RecordInspectionSnapshotDialog, LotInfoDialog) ---------- */
+
+// The lot form's values as the lot has them now, for a save that changes only some of them.
+function lotKept(lot) {
+  const p = lot.progress || {};
+  return {
+    progress: lotProgress(lot), drainage: null, constructionStatus: p.constructionStatus ?? 'Not Started', currentActivity: p.currentActivity || '',
+    remarks: p.remarks || '', photos: attachmentList(p.photosJson), billing: BILLING.map(([status]) => ({ billed: billed(p, status), reference: '', remarks: '' })),
+  };
+}
+
+/**
+ * GroupProgressDialog's save: `f` { progress, constructionStatus, currentActivity, remarks } for every lot picked; each
+ * keeps its own dates, contractor, photos and billing. Returns [[lot, lotSave's result]] for the lots it changes.
+ */
+export const lotsProgressSave = (lots, f, who) => lots.map(lot => [lot, lotSave(lot, { ...lotKept(lot), ...f }, who)]).filter(([, saved]) => saved);
+
+/**
+ * setSdpLotUse for the lots picked: saveEdits' edits giving `use` to each lot that does not have it yet, with the app's
+ * one "Lot Use Changed" entry on the first; empty when every lot already has it.
+ */
+export function lotsUseSave(lots, use, { user, at }) {
+  const changed = lots.filter(l => lotUse(l) !== use);
+  const audit = { actionType: 'Lot Use Changed', details: `Marked ${changed.length} lot(s) as ${use}: ${changed.slice(0, 20).map(lotTag).join(', ')}`,
+    oldValue: [...new Set(changed.map(lotUse))].join(', '), newValue: use };
+  return changed.map((l, i) => [l, { lotUse: use, lastModifiedBy: user, lastModifiedDate: at }, i ? null : audit]);
+}
+
+/**
+ * recordLotInspection: a formal inspection of a lot. `f`: { progress, constructionStatus, currentActivity, contractor,
+ * remarks }. Returns { build(ids) → the sdp_lot_inspections record (the snapshot, with the lot's billing as it
+ * stands), audit, progress: lotSave's result bringing the lot's own progress to the snapshot, or null when it already
+ * matches }.
+ * shortcut: the phone also blanks the lot's start and target dates here; the website keeps them.
+ */
+export function lotInspection(lot, f, who) {
+  const p = lot.progress || {}, pct = Math.min(100, Math.max(0, Math.round(Number(f.progress) || 0)));
+  return {
+    build: ids => newRecord(ids, 'sdp_lot_inspections', {
+      inspectionTimestamp: ids.now, inspectionDate: who.at, inspectedBy: who.user, physicalProgress: pct, constructionStatus: f.constructionStatus,
+      currentActivity: f.currentActivity, contractor: f.contractor, remarks: f.remarks, billingStatus: lotBillingLabel(lot.progress),
+      billingReference: p.billingReference || '', createdDate: who.at, _ref_sdpPlanId: lot._ref_sdpPlanId, _ref_sdpLotId: lot.uuid,
+    }),
+    audit: { actionType: 'Inspection Snapshot Recorded', details: `Recorded formal inspection for ${lotLabel(lot)}: ${pct}% (${f.constructionStatus})`,
+      oldValue: 'N/A', newValue: `Progress: ${pct}%, Inspector: ${who.user}, Date: ${who.at}` },
+    progress: lotSave(lot, { ...lotKept(lot), ...f, remarks: `Snapshot recorded: ${f.remarks}` }, who),
+  };
+}
+
+/**
+ * LotInfoDialog's inspection history: the lot's inspections, latest first, each with its `change` since the one
+ * before it ("+25 percentage points / 12 days"; "First inspection recorded" when it is the only one).
+ */
+export function lotInspections(records, lot) {
+  const list = records.filter(r => r.type === 'sdp_lot_inspections' && r._ref_sdpLotId === lot.uuid)
+    .sort((a, b) => (Number(b.inspectionTimestamp) || 0) - (Number(a.inspectionTimestamp) || 0));
+  const time = x => Date.parse(String(x.inspectionDate || '').replace(' ', 'T'));
+  return list.map((x, i) => {
+    const before = list[i + 1];
+    if (!before) return { ...x, change: list.length === 1 ? 'First inspection recorded' : '' };
+    const diff = (Number(x.physicalProgress) || 0) - (Number(before.physicalProgress) || 0), days = Math.floor((time(x) - time(before)) / 86400000);
+    return { ...x, change: `${diff >= 0 ? '+' : ''}${diff} percentage points / ${days > 0 ? days : 0} days` };
+  });
+}
 
 /* ---------- Plan tools: its scale, a quarter turn, the revision in use, deleting it (SubdivisionPlanTab, ProjectViewModel) ---------- */
 

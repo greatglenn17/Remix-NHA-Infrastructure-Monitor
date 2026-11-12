@@ -1092,3 +1092,56 @@ test('files: a delete or an edit names the files nothing holds any more, and no 
   // A deleted project: every file of it, once each.
   assert.deepEqual(L.unusedFiles([...records, project], [], [], null), [jpg(1), jpg(2), jpg(3), pdf(4), pdf(5)]);
 });
+
+test('several lots at once and inspections: one progress or use for the lots picked, and a snapshot with its history, are written like the phone', () => {
+  const who = { user: 'Engr. Web', at: '2026-11-13 09:30', contractor: 'ABC Builders' };
+  const P = 'nhafile:11111111-1111-4111-8111-111111111111/22222222-0000-4000-8000-000000000000.jpg';
+  const fresh = { uuid: 'lot-1', _ref_sdpPlanId: 'plan-1', blockNumber: '3', lotNumber: '1', progress: null };
+  const started = { uuid: 'lot-2', _ref_sdpPlanId: 'plan-1', blockNumber: '3', lotNumber: '2', progress: { uuid: 'pr-2', physicalProgress: 40, constructionStatus: 'Under Construction',
+    currentActivity: 'CHB laying', remarks: 'old', contractor: 'XYZ', startDate: '2026-01-05', photosJson: JSON.stringify([P]), billingStatus: 'BILLED', billingReference: 'DV-7', createdBy: 'A', createdDate: '2026-01-05 08:00' } };
+  const same = { uuid: 'lot-3', _ref_sdpPlanId: 'plan-1', blockNumber: '3', lotNumber: '3', progress: { uuid: 'pr-3', physicalProgress: 75, constructionStatus: 'Under Construction', currentActivity: 'Roofing', remarks: '' } };
+  const f = { progress: 75, constructionStatus: 'Under Construction', currentActivity: 'Roofing', remarks: '' };
+
+  // Group progress: every lot gets the four values; photos, billing and the contractor stay; a lot already there is left out.
+  const saves = L.lotsProgressSave([fresh, started, same], f, who);
+  assert.deepEqual(saves.map(([lot]) => lot.uuid), ['lot-1', 'lot-2']);
+  assert.deepEqual(saves[0][1].changes, { physicalProgress: 75, constructionStatus: 'Under Construction', currentActivity: 'Roofing', remarks: '', photosJson: '[]',
+    contractor: 'ABC Builders', createdBy: 'Engr. Web', createdDate: '2026-11-13 09:30', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 09:30' });
+  assert.deepEqual(saves[1][1].changes, { physicalProgress: 75, constructionStatus: 'Under Construction', currentActivity: 'Roofing', remarks: '', photosJson: JSON.stringify([P]),
+    contractor: 'XYZ', createdBy: 'A', createdDate: '2026-01-05 08:00', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 09:30' });
+  assert.deepEqual(saves[1][1].audits, [{ actionType: 'Construction Progress Update', details: 'Updated Lot Progress (Block 3 Lot 2) to 75% (Under Construction)',
+    oldValue: 'Progress: 40%, Status: Under Construction', newValue: 'Progress: 75%, Status: Under Construction, Activity: Roofing' }]);
+
+  // Group use: only the lots that change, one audit entry on the first.
+  const road = { uuid: 'lot-4', blockNumber: 'RL', lotNumber: '1', lotUse: 'Road Lot' }, open = { uuid: 'lot-5', blockNumber: 'OS', lotNumber: '1' };
+  const uses = L.lotsUseSave([fresh, road, open], 'Open Space', who);
+  assert.deepEqual(uses.map(([lot, changes]) => [lot.uuid, changes]), [['lot-1', { lotUse: 'Open Space', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 09:30' }],
+    ['lot-4', { lotUse: 'Open Space', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 09:30' }]]);
+  assert.deepEqual(uses.map(([, , audit]) => audit), [{ actionType: 'Lot Use Changed', details: 'Marked 2 lot(s) as Open Space: B3-L1, BRL-L1', oldValue: 'Saleable, Road Lot', newValue: 'Open Space' }, null]);
+  assert.deepEqual(L.lotsUseSave([open], 'Open Space', who), []);
+
+  // An inspection: the snapshot with the lot's billing as it stands, its audit entry, and the lot's progress brought to it.
+  const x = L.lotInspection(started, { progress: 99, constructionStatus: 'Substantially Completed', currentActivity: 'Painting', contractor: 'New Co', remarks: 'punch list' }, who);
+  const ids = { uuid: 'i-1', projectUuid: 'P', assignedUids: ['u'], uid: 'me', now: 1794562200000 };
+  const rec = x.build(ids);
+  assert.deepEqual({ ...rec, data: JSON.parse(rec.data) }, { uuid: 'i-1', type: 'sdp_lot_inspections', projectUuid: 'P', assignedUids: ['u'], revision: 1, updatedAt: 1794562200000, updatedByUid: 'me', isDeleted: false,
+    data: { inspectionTimestamp: 1794562200000, inspectionDate: '2026-11-13 09:30', inspectedBy: 'Engr. Web', physicalProgress: 99, constructionStatus: 'Substantially Completed', currentActivity: 'Painting',
+      contractor: 'New Co', remarks: 'punch list', billingStatus: 'M1 BILLED (80%)', billingReference: 'DV-7', createdDate: '2026-11-13 09:30', _ref_sdpPlanId: 'plan-1', _ref_sdpLotId: 'lot-2' } });
+  assert.deepEqual(x.audit, { actionType: 'Inspection Snapshot Recorded', details: 'Recorded formal inspection for Block 3 Lot 2: 99% (Substantially Completed)', oldValue: 'N/A',
+    newValue: 'Progress: 99%, Inspector: Engr. Web, Date: 2026-11-13 09:30' });
+  assert.deepEqual([x.progress.changes.physicalProgress, x.progress.changes.remarks, x.progress.changes.contractor, x.progress.changes.photosJson, 'billingStatus' in x.progress.changes],
+    [99, 'Snapshot recorded: punch list', 'New Co', JSON.stringify([P]), false]);
+  // The same values on a lot whose progress already says so change only its record of the inspection.
+  const again = { ...started, progress: { ...started.progress, ...x.progress.changes } };
+  assert.equal(L.lotInspection(again, { progress: 99, constructionStatus: 'Substantially Completed', currentActivity: 'Painting', contractor: 'New Co', remarks: 'punch list' }, who).progress, null);
+  // The lot form still keeps the lot's own contractor.
+  assert.equal(L.lotSave(started, { progress: 50, drainage: null, constructionStatus: 'Under Construction', currentActivity: 'CHB laying', remarks: 'old', photos: [P],
+    billing: [{ billed: true, reference: '', remarks: '' }, { billed: false, reference: '', remarks: '' }] }, who).changes.contractor, 'XYZ');
+
+  // The history: latest first, each with its change since the one before; another lot's inspections are left out.
+  const insp = (uuid, lot, at, pct, date) => ({ uuid, type: 'sdp_lot_inspections', _ref_sdpLotId: lot, inspectionTimestamp: at, physicalProgress: pct, inspectionDate: date });
+  const records = [insp('a', 'lot-2', 1, 10, '2026-10-01 08:00'), insp('c', 'lot-2', 3, 30, '2026-10-20 17:00'), insp('b', 'lot-2', 2, 35, '2026-10-13 09:00'), insp('z', 'lot-9', 9, 100, '2026-11-01 08:00')];
+  assert.deepEqual(L.lotInspections(records, started).map(i => [i.uuid, i.change]), [['c', '-5 percentage points / 7 days'], ['b', '+25 percentage points / 12 days'], ['a', '']]);
+  assert.deepEqual(L.lotInspections(records, { uuid: 'lot-9' }).map(i => i.change), ['First inspection recorded']);
+  assert.deepEqual(L.lotInspections(records, fresh), []);
+});

@@ -633,6 +633,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .ld-head h3 { margin: 0; font-size: 16px; flex: 1; }
 .lot-pct { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; color: #0B0F17; }
 .lot-detail h4 { margin: 12px 0 6px; font-size: 13px; }
+.insp { margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--surface); font-size: 12px; }
+.insp b { margin-left: 6px; font-size: 13px; }
+.insp span { float: right; color: var(--text-2); font-weight: 600; }
+.insp p { margin: 2px 0 0; color: var(--text-2); }
+.lc-group { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.lc-group .field { margin: 0; }
 
 /* Issues (IssueCard) */
 .issue-q { margin: 16px 0 0; }
