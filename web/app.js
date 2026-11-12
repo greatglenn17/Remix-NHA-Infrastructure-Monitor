@@ -941,7 +941,7 @@ function lotsView(c) {
 }
 
 /** The selected lot's card under the plan (the phone's bottom sheet). */
-function lotCard(l) {
+function lotCard(l, editable = false) {
   const p = l.progress || {};
   const pct = L.lotProgress(l), billing = L.lotBillingLabel(l.progress), billed = billing !== 'NOT BILLED';
   const road = L.lotUse(l) === 'Road Lot';
@@ -952,6 +952,7 @@ function lotCard(l) {
       <button class="icon-btn" id="lot-card-close" aria-label="Close">${icon('close', 'sm')}</button></div>
     <p>${esc(line)}</p>
     ${p.lastModifiedBy ? `<p class="lc-upd">Last updated: ${esc(p.lastModifiedDate ? L.displayDate(p.lastModifiedDate) : '')} by ${esc(p.lastModifiedBy)}</p>` : ''}
+    ${editable ? `<button class="btn lc-more" id="lot-edit">${icon('edit', 'sm')}Update progress</button>` : ''}
     <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
 
@@ -977,6 +978,97 @@ function lotDetail(l) {
     ${kv('Remarks', p.remarks)}
     ${photos.length ? `<h4>Lot photos (${photos.length})</h4>${photoGrid(photos, {})}` : ''}
   </div>`;
+}
+
+/**
+ * UpdateLotProgressDialog without the lot's name and use (those stay on the phone): the progress band (a road lot's
+ * state and drainage), status, activity, remarks and photos, and the M1 and M2 billing marks, saved together.
+ * A photo added here has no "Block X Lot Y" stamp.
+ */
+function editLot(c, lot) {
+  const p = lot.progress || {}, pct = L.lotProgress(lot), road = L.lotUse(lot) === 'Road Lot', label = L.lotLabel(lot);
+  const refs = L.attachmentList(p.photosJson), drained = Number(p.drainageProgress) >= 100;
+  const billed = [p.billingStatus === 'BILLED', p.m2BillingStatus === 'BILLED'];
+  const info = i => { const [date, by, refNo] = i ? [p.m2BillingDate, p.m2BilledBy, p.m2BillingReference] : [p.billingDate, p.billedBy, p.billingReference];
+    return `${date || 'N/A'} • By: ${by || 'N/A'}${refNo ? ` • Ref No: ${refNo}` : ''}`; };
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>${esc(label)} construction &amp; billing</h2>
+    <label class="field">${road ? 'Road' : 'Physical progress'}<select name="band">${(road ? L.ROAD_STATES : L.LOT_BANDS).map((o, i) =>
+      `<option value="${i}"${i === (road ? L.roadState(pct) : L.lotBand(pct)) ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
+    ${road ? `<label class="check"><input type="checkbox" name="drainage"${drained ? ' checked' : ''}>Drainage completed</label>` : ''}
+    <label class="field">Construction status<input name="constructionStatus" value="${esc(p.constructionStatus ?? 'Not Started')}" autocomplete="off"></label>
+    <label class="field">Current activity (e.g. rebar, concreting)<input name="currentActivity" value="${esc(p.currentActivity || '')}" autocomplete="off"></label>
+    <label class="field">Remarks<input name="remarks" value="${esc(p.remarks || '')}" autocomplete="off"></label>
+    <h3>Lot photos (${refs.length})</h3>
+    ${refs.length ? `<ul class="photo-edit">${refs.map((refText, i) => `<li>
+      ${L.storagePathOf(refText) ? `<a class="thumb" data-file="${esc(refText)}" data-alt="Photo of ${esc(label)}" target="_blank" rel="noopener">${icon('photo_camera')}</a>`
+        : `<span class="thumb gone">${icon('photo_camera')}<small>Not uploaded yet</small></span>`}
+      <label class="check"><input type="checkbox" data-drop="${i}">Remove this photo</label></li>`).join('')}</ul>` : ''}
+    <label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label>
+    <fieldset class="lot-billing"><legend>Developer billing</legend>
+      ${[0, 1].map(i => `<label class="check"><input type="checkbox" name="m${i + 1}"${billed[i] ? ' checked' : ''}><span>${i ? 'M2 · 20%' : 'M1 · 80%'} billed${billed[i] ? `<br><small class="muted">${esc(info(i))}</small>` : ''}</span></label>
+      <div data-bill="${i}"><label class="field">Billing reference / voucher no. (optional)<input name="ref${i + 1}" autocomplete="off"></label>
+        <label class="field">Billing remarks (optional)<input name="note${i + 1}" autocomplete="off"></label></div>`).join('')}
+      <small class="muted">M2 can be marked once M1 is billed.</small>
+    </fieldset>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  // M2 follows M1: it is billed after M1 and unbilled before M1. A newly ticked mark asks for its reference.
+  const billing = () => {
+    form.m1.disabled = form.m1.checked && form.m2.checked;
+    form.m2.disabled = !form.m1.checked && !form.m2.checked;
+    [form.m1, form.m2].forEach((m, i) => { form.querySelector(`[data-bill="${i}"]`).style.display = m.checked && !billed[i] ? '' : 'none'; });
+  };
+  form.m1.onchange = form.m2.onchange = billing;
+  billing();
+  // The status follows the band picked; it can still be retyped.
+  form.band.onchange = () => { form.constructionStatus.value = L.statusForProgress(L.pickedProgress(pct, Number(form.band.value), road)); };
+  const values = () => ({
+    progress: L.pickedProgress(pct, Number(form.band.value), road),
+    drainage: !road ? null : form.drainage.checked === drained ? Number(p.drainageProgress) || 0 : form.drainage.checked ? 100 : 0,
+    constructionStatus: form.constructionStatus.value, currentActivity: form.currentActivity.value, remarks: form.remarks.value,
+    photos: refs.filter((_, i) => !form.querySelector(`[data-drop="${i}"]`).checked),
+    billing: [1, 2].map(i => ({ billed: form[`m${i}`].checked, reference: form[`ref${i}`].value, remarks: form[`note${i}`].value })),
+  });
+  const changed = () => JSON.stringify(values()) !== initial || form.photos.files.length > 0;
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (!changed() || confirm('Discard your changes to this lot?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (!changed()) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      const f = values();
+      // Every photo is prepared before the first upload, so a file that is not a photo stops the save with nothing sent.
+      const blobs = [];
+      for (const file of form.photos.files) {
+        const blob = await attachmentBlob(file, L.PHOTO_MAX_EDGE);
+        if (blob[1] === 'pdf') throw new Error('Only photos can be added here.');
+        blobs.push(blob);
+      }
+      for (const blob of blobs) f.photos.push(await uploadFile(c, blob));
+      const saved = L.lotSave(lot, f, { user: s.profile.name || s.user.email, at: `${today()} ${new Date().toTimeString().slice(0, 5)}`, contractor: c.project.contractor || '' });
+      if (saved) {
+        await (lot.progress ? saveEdits(c, [[lot.progress, saved.changes, saved.audits]], 'lot')
+          : addRecords(c, [[ids => L.newLotProgressRecord(ids, lot, saved.changes), saved.audits]]));
+      }
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  loadFiles(d);
+  d.showModal();
 }
 
 const planDrawings = new Map();
@@ -1009,8 +1101,10 @@ async function bindLots(c) {
     const sel = site.lots.find(l => l.uuid === st.sel);
     if (card) {
       card.hidden = !sel;
-      card.innerHTML = sel ? lotCard(sel) : '';
+      card.innerHTML = sel ? lotCard(sel, L.canEdit(c.project, s.user.uid, s.claims)) : '';
       if (sel) {
+        const edit = document.getElementById('lot-edit');
+        if (edit) edit.onclick = () => editLot(c, sel);
         document.getElementById('lot-card-close').onclick = () => { st.sel = null; st.more = false; paint(); };
         document.getElementById('lot-more').onclick = () => { st.more = !st.more; paint(); if (st.more) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
       }
@@ -1814,14 +1908,15 @@ function editPhotos(c, report) {
 /** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
 const addRecord = (c, build, entry) => addRecords(c, [[build, entry]]);
 
-/** addRecord for several records that must be added together (`items`: [build, audit entry] each), all or none. */
+/** addRecord for several records that must be added together (`items`: [build, audit entry or entries] each), all or none. */
 async function addRecords(c, items) {
   const uid = s.user.uid, now = Date.now();
   const project = await getDoc(doc(db, 'projects', c.page.id));
   const ids = () => ({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids: project.get('assignedUids') ?? [], uid, now });
   const batch = writeBatch(db);
   for (const [build, entry] of items) {
-    for (const record of [build(ids()), L.auditRecord({ ...ids(), user: s.profile.name || s.user.email, ...entry })]) batch.set(doc(db, 'records', record.uuid), record);
+    const audits = [entry].flat().map(e => L.auditRecord({ ...ids(), user: s.profile.name || s.user.email, ...e }));
+    for (const record of [build(ids()), ...audits]) batch.set(doc(db, 'records', record.uuid), record);
   }
   await batch.commit();
 }
@@ -1835,7 +1930,7 @@ const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, 
 
 /**
  * saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes
- * delete it, and a null entry logs nothing, where the phone logs nothing), all or none. `projectFields`, when they differ from the project's, are saved on it in the same
+ * delete it; the entry may be several, or null to log nothing, where the phone logs nothing), all or none. `projectFields`, when they differ from the project's, are saved on it in the same
  * transaction, one revision up, the way a phone uploads a project change.
  */
 async function saveEdits(c, edits, noun, projectFields = null) {
@@ -1851,9 +1946,10 @@ async function saveEdits(c, edits, noun, projectFields = null) {
       }
       const assignedUids = project.get('assignedUids') ?? was.get('assignedUids') ?? [];
       t.update(was.ref, changes ? L.editedRecord(was.data(), changes, { uid, now, assignedUids }) : L.deletedRecord(was.data(), { uid, now, assignedUids }));
-      if (!entry) return;
-      const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
-      t.set(doc(db, 'records', audit.uuid), audit);
+      for (const e of [entry].flat().filter(Boolean)) {
+        const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...e });
+        t.set(doc(db, 'records', audit.uuid), audit);
+      }
     });
     if (projectFields && Object.entries(projectFields).some(([key, value]) => (project.get(key) ?? '') !== value)) {
       t.update(project.ref, { ...projectFields, revision: (Number(project.get('revision')) || 1) + 1, updatedAt: now, updatedByUid: uid });

@@ -287,4 +287,52 @@ class WebEditSyncTest {
         assertEquals("the order is gone", 0, db.projectDao().getPendingDocumentsForProject(projectId).first().count { it.uuid == uuid })
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/logic.js newLotProgressRecord and lotSave: a lot's first progress record from the website, then its edit onto the phone's own row. */
+    @Test
+    fun websiteLotProgress_isAddedToItsLot_andMergesWithThePhonesRow() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val dao = db.projectDao()
+        val projectId = dao.insertProject(project)
+        val plan = com.example.data.model.SdpPlan(projectId = projectId, planName = "SDP", pdfFileUrl = "", uploadedDate = "2026-11-09", uploadedBy = "x")
+        val planId = dao.insertSdpPlan(plan)
+        fun lot(no: String) = com.example.data.model.SdpLot(projectId = projectId, sdpPlanId = planId, blockNumber = "3", lotNumber = no, polygonNormalizedJson = "[]")
+        val first = lot("12")
+        val second = lot("13")
+        val firstId = dao.insertSdpLot(first)
+        val secondId = dao.insertSdpLot(second)
+        // The phone already started a row for the second lot.
+        dao.insertOrUpdateLotProgress(com.example.data.model.SdpLotProgress(projectId = projectId, sdpPlanId = planId, sdpLotId = secondId, physicalProgress = 25))
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        fun progress(uuid: String, lotUuid: String, revision: Long, pct: Int, m1: String) = mapOf(
+            "uuid" to uuid, "type" to "sdp_lot_progress", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to revision, "updatedAt" to 4_102_444_800_000L + revision, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to """{"physicalProgress":$pct,"drainageProgress":0,"constructionStatus":"Under Construction","currentActivity":"Walls",""" +
+                """"startDate":"","targetCompletionDate":"","contractor":"C","remarks":"","billingStatus":"$m1","billingDate":"2026-11-12 14:05",""" +
+                """"billedBy":"Engr. Web","billingReference":"DV-7","billingRemarks":"","m2BillingStatus":"NOT BILLED","m2BillingDate":"","m2BilledBy":"",""" +
+                """"m2BillingReference":"","m2BillingRemarks":"","photosJson":"[\"nhafile:p/a.jpg\"]","createdBy":"Engr. Web","createdDate":"2026-11-12 14:05",""" +
+                """"lastModifiedBy":"Engr. Web","lastModifiedDate":"2026-11-12 14:05","_ref_sdpPlanId":"${plan.uuid}","_ref_sdpLotId":"$lotUuid"}"""
+        )
+
+        recordSync.applyRemote(listOf(
+            progress("1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", first.uuid, 1, 50, "BILLED"),
+            progress("2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e", second.uuid, 3, 75, "NOT BILLED")
+        ))
+
+        val rows = dao.getLotProgressForPlan(planId).first()
+        assertEquals("one row for each lot", 2, rows.size)
+        val added = rows.single { it.sdpLotId == firstId }
+        assertEquals(50, added.physicalProgress)
+        assertEquals("BILLED", added.billingStatus)
+        assertEquals("DV-7", added.billingReference)
+        assertEquals("[\"nhafile:p/a.jpg\"]", added.photosJson)
+        val merged = rows.single { it.sdpLotId == secondId }
+        assertEquals("the website's edit lands on the phone's own row", 75, merged.physicalProgress)
+        assertEquals("2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e", merged.uuid)
+    }
 }
