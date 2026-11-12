@@ -203,6 +203,17 @@ export function withEnd(remarks) {
   return /End: \d{4}-\d{2}-\d{2}/.test(r) ? r.replace(/End: \d{4}-\d{2}-\d{2}/g, end) : r.replace(eff[0], `${eff[0]} | ${end}`);
 }
 
+/** ProjectSchedule.suspensionEnd: the last day in a suspension's or continuance's remarks, or '' when it has none. */
+export const suspensionEnd = remarks => (/End: (\d{4}-\d{2}-\d{2})/.exec(withEnd(remarks)) || [])[1] || '';
+
+/** ProjectSchedule.withEndDate: remarks ending on `end` instead, the Duration following. Unchanged when `end` is before the Effectivity. */
+export function withEndDate(remarks, end) {
+  const from = isoDay((/Effectivity: (\d{4}-\d{2}-\d{2})/.exec(remarks) || [])[1]), to = isoDay(end);
+  if (from == null || to == null || to < from) return remarks;
+  const days = `Duration: ${Math.round((to - from) / DAY) + 1}`;
+  return withEnd(/Duration: \d+/.test(remarks) ? remarks.replace(/Duration: \d+/g, days) : `${days} Days | ${remarks}`);
+}
+
 /**
  * BarChart.periods: each approved suspension (and continuance) with its Effectivity and when work resumes, the earlier
  * of its resumption order's Effectivity and the day after its End, its last suspended day (UTC ms); a null end means
@@ -1053,6 +1064,28 @@ export const newDocumentRecord = (ids, { documentName, remarks }) =>
 /** ProjectViewModel.addPendingDocument's audit entry, word for word. */
 export const addedDocumentAudit = name => ({
   actionType: 'Document Upload', details: `Added document checklist item: ${name}`, oldValue: '', newValue: `Document: ${name}, Status: Pending`,
+});
+
+/** OrderStatusDialog's statuses; only an Approved order changes the dates and the cost. */
+export const ORDER_STATUSES = ['Pending', 'Submitted', 'Signed', 'Notarized', 'Approved'];
+
+/** Permission.APPROVE_ORDER: the Super Admin and Engineer Admins set or undo Approved and delete an order. The phone checks this on its form, not in firestore.rules. */
+export const canApprove = claims => ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
+
+/**
+ * DocumentsSection.keepOrderFields: the edited remarks with any Duration, Effectivity, End, Date Approved or Items
+ * field of the original put back when the edit dropped it, so the schedule and the cost keep reading them. A field
+ * whose value was changed (its key still there) stays as edited.
+ */
+export function keepOrderFields(original, edited) {
+  const dropped = [...(original || '').matchAll(/\b(Duration|Effectivity|End|Date Approved|Items):[^|]*/gi)]
+    .filter(m => !new RegExp(`\\b${m[1]}:`, 'i').test(edited)).map(m => m[0].trim());
+  return [...dropped, edited.trim()].filter(Boolean).join(' | ');
+}
+
+/** ProjectViewModel.updatePendingDocumentStatus's audit entry, word for word; null for the same status (logAuditAction skips an unchanged value). */
+export const orderStatusAudit = (d, status) => (status === d.status ? null : {
+  actionType: 'Document Upload', details: `Updated document status for ${d.documentName}`, oldValue: `Status: ${d.status}`, newValue: `Status: ${status}`,
 });
 
 /** ProjectViewModel.deleteContractorLetter's audit entry, word for word. */

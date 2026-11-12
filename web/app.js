@@ -672,6 +672,8 @@ function drawProject(page) {
   if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
   const requestAdd = document.getElementById('request-add');
   if (requestAdd) requestAdd.onclick = () => editRequest(c, null);
+  main.querySelectorAll('[data-add-order]').forEach(b => { b.onclick = () => addOrder(c, b.dataset.addOrder); });
+  main.querySelectorAll('[data-edit-order]').forEach(b => { b.onclick = () => { const o = documents.find(x => x.uuid === b.dataset.editOrder); if (o) editOrder(c, o); }; });
   main.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editPhotos); if (r) editPhotos(c, r); }; });
   main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
@@ -1317,7 +1319,7 @@ function editIssue(c, issue) {
  * OrderFieldInputs: the details of the order a new request asks for, one group for each request type (bindOrderFields
  * shows the chosen type's). A Partial suspension picks the bar chart items it pauses.
  */
-function orderFields(c) {
+function orderFields(c, heading = '<h3>Order requested</h3>') {
   const text = (name, label, attrs = '') => `<label class="field">${label}<input name="${name}" autocomplete="off" ${attrs}></label>`;
   const date = (name, label) => `<label class="field">${label}<input type="date" name="${name}"></label>`;
   const pick = (name, label, options) => `<label class="field">${label}<select name="${name}">${options.map(o => `<option>${o}</option>`).join('')}</select></label>`;
@@ -1326,7 +1328,7 @@ function orderFields(c) {
   const group = (type, body) => `<div class="order-fields" data-order="${type}">${body}</div>`;
   const items = L.chartItemNames(c.project), suspensions = L.suspensionsByNo(c.documents);
   const [ws, co, wr, vo, te] = L.REQUEST_TYPES;
-  return `<h3>Order requested</h3><p class="muted" data-order-note></p>
+  return `${heading}<p class="muted" data-order-note></p>
     ${group(ws, text('wsNo', 'Suspension No.') + pick('wsType', 'Type of suspension', ['Full', 'Partial']) + span('ws') + text('wsReason', 'Reason')
       + (items.length ? `<fieldset data-items><legend>Work items suspended (their target pauses; the rest go on)</legend>
         ${items.map(i => `<label class="check"><input type="checkbox" name="wsItems" value="${esc(i)}">${esc(i)}</label>`).join('')}</fieldset>` : ''))}
@@ -1379,6 +1381,107 @@ function bindOrderFields(c, form) {
   };
 }
 
+/** orderFields' values, by name, with the work items ticked. */
+const orderValues = form => ({ ...textFields(form), wsItems: new FormData(form).getAll('wsItems') });
+
+/**
+ * AddCustomDocumentDialog for one kind of order (the card's Add): its details, filed in Documents as Pending.
+ * `continued` is the suspension a continuance starts on (OrderDialogs' "Add Continuance").
+ */
+function addOrder(c, type, continued = '') {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>New ${esc(type.toLowerCase())}</h2>
+    <input type="hidden" name="requestType" value="${esc(type)}">
+    ${orderFields(c, '')}
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+  bindOrderFields(c, form);
+  if (continued && form.coOf) { form.coOf.value = continued; form.coOf.onchange(); }
+  const snapshot = () => JSON.stringify(orderValues(form));
+  const initial = snapshot();
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (snapshot() === initial || confirm('Discard this new order?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const o = orderValues(form), suspension = c.documents.find(x => x.uuid === o.coOf);
+    const errors = L.orderErrors(type, o, suspension);
+    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      const filed = L.orderDocument(type, o, suspension, c.documents);
+      await addRecord(c, ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
+ * OrderStatusDialog: an order's status and remarks; a suspension's End date moves its Duration. Only approvers set or
+ * undo Approved and delete; others update an order still in progress. A suspension also offers its next continuance.
+ */
+function editOrder(c, o) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  const canApprove = L.canApprove(s.claims), locked = !canApprove && o.status === 'Approved', off = locked ? ' disabled' : '';
+  const statuses = L.ORDER_STATUSES.includes(o.status) ? L.ORDER_STATUSES : [o.status || '', ...L.ORDER_STATUSES];
+  const hasEnd = !locked && /work suspension/i.test(o.documentName || '') && L.suspensionEnd(o.remarks);
+  d.innerHTML = `<form novalidate>
+    <h2>Update status</h2>
+    <b>${esc(L.orderLabel(o.documentName))}</b>
+    <label class="field">Status<select name="status"${off}>${statuses.map(v => `<option${v === (o.status || '') ? ' selected' : ''}${v === 'Approved' && !canApprove ? ' disabled' : ''}>${esc(v)}</option>`).join('')}</select></label>
+    ${canApprove ? '' : '<p class="muted">Only an Engineer Admin can approve.</p>'}
+    ${hasEnd ? '<label class="field">End date<input type="date" data-end></label>' : ''}
+    <label class="field">Remarks<input name="remarks" value="${esc(L.withEnd(o.remarks))}" autocomplete="off"${off}></label>
+    ${L.isSuspension(o) ? `<button type="button" class="text-btn" data-continue>${icon('add_circle', 'sm')}Add continuance of work suspension</button>` : ''}
+    <p class="error" role="alert"></p>
+    <div class="actions">${canApprove ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete order</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${off}>Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), end = d.querySelector('[data-end]');
+  if (end) {
+    // The End follows the remarks typed; picking another End changes the Duration to match.
+    (form.remarks.oninput = () => { end.value = L.suspensionEnd(form.remarks.value); })();
+    end.onchange = () => { form.remarks.value = L.withEndDate(form.remarks.value, end.value); form.remarks.oninput(); };
+  }
+  const snapshot = () => JSON.stringify([form.status.value, form.remarks.value]);
+  const initial = snapshot();
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (snapshot() === initial || confirm('Discard your changes to this order?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  const more = d.querySelector('[data-continue]');
+  if (more) more.onclick = () => { done(); addOrder(c, L.REQUEST_TYPES[1], o.uuid); };
+  // The phone logs nothing for a deleted order.
+  bindDelete(d, `Delete ${L.orderLabel(o.documentName)}? This cannot be undone.`, () => saveEdits(c, [[o, null, null]], 'order'));
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const status = form.status.value, remarks = L.keepOrderFields(o.remarks, form.remarks.value);
+    if (locked || (status === (o.status || '') && remarks === (o.remarks || ''))) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await saveEdit(c, o, { status, remarks }, 'order', L.orderStatusAudit(o, status));
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
 /**
  * DeveloperRequestDialog: a new request (`r` null) or an edit: type, details and dates, including the date packaged.
  * A new request also takes the details of the order it asks for, which is filed in Documents as Pending.
@@ -1409,8 +1512,7 @@ function editRequest(c, r) {
     const f = Object.fromEntries(new FormData(form));
     return { requestType: f.requestType, details: f.details.trim(), dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged };
   };
-  // The order form's fields, by name; a new request only.
-  const order = () => ({ ...textFields(form), wsItems: new FormData(form).getAll('wsItems') });
+  const order = () => orderValues(form); // a new request only
   const snapshot = () => JSON.stringify(isNew ? order() : values());
   const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
@@ -1678,7 +1780,7 @@ const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, 
 
 /**
  * saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes
- * delete it), all or none. `projectFields`, when they differ from the project's, are saved on it in the same
+ * delete it, and a null entry logs nothing, where the phone logs nothing), all or none. `projectFields`, when they differ from the project's, are saved on it in the same
  * transaction, one revision up, the way a phone uploads a project change.
  */
 async function saveEdits(c, edits, noun, projectFields = null) {
@@ -1694,6 +1796,7 @@ async function saveEdits(c, edits, noun, projectFields = null) {
       }
       const assignedUids = project.get('assignedUids') ?? was.get('assignedUids') ?? [];
       t.update(was.ref, changes ? L.editedRecord(was.data(), changes, { uid, now, assignedUids }) : L.deletedRecord(was.data(), { uid, now, assignedUids }));
+      if (!entry) return;
       const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
       t.set(doc(db, 'records', audit.uuid), audit);
     });
@@ -1963,20 +2066,26 @@ function paymentsBody({ project, payments, cost, billed }) {
 
 /** LogEntry: a title and its lines (blank ones skipped), with any attached file under them. */
 const entry = (title, lines, extra = '', cls = '') => `<div class="entry ${cls}"><b>${esc(title)}</b>${lines.filter(x => x && x.trim()).map(x => `<span>${esc(x)}</span>`).join('')}${extra}</div>`;
-const orderEntry = (d, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.withEnd(d.remarks)], d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '', cls);
-const ordersCard = (title, ic, items, emptyText) => section(title, ic, items || emptyLine(emptyText));
+/** An order's attached copy and, when `editable`, the button that opens its status. */
+const orderExtra = (d, editable) => (d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '')
+  + (editable ? `<button class="text-btn entry-edit" data-edit-order="${esc(d.uuid)}">${icon('edit', 'sm')}Update status</button>` : '');
+const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.withEnd(d.remarks)], orderExtra(d, editable), cls);
+/** `addType`, when set, is the kind of order the card's Add button files. */
+const ordersCard = (title, ic, items, emptyText, addType = '') => section(title, ic, items || emptyLine(emptyText), '',
+  addType ? `<button class="text-btn" data-add-order="${esc(addType)}">${icon('add_circle', 'sm')}Add</button>` : '');
 
 function documentsBody(c, chip) {
   const { of, documents, now } = c;
   if (chip === 'Audit log') return auditView(c);
   const named = text => documents.filter(d => (d.documentName || '').toLowerCase().includes(text));
-  if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d)).join(''), 'No time extensions.');
+  const editable = L.canEdit(c.project, s.user.uid, s.claims), [ws, , wr, vo, te] = L.REQUEST_TYPES, add = type => (editable ? type : '');
+  if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d, editable)).join(''), 'No time extensions.', add(te));
   if (chip === 'Variation Orders') {
     const vos = named('variation order');
-    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(vo => entry(vo.documentName, L.variationLines(vo), vo.fileUrl ? fileLink(vo.fileUrl, 'Attached copy') : '')).join(''), 'No variation orders recorded.');
+    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(d.documentName, L.variationLines(d), orderExtra(d, editable))).join(''), 'No variation orders recorded.', add(vo));
   }
-  if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), L.canEdit(c.project, s.user.uid, s.claims));
-  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, L.canEdit(c.project, s.user.uid, s.claims));
+  if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
+  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable);
   if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents));
   const suspensions = documents.filter(L.isSuspension);
   const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
@@ -1984,8 +2093,8 @@ function documentsBody(c, chip) {
   const listed = new Set(chains.flatMap(([ws, list]) => [ws, ...list]));
   const orphans = named('work suspension').filter(d => !listed.has(d));
   return `<div class="stack">
-    ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([ws, list]) => orderEntry(ws) + list.map(d => orderEntry(d, 'nested')).join('')).join('') + orphans.map(d => orderEntry(d)).join(''), 'No work suspension orders.')}
-    ${ordersCard('Work resumption orders', 'play_circle', named('work resumption').map(d => orderEntry(d)).join(''), 'No work resumption orders.')}
+    ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([s0, list]) => orderEntry(s0, editable) + list.map(d => orderEntry(d, editable, 'nested')).join('')).join('') + orphans.map(d => orderEntry(d, editable)).join(''), 'No work suspension orders.', add(ws))}
+    ${ordersCard('Work resumption orders', 'play_circle', named('work resumption').map(d => orderEntry(d, editable)).join(''), 'No work resumption orders.', add(wr))}
   </div>`;
 }
 
