@@ -378,6 +378,31 @@ test('deleting a letter or a developer request writes the app audit entry', () =
   assert.equal(L.deletedRequestAudit({ requestType: 'Variation Order', dateReceived: '2026-07-03' }).oldValue, '');
 });
 
+test('weekly report photos: titles, removals and additions, and the project card photo', () => {
+  const a = 'nhafile:p/a.jpg', b = 'nhafile:p/b.jpg', n = 'nhafile:p/n.jpg';
+  const report = {
+    attachedPhotoUrlsJson: JSON.stringify([a, b]),
+    photoDetailsJson: JSON.stringify({ [a]: { title: 'Old', takenAt: 'Nov 1, 2026 8:00 AM', lat: 14.8, lng: 120.9 }, [b]: { title: 'Gate', takenAt: '' } }),
+  };
+  const out = L.editedPhotos(report, { titles: { [a]: 'Slab pour', [b]: 'Gate' }, removed: [b], added: [[n, 'New wall']] });
+  assert.deepEqual(JSON.parse(out.attachedPhotoUrlsJson), [a, n]);
+  assert.deepEqual(JSON.parse(out.photoDetailsJson), {
+    [a]: { title: 'Slab pour', takenAt: 'Nov 1, 2026 8:00 AM', lat: 14.8, lng: 120.9 },
+    [n]: { title: 'New wall', takenAt: '' },
+  });
+  // A report saved by an old version (one bare reference, no details) still edits.
+  const old = L.editedPhotos({ attachedPhotoUrlsJson: a, photoDetailsJson: '' }, { titles: { [a]: '' }, added: [[n, '']] });
+  assert.deepEqual(JSON.parse(old.attachedPhotoUrlsJson), [a, n]);
+  assert.deepEqual(JSON.parse(old.photoDetailsJson), { [n]: { title: '', takenAt: '' } });
+  const weekly = [
+    { createdAtTimestamp: 1, attachedPhotoUrlsJson: JSON.stringify([a]) },
+    { createdAtTimestamp: 3, attachedPhotoUrlsJson: '[]' },
+    { createdAtTimestamp: 2, attachedPhotoUrlsJson: JSON.stringify([b, n]) },
+  ];
+  assert.equal(L.latestSitePhoto(weekly), b);
+  assert.equal(L.latestSitePhoto([{ createdAtTimestamp: 1, attachedPhotoUrlsJson: '[]' }]), '');
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');

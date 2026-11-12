@@ -670,6 +670,7 @@ function drawProject(page) {
   main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
   const letterAdd = document.getElementById('letter-add');
   if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
+  main.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editPhotos); if (r) editPhotos(c, r); }; });
   main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
   const editWx = main.querySelector('[data-edit-weather]');
@@ -801,7 +802,8 @@ function progressBody(c, chip) {
   if (chip === 'Weather') return weatherView(c);
   if (chip === 'Issues') return issuesView(c);
   if (!c.weekly.length) return `<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
-  return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id)).join('')}</div>`;
+  const editable = L.canEdit(c.project, s.user.uid, s.claims);
+  return `<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
 }
 
 const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
@@ -812,7 +814,7 @@ const equipmentLevel = status => (/^operational$/i.test(status.trim()) ? 'ok' : 
 const noteLevel = v => { const lv = L.varianceLevel(Math.round(v * 100) / 100); return lv === 'neutral' ? 'muted' : lv; };
 
 /** WeeklyReportCard: week, who and when, actual against target; the report's five tables and photos under "Report details". */
-function reportCard(r, all, pid) {
+function reportCard(r, all, pid, editable = false) {
   const target = Number(r.targetAccomplishmentPct) || 0, actual = Number(r.actualAccomplishmentPct) || 0;
   const prev = L.previousReport(all, r);
   const acc = L.accomplishmentOf(r.accomplishmentItemsJson);
@@ -846,11 +848,16 @@ function reportCard(r, all, pid) {
         <h4>5. Issues encountered / action taken</h4>
         ${issues.length ? table(['Issues encountered', 'Action taken'], issues.map(i => `<tr><td>${esc(i.description)}</td><td><b>${esc([i.actionBy, i.actionTaken].filter(x => x.trim()).join(': '))}</b></td></tr>`).join(''))
           : emptyLine('No issues encountered for this reporting period.')}
-        ${photos.length ? `<h4>Attached site photos (${photos.length})</h4>${photoGrid(photos, L.photoDetails(r.photoDetailsJson))}` : ''}
+        ${photos.length || editable ? `<h4>Attached site photos (${photos.length})</h4>` : ''}
+        ${photos.length ? photoGrid(photos, L.photoDetails(r.photoDetailsJson)) : ''}
+        ${editable ? photosButton(r, photos.length) : ''}
       </div>
     </details>
   </article>`;
 }
+
+/** Opens editPhotos for a weekly report. */
+const photosButton = (r, count) => `<button class="text-btn entry-edit" data-edit-photos="${esc(r.uuid)}">${icon('photo_camera', 'sm')}${count ? 'Edit photos' : 'Add photos'}</button>`;
 
 /** Photos as thumbnails that open full size; PDFs in the list as file links. */
 function photoGrid(refs, details) {
@@ -1449,8 +1456,8 @@ const textFields = form => Object.fromEntries([...new FormData(form)].filter(([,
 /** True when a file was picked in the form or an attached one is ticked for removal. */
 const hasPicked = form => [...form.querySelectorAll('input[type=file]')].some(i => i.files[0]) || Boolean(form.querySelector('input[data-remove]:checked'));
 
-/** What the phone keeps of a picked file: a PDF as it is, anything else as a JPEG no larger than a scan. [blob, extension, content type]. */
-async function attachmentBlob(file) {
+/** What the phone keeps of a picked file: a PDF as it is, anything else as a JPEG no larger than `maxEdge`. [blob, extension, content type]. */
+async function attachmentBlob(file, maxEdge = L.SCAN_MAX_EDGE) {
   const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
   if (String.fromCharCode(...head) === '%PDF') {
     if (file.size >= L.MAX_FILE_BYTES) throw new Error('The file must be smaller than 20 MB.');
@@ -1459,7 +1466,7 @@ async function attachmentBlob(file) {
   if (file.size > L.MAX_FILE_BYTES * 3) throw new Error('The file must be smaller than 20 MB.');
   let bitmap;
   try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { throw new Error('Only photos and PDF files can be attached.'); }
-  const [width, height] = L.scaledSize(bitmap.width, bitmap.height, L.SCAN_MAX_EDGE);
+  const [width, height] = L.scaledSize(bitmap.width, bitmap.height, maxEdge);
   const canvas = Object.assign(document.createElement('canvas'), { width, height });
   const g = canvas.getContext('2d');
   g.fillStyle = '#fff'; // a see-through PNG would turn black as a JPEG
@@ -1480,17 +1487,90 @@ async function uploadPicked(c, form) {
   // A ticked Remove box clears its column; a file picked for the same column wins.
   const refs = Object.fromEntries([...form.querySelectorAll('input[data-remove]:checked')].map(i => [i.dataset.remove, '']));
   for (const input of form.querySelectorAll('input[type=file]')) {
-    if (!input.files[0]) continue;
-    const [blob, ext, contentType] = await attachmentBlob(input.files[0]);
-    const refText = L.newFileRef(c.page.id, crypto.randomUUID(), ext);
-    try {
-      await uploadBytes(ref(storage, L.storagePathOf(refText)), blob, { contentType });
-    } catch (x) {
-      throw x.code === 'storage/unauthorized' ? Object.assign(new Error('denied'), { code: 'permission-denied' }) : new Error('The file could not be uploaded. Check the connection, then save again.');
-    }
-    refs[input.name] = refText;
+    if (input.files[0]) refs[input.name] = await uploadFile(c, await attachmentBlob(input.files[0]));
   }
   return refs;
+}
+
+/** Uploads one prepared file (attachmentBlob's result) to this project's attachments and returns its reference. */
+async function uploadFile(c, [blob, ext, contentType]) {
+  const refText = L.newFileRef(c.page.id, crypto.randomUUID(), ext);
+  try {
+    await uploadBytes(ref(storage, L.storagePathOf(refText)), blob, { contentType });
+  } catch (x) {
+    throw x.code === 'storage/unauthorized' ? Object.assign(new Error('denied'), { code: 'permission-denied' }) : new Error('The file could not be uploaded. Check the connection, then save again.');
+  }
+  return refText;
+}
+
+/**
+ * A weekly report's site photos, as AddWeeklyReportDialog's photo strip: a title for each, take one off, add more.
+ * Save rewrites only the report's two photo columns, with the app's "Edited Weekly Report" entry, and points the
+ * project's card photo at the newest report photo left (ProjectViewModel.refreshSitePhoto).
+ * shortcut: no geo-tag stamp, and a removed photo's file stays in the bucket.
+ */
+function editPhotos(c, report) {
+  const refs = L.attachmentList(report.attachedPhotoUrlsJson), details = L.photoDetails(report.photoDetailsJson);
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Site photos</h2>
+    <p class="muted small">${esc(report.reportingWeek || '')}</p>
+    ${refs.length ? `<ul class="photo-edit">${refs.map((refText, i) => `<li>
+      ${L.isPdf(refText) ? fileLink(refText, 'Attached PDF') : L.storagePathOf(refText)
+        ? `<a class="thumb" data-file="${esc(refText)}" data-alt="${esc(details[refText]?.title || 'Site photo')}" target="_blank" rel="noopener">${icon('photo_camera')}</a>`
+        : `<span class="thumb gone">${icon('photo_camera')}<small>Not uploaded yet</small></span>`}
+      <div><label class="field">Title<input data-title="${i}" value="${esc(details[refText]?.title || '')}" autocomplete="off"></label>
+        <label class="check"><input type="checkbox" data-drop="${i}">Remove this photo</label></div>
+    </li>`).join('')}</ul>` : emptyLine('No photos on this report yet.')}
+    <label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label>
+    <div class="photo-new"></div>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), fresh = d.querySelector('.photo-new');
+  // Each picked photo gets a title box of its own.
+  form.photos.onchange = () => {
+    fresh.innerHTML = [...form.photos.files].map((file, i) => `<label class="field">Title for ${esc(file.name)}<input data-new-title="${i}" autocomplete="off"></label>`).join('');
+  };
+  const values = () => ({
+    titles: Object.fromEntries(refs.map((refText, i) => [refText, form.querySelector(`[data-title="${i}"]`).value.trim()])),
+    removed: refs.filter((_, i) => form.querySelector(`[data-drop="${i}"]`).checked),
+    newTitles: [...form.photos.files].map((_, i) => fresh.querySelector(`[data-new-title="${i}"]`)?.value.trim() || ''),
+  });
+  const initial = JSON.stringify(values());
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to these photos?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values();
+    if (JSON.stringify(f) === initial) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // Every photo is prepared before the first upload, so a file that is not a photo stops the save with nothing sent.
+      const blobs = [];
+      for (const file of form.photos.files) {
+        const blob = await attachmentBlob(file, L.PHOTO_MAX_EDGE);
+        if (blob[1] === 'pdf') throw new Error('Only photos can be added here.');
+        blobs.push(blob);
+      }
+      const added = [];
+      for (const [i, blob] of blobs.entries()) added.push([await uploadFile(c, blob), f.newTitles[i]]);
+      const changes = L.editedPhotos(report, { titles: f.titles, removed: f.removed, added });
+      const cover = L.latestSitePhoto(c.weekly.map(r => (r.uuid === report.uuid ? { ...r, ...changes } : r)));
+      await saveEdits(c, [[report, changes, { actionType: 'Edited Weekly Report', details: `Modified report for ${report.reportingWeek}` }]], 'weekly report', { latestUpdatePhotoUrl: cover });
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  loadFiles(d);
+  d.showModal();
 }
 
 /** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
@@ -1513,8 +1593,12 @@ async function addRecord(c, build, entry) {
  */
 const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
 
-/** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes delete it), all or none. */
-async function saveEdits(c, edits, noun) {
+/**
+ * saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes
+ * delete it), all or none. `projectFields`, when they differ from the project's, are saved on it in the same
+ * transaction, one revision up, the way a phone uploads a project change.
+ */
+async function saveEdits(c, edits, noun, projectFields = null) {
   const uid = s.user.uid;
   await runTransaction(db, async t => {
     const [project, ...stored] = await Promise.all([t.get(doc(db, 'projects', c.page.id)), ...edits.map(([rec]) => t.get(doc(db, 'records', rec.uuid)))]);
@@ -1530,6 +1614,9 @@ async function saveEdits(c, edits, noun) {
       const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...entry });
       t.set(doc(db, 'records', audit.uuid), audit);
     });
+    if (projectFields && Object.entries(projectFields).some(([key, value]) => (project.get(key) ?? '') !== value)) {
+      t.update(project.ref, { ...projectFields, revision: (Number(project.get('revision')) || 1) + 1, updatedAt: now, updatedByUid: uid });
+    }
   });
 }
 
@@ -1751,12 +1838,13 @@ async function addBilling(c, f) {
 }
 
 /** PhotoGalleryTab: one album per reporting week, in report order. */
-function photosView({ weekly }) {
+function photosView({ weekly, project }) {
+  const editable = L.canEdit(project, s.user.uid, s.claims);
   const albums = weekly.map(r => [r, L.attachmentList(r.attachedPhotoUrlsJson)]).filter(([, p]) => p.length);
   const total = albums.reduce((t, [, p]) => t + p.length, 0);
   if (!total) return `<div class="card empty">${icon('photo_library')}<p>No site update photos uploaded yet</p><small>Update photos attached to weekly reports will appear here.</small></div>`;
   return `<h2 class="list-title">Project update photo gallery (${plural(total, 'photo')})</h2>${albums.map(([r, refs]) => `
-    <section class="card section album"><div class="section-head">${icon('photo_library')}<h2>${esc(r.reportingWeek)} · ${plural(refs.length, 'photo')}</h2></div>
+    <section class="card section album"><div class="section-head">${icon('photo_library')}<h2>${esc(r.reportingWeek)} · ${plural(refs.length, 'photo')}</h2>${editable ? photosButton(r, refs.length) : ''}</div>
       <p class="muted">By ${esc(r.submittedByStaff || '-')}</p>${photoGrid(refs, L.photoDetails(r.photoDetailsJson))}</section>`).join('')}`;
 }
 

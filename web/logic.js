@@ -378,6 +378,8 @@ export function storagePathOf(ref) {
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 /** Attachments.Kind.SCAN: a scanned image's longest side, in pixels. */
 export const SCAN_MAX_EDGE = 2500;
+/** Attachments.Kind.PHOTO: a site photo's longest side, in pixels. */
+export const PHOTO_MAX_EDGE = 2048;
 
 /** A new attachment reference as Attachments.store makes one: `nhafile:<projectUuid>/<id>.jpg|.pdf`. */
 export const newFileRef = (projectUuid, id, ext) => `nhafile:${projectUuid}/${id}.${ext}`;
@@ -459,6 +461,27 @@ export function photoDetails(json) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
   return Object.fromEntries(Object.entries(o).map(([ref, d]) => [ref, { title: str(d?.title), takenAt: str(d?.takenAt) }]));
 }
+
+/**
+ * A weekly report's photo columns after an edit on the site: `titles` are the captions by reference, `removed` the
+ * references taken off, `added` the new photos as [reference, title]. A photo keeps the time and place it was taken.
+ * shortcut: a photo added here has neither (the site does not read a picked photo's EXIF, as PhotoDetails.fromExif does).
+ */
+export function editedPhotos(report, { titles = {}, removed = [], added = [] }) {
+  let details;
+  try { details = JSON.parse(report.photoDetailsJson || '{}'); } catch { details = {}; }
+  if (!details || typeof details !== 'object' || Array.isArray(details)) details = {};
+  const detail = (d, title) => ({ title, takenAt: str(d?.takenAt), ...(d?.lat != null && d?.lng != null ? { lat: d.lat, lng: d.lng } : {}) });
+  const kept = attachmentList(report.attachedPhotoUrlsJson).filter(ref => !removed.includes(ref));
+  const out = {};
+  for (const ref of kept) if (details[ref] || titles[ref]) out[ref] = detail(details[ref], titles[ref] ?? str(details[ref]?.title));
+  for (const [ref, title] of added) out[ref] = detail(null, title);
+  return { attachedPhotoUrlsJson: JSON.stringify([...kept, ...added.map(([ref]) => ref)]), photoDetailsJson: JSON.stringify(out) };
+}
+
+/** SitePhotos.latest: the first photo of the newest weekly report that has one, or ''. */
+export const latestSitePhoto = weekly => [...weekly].sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0))
+  .map(r => attachmentList(r.attachedPhotoUrlsJson)[0]).find(Boolean) || '';
 
 export const isPdf = ref => /\.pdf$/i.test(ref || '');
 
