@@ -2048,12 +2048,31 @@ export const planScaleOf = text => { const n = /^\d+$/.test(text.trim()) ? Numbe
 export function planScale(plan, lots, page, scale, { user, at }) {
   const was = Number(plan.scaleDenominator) || 0;
   const worked = page ? lots.flatMap(l => {
-    const polygon = lotPolygon(l), area = lotAreaSqM(polygon, ...page, scale), has = Number(l.lotAreaSqM) || 0;
-    const untyped = has === 0 || has === 50 || (was > 0 && Math.abs(has - lotAreaSqM(polygon, ...page, was)) < 0.01);
-    return untyped && area !== has ? [[l, { lotAreaSqM: area, lastModifiedBy: user, lastModifiedDate: at }, null]] : [];
+    const area = lotAreaSqM(lotPolygon(l), ...page, scale);
+    return untypedArea(l, page, was) && area !== (Number(l.lotAreaSqM) || 0) ? [[l, { lotAreaSqM: area, lastModifiedBy: user, lastModifiedDate: at }, null]] : [];
   }) : [];
   return [[plan, { scaleDenominator: scale }, { actionType: 'Project Edit', details: `Set SDP Plan v${plan.version} scale to 1:${scale} and worked out ${worked.length} lot areas`,
     oldValue: was > 0 ? `1:${was}` : 'No scale', newValue: `1:${scale}` }], ...worked];
+}
+
+// An area nobody typed for a lot: blank, the add form's 50, or the area `scale` gives its outline.
+const untypedArea = (l, page, scale) => {
+  const has = Number(l.lotAreaSqM) || 0;
+  return has === 0 || has === 50 || (scale > 0 && Math.abs(has - lotAreaSqM(lotPolygon(l), ...page, scale)) < 0.01);
+};
+
+/**
+ * ProjectViewModel.updateSdpLot for a lot's outline with corners moved or added: its `polygon` (page fractions), and
+ * its area from the plan's scale when nobody typed one (`page`: the PDF page's [width, height] in points, or null when
+ * the PDF cannot be read; `scale` is 0 without one). Its name, progress, billing and inspections stay. Returns { changes, audit }.
+ * shortcut: the phone's audit text names the lot by its local id, which the website does not have; it names the lot.
+ */
+export function lotOutline(lot, polygon, page, scale, { user, at }) {
+  const area = page ? lotAreaSqM(polygon, ...page, scale) : 0;
+  return {
+    changes: { polygonNormalizedJson: JSON.stringify(polygon), ...(area > 0 && untypedArea(lot, page, scale) ? { lotAreaSqM: area } : {}), lastModifiedBy: user, lastModifiedDate: at },
+    audit: { actionType: 'Lot Geometry Changed', details: `Updated Lot ${lotTag(lot)}`, newValue: `Updated boundary/info for Lot ${lotTag(lot)}` },
+  };
 }
 
 /** PlanRotation.next: the plan a quarter turn clockwise on screen; its lots keep their page coordinates. */

@@ -106,6 +106,11 @@ is read only.
   found lot as checked against the plan, and leaves the panel open for the next block. It warns about names two lots
   share and about other lots already in the block typed, and does not stop either, as on the phone. The phone's line
   about blocks that still have the app's numbers is left out (the website does not draw their dashed outline).
+- **Edit outline** on a lot's card (`L.lotOutline`): the whole page is shown with the lot's corners as dots. Drag a
+  corner to move it, click to add a corner after the last, Undo corner takes the last one off, and **Save outline**
+  writes the corners onto the same lot, so its name, progress, billing and inspections stay, with a "Lot Geometry
+  Changed" audit entry. An area nobody typed is worked out again from the plan's scale. A corner can be dragged while
+  a new lot is being drawn too. The phone has no such tool: its Edit geometry starts a new lot.
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
   name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
   current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
@@ -326,4 +331,6 @@ touched by this command.
 
 ## Not on the site yet
 
-On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, and roads.
+On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap. Roads (`sdp_roads`) are neither
+shown nor drawn: the phone cannot draw one any more (its road form is never opened), and a road on a plan is a lot
+whose use is Road Lot.

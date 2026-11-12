@@ -1254,7 +1254,7 @@ function monthlyView({ page, weekly, of, now }) {
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null });
-// draw: the corners of a lot being added; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
+// draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
@@ -1295,8 +1295,8 @@ function lotsView(c) {
     </div>
     <p class="muted lot-count" id="lot-count"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
-    ${st.draw ? `<div class="lot-draw" role="group" aria-label="Add lot"><p class="muted small" id="draw-hint" aria-live="polite"></p>
-      <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">Save lot</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
+    ${st.draw ? `<div class="lot-draw" role="group" aria-label="${st.draw.lot ? 'Edit outline' : 'Add lot'}"><p class="muted small" id="draw-hint" aria-live="polite"></p>
+      <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">${st.draw.lot ? 'Save outline' : 'Save lot'}</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
     ${st.frame ? `<div class="lot-draw" role="group" aria-label="Plan area for printing"><p class="muted small" id="frame-hint" aria-live="polite"></p>
       <button class="text-btn" id="frame-close">Close</button><button class="text-btn" id="frame-page">Whole page</button><button class="text-btn" id="frame-fit">Fit to lots</button></div>` : ''}
     ${site.lots.length || busy ? `<div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
@@ -1327,6 +1327,7 @@ function lotCard(l, editable = false) {
       <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>
       <button class="btn lc-more" id="lot-inspect">${icon('assignment', 'sm')}Record inspection</button>
       <button class="btn lc-more" id="lot-group">${icon('add_circle', 'sm')}Select more lots</button>
+      <button class="btn lc-more" id="lot-outline">Edit outline</button>
       <button class="btn lc-more" id="lot-renum">${L.unassigned(l) ? 'Number lots' : `Renumber Block ${esc(l.blockNumber)}`}</button>` : ''}
     <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
@@ -1875,7 +1876,7 @@ async function bindLots(c) {
     const [lots, numbers] = st.renum ? numbered() : [[], []], no = new Map(lots.map((l, i) => [l.uuid, numbers[i]]));
     svg.innerHTML = site.lots.map(l => {
       const pts = d.shapes.get(l.uuid);
-      if (!pts) return '';
+      if (!pts || l.uuid === st.draw?.lot) return ''; // a lot whose outline is being edited shows as the draft only
       const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
       const picked = st.renum ? st.renum.ids.includes(l.uuid) : st.group ? st.group.includes(l.uuid) : l.uuid === st.sel;
       const [x, y] = d.centres.get(l.uuid);
@@ -1891,7 +1892,8 @@ async function bindLots(c) {
     if (frameHint) frameHint.textContent = st.frame.length ? 'Now click the opposite corner.' : 'The dashed box is what prints. Click one corner of the plan area, then the opposite corner.';
     const hint = document.getElementById('draw-hint');
     if (hint) {
-      hint.textContent = `Click each corner of the lot on the plan, in order (${plural(st.draw.length, 'corner')} so far). Drag moves the plan and the wheel zooms it.`;
+      hint.textContent = `${st.draw.lot ? 'Drag a corner of the lot to move it; a click adds a corner after the last' : 'Click each corner of the lot on the plan, in order; drag a corner to move it'} (${
+        plural(st.draw.length, 'corner')} so far). Dragging elsewhere moves the plan and the wheel zooms it.`;
       document.getElementById('draw-save').disabled = st.draw.length < 3;
       document.getElementById('draw-undo').disabled = !st.draw.length;
     }
@@ -1947,6 +1949,8 @@ async function bindLots(c) {
         if (inspect) inspect.onclick = () => inspectLot(c, sel);
         const many = document.getElementById('lot-group');
         if (many) many.onclick = () => { Object.assign(st, { group: [sel.uuid], sel: null, more: false }); paint(); };
+        const outline = document.getElementById('lot-outline');
+        if (outline) outline.onclick = () => { Object.assign(st, { draw: Object.assign(L.lotPolygon(sel), { lot: sel.uuid }), sel: null, more: false, view: null, group: null, renum: null }); drawProject(c.page); };
         const renumber = document.getElementById('lot-renum');
         if (renumber) renumber.onclick = () => startRenum(sel);
         const edit = document.getElementById('lot-edit');
@@ -1978,9 +1982,18 @@ async function bindLots(c) {
   if (st.draw) {
     document.getElementById('draw-undo').onclick = () => { st.draw.pop(); paint(); };
     document.getElementById('draw-done').onclick = () => { Object.assign(st, { draw: null, view: null }); drawProject(c.page); };
-    // The next lot is drawn straight after this one is saved.
-    document.getElementById('draw-save').onclick = () => lotForm(c, site, null, st.draw,
-      d && !d.problem ? L.lotAreaSqM(st.draw, ...d.page, Number(site.plan.scaleDenominator) || 0) : 0, () => { st.draw = []; drawProject(c.page); });
+    document.getElementById('draw-save').onclick = e => {
+      const scale = Number(site.plan.scaleDenominator) || 0, page = d && !d.problem ? d.page : null;
+      // The next lot is drawn straight after this one is saved.
+      if (!st.draw.lot) { lotForm(c, site, null, st.draw, page ? L.lotAreaSqM(st.draw, ...page, scale) : 0, () => { st.draw = []; drawProject(c.page); }); return; }
+      // An outline being edited is saved onto its lot, with no form: only its corners (and an area nobody typed) change.
+      const lot = site.lots.find(l => l.uuid === st.draw.lot), saved = lot && L.lotOutline(lot, [...st.draw], page, scale, lotWho(c));
+      if (!lot) { st.draw = null; drawProject(c.page); return; }
+      if (!navigator.onLine) { alert('You are offline. Connect to the internet, then save again.'); return; }
+      e.target.disabled = true;
+      saveEdit(c, lot, saved.changes, 'lot', saved.audit).then(() => { Object.assign(st, { draw: null, view: null, sel: lot.uuid }); drawProject(c.page); },
+        x => { alert(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.'); e.target.disabled = false; });
+    };
   }
   paint();
   if (!viewer) return;
@@ -2031,11 +2044,18 @@ async function bindLots(c) {
   // Drag to move, two fingers to pinch, a click without a drag picks the lot under it (or clears the selection).
   // Inside the viewer's border, where the stage is placed; a corner of a new lot lands exactly under the pointer.
   const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left - viewer.clientLeft, e.clientY - r.top - viewer.clientTop]; };
+  // The point of the page under a place inside the viewer; a place off the page counts as its edge.
+  const pageAt = ([px, py]) => { const v = view(), k = v.s * fit; return d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(Math.min(1, Math.max(0, n)) * 1e6) / 1e6); };
   const down = new Map();
-  let moved = false;
+  let moved = false, grab = -1; // grab: the corner of the outline being drawn that this press took hold of
   stage.onpointerdown = e => {
-    down.set(e.pointerId, local(e));
-    if (down.size === 1) moved = false;
+    const at = local(e);
+    down.set(e.pointerId, at);
+    if (down.size === 1) {
+      moved = false;
+      const v = view(), k = v.s * fit;
+      grab = (st.draw || []).findIndex(p => { const [x, y] = d.place(...p); return Math.hypot(x * k + v.x - at[0], y * k + v.y - at[1]) < 10; });
+    }
     stage.setPointerCapture(e.pointerId);
   };
   stage.onpointermove = e => {
@@ -2045,6 +2065,7 @@ async function bindLots(c) {
     if (down.size === 1) {
       if (!moved && Math.hypot(now[0] - was[0], now[1] - was[1]) < 4) return;
       moved = true;
+      if (grab >= 0) { st.draw[grab] = pageAt(now); shapes(); return; } // the corner follows the pointer
       const v = view();
       st.view = { ...v, x: v.x + now[0] - was[0], y: v.y + now[1] - was[1] };
       apply();
@@ -2057,13 +2078,13 @@ async function bindLots(c) {
     down.set(e.pointerId, now);
   };
   stage.onpointerup = stage.onpointercancel = e => {
-    const tap = e.type === 'pointerup' && down.size === 1 && !moved;
+    const tap = e.type === 'pointerup' && down.size === 1 && !moved, held = grab >= 0;
     down.delete(e.pointerId);
-    if (!tap) return;
+    grab = -1;
+    if (!tap || held) return; // a click on a corner already there adds none
     if (st.frame) {
-      // The print area: two opposite corners as points of the page; a click off the page counts as its edge.
-      const [px, py] = local(e), v = view(), k = v.s * fit, pt = d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.min(1, Math.max(0, n)));
-      const text = st.frame.length ? L.planFrame(st.frame[0], pt) : '';
+      // The print area: two opposite corners as points of the page.
+      const pt = pageAt(local(e)), text = st.frame.length ? L.planFrame(st.frame[0], pt) : '';
       if (!st.frame.length) { st.frame = [pt]; paint(); }
       else if (L.parseFrame(text)) planAct(c, null, () => saveEdit(c, site.plan, { frame: text }, 'plan', null));
       return;

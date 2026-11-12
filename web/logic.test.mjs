@@ -1190,4 +1190,14 @@ test('plan tools: a revision as its own site, the print area, and a block renumb
   assert.deepEqual(L.renumberNotes([lot('a', '1', '1'), lot('b', '1', '1'), lot('c', '', ''), lot('d', '', '', { lotUse: 'Open Space' }), lot('e', '2', '1')]),
     ['1 lot has no block and lot yet.', 'Used twice: B1-L1']);
   assert.deepEqual(L.renumberNotes([lot('a', '1', '1')]), []);
+
+  // A lot's outline edited: its corners, and its area from the scale unless someone typed one. A 100 x 100 point square at 1:1000 is 1244.52 sq.m.
+  const square = [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]], wide = [[0.1, 0.1], [0.3, 0.1], [0.3, 0.2], [0.1, 0.2]], page = [1000, 1000];
+  const drawn = lot('l5', '2', '9', { polygonNormalizedJson: JSON.stringify(square), lotAreaSqM: 1244.52 });
+  assert.deepEqual(L.lotOutline(drawn, wide, page, 1000, who), {
+    changes: { polygonNormalizedJson: JSON.stringify(wide), lotAreaSqM: 2489.04, lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 10:00' },
+    audit: { actionType: 'Lot Geometry Changed', details: 'Updated Lot B2-L9', newValue: 'Updated boundary/info for Lot B2-L9' } });
+  assert.equal('lotAreaSqM' in L.lotOutline({ ...drawn, lotAreaSqM: 120 }, wide, page, 1000, who).changes, false); // a typed area stays
+  assert.equal('lotAreaSqM' in L.lotOutline(drawn, wide, page, 0, who).changes, false); // no scale, no area
+  assert.equal('lotAreaSqM' in L.lotOutline(drawn, wide, null, 1000, who).changes, false); // the PDF could not be read
 });
