@@ -1253,7 +1253,8 @@ function monthlyView({ page, weekly, of, now }) {
 
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null }); // draw: the corners of a lot being added; group: the lots picked for one update
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null });
+// draw: the corners of a lot being added; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
@@ -1263,16 +1264,19 @@ function lotsView(c) {
   const upload = L.canManagePlans(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="plan-upload">${icon('cloud_upload', 'sm')}Upload plan</button>` : '';
   if (!site) return `<div class="card empty">${icon('home_work')}<p>No subdivision plan uploaded yet</p>${upload}</div>`;
   const edit = L.canEdit(c.project, s.user.uid, s.claims), manage = L.canManagePlans(c.project, s.user.uid, s.claims);
-  const addLot = !st.draw && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
+  const busy = st.draw || st.frame;
+  const addLot = !busy && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
   // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn.
   const scale = Number(site.plan.scaleDenominator) || 0;
-  const tools = st.draw ? '' : [
+  const tools = busy ? '' : [
     edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '',
     edit ? `<button class="text-btn" id="plan-turn">${icon('rotate_90_degrees_cw', 'sm')}Turn plan</button>` : '',
+    edit && site.plan.pdfFileUrl ? '<button class="text-btn" id="plan-frame">Print area</button>' : '',
+    manage ? `<button class="text-btn" id="plan-site">Make v${esc(site.plan.version ?? 1)} its own site</button>` : '',
     manage ? `<button class="text-btn danger" id="plan-delete">${icon('delete', 'sm')}Delete plan</button>` : '',
   ].join('');
   const name = p => `${p.planName || 'Subdivision plan'} · v${p.version ?? 1}`;
-  const title = manage && !st.draw && site.plans.length > 1
+  const title = manage && !busy && site.plans.length > 1
     ? `<select id="plan-rev" aria-label="Revision in use">${site.plans.map(p => `<option value="${esc(p.uuid)}"${p === site.plan ? ' selected' : ''}>${esc(name(p))}</option>`).join('')}</select>`
     : `${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span>`;
   const k = L.lotStats(site.lots);
@@ -1293,7 +1297,9 @@ function lotsView(c) {
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
     ${st.draw ? `<div class="lot-draw" role="group" aria-label="Add lot"><p class="muted small" id="draw-hint" aria-live="polite"></p>
       <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">Save lot</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
-    ${site.lots.length || st.draw ? `<div class="lot-viewer${st.draw ? ' drawing' : ''}" id="lot-plan">
+    ${st.frame ? `<div class="lot-draw" role="group" aria-label="Plan area for printing"><p class="muted small" id="frame-hint" aria-live="polite"></p>
+      <button class="text-btn" id="frame-close">Close</button><button class="text-btn" id="frame-page">Whole page</button><button class="text-btn" id="frame-fit">Fit to lots</button></div>` : ''}
+    ${site.lots.length || busy ? `<div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
       <div class="zoom-bar" role="group" aria-label="Zoom">
         ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
@@ -1320,7 +1326,8 @@ function lotCard(l, editable = false) {
     ${editable ? `<button class="btn lc-more" id="lot-edit">${icon('edit', 'sm')}Update progress</button>
       <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>
       <button class="btn lc-more" id="lot-inspect">${icon('assignment', 'sm')}Record inspection</button>
-      <button class="btn lc-more" id="lot-group">${icon('add_circle', 'sm')}Select more lots</button>` : ''}
+      <button class="btn lc-more" id="lot-group">${icon('add_circle', 'sm')}Select more lots</button>
+      <button class="btn lc-more" id="lot-renum">${L.unassigned(l) ? 'Number lots' : `Renumber Block ${esc(l.blockNumber)}`}</button>` : ''}
     <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
 
@@ -1330,6 +1337,21 @@ const groupCard = n => `<div class="lc-head"><b>${plural(n, 'lot')} selected</b>
   <p>Click lots on the plan to add or remove them.</p>
   <div class="lc-group"><label class="field">Set use<select id="group-use"${n ? '' : ' disabled'}><option value="">Choose…</option>${L.LOT_USES.map(u => `<option>${esc(u)}</option>`).join('')}</select></label>
     <button class="btn lc-more" id="group-update"${n ? '' : ' disabled'}>${icon('edit', 'sm')}Update progress</button></div>`;
+
+/** The renumber panel (the phone's RENUMBER BLOCK PANEL): the `n` lots picked get the block typed, and numbers from where they sit. */
+function renumCard(r, n, notes) {
+  const chip = (key, label, on) => `<button data-renum="${key}" aria-pressed="${Boolean(on)}">${label}</button>`;
+  return `<div class="lc-head"><b>${esc(!n ? 'Renumber blocks' : r.block ? `Renumber Block ${r.block} (${plural(n, 'lot')})` : `Number lots (${plural(n, 'lot')})`)}</b>
+      <button class="icon-btn" id="renum-close" aria-label="Close">${icon('close', 'sm')}</button></div>
+    <p>${!n ? 'Saved. Click a lot to renumber its block.' : r.block ? 'Check the numbers on the shaded lots against the plan. Click a lot to add it to this block or take it out.'
+      : 'Click the other lots of this block to add them, then type the block on the plan and its first lot.'}</p>
+    ${notes.map(t => `<p class="lc-upd">${esc(t)}</p>`).join('')}
+    ${n ? `<div class="lc-group"><label class="field">Block on plan<input id="renum-to" maxlength="10" autocomplete="off" value="${esc(r.to)}"></label>
+        <label class="field">First lot<input id="renum-first" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(r.first)}"></label></div>
+      <div class="chips" role="group" aria-label="Numbering">${chip('odd', 'Odd / even rows', !r.consecutive)}${chip('consecutive', 'Consecutive', r.consecutive)}${chip('otherEnd', 'Start from other end', r.otherEnd)}${chip('otherRow', 'Start on other row', r.otherRow)}</div>
+      <p class="lc-upd" id="renum-others"></p><p class="error" role="alert" id="renum-err"></p>
+      <button class="btn lc-more" id="renum-save">Save numbers</button>` : ''}`;
+}
 
 /** LotInfoDialog's current status and inspection history (`inspections`: L.lotInspections), read-only. */
 function lotDetail(l, inspections) {
@@ -1662,7 +1684,7 @@ function planForm(c) {
       if (up.edits.length) await saveEdits(c, up.edits, 'plan');
       await addRecords(c, [[up.build, up.audit]]);
       // Shows the new plan, as the phone does.
-      Object.assign(lotState(c.page), { site: up.site, sel: null, more: false, view: null, draw: null });
+      Object.assign(lotState(c.page), { site: up.site, sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null });
       done();
       drawProject(c.page);
     } catch (x) {
@@ -1710,6 +1732,59 @@ function scaleForm(c, site) {
   d.showModal();
 }
 
+/** MoveToSiteDialog: the plan on screen, uploaded as a revision, becomes the first plan of a site of its own. */
+function ownSiteForm(c, sites, site) {
+  const plan = site.plan, v = plan.version ?? 1;
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Make v${esc(v)} its own site</h2>
+    <p class="muted small">${esc(`Use this when v${v} (${plan.planName || 'Subdivision plan'}) is another site under this contract, not a revision of ${site.site || 'Main site'}. Its lots, progress and inspections move with it. The other versions stay in ${site.site || 'the first site'}.`)}</p>
+    ${site.site ? '' : '<label class="field">Name of the first site<input name="currentSiteName" autocomplete="off" value="Phase 1"></label>'}
+    <label class="field">Name of the new site<input name="newSite" autocomplete="off" value="Phase ${sites.length + 1}"></label>
+    <p class="muted small">v${esc(v)} becomes version 1 of this site.</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Make site</button></div>
+  </form>`;
+  const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const done = () => { d.close(); d.remove(); };
+  d.querySelector('[data-cancel]').onclick = done;
+  d.addEventListener('cancel', e => { e.preventDefault(); done(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const newSite = el.newSite.value, current = el.currentSiteName?.value || '';
+    const problem = L.siteNameError(newSite, !site.site, current, sites.map(x => x.site));
+    if (problem) { err.textContent = problem; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await saveEdits(c, L.planOwnSite(c.records.filter(r => r.type === 'sdp_plans'), plan, newSite, current), 'plan');
+      // Shows the new site, as the phone does.
+      Object.assign(lotState(c.page), { site: newSite.trim(), sel: null, more: false, view: null, group: null, renum: null });
+      done();
+      drawProject(c.page);
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+// One click on the plan's tools with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
+async function planAct(c, el, run) {
+  if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); drawProject(c.page); return; }
+  if (el) el.disabled = true;
+  try {
+    await run();
+    Object.assign(lotState(c.page), { sel: null, more: false, view: null, frame: null, renum: null });
+  } catch (x) {
+    alert(x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.');
+  }
+  drawProject(c.page);
+}
+
 /**
  * Deletes a plan with its lots, roads, lot progress and inspections, as the phone's delete does: each is marked
  * deleted, and their files leave the bucket.
@@ -1727,24 +1802,19 @@ async function deletePlan(c, plan) {
   dropFiles(L.unusedFiles(gone.children, [], c.records.filter(r => r.uuid !== plan.uuid), c.project));
 }
 
-/** The plan's own tools on Progress → Lots: its scale, a quarter turn, the revision in use, and deleting it. */
+/** The plan's own tools on Progress → Lots: its scale, a quarter turn, its print area, the revision in use, a site of its own, and deleting it. */
 function bindPlanTools(c) {
   const st = lotState(c.page), { sites, site } = lotSite(c, st);
   const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
-  // One click each with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
-  const act = async (el, run) => {
-    if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); drawProject(c.page); return; }
-    el.disabled = true;
-    try {
-      await run();
-      Object.assign(st, { sel: null, more: false, view: null });
-    } catch (x) {
-      alert(x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.');
-    }
-    drawProject(c.page);
-  };
+  const act = (el, run) => planAct(c, el, run);
   bind('plan-scale', 'onclick', () => scaleForm(c, site));
   bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
+  // The print area (setSdpPlanFrame): two clicks on the whole page mark it (bindLots), or the whole page, or the box around the lots.
+  bind('plan-frame', 'onclick', () => { Object.assign(st, { frame: [], sel: null, more: false, view: null, group: null, renum: null }); drawProject(c.page); });
+  bind('frame-close', 'onclick', () => { Object.assign(st, { frame: null, view: null }); drawProject(c.page); });
+  bind('frame-page', 'onclick', el => act(el, () => saveEdit(c, site.plan, { frame: L.planFrame([0, 0], [1, 1]) }, 'plan', null)));
+  bind('frame-fit', 'onclick', el => act(el, () => saveEdit(c, site.plan, { frame: '' }, 'plan', null)));
+  bind('plan-site', 'onclick', () => ownSiteForm(c, sites, site));
   bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
   bind('plan-delete', 'onclick', el => {
     const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
@@ -1776,32 +1846,96 @@ async function bindLots(c) {
   const more = document.getElementById('lot-results');
   let d = null, svg = null, stage = null;
 
-  // The lot being added: its corners so far (dots), joined in the order clicked.
+  // Renumber block: the lots picked and the numbers they would get, from where they sit on the plan as it is turned.
+  const numbered = () => {
+    const r = st.renum, lots = d ? site.lots.filter(l => r.ids.includes(l.uuid) && d.centres.has(l.uuid)) : [];
+    return [lots, L.blockNumbers(lots.map(l => d.centres.get(l.uuid)), r.first === '' ? 1 : Number(r.first), r.consecutive, r.otherEnd, r.otherRow)];
+  };
+  // A lot's whole block (a lot without a name: the lot alone, the rest of its block is clicked).
+  const startRenum = lot => {
+    Object.assign(st, { renum: { block: lot.blockNumber || '', ids: L.unassigned(lot) ? [lot.uuid] : site.lots.filter(l => l.blockNumber === lot.blockNumber).map(l => l.uuid),
+      to: lot.blockNumber || '', first: '1', consecutive: false, otherEnd: false, otherRow: false }, sel: null, more: false, group: null });
+    paint();
+  };
+  // The lot being added: its corners so far (dots), joined in the order clicked. Marking the print area: the dashed box
+  // that prints now, and the first corner clicked.
   const draft = () => {
+    if (st.frame) {
+      const f = L.parseFrame(site.plan.frame) || L.frameAround(site.lots.map(L.lotPolygon)) || [0, 0, 1, 1];
+      const at = (x, y) => d.place(x, y).map(n => n.toFixed(1));
+      return `<polygon class="frame" points="${[at(f[0], f[1]), at(f[2], f[1]), at(f[2], f[3]), at(f[0], f[3])].join(' ')}"/>${st.frame.map(p => `<path class="draft" d="M${at(...p).join(' ')}h0.01"/>`).join('')}`;
+    }
     const pts = (st.draw || []).map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)));
     return pts.length ? `<${pts.length > 2 ? 'polygon' : 'polyline'} class="draft" points="${pts.join(' ')}"/>${pts.map(([x, y]) => `<path class="draft" d="M${x} ${y}h0.01"/>`).join('')}` : '';
   };
-  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters, the selection outlined.
-  const paint = () => {
-    const n = site.lots.filter(l => L.lotMatches(l, st)).length;
-    count.textContent = n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`;
-    if (svg) svg.innerHTML = site.lots.map(l => {
+  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters, the selection outlined; a block
+  // being renumbered shows the number each lot would get.
+  const shapes = () => {
+    if (!svg) return;
+    const [lots, numbers] = st.renum ? numbered() : [[], []], no = new Map(lots.map((l, i) => [l.uuid, numbers[i]]));
+    svg.innerHTML = site.lots.map(l => {
       const pts = d.shapes.get(l.uuid);
       if (!pts) return '';
       const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
-      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${(st.group ? st.group.includes(l.uuid) : l.uuid === st.sel) ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
+      const picked = st.renum ? st.renum.ids.includes(l.uuid) : st.group ? st.group.includes(l.uuid) : l.uuid === st.sel;
+      const [x, y] = d.centres.get(l.uuid);
+      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
+        no.has(l.uuid) ? `<text class="renum-no" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>` : ''}`;
     }).join('') + draft();
+  };
+  const paint = () => {
+    const n = site.lots.filter(l => L.lotMatches(l, st)).length;
+    count.textContent = n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`;
+    shapes();
+    const frameHint = document.getElementById('frame-hint');
+    if (frameHint) frameHint.textContent = st.frame.length ? 'Now click the opposite corner.' : 'The dashed box is what prints. Click one corner of the plan area, then the opposite corner.';
     const hint = document.getElementById('draw-hint');
     if (hint) {
       hint.textContent = `Click each corner of the lot on the plan, in order (${plural(st.draw.length, 'corner')} so far). Drag moves the plan and the wheel zooms it.`;
       document.getElementById('draw-save').disabled = st.draw.length < 3;
       document.getElementById('draw-undo').disabled = !st.draw.length;
     }
-    const group = st.group && site.lots.filter(l => st.group.includes(l.uuid));
-    const sel = group ? null : site.lots.find(l => l.uuid === st.sel);
+    const renum = st.renum, group = !renum && st.group && site.lots.filter(l => st.group.includes(l.uuid));
+    const sel = group || renum ? null : site.lots.find(l => l.uuid === st.sel);
     if (card) {
-      card.hidden = !sel && !group;
-      card.innerHTML = group ? groupCard(group.length) : sel ? lotCard(sel, L.canEdit(c.project, s.user.uid, s.claims)) : '';
+      card.hidden = !sel && !group && !renum;
+      card.innerHTML = renum ? renumCard(renum, site.lots.filter(l => renum.ids.includes(l.uuid)).length, L.renumberNotes(site.lots))
+        : group ? groupCard(group.length) : sel ? lotCard(sel, L.canEdit(c.project, s.user.uid, s.claims)) : '';
+      if (renum) {
+        document.getElementById('renum-close').onclick = () => { st.renum = null; paint(); };
+        const to = document.getElementById('renum-to'), first = document.getElementById('renum-first'), save = document.getElementById('renum-save');
+        if (to) {
+          const note = () => {
+            const block = renum.to.trim(), others = site.lots.filter(l => (l.blockNumber || '') === block && !renum.ids.includes(l.uuid)).length;
+            document.getElementById('renum-others').textContent = block && others ? `Block ${block} already has ${others} other ${others === 1 ? 'lot' : 'lots'}. They keep their numbers until you renumber them.` : '';
+            save.disabled = !block || renum.first === '' || !d;
+          };
+          // Typing leaves the card as it is (the field keeps its place); only the numbers on the plan and the note follow.
+          to.oninput = () => { renum.to = to.value; note(); };
+          first.oninput = () => { renum.first = first.value = first.value.replace(/\D/g, ''); note(); shapes(); };
+          card.querySelectorAll('[data-renum]').forEach(b => { b.onclick = () => {
+            const k = b.dataset.renum;
+            if (k === 'odd' || k === 'consecutive') renum.consecutive = k === 'consecutive'; else renum[k] = !renum[k];
+            paint();
+          }; });
+          save.onclick = async () => {
+            const [lots, numbers] = numbered(), err = document.getElementById('renum-err');
+            if (!lots.length) return;
+            if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+            save.disabled = true; err.textContent = '';
+            try {
+              // shortcut: the block's lots and the audit entry go in one write; split it if a block passes a few hundred lots.
+              await saveEdits(c, L.lotsRenumbered(lots, numbers, renum.to.trim(), renum.block, lotWho(c)), 'lot');
+              renum.ids = []; // stays open, so the next click picks the next block
+              drawProject(c.page);
+            } catch (x) {
+              err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+              save.disabled = false;
+            }
+          };
+          note();
+        }
+      }
       if (group) {
         const saved = () => { st.group = null; drawProject(c.page); };
         document.getElementById('group-cancel').onclick = () => { st.group = null; paint(); };
@@ -1813,6 +1947,8 @@ async function bindLots(c) {
         if (inspect) inspect.onclick = () => inspectLot(c, sel);
         const many = document.getElementById('lot-group');
         if (many) many.onclick = () => { Object.assign(st, { group: [sel.uuid], sel: null, more: false }); paint(); };
+        const renumber = document.getElementById('lot-renum');
+        if (renumber) renumber.onclick = () => startRenum(sel);
         const edit = document.getElementById('lot-edit');
         if (edit) edit.onclick = () => editLot(c, sel);
         const name = document.getElementById('lot-name');
@@ -1836,9 +1972,9 @@ async function bindLots(c) {
     paint();
   };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; paint(); }; });
-  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; st.draw = null; st.group = null; drawProject(c.page); }; });
+  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { Object.assign(st, { site: b.dataset.lotSite, sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null }); drawProject(c.page); }; });
   const add = document.getElementById('lot-add');
-  if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null, group: null }); drawProject(c.page); };
+  if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null, group: null, renum: null }); drawProject(c.page); };
   if (st.draw) {
     document.getElementById('draw-undo').onclick = () => { st.draw.pop(); paint(); };
     document.getElementById('draw-done').onclick = () => { Object.assign(st, { draw: null, view: null }); drawProject(c.page); };
@@ -1866,13 +2002,14 @@ async function bindLots(c) {
   };
   const centreOn = ([cx, cy], s) => { st.view = { s, x: W / 2 - cx * fit * s, y: H / 2 - cy * fit * s }; apply(); };
 
-  d = await planBase(site, Boolean(st.draw));
+  d = await planBase(site, Boolean(st.draw || st.frame));
   if (!viewer.isConnected) return;
-  // Each lot's points in plan-image pixels, and its centre for the search.
-  d.shapes = new Map(); d.centres = new Map();
+  // Each lot's points in plan-image pixels, its centre for the search, and its narrower side for a number drawn on it.
+  d.shapes = new Map(); d.centres = new Map(); d.spans = new Map();
   for (const l of site.lots) {
     const pts = L.lotPolygon(l).map(([x, y]) => d.place(x, y));
     if (pts.length < 3) continue;
+    d.spans.set(l.uuid, Math.min(...[0, 1].map(i => Math.max(...pts.map(q => q[i])) - Math.min(...pts.map(q => q[i])))));
     d.shapes.set(l.uuid, pts.map(q => q.map(n => n.toFixed(1)).join(',')).join(' '));
     d.centres.set(l.uuid, [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length]);
   }
@@ -1923,6 +2060,14 @@ async function bindLots(c) {
     const tap = e.type === 'pointerup' && down.size === 1 && !moved;
     down.delete(e.pointerId);
     if (!tap) return;
+    if (st.frame) {
+      // The print area: two opposite corners as points of the page; a click off the page counts as its edge.
+      const [px, py] = local(e), v = view(), k = v.s * fit, pt = d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.min(1, Math.max(0, n)));
+      const text = st.frame.length ? L.planFrame(st.frame[0], pt) : '';
+      if (!st.frame.length) { st.frame = [pt]; paint(); }
+      else if (L.parseFrame(text)) planAct(c, null, () => saveEdit(c, site.plan, { frame: text }, 'plan', null));
+      return;
+    }
     if (st.draw) {
       // A corner of the lot being added, as a point of the page; the second click of a double click is not another corner.
       const [px, py] = local(e), v = view(), k = v.s * fit, pt = d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(n * 1e6) / 1e6);
@@ -1931,6 +2076,13 @@ async function bindLots(c) {
       return;
     }
     const hit = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot);
+    if (st.renum) {
+      // Renumbering: a click adds the lot to the block or takes it out (one always stays); after a save it picks the next block.
+      const id = hit?.dataset.lot, ids = st.renum.ids;
+      if (id && !ids.length) startRenum(site.lots.find(l => l.uuid === id));
+      else if (id) { st.renum.ids = !ids.includes(id) ? [...ids, id] : ids.length > 1 ? ids.filter(x => x !== id) : ids; paint(); }
+      return;
+    }
     if (st.group) {
       // Group select: a click adds the lot to the lots picked, or takes it out.
       if (hit) { const id = hit.dataset.lot; st.group = st.group.includes(id) ? st.group.filter(x => x !== id) : [...st.group, id]; paint(); }
@@ -1938,7 +2090,7 @@ async function bindLots(c) {
     }
     pick(hit && hit.dataset.lot !== st.sel ? hit.dataset.lot : null);
   };
-  stage.ondblclick = e => { if (st.draw) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
+  stage.ondblclick = e => { if (st.draw || st.frame) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
   viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };
 }
 

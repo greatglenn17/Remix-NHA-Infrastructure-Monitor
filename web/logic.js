@@ -1914,7 +1914,8 @@ export function lotAreaSqM(polygon, pageW, pageH, scale) {
   return Math.round(Math.abs(twice) / 2 * metres * metres * 100) / 100;
 }
 
-const unassigned = l => !(l.blockNumber || '').trim() || !(l.lotNumber || '').trim();
+/** SdpLot.isUnassigned: a lot found on the plan that nobody has given a block and lot yet. */
+export const unassigned = l => !(l.blockNumber || '').trim() || !(l.lotNumber || '').trim();
 const lotTag = l => `B${l.blockNumber || ''}-L${l.lotNumber || ''}`;
 
 /**
@@ -2071,6 +2072,22 @@ export function planInUse(plans, plan) {
 const siteNote = plan => ((plan.siteName || '').trim() ? ` (${plan.siteName})` : '');
 
 /**
+ * ProjectViewModel.moveSdpPlanToNewSite: `plan`, uploaded as a revision, becomes version 1, in use, of a site of its
+ * own; its lots, progress and inspections follow it. `currentSiteName` names the site it leaves when that site has no
+ * name yet, on that site's other plans too. `plans`: the project's sdp_plans records. Returns saveEdits' [[record, changes, audit]].
+ */
+export function planOwnSite(plans, plan, newSite, currentSiteName = '') {
+  const blank = p => !(p.siteName || '').trim(), called = blank(plan) ? currentSiteName.trim() : '';
+  const old = called || (plan.siteName || '').trim() || 'Main site', site = newSite.trim();
+  return [[plan, { siteName: site, version: 1, isActive: 1 }, { actionType: 'Project Edit', details: `Made SDP Plan v${plan.version} of ${old} its own site: ${site}`,
+    oldValue: `Site: ${old}, Version: ${plan.version}`, newValue: `Site: ${site}, Version: 1` }],
+    ...(called ? plans.filter(p => p.uuid !== plan.uuid && blank(p)).map(p => [p, { siteName: called }, null]) : [])];
+}
+
+/** setSdpPlanFrame's text for the box between two opposite corners (page fractions): "minX,minY,maxX,maxY", four decimals. */
+export const planFrame = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])].map(n => n.toFixed(4)).join(',');
+
+/**
  * ProjectViewModel.deleteSdpPlan: the plan's audit entry, and `children`: the project's records under the plan (its
  * lots, roads, lot progress and inspections), which the phone's delete removes with it.
  */
@@ -2079,3 +2096,58 @@ export const planDeleted = (plan, records) => ({
   audit: { actionType: 'Document Deletion', details: `Deleted SDP Plan${siteNote(plan)} Version ${plan.version}: ${plan.planName}, with its lots and progress`,
     oldValue: `Plan: ${plan.planName}, Version: ${plan.version}` },
 });
+
+/* ---------- Renumber a block (BlockNumbering, the RENUMBER BLOCK PANEL, ProjectViewModel.renumberSdpLots) ---------- */
+
+/**
+ * BlockNumbering.number: lot numbers for the lots of one block, from where the lots sit. `centres` are the lots'
+ * centres as [x, y] in one unit, on the plan as it is turned on screen. The lots are split into rows along the block's
+ * long direction and numbered odd along one row and even along the other (1 across from 2), or, `consecutive`, around
+ * the block (one row out, the next back). Without the flips the first row is the top (or left) one and numbering starts
+ * at its left (or top) end. Returns each lot's number, in the order of `centres`.
+ */
+export function blockNumbers(centres, first, consecutive = false, otherEnd = false, otherRow = false) {
+  const n = centres.length;
+  if (n < 2) return centres.map(() => first);
+  const mx = centres.reduce((t, p) => t + p[0], 0) / n, my = centres.reduce((t, p) => t + p[1], 0) / n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const [x, y] of centres) { const dx = x - mx, dy = y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  let ux = Math.cos(angle), uy = Math.sin(angle);
+  // Point the long axis rightwards (downwards when the block stands upright).
+  if (Math.abs(ux) > 0.3 ? ux < 0 : uy < 0) { ux = -ux; uy = -uy; }
+  const along = centres.map(([x, y]) => (x - mx) * ux + (y - my) * uy), across = centres.map(([x, y]) => (x - mx) * -uy + (y - my) * ux);
+  // Neighbours in a row sit one lot width apart; the next row is a lot depth away.
+  const width = centres.map(([x, y], i) => Math.min(...centres.filter((_, j) => j !== i).map(([a, b]) => Math.hypot(x - a, y - b)))).sort((a, b) => a - b)[Math.floor(n / 2)];
+  const rows = [[]], byAcross = centres.map((_, i) => i).sort((a, b) => across[a] - across[b]);
+  byAcross.forEach((i, k) => { if (k > 0 && across[i] - across[byAcross[k - 1]] > width * 0.5) rows.push([]); rows.at(-1).push(i); });
+  if (otherRow) rows.reverse();
+  for (const row of rows) row.sort((a, b) => (otherEnd ? along[b] - along[a] : along[a] - along[b]));
+  const numbers = centres.map(() => first), used = [0, 0];
+  let next = first;
+  rows.forEach((row, k) => {
+    if (consecutive) for (const i of k % 2 ? [...row].reverse() : row) numbers[i] = next++;
+    else { row.forEach((i, m) => { numbers[i] = first + k % 2 + 2 * (used[k % 2] + m); }); used[k % 2] += row.length; }
+  });
+  return numbers;
+}
+
+/**
+ * ProjectViewModel.renumberSdpLots: `lots` get `block` and their `numbers` (blockNumbers, in the lots' order); progress
+ * and billing follow the lots. `oldBlock` is the block they were picked from ('' for lots without a name). A found lot
+ * is marked as checked against the plan. Returns saveEdits' [[lot, changes, audit]], one audit entry on the first.
+ */
+export function lotsRenumbered(lots, numbers, block, oldBlock, { user, at }) {
+  const audit = { actionType: 'Lot Geometry Changed', details: oldBlock ? `Renumbered ${lots.length} lots of Block ${oldBlock}` : `Numbered ${lots.length} unassigned lots`,
+    oldValue: oldBlock ? `Block ${oldBlock}` : 'Unassigned', newValue: `Block ${block}, Lots ${Math.min(...numbers)}-${Math.max(...numbers)}` };
+  return lots.map((l, i) => [l, { blockNumber: block, lotNumber: String(numbers[i]), ...((l.description || '').startsWith('Auto-detected') ? { description: 'Renumbered to the plan' } : {}),
+    lastModifiedBy: user, lastModifiedDate: at }, i ? null : audit]);
+}
+
+/** The renumber panel's warnings about a plan's lots: saleable lots still without a name, and names two lots share. */
+export function renumberNotes(lots) {
+  const tags = lots.filter(l => !unassigned(l)).map(lotTag), twice = [...new Set(tags.filter((t, i) => tags.indexOf(t) !== i))];
+  const unnamed = lots.filter(l => unassigned(l) && lotUse(l) === 'Saleable').length;
+  return [unnamed && `${unnamed} ${unnamed === 1 ? 'lot has' : 'lots have'} no block and lot yet.`,
+    twice.length && `Used twice: ${twice.slice(0, 4).join(', ')}${twice.length > 4 ? ` and ${twice.length - 4} more` : ''}`].filter(Boolean);
+}

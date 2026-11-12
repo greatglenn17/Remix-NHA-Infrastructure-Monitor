@@ -1145,3 +1145,49 @@ test('several lots at once and inspections: one progress or use for the lots pic
   assert.deepEqual(L.lotInspections(records, { uuid: 'lot-9' }).map(i => i.change), ['First inspection recorded']);
   assert.deepEqual(L.lotInspections(records, fresh), []);
 });
+
+test('plan tools: a revision as its own site, the print area, and a block renumbered from where its lots sit, are written like the phone', () => {
+  const plan = (uuid, siteName, version, isActive) => ({ uuid, type: 'sdp_plans', siteName, version, isActive, planName: `Plan ${uuid}` });
+  // From a first site without a name: the plan leaves as version 1, in use, and the site it leaves is named on its other plans.
+  const plans = [plan('a', '', 1, 0), plan('b', '', 2, 1), plan('c', 'Phase 9', 1, 1)];
+  assert.deepEqual(L.planOwnSite(plans, plans[1], ' Phase 2 ', ' Phase 1 '), [
+    [plans[1], { siteName: 'Phase 2', version: 1, isActive: 1 }, { actionType: 'Project Edit', details: 'Made SDP Plan v2 of Phase 1 its own site: Phase 2',
+      oldValue: 'Site: Phase 1, Version: 2', newValue: 'Site: Phase 2, Version: 1' }],
+    [plans[0], { siteName: 'Phase 1' }, null]]);
+  assert.deepEqual(L.planOwnSite(plans, plans[1], 'Phase 2').map(([p, , audit]) => [p.uuid, audit.oldValue]), [['b', 'Site: Main site, Version: 2']]);
+  // From a named site only the plan changes.
+  const named = [plan('d', 'East', 1, 0), plan('e', 'East', 2, 1)];
+  assert.deepEqual(L.planOwnSite(named, named[1], 'West', 'ignored').map(([p, changes, audit]) => [p.uuid, changes, audit.details]),
+    [['e', { siteName: 'West', version: 1, isActive: 1 }, 'Made SDP Plan v2 of East its own site: West']]);
+
+  // The print area: the box between two opposite corners, whichever two were clicked; a box with no width is not one.
+  assert.equal(L.planFrame([0.8, 0.25], [0.1, 0.75]), '0.1000,0.2500,0.8000,0.7500');
+  assert.deepEqual(L.parseFrame(L.planFrame([0, 0], [1, 1])), [0, 0, 1, 1]);
+  assert.equal(L.parseFrame(L.planFrame([0.5, 0.5], [0.5, 0.9])), null);
+
+  // A block of two rows of four lots (10 apart in a row, the rows 20 apart), listed top, bottom, top, bottom...
+  const block = [0, 1, 2, 3].flatMap(i => [[i * 10, 0], [i * 10, 20]]);
+  assert.deepEqual(L.blockNumbers(block, 1), [1, 2, 3, 4, 5, 6, 7, 8]); // odd along the top row, even along the bottom
+  assert.deepEqual(L.blockNumbers(block, 1, true), [1, 8, 2, 7, 3, 6, 4, 5]); // out along the top row, back along the bottom
+  assert.deepEqual(L.blockNumbers(block, 1, false, true), [7, 8, 5, 6, 3, 4, 1, 2]);
+  assert.deepEqual(L.blockNumbers(block, 1, false, false, true), [2, 1, 4, 3, 6, 5, 8, 7]);
+  assert.deepEqual(L.blockNumbers(block, 11, true, true, true), [15, 14, 16, 13, 17, 12, 18, 11]);
+  // The same block standing upright: the rows run down the page.
+  assert.deepEqual(L.blockNumbers(block.map(([x, y]) => [y, x]), 1), [2, 1, 4, 3, 6, 5, 8, 7]);
+  assert.deepEqual(L.blockNumbers([[5, 5]], 7), [7]);
+  assert.deepEqual(L.blockNumbers([], 1), []);
+
+  const who = { user: 'Engr. Web', at: '2026-11-13 10:00' };
+  const lot = (uuid, blockNumber, lotNumber, extra = {}) => ({ uuid, type: 'sdp_lots', blockNumber, lotNumber, ...extra });
+  const found = [lot('l1', '7', '1', { description: 'Auto-detected' }), lot('l2', '7', '2', { description: 'Corner lot' })];
+  assert.deepEqual(L.lotsRenumbered(found, [12, 11], '3', '7', who), [
+    [found[0], { blockNumber: '3', lotNumber: '12', description: 'Renumbered to the plan', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 10:00' },
+      { actionType: 'Lot Geometry Changed', details: 'Renumbered 2 lots of Block 7', oldValue: 'Block 7', newValue: 'Block 3, Lots 11-12' }],
+    [found[1], { blockNumber: '3', lotNumber: '11', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 10:00' }, null]]);
+  assert.deepEqual(L.lotsRenumbered([lot('l3', '', '')], [5], '4', '', who)[0][2],
+    { actionType: 'Lot Geometry Changed', details: 'Numbered 1 unassigned lots', oldValue: 'Unassigned', newValue: 'Block 4, Lots 5-5' });
+
+  assert.deepEqual(L.renumberNotes([lot('a', '1', '1'), lot('b', '1', '1'), lot('c', '', ''), lot('d', '', '', { lotUse: 'Open Space' }), lot('e', '2', '1')]),
+    ['1 lot has no block and lot yet.', 'Used twice: B1-L1']);
+  assert.deepEqual(L.renumberNotes([lot('a', '1', '1')]), []);
+});

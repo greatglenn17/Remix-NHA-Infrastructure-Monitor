@@ -88,6 +88,24 @@ is read only.
     app's "Document Deletion" audit entry. The records under the plan go first, in batches, then the plan, so a delete
     that stops partway leaves the plan listed and Delete plan again finishes it. A site
     with an earlier revision then shows that one.
+  - **Print area**, for anyone who can edit the project (`L.planFrame`): the whole page is shown with a dashed box
+    around what prints now; click one corner of the plan area, then the opposite corner, or pick **Whole page** or
+    **Fit to lots** (no saved frame: the box around the lots). The frame is saved on the plan as the phone saves it
+    (`frame`, four page fractions), on a turned plan too, and nothing is logged, as on the phone. The viewer, the
+    print and the phone all show the plan cut to it.
+  - **Make v_n_ its own site**, for the `L.canManagePlans` roles (`ownSiteForm`, `L.planOwnSite`): the plan on screen,
+    uploaded as a revision, becomes version 1, in use, of a new site, and its lots, progress and inspections go with
+    it. When the site it leaves has no name yet, that site is named too (on its other plans). One write, with the
+    app's "Project Edit" audit entry. The phone's Undo for this is not here: to put a plan back, ask on the phone.
+- **Renumber Block _n_** (or **Number lots**, for a lot without a name) on a lot's card is the app's renumber panel
+  (`renumCard`, `L.blockNumbers`, `L.lotsRenumbered`): the lot's whole block is picked, and a click on the plan adds
+  a lot or takes one out. Type the block as the plan names it and its first lot, pick odd / even rows or
+  consecutive, and flip the end or the row it starts from; each lot shows the number it would get, worked out from
+  where the lots sit on the plan as it is turned (`BlockNumbering` on the phone, ported line for line). **Save
+  numbers** writes the block and lot numbers in one write with the app's one "Lot Geometry Changed" entry, marks a
+  found lot as checked against the plan, and leaves the panel open for the next block. It warns about names two lots
+  share and about other lots already in the block typed, and does not stop either, as on the phone. The phone's line
+  about blocks that still have the app's numbers is left out (the website does not draw their dashed outline).
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
   name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
   current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
@@ -308,5 +326,4 @@ touched by this command.
 
 ## Not on the site yet
 
-On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, roads,
-renumbering a block, the plan's print frame, and making a revision its own site.
+On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap, moving a lot's corners, and roads.
