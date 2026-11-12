@@ -607,3 +607,58 @@ test('lot form: the progress, photos and billing it saves, and the audit entries
   assert.deepEqual(undo.audits.map(a => a.details), ['Updated Lot Progress (Road Lot 4) to 50% (Under Construction)', 'Updated M2 billing for Road Lot 4 to NOT BILLED (Ref: )']);
   assert.equal(undo.audits[0].oldValue, 'Progress: 50%, Status: Under Construction');
 });
+
+test('new weekly report: the week, the lines from the chart or the scope, the record, the project fields and the audit entry', () => {
+  // The week: Saturday to Friday, labelled as the phone does, and read back by the site's own week reader.
+  assert.deepEqual(['2026-02-14', '2026-02-18', '2026-02-20', '2026-02-21'].map(L.weekSaturday), ['2026-02-14', '2026-02-14', '2026-02-14', '2026-02-21']);
+  assert.equal(L.weekLabel('2026-10-31'), 'Oct 31, 2026 - Nov 6, 2026');
+  assert.equal(L.weekDays(L.weekLabel('2026-02-14'))[6], '2026-02-20');
+
+  // With a chart: weights by amount, targets its plan on the week's last day (contract day 51), not typed.
+  const project = { dateStarted: '2026-01-01', completionDateOriginal: '2026-12-31', completionDateRevised: '', scopeOfWork: 'ignored with a chart',
+    barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) };
+  const lines = L.weeklyLines(project, [], '2026-02-20');
+  assert.deepEqual(lines, [{ name: 'Land Acquisition', weightPct: 0, targetPct: 0 }, { name: 'Land Development', weightPct: 60, targetPct: 51 }, { name: 'Housing Construction', weightPct: 40, targetPct: 1 }]);
+
+  // Without one: the Scope of Works' weights and typed targets; no scope at all leaves every weight at 0.
+  const scope = JSON.stringify([{ name: 'Land development', amount: 1, weightPct: 70 }, { name: 'Housing units', amount: 1, weightPct: 30 }]);
+  assert.deepEqual(L.weeklyLines({ dateStarted: '2026-01-01', scopeOfWork: scope }, [], '2026-02-20').map(l => [l.weightPct, l.targetPct]), [[0, null], [70, null], [30, null]]);
+  assert.deepEqual(L.weeklyLines({ scopeOfWork: '' }, [], '2026-02-20').map(l => [l.weightPct, l.targetPct]), [[0, null], [0, null], [0, null]]);
+
+  const f = {
+    first: '2026-02-14',
+    lines: [{ ...lines[0], target: '0.00', actual: '' }, { ...lines[1], target: '51.00', actual: '50' }, { ...lines[2], target: '1.00', actual: '' }],
+    manpower: [{ designation: ' Foreman ', count: '2' }, { designation: '', count: '5' }, { designation: 'Labor', count: '' }],
+    equipment: [{ description: 'Backhoe', count: '1', status: 'Idle' }],
+    activities: [{ from: 'Monday', to: 'Wednesday', description: 'Excavation', remarks: ' ok ' }, { from: 'Friday', to: '', description: 'Rebar', remarks: '' }, { from: 'Monday', to: '', description: ' ', remarks: 'x' }],
+    issues: [{ description: 'Rain', actionTaken: 'Moved concreting', actionBy: 'Contractor/Developer' }],
+  };
+  assert.deepEqual(L.weeklyErrors(f), []);
+  assert.deepEqual(L.weeklyErrors({ first: '', lines: [{ name: 'Land Development', target: '101', actual: 'abc' }] }),
+    ['Pick the first day of the week.', 'Land Development: target must be 0 to 100%.', 'Land Development: actual must be 0 to 100%.']);
+
+  const report = L.newWeeklyReport(f, project, 'Engr. Web');
+  const record = report.build({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'me', now: 1794470800000 });
+  const data = JSON.parse(record.data);
+  assert.deepEqual({ ...record, data: null }, { uuid: 'u1', type: 'weekly_reports', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 1794470800000, updatedByUid: 'me', isDeleted: false, data: null });
+  assert.equal(data.reportingWeek, 'Feb 14, 2026 - Feb 20, 2026');
+  assert.deepEqual([data.daysElapsed, data.remainingDays], [51, 314]);
+  assert.ok(Math.abs(data.targetAccomplishmentPct - 31) < 1e-9);
+  assert.equal(data.actualAccomplishmentPct, 30);
+  assert.deepEqual(JSON.parse(data.manpowerJson), [{ designation: 'Foreman', count: 2, remarks: '' }, { designation: 'Labor', count: 0, remarks: '' }]);
+  assert.deepEqual(JSON.parse(data.equipmentJson), [{ description: 'Backhoe', count: 1, status: 'Idle', remarks: '' }]);
+  assert.deepEqual(JSON.parse(data.activitiesJson), [{ day: 'Monday - Wednesday', description: 'Excavation', remarks: 'ok' }, { day: 'Friday', description: 'Rebar', remarks: '' }]);
+  assert.deepEqual(JSON.parse(data.issuesJson), [{ description: 'Rain', actionTaken: 'Moved concreting', remarks: '', actionBy: 'Contractor/Developer' }]);
+  assert.deepEqual([data.documentsIssuedReceivedJson, data.attachedPhotoUrlsJson, data.photoDetailsJson, data.submittedByStaff, data.createdAtTimestamp, data._weather],
+    ['[]', '[]', '{}', 'Engr. Web', 1794470800000, []]);
+  // The site reads it back as its three lines, and offers all 7 days for weather.
+  assert.deepEqual(L.accomplishmentOf(data.accomplishmentItemsJson).map(a => [a.itemDescription, a.weightPct, a.targetPct, a.actualPct]),
+    [['Land Acquisition', 0, 0, 0], ['Land Development', 60, 51, 50], ['Housing Construction', 40, 1, 0]]);
+  assert.deepEqual(L.weatherForm(data).map(d => d.logged), Array(7).fill(false));
+
+  assert.deepEqual(report.projectFields, { targetAccomplishment: data.targetAccomplishmentPct, actualAccomplishment: 30 });
+  assert.deepEqual(report.audit, { actionType: 'Report Creation', details: 'Submitted Weekly Report for Feb 14, 2026 - Feb 20, 2026',
+    newValue: `Week: Feb 14, 2026 - Feb 20, 2026, Target: ${data.targetAccomplishmentPct}%, Actual: 30%` });
+  // No dates on the project: day counts are 0, as on the phone.
+  assert.deepEqual((({ daysElapsed, remainingDays }) => [daysElapsed, remainingDays])(JSON.parse(L.newWeeklyReport(f, {}, 'x').build({}).data)), [0, 0]);
+});

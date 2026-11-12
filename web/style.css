@@ -647,6 +647,17 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .edit-form h3 { margin: 6px 0 -10px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--link); }
 .edit-form h3 + p { margin: 0; font-size: 13px; }
 .order-fields { display: grid; gap: 14px; }
+.weekly-add { margin: 16px 0 12px; }
+.wk-form { width: min(680px, calc(100vw - 32px)); }
+.wk-rows { display: grid; gap: 8px; }
+.wk-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.wk-row legend { padding: 0 4px; font-size: 13px; color: var(--text-2); }
+.wk-row .field { flex: 1 1 150px; }
+.wk-row .field.n { flex: 0 0 76px; }
+.wk-row .field.full { flex-basis: 100%; }
+.wk-row .icon-btn { margin-left: auto; }
+.wk-add { justify-self: start; margin-top: -6px; }
+.wk-total { margin: 0; font-weight: 600; }
 .order-fields fieldset, fieldset.lot-billing { margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .order-fields legend, .lot-billing legend { padding: 0 4px; font-size: 13px; color: var(--text-2); }
 .field textarea, .field select { font: 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }
