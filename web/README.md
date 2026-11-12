@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding a weekly report (Progress → Weekly → New weekly report) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -76,9 +76,16 @@ is read only.
   the week (7 days from the first day picked, the Saturday of this week to start), the three accomplishment lines,
   manpower, equipment, activities and issues. With an approved bar chart the targets are its plan for the week's last
   day and are not typed; without one they are typed, weighted by the Scope of Works. Save adds the `weekly_reports`
-  record (`L.newWeeklyReport`), sets the project's target and actual accomplishment as the phone does, and writes the
+  record (`L.newWeeklyReport`), sets the project's target and actual accomplishment, and writes the
   app's "Report Creation" audit entry. The new report has no photos and no weather log: add them with **Add photos**
   and **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
+- **Edit** on a weekly report opens the same form on the saved report (`L.weeklyStart`, `L.editedWeeklyReport`), with
+  the app's "Edited Weekly Report" audit entry. The project's target and actual follow a report added or edited here
+  only when no other report is for a later week, so a late entry or a fix to an older week does not set the project
+  back (the phone sets them from any report saved). The week's label is kept unless its first day is changed; then weather logged for days outside the new week
+  is dropped. Photos, the rest of the weather, and remarks the form has no box for are left as saved. **Delete
+  report** (Super Admin and Engineer Admins, as on the phone) asks first, marks the record deleted with the app's
+  "Deleted Weekly Report" audit entry, and moves the project's site photo to the newest one left.
 - **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
@@ -191,4 +198,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Editing or deleting a weekly report's details; a lot's name and use, formal lot inspections, and updating several lots at once.
+A lot's name and use, formal lot inspections, and updating several lots at once.

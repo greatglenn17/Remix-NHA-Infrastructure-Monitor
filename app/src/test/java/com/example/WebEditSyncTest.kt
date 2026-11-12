@@ -374,4 +374,52 @@ class WebEditSyncTest {
         assertEquals(50.0, com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson).single { it.itemDescription == "Land Development" }.actualPct, 0.0)
         assertEquals("no weather until it is logged", 0, db.reportDao().getDailyWeatherForProject(projectId).first().size)
     }
+
+    /** web/logic.js editedWeeklyReport: a report's week moved a day and its figures changed on the website, then the report deleted there. */
+    @Test
+    fun websiteWeeklyReportEdit_thenDelete_reachThePhone() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 0.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        val report = com.example.data.model.WeeklyReport(
+            projectId = projectId, reportingWeek = "Oct 31, 2026 - Nov 6, 2026", daysElapsed = 98, remainingDays = 55,
+            targetAccomplishmentPct = 40.0, actualAccomplishmentPct = 38.5, manpowerJson = "[]", equipmentJson = "[]",
+            activitiesJson = "[{\"day\":\"Monday\",\"description\":\"Rebar works\"}]", issuesJson = "[]", accomplishmentItemsJson = "[]",
+            documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[\"nhafile:p/a.jpg\"]", submittedByStaff = "Engr. Sample"
+        )
+        val fair = List(24) { "FAIR" }.joinToString(",")
+        com.example.data.local.WeeklyReportWeatherWriter(db, db.reportDao()).create(report, listOf("10-31", "11-01", "11-02", "11-03", "11-04", "11-05", "11-06").map {
+            com.example.data.model.DailyHourlyWeather(projectId = projectId, date = "2026-$it", dayOfWeek = "x", hourlyConditionsCsv = fair)
+        })
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+
+        // The edit: every other field in the record's data stays as the phone uploaded it.
+        val cloud = recordSync.buildDocument("weekly_reports", report.uuid, "phone")!!
+        val data = JSONObject(cloud["data"] as String)
+        data.put("reportingWeek", "Nov 1, 2026 - Nov 7, 2026").put("daysElapsed", 99).put("remainingDays", 54).put("actualAccomplishmentPct", 41)
+            .put("activitiesJson", "[{\"day\":\"Monday - Wednesday\",\"description\":\"Rebar works\",\"remarks\":\"\"}]")
+        data.getJSONArray("_weather").remove(0) // Oct 31 is outside the new week
+        val revision = (cloud["revision"] as Long) + 1
+        val edited = cloud + mapOf("revision" to revision, "updatedAt" to 4_102_444_800_000L, "updatedByUid" to "web", "data" to data.toString())
+        recordSync.applyRemote(listOf(edited))
+
+        val row = db.reportDao().getWeeklyReportsForProject(projectId).first().single()
+        assertEquals("Nov 1, 2026 - Nov 7, 2026", row.reportingWeek)
+        assertEquals(99, row.daysElapsed)
+        assertEquals(41.0, row.actualAccomplishmentPct, 0.0)
+        assertEquals("the photos stay", "[\"nhafile:p/a.jpg\"]", row.attachedPhotoUrlsJson)
+        assertEquals("Engr. Sample", row.submittedByStaff)
+        assertEquals(6L, long("SELECT COUNT(*) FROM daily_hourly_weather WHERE projectId = ?", projectId))
+        assertEquals(0L, long("SELECT COUNT(*) FROM daily_hourly_weather WHERE date = '2026-10-31'"))
+
+        recordSync.applyRemote(listOf(edited + mapOf("revision" to revision + 1, "updatedAt" to 4_102_444_800_001L, "isDeleted" to true)))
+
+        assertEquals("the report is gone", 0, db.reportDao().getWeeklyReportsForProject(projectId).first().size)
+        assertEquals("and its weather with it", 0L, long("SELECT COUNT(*) FROM daily_hourly_weather WHERE projectId = ?", projectId))
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }
