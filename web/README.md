@@ -43,6 +43,13 @@ is read only.
   storage.rules already lets an assigned writer add these, and uploads through the Firebase SDK need no bucket CORS
   setting (that is only for reading file bytes). An attached file can be replaced, or removed with the "Remove the
   attached file" box; either way the old file stays in the bucket.
+- **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
+  Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
+  as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
+  the app's "Edited Weekly Report" audit entry and, in the same transaction, points the project's card photo
+  (`latestUpdatePhotoUrl` on `projects/{id}`, one revision up) at the newest report photo left, as the app's
+  `refreshSitePhoto` does. This is the site's only write to a project document. A photo added here has no time or GPS
+  (the site does not read EXIF) and no geo-tag stamp.
 - **Delete request** and **Delete letter**, in those forms, ask first, then mark the record `isDeleted` (one revision up)
   as a phone's delete is uploaded, with the app's audit entry for that deletion.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
@@ -148,4 +155,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, weekly reports and orders; editing lots; weekly report photos.
+Adding developer requests, weekly reports and orders; editing lots.
