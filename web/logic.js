@@ -1676,12 +1676,33 @@ export function editedProject(project, f) {
   };
   const was = fieldsOf(projectStart(project, ''));
   const fields = Object.fromEntries(Object.entries(fieldsOf(f)).filter(([k, v]) => was[k] !== v));
+  return { fields, audit: projectEditAudit(project, fields) };
+}
+
+/** updateProjectMaster's audit entry for `fields` saved on `project`. */
+export function projectEditAudit(project, fields) {
   const after = { ...project, ...fields };
   return {
-    fields,
-    audit: {
-      actionType: 'Project Edit', details: `Updated project master: ${after.name}`,
-      oldValue: `Status: ${displayStatus(project)}`, newValue: `Status: ${displayStatus(after)}, Revised Cost: ₱${Number(after.contractCostRevised) || 0}`,
-    },
+    actionType: 'Project Edit', details: `Updated project master: ${after.name}`,
+    oldValue: `Status: ${displayStatus(project)}`, newValue: `Status: ${displayStatus(after)}, Revised Cost: ₱${Number(after.contractCostRevised) || 0}`,
   };
+}
+
+/** SignatoriesDialog's suggestions for each signer's position and office; any other text can be typed. */
+export const SIGNATORY_POSITIONS = {
+  prepared: ['Senior Engineer A', 'Senior Architect A', 'Supervising Engineer A', 'Principal Engineer C', 'Principal Engineer A', 'Principal Architect A'],
+  weeklyChecked: ['Principal Engineer A', 'Principal Architect A'], weeklyNoted: ['District Manager', 'Officer-in-Charge'],
+  checked: ['District Manager', 'Officer-in-Charge'], noted: ['Regional Manager', 'Officer-in-Charge'],
+};
+export const SIGNATORY_OFFICES = ['Bulacan District Office', 'Region 3 Office'];
+
+/**
+ * saveSignatories: the project fields that differ from `s`, a weekly or a monthly report's signatories as the form has
+ * them (trimmed). Prepared by is shared; the weekly report has its own checker and noter. Empty when nothing differs.
+ */
+export function signatoryFields(project, s, weekly) {
+  const [checked, noted] = weekly ? ['weeklyChecked', 'weeklyNoted'] : ['checked', 'noted'];
+  const all = [['prepared', 'prepared'], [checked, 'checked'], [noted, 'noted']].flatMap(([field, key]) =>
+    ['Name', 'Position', 'Office'].map(part => [`${field}By${part}`, String(s[`${key}${part}`] ?? '').trim()]));
+  return Object.fromEntries(all.filter(([k, v]) => (project[k] ?? '') !== v));
 }
