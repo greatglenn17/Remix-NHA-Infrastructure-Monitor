@@ -27,6 +27,8 @@ async function account(email, claims) {
     uid = (await call(`${AUTH}/accounts:signInWithPassword?key=demo`, 'POST', { email, password: PASSWORD })).localId;
   }
   await call(`${AUTH}/projects/${PROJECT}/accounts:update`, 'POST', { localId: uid, customAttributes: JSON.stringify(claims) }, OWNER);
+  // The profile a phone saves at sign-up: Manage users and Assign people list accounts from here.
+  await put(`users/${uid}`, { email, role: claims.role, approved: true });
   return uid;
 }
 

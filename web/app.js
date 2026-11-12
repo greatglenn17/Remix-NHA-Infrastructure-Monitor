@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
+  getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -603,6 +603,61 @@ function projectForm(c = null) {
   d.showModal();
 }
 
+/**
+ * AssignStaffField, on its own: the Super Admin ticks the accounts this project is assigned to. Save writes the list
+ * and their names to the project with the "Project Edit" audit entry; the cloud function (syncProjectAssignmentToRecords)
+ * then copies the list to the project's records, as after an assignment made on a phone.
+ */
+async function assignForm(c) {
+  const was = c.project.assignedUids || [];
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Assign people</h2>
+    <p class="muted">Ticked accounts can open this project. What they can change in it still depends on their role.</p>
+    <div class="assign-list" data-list><p class="muted">Loading accounts…</p></div>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn" disabled>Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn'), list = d.querySelector('[data-list]');
+  const values = () => [...list.querySelectorAll('input:checked')].map(i => i.value);
+  let initial = '[]';
+  const done = () => { d.close(); d.remove(); };
+  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the assignment?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  document.body.append(d);
+  d.showModal();
+  let users;
+  try {
+    users = L.assignableUsers((await getDocs(collection(db, 'users'))).docs.map(u => L.userRow(u.id, u.data())), was);
+  } catch {
+    // Without the list a save could only clear the project, so there is no Save (the phone's read-only field).
+    list.innerHTML = '';
+    err.textContent = 'The account list could not be loaded, so the assignment cannot be changed right now.';
+    return;
+  }
+  list.innerHTML = users.map(u => `<label class="check"><input type="checkbox" value="${esc(u.uid)}"${was.includes(u.uid) ? ' checked' : ''}>
+    <span>${esc(u.name)}${u.role ? `<small class="muted">${esc(ROLE_LABELS[u.role] || u.role)}</small>` : ''}</span></label>`).join('') || '<p class="muted">No registered accounts</p>';
+  initial = JSON.stringify(values());
+  save.disabled = false;
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fields = L.assignmentFields(c.project, values(), users);
+    if (!Object.keys(fields).length) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // The audit entry carries the new list, like every record of the project once the function has run.
+      await addRecords(c, [[ids => L.auditRecord({ ...ids, assignedUids: fields.assignedUids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot assign people to this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+}
+
 function redrawDashboard() {
   const grid = document.getElementById('grid');
   if (!grid || !s.user) return;
@@ -797,6 +852,8 @@ function drawProject(page) {
   if (document.getElementById('issue-results')) bindIssues(c);
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
+  const projectAssign = document.getElementById('project-assign');
+  if (projectAssign) projectAssign.onclick = () => assignForm(c);
   const weeklyAdd = document.getElementById('weekly-add');
   if (weeklyAdd) weeklyAdd.onclick = () => weeklyForm(c);
   main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
@@ -851,7 +908,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
       <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`,
-    '', `${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
+    '', `${L.canAssign(s.claims) ? `<button class="text-btn" id="project-assign">${icon('person', 'sm')}Assign</button>` : ''}
+      ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
       <a class="text-btn" href="#/p/${esc(page.id)}/print/profile">${icon('print', 'sm')}Print</a>`);
 
   // Key dates as a timeline: filled = passed, hollow = ahead, red (late) = a completion date passed on an unfinished project.
