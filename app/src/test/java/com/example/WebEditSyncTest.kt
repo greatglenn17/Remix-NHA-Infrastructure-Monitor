@@ -255,4 +255,36 @@ class WebEditSyncTest {
         assertEquals("off the core checklist", false, order.isCoreChecklist)
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
+
+    /** web/app.js editOrder: an order approved on the website (revision up by one), then deleted there. */
+    @Test
+    fun websiteOrderApproval_thenDelete_reachThePhone() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 51_500_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        val uuid = "5e4d3c2b-1a0f-4e9d-8c7b-6a5f4e3d2c1b"
+        fun order(revision: Long, status: String, remarks: String, deleted: Boolean = false) = mapOf(
+            "uuid" to uuid, "type" to "pending_documents", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to revision, "updatedAt" to 1_794_292_093_231L + revision, "updatedByUid" to "web", "isDeleted" to deleted,
+            "data" to """{"documentName":"Work Suspension Order No. 3","status":"$status","remarks":"$remarks","isCoreChecklist":0,"fileUrl":""}"""
+        )
+        recordSync.applyRemote(listOf(order(1, "Pending", "Duration: 10 Days | Effectivity: 2026-11-01 | End: 2026-11-10")))
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+
+        recordSync.applyRemote(listOf(order(2, "Approved", "Duration: 12 Days | Effectivity: 2026-11-01 | End: 2026-11-12 | Typhoon")))
+
+        val approved = db.projectDao().getPendingDocumentsForProject(projectId).first().single { it.uuid == uuid }
+        assertEquals("Approved", approved.status)
+        assertEquals("Duration: 12 Days | Effectivity: 2026-11-01 | End: 2026-11-12 | Typhoon", approved.remarks)
+        assertEquals("Work Suspension Order No. 3", approved.documentName)
+
+        recordSync.applyRemote(listOf(order(3, "Approved", "Duration: 12 Days | Effectivity: 2026-11-01 | End: 2026-11-12 | Typhoon", deleted = true)))
+
+        assertEquals("the order is gone", 0, db.projectDao().getPendingDocumentsForProject(projectId).first().count { it.uuid == uuid })
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
 }

@@ -499,3 +499,27 @@ test('deleting a billing: the tombstone, later balances given back, and the audi
   assert.deepEqual(L.deletedPaymentAudit(payments[1]),
     { actionType: 'Payment Deletion', details: 'Deleted billing: b (DV)', oldValue: 'DV: DV, Gross: ₱200.00', newValue: '' });
 });
+
+test('order status: the remarks keep their schedule fields, the End moves the days, and the audit entry is the phone\'s', () => {
+  // The phone's own cases (OrderFixesTest, ProjectScheduleTest).
+  const ws = 'Duration: 10 Days | Effectivity: 2026-06-01 | End: 2026-06-11';
+  assert.equal(L.keepOrderFields(ws, ws), ws);
+  assert.equal(L.keepOrderFields(ws, 'Typhoon'), `${ws} | Typhoon`);
+  assert.equal(L.keepOrderFields(ws, 'Duration: 12 Days'), 'Effectivity: 2026-06-01 | End: 2026-06-11 | Duration: 12 Days');
+  assert.equal(L.keepOrderFields('Reason: Added culvert | Date Approved: 2026-06-02', 'Reason: Bigger culvert'), 'Date Approved: 2026-06-02 | Reason: Bigger culvert');
+  assert.equal(L.keepOrderFields('Reason: Rain', 'Note'), 'Note');
+  assert.equal(L.keepOrderFields(`${ws} | Reason: ROW | Items: Land Acquisition; Roadworks`, ''), `${ws} | Items: Land Acquisition; Roadworks`);
+  assert.equal(L.keepOrderFields(undefined, ' Note '), 'Note');
+  const old = 'Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24 | Reason: ROW';
+  assert.equal(L.suspensionEnd(old), '2026-08-23');
+  assert.equal(L.suspensionEnd('Reason: Rain'), '');
+  assert.equal(L.withEndDate(old, '2026-09-02'), 'Duration: 100 Days | Effectivity: 2026-05-26 | End: 2026-09-02 | Reason: ROW');
+  assert.equal(L.withEndDate(old, '2026-05-01'), old);
+  assert.equal(L.withEndDate(old, ''), old);
+  const order = { documentName: 'Work Suspension Order No. 1', status: 'Pending' };
+  assert.deepEqual(L.orderStatusAudit(order, 'Approved'),
+    { actionType: 'Document Upload', details: 'Updated document status for Work Suspension Order No. 1', oldValue: 'Status: Pending', newValue: 'Status: Approved' });
+  assert.equal(L.orderStatusAudit(order, 'Pending'), null);
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'VIEWER', undefined].map(role => L.canApprove({ role })), [true, true, false, false, false]);
+  assert.equal(L.ORDER_STATUSES.at(-1), 'Approved');
+});

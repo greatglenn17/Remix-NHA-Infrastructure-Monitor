@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging and editing issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status (Documents) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -43,6 +43,16 @@ is read only.
   continues (the highest-numbered one unless another is picked) and starts the day after it and its continuances end;
   the End date follows the days typed; a Partial suspension picks the bar chart items it pauses; a time extension for
   a suspension starts with the days the approved suspensions stopped work.
+- **Add** on the order cards (Documents → Suspension / Resumption, Time Extensions, Variation Orders) is the app's Add
+  Document form for that kind of order: the same order details as Add request, filed as Pending with the app's
+  "Document Upload" audit entry.
+- **Update status** on an order is the app's Update status form: Pending, Submitted, Signed, Notarized or Approved, and
+  the remarks. A suspension's End date moves its Duration, and a Duration, Effectivity, End, Date Approved or Items
+  field dropped from the remarks is put back (`L.keepOrderFields`), so the schedule and the cost keep reading it. As on
+  the phone, only the Super Admin and Engineer Admins set or undo Approved and delete an order; a Field Engineer
+  updates one that is not yet approved. A changed status gets the app's "Updated document status" audit entry; a
+  remarks-only edit and a delete get none, as on the phone. A suspension's form also has **Add continuance of work
+  suspension**. The phone has no scan on an order, so none is attached here.
 - **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
   developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
   keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
@@ -162,5 +172,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding weekly reports and orders (an order is filed only with a developer request); editing or approving orders;
-editing lots.
+Adding weekly reports; adding or editing a related file; editing lots.
