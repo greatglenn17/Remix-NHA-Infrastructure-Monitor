@@ -946,7 +946,16 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   const vo = [{ documentName: 'Variation Order No. 1 (Additive) - PHP 500,000.00', status: 'Approved' }];
   two[1].label = 'Revised No. 1';
   assert.deepEqual(L.chartErrors(two, saved, vo), []);
-  assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: add the Scope of Works items to the project first']);
+  assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: import the Excel file, or add the Scope of Works items to the project first']);
+  // An imported sheet (chart-excel.js) replaces a chart's items; its notes say what was read and where a bar is not its Duration.
+  const sheet = { name: 'Revised', items: [{ name: 'Mobilization', amount: 1000, bars: [[1, 10], [41, 45]] }, { name: 'Earthworks', amount: 3000.5, bars: [[11, 40]] }, { name: 'Turnover', amount: 999.5, bars: [] }],
+    durations: { Mobilization: 10, Earthworks: 30 } };
+  assert.deepEqual(L.draftItems(sheet.items), [
+    { name: 'Mobilization', amount: 1000, bars: [{ sm: '1', sc: '5', em: '1', ec: '10' }, { sm: '2', sc: '15', em: '2', ec: '15' }] },
+    { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sc: '15', em: '2', ec: '10' }] },
+    { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sc: '', em: '', ec: '' }] }]);
+  assert.deepEqual(L.importNotes(sheet), ['Read 3 items from the sheet "Revised".', 'Mobilization: the bar covers 15 days but its Duration says 10.']);
+  assert.deepEqual([[0, 5000000], [0, 5500000], [1, 5500000], [1, 5000000], [1, 5200000]].map(([i, total]) => L.chartTotalMatches(i, total, project, vo)), [true, false, true, true, false]);
   assert.equal(L.chartJson([]), '');
   assert.deepEqual([L.chartAudit(json), L.chartAudit('')], [{ actionType: 'Bar Chart', details: 'Saved the approved bar chart' }, { actionType: 'Bar Chart', details: 'Removed the approved bar chart' }]);
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].map(role => L.canEditChart(project, 'u1', { role })), [true, true, false]);

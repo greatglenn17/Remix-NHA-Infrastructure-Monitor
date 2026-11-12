@@ -13,6 +13,7 @@ import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uplo
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
 import * as P from './print.js';
+import { readChartWorkbook } from './chart-excel.js';
 
 // `?emulator` on localhost talks to `firebase emulators:start --project demo-nha` instead of the live project.
 const emulator = new URLSearchParams(location.search).has('emulator') && ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -980,21 +981,24 @@ const curveTable = version => table(['Month', { text: 'Monthly', num: true }, { 
  * BarChartDialog: the approved bar chart, per Scope of Works item the bar(s) from month and cell to month and cell. A
  * revised chart is added with the date it takes effect; the earlier ones stay. Save writes the project's barChartJson,
  * one revision up, with the app's "Bar Chart" audit entry.
- * shortcut: no Excel import here, the items come from the Scope of Works or the saved chart; import on the phone until it is added.
+ * Import from Excel fills the selected chart's items and bars from the contractor's workbook (chart-excel.js), as the app does.
  */
 function barChartForm(c) {
   const { project, documents } = c;
   const drafts = L.chartDrafts(project);
   if (!drafts) { alert('Set the project\'s start date first; the bar chart counts its days from it.'); return; }
-  let selected = drafts.length - 1;
+  let selected = drafts.length - 1, notes = [], sheets = []; // what the last import said; the chart sheets of a workbook with several
   const initial = L.chartJson(drafts);
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
   d.innerHTML = `<form novalidate>
     <h2>Approved bar chart</h2>
     <div class="chips" role="group" aria-label="Chart" data-tabs></div>
-    <p class="muted small">Enter each item's bar as drawn: From month and cell, To month and cell. A month is 30 days; its cells are 5, 10, 15, 20, 25 and 30,
-      counted from the start date. The chart must total the contract amount. The target % then follows this chart every day.</p>
+    <p class="muted small">Import the contractor's Excel file, or enter each item's bar as drawn: From month and cell, To month and cell. A month is 30 days;
+      its cells are 5, 10, 15, 20, 25 and 30, counted from the start date. The chart must total the contract amount. The target % then follows this chart every day.</p>
+    <label class="field" data-import>Import from Excel (.xlsx)<input type="file" data-file accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    <ul class="bc-errors" data-notes aria-live="polite"></ul>
+    <div data-sheets></div>
     <ul class="bc-errors" data-errors aria-live="polite"></ul>
     <div class="bc-body" data-body></div>
     <p class="error" role="alert"></p>
@@ -1002,6 +1006,7 @@ function barChartForm(c) {
   </form>`;
   const form = d.querySelector('form'), tabs = d.querySelector('[data-tabs]'), body = d.querySelector('[data-body]'), errs = d.querySelector('[data-errors]');
   const err = d.querySelector('p.error'), save = d.querySelector('.actions .btn');
+  const total = items => items.reduce((t, x) => t + x.amount, 0);
   const tabName = i => drafts[i].label.trim() || `Chart ${i + 1}`;
   const cells = cur => ['', 5, 10, 15, 20, 25, 30].map(n => `<option${String(n) === cur ? ' selected' : ''}>${n}</option>`).join('');
   const barRow = (b, key, many) => `<div class="wk-row" data-bar="${key}">
@@ -1029,6 +1034,13 @@ function barChartForm(c) {
     tabs.innerHTML = drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === selected}">${esc(tabName(i))}</button>`).join('')
       + `<button type="button" data-add-chart>${icon('add_circle', 'sm')}${drafts.length ? 'Revised chart' : 'Add the chart'}</button>`;
     const v = drafts[selected];
+    d.querySelector('[data-import]').hidden = !v;
+    // What was read is a plain note; what went wrong, or a bar that is not its Duration, is in the errors' red.
+    d.querySelector('[data-notes]').innerHTML = notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('');
+    d.querySelector('[data-sheets]').innerHTML = !sheets.length ? '' : `<fieldset class="bc-item"><legend>Which sheet?</legend>
+      ${sheets.map((sh, i) => `<button type="button" class="text-btn" data-sheet="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
+        + (L.chartTotalMatches(selected, total(sh.items), project, documents) ? ' · matches the contract' : ''))}</button>`).join('')}
+      <button type="button" class="text-btn" data-sheet="-1">Cancel</button></fieldset>`;
     body.innerHTML = !v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>' : `
       <label class="field">Name<input data-label value="${esc(v.label)}"></label>
       ${selected === 0 ? `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`
@@ -1049,15 +1061,32 @@ function barChartForm(c) {
     else if (t.dataset.k) { const [i, j] = t.closest('[data-bar]').dataset.bar.split(':'); v.items[i].bars[j][t.dataset.k] = t.value; }
     drawNumbers();
   };
+  const useSheet = sheet => { drafts[selected].items = L.draftItems(sheet.items); notes = L.importNotes(sheet); sheets = []; };
+  form.onchange = async e => {
+    const input = e.target, file = input.matches('[data-file]') && input.files[0], v = drafts[selected];
+    if (!file) return;
+    let found = null;
+    try { if (file.size <= 20 * 1024 * 1024) found = await readChartWorkbook(await file.arrayBuffer()); } catch { /* not a workbook: the note below says so */ }
+    input.value = ''; // so the same file, saved again, can be picked again
+    if (drafts[selected] !== v) return; // another chart was opened meanwhile
+    sheets = [];
+    if (!found) notes = ['That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).'];
+    else if (!found.length) notes = ['No sheet in that file has the ITEM NO. / DESCRIPTION / Amount header with a Month 1 row.'];
+    else if (found.length === 1) useSheet(found[0]);
+    else { notes = []; sheets = found; }
+    draw();
+  };
   form.onclick = e => {
-    const on = sel => e.target.closest(sel), tab = on('[data-tab]'), drop = on('[data-drop-bar]');
+    const on = sel => e.target.closest(sel), tab = on('[data-tab]'), drop = on('[data-drop-bar]'), sheet = on('[data-sheet]'), was = drafts[selected];
     if (tab) selected = +tab.dataset.tab;
+    else if (sheet) { if (sheets[sheet.dataset.sheet]) useSheet(sheets[sheet.dataset.sheet]); else sheets = []; }
     else if (on('[data-add-chart]')) { drafts.push(drafts.length ? L.revisedDraft(drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); selected = drafts.length - 1; }
     else if (on('[data-add-bar]')) drafts[selected].items[on('[data-item]').dataset.item].bars.push(L.emptyBar());
     else if (drop) { const [i, j] = drop.closest('[data-bar]').dataset.bar.split(':'); drafts[selected].items[i].bars.splice(j, 1); }
     // The first chart left always runs from the start date.
     else if (on('[data-drop-chart]')) { drafts.splice(selected, 1); selected = Math.max(selected - 1, 0); if (drafts[0]) drafts[0].effective = project.dateStarted; }
     else return;
+    if (drafts[selected] !== was) { notes = []; sheets = []; } // the notes are about the chart that was open
     draw();
   };
   draw();

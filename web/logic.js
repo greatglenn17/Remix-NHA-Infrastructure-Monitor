@@ -1780,12 +1780,16 @@ const EMPTY_BAR = () => ({ sm: '', sc: '', em: '', ec: '' });
  */
 export function chartDrafts(project) {
   if (isoDay(project.dateStarted) == null) return null;
-  const bar = ([a, b]) => { const [sm, sc] = cellOf(a), [em, ec] = cellOf(b); return { sm: String(sm), sc: String(sc), em: String(em), ec: String(ec) }; };
-  const items = list => list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()] }));
-  const saved = chartVersions(project.barChartJson).map(v => ({ label: String(v.label ?? ''), effective: String(v.effective ?? ''), items: items(v.items || []) }));
-  const drafts = saved.length ? saved : [{ label: 'Original', effective: '', items: items(scopeItems(project.scopeOfWork)) }];
+  const saved = chartVersions(project.barChartJson).map(v => ({ label: String(v.label ?? ''), effective: String(v.effective ?? ''), items: draftItems(v.items || []) }));
+  const drafts = saved.length ? saved : [{ label: 'Original', effective: '', items: draftItems(scopeItems(project.scopeOfWork)) }];
   drafts[0].effective = project.dateStarted;
   return drafts;
+}
+
+/** itemDrafts: a chart's items (saved, from the scope, or read from an Excel sheet) as the form edits them, an item with no bar getting an empty one. */
+export function draftItems(list) {
+  const bar = ([a, b]) => { const [sm, sc] = cellOf(a), [em, ec] = cellOf(b); return { sm: String(sm), sc: String(sc), em: String(em), ec: String(ec) }; };
+  return list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()] }));
 }
 
 /** The "+ Revised chart" tab: the next chart starts as a copy of the last one, with no date yet. */
@@ -1811,18 +1815,17 @@ export const chartJson = drafts => (drafts.length ? JSON.stringify(drafts.map(dr
 /**
  * BarChartDialog's errors, which keep Save off. The original chart must total the original contract amount, a revised
  * one the original or the current (after Variation Orders); a revised chart takes effect after the start date and
- * after the chart before it. A chart with no items (a project with no Scope of Works) is refused here, where there is
- * no Excel import to fill it.
+ * after the chart before it. A chart with no items (no Scope of Works, and nothing imported) is refused here.
  */
 export function chartErrors(drafts, project, docs) {
   const start = isoDay(project.dateStarted), original = originalCost(project), current = currentCost(project, docs);
   return drafts.flatMap((d, i) => {
     const name = d.label.trim() || `Chart ${i + 1}`, date = isoDay(d.effective), total = d.items.reduce((t, x) => t + x.amount, 0);
-    const matches = Math.abs(total - original) < 0.015 || (i > 0 && Math.abs(total - current) < 0.015);
+    const matches = chartTotalMatches(i, total, project, docs);
     const bad = d.items.filter(x => !x.bars.every(draftBar));
     return [
       !d.label.trim() && `${name}: enter a name`,
-      !d.items.length && `${name}: add the Scope of Works items to the project first`,
+      !d.items.length && `${name}: import the Excel file, or add the Scope of Works items to the project first`,
       d.items.length && !matches && `${name}: the chart totals ${formatPhp(total)} but the contract amount is ${formatPhp(i > 0 ? current : original)}`,
       i > 0 && date == null && `${name}: pick the date it takes effect`,
       i > 0 && date != null && start != null && date < start && `${name}: takes effect before the start date`,
@@ -1831,6 +1834,16 @@ export function chartErrors(drafts, project, docs) {
     ].filter(Boolean);
   });
 }
+
+/** totalMatches: chart `i` totals the original contract amount, or for a revised one the current (after Variation Orders). */
+export const chartTotalMatches = (i, total, project, docs) =>
+  Math.abs(total - originalCost(project)) < 0.015 || (i > 0 && Math.abs(total - currentCost(project, docs)) < 0.015);
+
+/** useSheet's notes on an imported sheet (chart-excel.js): what was read, then each item whose bars do not cover the days its Duration column says. */
+export const importNotes = sheet => [`Read ${sheet.items.length} items from the sheet "${sheet.name}".`, ...sheet.items.flatMap(item => {
+  const days = item.bars.reduce((n, b) => n + barDays(b), 0), said = Object.hasOwn(sheet.durations, item.name) ? sheet.durations[item.name] : days;
+  return said === days ? [] : [`${item.name}: the bar covers ${days} days but its Duration says ${said}.`];
+})];
 
 /** saveBarChart's audit entry. */
 export const chartAudit = json => ({ actionType: 'Bar Chart', details: json ? 'Saved the approved bar chart' : 'Removed the approved bar chart' });

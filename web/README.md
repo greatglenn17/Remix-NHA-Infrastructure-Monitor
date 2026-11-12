@@ -113,8 +113,10 @@ is read only.
   month and cell, To month and cell. The errors that keep Save off are the app's (`L.chartErrors`): a name, the
   contract total, a revised chart's date, and bars that read. Save writes `barChartJson` in the phone's shape
   (`L.chartJson`), one revision up, with the app's "Bar Chart" audit entry; deleting the only chart removes it.
-  The Excel import is not here yet, so a chart whose items differ from the Scope of Works is still imported on the
-  phone, and a chart with no items is refused.
+  **Import from Excel (.xlsx)** is the app's import (`chart-excel.js`, the port of `util/BarChartExcel.kt`; change
+  both together): it reads the contractor's workbook in the browser, nothing is uploaded, and replaces the open
+  chart's items with the sheet's items and their bars from the coloured cells. A workbook with several chart sheets
+  asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused.
 - **Delete project** in that form, for the Super Admin and an Engineer Admin who can edit the project (the app's
   DELETE_PROJECT roles, on a project that is not view-only: `L.canDeleteProject`). It asks first, then marks the
   project document deleted the way a phone uploads a delete (`L.deletedProject`); the document and its records stay
