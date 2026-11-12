@@ -1201,3 +1201,76 @@ test('plan tools: a revision as its own site, the print area, and a block renumb
   assert.equal('lotAreaSqM' in L.lotOutline(drawn, wide, page, 0, who).changes, false); // no scale, no area
   assert.equal('lotAreaSqM' in L.lotOutline(drawn, wide, null, 1000, who).changes, false); // the PDF could not be read
 });
+
+test('find lots: the closed outlines of a plan page become lots, numbered and named like the phone, and replace earlier found lots', () => {
+  // A 300 x 300 page: two blocks of 2 rows x 4 lots (30 x 40 a lot, one-pixel lines), an open space between them, and a road strip around.
+  const W = 300, H = 300, dark = new Uint8Array(W * H);
+  const line = (x1, y1, x2, y2) => { for (let x = x1; x <= x2; x++) for (let y = y1; y <= y2; y++) dark[y * W + x] = 1; };
+  const grid = (x, y) => { for (let i = 0; i <= 4; i++) line(x + 30 * i, y, x + 30 * i, y + 80); for (let j = 0; j <= 2; j++) line(x, y + 40 * j, x + 120, y + 40 * j); };
+  grid(20, 20); grid(20, 200);
+  line(30, 120, 130, 120); line(30, 180, 130, 180); line(30, 120, 30, 180); line(130, 120, 130, 180);
+  const centre = (bx, by, col, row) => [bx + 30 * col + 15.5, by + 40 * row + 20.5];
+
+  const areas = L.findLots(dark, W, H);
+  assert.deepEqual(areas.map(a => [a.block, a.lot, a.isLot]), [...[1, 2].flatMap(b => [1, 2, 3, 4, 5, 6, 7, 8].map(l => [b, l, true])), [0, 1, false]]);
+  // Each lot is its rectangle, to the middle of its lines: block 1's lots run along the top row, then the bottom row.
+  const middle = p => [p.reduce((t, q) => t + q[0], 0) / p.length * W, p.reduce((t, q) => t + q[1], 0) / p.length * H];
+  const near = (p, [x, y]) => { const [mx, my] = middle(p); return Math.abs(mx - x) < 2 && Math.abs(my - y) < 2; };
+  assert.equal(areas.slice(0, 16).every(a => a.polygon.length === 4), true);
+  assert.equal(areas.slice(0, 8).every((a, i) => near(a.polygon, centre(20, 20, i % 4, Math.floor(i / 4)))), true);
+  assert.equal(areas.slice(8, 16).every((a, i) => near(a.polygon, centre(20, 200, i % 4, Math.floor(i / 4)))), true);
+  assert.equal(near(areas[16].polygon, [80.5, 150.5]), true);
+  const [x0, x1] = [Math.min(...areas[0].polygon.map(p => p[0])) * W, Math.max(...areas[0].polygon.map(p => p[0])) * W];
+  assert.equal(x0 >= 19 && x0 <= 22 && x1 >= 49 && x1 <= 52, true, `lot 1 spans ${x0} to ${x1}`);
+  // A page with no lot pattern finds nothing.
+  assert.deepEqual(L.findLots(new Uint8Array(W * H), W, H), []);
+
+  // A click inside a lot traces it; on the road (open to the page's edge) it traces nothing.
+  // Alone on the page, a traced lot takes its lines' corners too, so each corner comes out cut by a pixel or two, as on the phone.
+  const traced = L.traceLot(dark, W, H, 95 / W, 225 / H);
+  assert.equal(traced.length >= 4 && traced.length <= 8 && near(traced, centre(20, 200, 2, 0)), true);
+  assert.equal(near(L.traceLot(dark, W, H, 95 / W, 240 / H), centre(20, 200, 2, 0)), true); // on a lot line: the nearest open pixel is taken
+  assert.equal(L.traceLot(dark, W, H, 200 / W, 150 / H), null);
+
+  // Names: block 1 is labelled "BLOCK 7" in one run; block 2 by "BLK." with "9" beside it. A lot's number is the biggest
+  // number in it; "B9 L20" names a lot by itself; a number two lots share names neither.
+  const word = (text, [x, y], size = 8) => ({ text, x, y, size });
+  const words = [
+    word('BLOCK 7', [80, 108]), word('BLK.', [60, 192]), word('9', [80, 192]),
+    ...['1', '2', '3', 'L-4', '5', '5', 'LOT 7', '8'].map((t, i) => word(t, centre(20, 20, i % 4, Math.floor(i / 4)))),
+    ...['1', '2', '3', '4', '5', '6', '7'].map((t, i) => word(t, centre(20, 200, i % 4, Math.floor(i / 4)))),
+    word('150', [centre(20, 200, 0, 0)[0], centre(20, 200, 0, 0)[1] + 9], 4), word('b9 l20', centre(20, 200, 3, 1)), word('TITLE 12', [250, 280]),
+  ];
+  const lots = areas.filter(a => a.isLot);
+  assert.deepEqual(L.lotNames(lots.map(a => a.polygon), lots.map(a => a.block), { words, width: W, height: H }), [
+    ['7', '1'], ['7', '2'], ['7', '3'], ['7', '4'], ['', ''], ['', ''], ['7', '7'], ['7', '8'],
+    ['9', '1'], ['9', '2'], ['9', '3'], ['9', '4'], ['9', '5'], ['9', '6'], ['9', '7'], ['9', '20']]);
+  // A plan with no text names nothing.
+  assert.deepEqual(L.lotNames(lots.slice(0, 2).map(a => a.polygon), [1, 1], { words: [], width: W, height: H }), [['', ''], ['', '']]);
+
+  // Adding them: an earlier found lot without progress is replaced; a found area under a lot that stays is left out,
+  // and a name a lot that stays already has is not given again.
+  const who = { user: 'Engr. Web', at: '2026-11-13 11:00' };
+  const plan = { uuid: 'plan-1', version: 2, scaleDenominator: 1000 };
+  const box = (a, b, c, d) => JSON.stringify([[a, b], [c, b], [c, d], [a, d]]);
+  const drawn = { uuid: 'k1', blockNumber: '7', lotNumber: '2', description: '', polygonNormalizedJson: box(20 / W, 20 / H, 50 / W, 60 / H), progress: null };
+  const old = { uuid: 'k2', blockNumber: '', lotNumber: '', description: 'Auto-detected', polygonNormalizedJson: box(0.8, 0.8, 0.9, 0.9), progress: null };
+  const started = { uuid: 'k3', blockNumber: '', lotNumber: '', description: 'Auto-detected', polygonNormalizedJson: box(0.8, 0.1, 0.9, 0.2), progress: { uuid: 'pr' } };
+  const named = lots.slice(0, 3).map((a, i) => ({ ...a, blockName: '7', lotName: String(i + 1) }));
+  const saved = L.foundLots(plan, [drawn, old, started], [...named, areas[16]], [W, H], who);
+  assert.deepEqual(saved.stale, [[old, { isActive: 0, lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 11:00' }, null]]);
+  assert.deepEqual(saved.audit, { actionType: 'Lot Created', details: 'Added 3 lots found in SDP Plan v2', newValue: '2 lots, 1 larger areas' });
+  const ids = { uuid: 'n', projectUuid: 'P', assignedUids: ['u'], uid: 'me', now: 5 };
+  const made = saved.builds.map(build => { const r = build(ids); return { type: r.type, ...JSON.parse(r.data) }; });
+  assert.deepEqual(made.map(r => [r.blockNumber, r.lotNumber, r.lotUse, r.description]), [['', '', '', 'Auto-detected'], ['7', '3', '', 'Auto-detected'], ['', '', 'Open Space', 'Auto-detected open space or facility']]);
+  assert.deepEqual({ ...made[1], polygonNormalizedJson: '', lotAreaSqM: 0 }, { type: 'sdp_lots', blockNumber: '7', lotNumber: '3', housingUnitNumber: '', lotAreaSqM: 0, polygonNormalizedJson: '', isActive: 1,
+    description: 'Auto-detected', lotUse: '', createdBy: 'Engr. Web', createdDate: '2026-11-13 11:00', lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 11:00', _ref_sdpPlanId: 'plan-1' });
+  assert.deepEqual(JSON.parse(made[1].polygonNormalizedJson), named[2].polygon);
+  assert.equal(made[1].lotAreaSqM, L.lotAreaSqM(named[2].polygon, W, H, 1000));
+  assert.equal(made[1].lotAreaSqM > 100, true);
+
+  // Remove found lots: only the found lots without progress, with one audit entry.
+  assert.deepEqual(L.foundLotsRemoved(plan, [drawn, old, started], who), [[old, { isActive: 0, lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 11:00' },
+    { actionType: 'Lot Deactivated', details: 'Removed 1 auto-detected lots from SDP Plan v2', oldValue: 'Active', newValue: 'Deactivated' }]]);
+  assert.deepEqual([drawn, old, started].map(L.foundLot), [false, true, true]);
+});

@@ -111,6 +111,19 @@ is read only.
   writes the corners onto the same lot, so its name, progress, billing and inspections stay, with a "Lot Geometry
   Changed" audit entry. An area nobody typed is worked out again from the plan's scale. A corner can be dragged while
   a new lot is being drawn too. The phone has no such tool: its Edit geometry starts a new lot.
+- **Find lots** in the plan's tools, for the `L.canManagePlans` roles, is the app's lot finder (`findLots`,
+  `planScan`, `L.findLots`, `L.lotNames`, `L.foundLots`; `LotDetector` and `PlanLabels` on the phone, ported line for
+  line). The plan PDF's first page is drawn about 3200 pixels across in the browser, every closed outline of the
+  common lot size is a lot, larger clean rectangles inside the site are open spaces or facilities, and each lot takes
+  the block and lot printed on the plan when both can be read. A review says what was found before anything is saved:
+  **Add lots**, or **Add lots and larger areas**. Found lots are saved as the phone saves them ("Auto-detected", with
+  the area the plan's scale gives), 200 a write, with the app's one "Lot Created" entry. Earlier found lots with no
+  progress yet are replaced; lots drawn by hand, renumbered, or with progress stay, and nothing is added on top of
+  them. A scanned plan has no clear outlines and finds nothing. **Remove found lots (_n_)**, for anyone who can edit
+  the project, takes the found lots without progress off again (`L.foundLotsRemoved`, "Lot Deactivated").
+- **Trace with a click**, in the Add lot bar, is the phone's tap-to-add (`L.traceLot`): a click inside a closed outline
+  on the plan traces it and opens the lot's form; a click on a lot already there, or where the lines do not close,
+  says so. It works on a turned plan too.
 - **Update progress** on a lot's card (Progress → Lots) is the app's lot Construction & Billing form without the lot's
   name and use (those are Name & use): the progress band (a road lot's state and its drainage), construction status,
   current activity, remarks, the lot's photos (remove some, add more), and the M1 (80%) and M2 (20%) billing marks
@@ -331,6 +344,5 @@ touched by this command.
 
 ## Not on the site yet
 
-On the plan: finding the lots in the PDF (Find lots) and tracing one with a tap. Roads (`sdp_roads`) are neither
-shown nor drawn: the phone cannot draw one any more (its road form is never opened), and a road on a plan is a lot
-whose use is Road Lot.
+Roads (`sdp_roads`) are neither shown nor drawn: the phone cannot draw one any more (its road form is never opened),
+and a road on a plan is a lot whose use is Road Lot.
