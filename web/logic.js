@@ -222,6 +222,20 @@ function periods(docs) {
   });
 }
 
+/**
+ * BarChart.suspensionExtensionDays: the days a time extension for suspension covers: the days approved suspensions
+ * that have ended stopped work, less the days of time extensions already logged for a suspension.
+ */
+export function suspensionExtensionDays(docs) {
+  const suspended = periods(docs).reduce((t, { begin, end }) => t + (end == null ? 0 : Math.max(0, (end - begin) / DAY)), 0);
+  const claimed = (docs || []).filter(d => /time extension/i.test(d.documentName || '') && /suspen/i.test(d.remarks || ''))
+    .reduce((t, d) => t + (Number((/ - (\d+) Days/i.exec(d.documentName) || [])[1]) || 0), 0);
+  return Math.max(0, suspended - claimed);
+}
+
+/** BarChart.itemNames: the latest chart's work items, for picking what a Partial suspension pauses; none without a chart. */
+export const chartItemNames = project => (chartVersions(project.barChartJson).at(-1)?.items || []).map(i => i.name);
+
 /** BarChart.suspendedDays: days from `from` through `until` (UTC ms) under approved suspensions that pause `item`. */
 function suspendedDays(docs, from, until, item) {
   return periods(docs)
@@ -600,8 +614,9 @@ export function orderLabel(name) {
 
 /** ProjectSchedule.isSuspension. */
 export const isSuspension = doc => /^suspension$/i.test((ORDER.exec((doc.documentName || '').trim()) || [])[2] || '');
-/** ProjectSchedule.continuances: a suspension's continuances, in the order given. */
-export const continuances = (suspension, docs) => docs.filter(d => continuanceOf(d.documentName) === baseOf(suspension.documentName || ''));
+/** ProjectSchedule.continuances: a suspension's continuances, 1st to last (the phone lists them as added, which the cloud does not record). */
+export const continuances = (suspension, docs) => docs.filter(d => continuanceOf(d.documentName) === baseOf(suspension.documentName || ''))
+  .sort((a, b) => (parseInt(orderLabel(a.documentName), 10) || 0) - (parseInt(orderLabel(b.documentName), 10) || 0));
 /** ProjectSchedule.chained: each suspension, then its continuances, then its resumption; the other orders keep their place. */
 export function chained(orders) {
   const resumes = (r, s) => /^resumption$/i.test((ORDER.exec((r.documentName || '').trim()) || [])[2] || '') && baseOf(r.documentName) === baseOf(s.documentName);
@@ -612,6 +627,24 @@ export function chained(orders) {
 
 /** A "Key: value" field of an order's or letter's remarks. */
 export const remarkField = (remarks, key) => ((new RegExp(`${key}: ([^|]*)`).exec(remarks || '') || [])[1] || '').trim();
+
+/**
+ * The project's suspensions, lowest order number first. A new continuance starts on the last one; the phone takes the
+ * one logged last, which the cloud does not record, so the form lets another be picked.
+ */
+export const suspensionsByNo = docs => docs.filter(isSuspension)
+  .sort((a, b) => String(orderNo(a.documentName)).localeCompare(String(orderNo(b.documentName)), undefined, { numeric: true }));
+
+/**
+ * ProjectSchedule.nextContinuance: [name, first day] of the next continuance of `suspension`, e.g. "2nd Partial
+ * Continuance of Work Suspension Order No. 1", starting the day after the latest End of the suspension and its
+ * continuances so far ('' when none has an End).
+ */
+export function nextContinuance(suspension, docs, type) {
+  const chain = continuances(suspension, docs);
+  const lastEnd = [...chain, suspension].map(d => remarkField(withEnd(d.remarks), 'End')).filter(x => isoDay(x) != null).sort().at(-1);
+  return [`${ordinal(chain.length + 1)}${type === 'Partial' ? ' Partial' : ''} Continuance of ${baseOf(suspension.documentName || '')}`, lastEnd ? lastDay(lastEnd, 2) : ''];
+}
 
 /** ContractorLetters.merged: letter records plus the older "Letter to Contractor No. N" documents, newest first. */
 export function mergedLetters(letters, docs) {
@@ -956,16 +989,71 @@ export function letterErrors(f) {
   ].filter(Boolean);
 }
 
-/** A new contractor_letters record as RecordSync uploads one: the ContractorLetter row without its local ids. */
-export function newLetterRecord({ uuid, projectUuid, assignedUids, uid, now }, f) {
-  return {
-    uuid, type: 'contractor_letters', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
-    data: JSON.stringify({
-      dateSent: f.dateSent, subject: f.subject, actionTaken: f.actionTaken, dateReplied: f.dateReplied, replyFileUrl: f.replyFileUrl || '',
-      dateReceived: f.dateReceived, receivedFileUrl: f.receivedFileUrl || '',
-    }),
-  };
+/**
+ * OrderFields.valid, as messages: the checks on the order a new request asks for. `o` holds the order form's fields;
+ * `suspension` is the one a continuance continues.
+ */
+export function orderErrors(type, o, suspension) {
+  const days = v => !/^\d+$/.test((v || '').trim()) && 'Type the number of days, in whole days.';
+  return ({
+    'Work Suspension Order': [days(o.wsDays)],
+    'Continuance of Work Suspension Order': suspension ? [days(o.coDays), !o.coEffectivity && 'Pick the effectivity date.']
+      : ['No work suspension order is logged yet. Log the suspension first.'],
+    'Variation Order': [(o.voAmount || '').trim() && parseAmount(o.voAmount) == null && 'Type a valid amount.'],
+    'Time Extension': [days(o.teDays)],
+  }[type] || []).filter(Boolean);
 }
+
+/**
+ * OrderFields.name and remarks: the document a new request files in Documents, named and worded as the phone does, so
+ * the schedule and the contract cost read it. Only after orderErrors.
+ */
+export function orderDocument(type, o, suspension, docs = []) {
+  const partial = t => (t === 'Partial' ? 'Partial ' : '');
+  // ProjectSchedule.suspensionRemarks: withEnd adds the End when there are days and an effectivity date.
+  const span = (days, effectivity) => withEnd(`Duration: ${Number(days.trim())} Days | Effectivity: ${effectivity}`);
+  switch (type) {
+    case 'Work Suspension Order': return {
+      documentName: `${partial(o.wsType)}Work Suspension Order No. ${o.wsNo.trim()}`,
+      remarks: span(o.wsDays, o.wsEffectivity) + (o.wsReason.trim() ? ` | Reason: ${o.wsReason.trim()}` : '')
+        + (o.wsType === 'Partial' && o.wsItems.length ? ` | Items: ${o.wsItems.join('; ')}` : ''),
+    };
+    case 'Continuance of Work Suspension Order': return { documentName: nextContinuance(suspension, docs, o.coType)[0], remarks: span(o.coDays, o.coEffectivity) };
+    case 'Work Resumption Order': return {
+      documentName: `${partial(o.wrType)}Work Resumption Order No. ${o.wrNo.trim()}`, remarks: `Effectivity: ${o.wrEffectivity} | Remarks: ${o.wrRemarks}`,
+    };
+    case 'Variation Order': return {
+      documentName: `Variation Order No. ${o.voNo} (${o.voType}) - PHP ${o.voAmount.replace(/\s/g, '')}`,
+      remarks: `Reason: ${o.voReason}${o.voDateApproved ? ` | Date Approved: ${o.voDateApproved}` : ''}`,
+    };
+    default: return { documentName: `Time Extension No. ${o.teNo.trim()} - ${o.teDays.trim()} Days`, remarks: `Reason: ${o.teReason}` };
+  }
+}
+
+/** A new record as RecordSync uploads one: a row's columns, without its local ids, as `data`. */
+const newRecord = ({ uuid, projectUuid, assignedUids, uid, now }, type, data) =>
+  ({ uuid, type, projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false, data: JSON.stringify(data) });
+
+/** A new contractor_letters record: the ContractorLetter row. */
+export const newLetterRecord = (ids, f) => newRecord(ids, 'contractor_letters', {
+  dateSent: f.dateSent, subject: f.subject, actionTaken: f.actionTaken, dateReplied: f.dateReplied, replyFileUrl: f.replyFileUrl || '',
+  dateReceived: f.dateReceived, receivedFileUrl: f.receivedFileUrl || '',
+});
+
+/** A new developer_requests record: the DeveloperRequest row. */
+export const newRequestRecord = (ids, f) => newRecord(ids, 'developer_requests', {
+  requestType: f.requestType, details: f.details, dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged,
+  requestFileUrl: f.requestFileUrl || '',
+});
+
+/** A new pending_documents record as ProjectViewModel.addPendingDocument saves one: Pending, off the core checklist, no file. */
+export const newDocumentRecord = (ids, { documentName, remarks }) =>
+  newRecord(ids, 'pending_documents', { documentName, status: 'Pending', remarks, isCoreChecklist: 0, fileUrl: '' });
+
+/** ProjectViewModel.addPendingDocument's audit entry, word for word. */
+export const addedDocumentAudit = name => ({
+  actionType: 'Document Upload', details: `Added document checklist item: ${name}`, oldValue: '', newValue: `Document: ${name}, Status: Pending`,
+});
 
 /** ProjectViewModel.deleteContractorLetter's audit entry, word for word. */
 export const deletedLetterAudit = l => ({

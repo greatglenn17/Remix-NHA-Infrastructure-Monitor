@@ -403,6 +403,62 @@ test('weekly report photos: titles, removals and additions, and the project card
   assert.equal(L.latestSitePhoto([{ createdAtTimestamp: 1, attachedPhotoUrlsJson: '[]' }]), '');
 });
 
+test('new developer request: the order it files is named and worded as the phone does', () => {
+  const blank = { wsNo: '', wsType: 'Full', wsDays: '', wsEffectivity: '', wsReason: '', wsItems: [], coType: 'Full', coDays: '', coEffectivity: '',
+    wrNo: '', wrType: 'Full', wrEffectivity: '', wrRemarks: '', voNo: '', voType: 'Additive', voAmount: '', voReason: '', voDateApproved: '', teNo: '', teDays: '', teReason: '' };
+  const [ws, co, wr, vo, te] = L.REQUEST_TYPES;
+  const s1 = { uuid: 's1', documentName: 'Work Suspension No. 1 (Partial)', status: 'Approved', remarks: 'Duration: 10 Days | Effectivity: 2026-08-01 | End: 2026-08-11' };
+  const docs = [
+    { uuid: 's2', documentName: 'Work Suspension Order No. 2', status: 'Pending', remarks: '' }, s1,
+    { uuid: 'c1', documentName: '1st Partial Continuance of Work Suspension Order No. 1', status: 'Pending', remarks: 'Duration: 5 Days | Effectivity: 2026-08-11' },
+    { uuid: 't1', documentName: 'Time Extension No. 1 - 4 Days', status: 'Pending', remarks: 'Reason: Work suspension' },
+  ];
+  // Day 1 is the effectivity date, so 10 days from Aug 1 end Aug 10 and the continuance's 5 from Aug 11 end Aug 15.
+  assert.deepEqual(L.suspensionsByNo(docs).map(d => d.uuid), ['s1', 's2']);
+  assert.deepEqual(L.nextContinuance(s1, docs, 'Partial'), ['2nd Partial Continuance of Work Suspension Order No. 1', '2026-08-16']);
+  assert.deepEqual(L.nextContinuance(docs[0], docs, 'Full'), ['1st Continuance of Work Suspension Order No. 2', '']);
+  // Continuances list 1st to last whatever order the cloud gives them in, old names included.
+  const later = [{ documentName: '3rd Continuance of Work Suspension Order No. 1' }, { documentName: 'Continuance No. 2 of Work Suspension No. 1 (Partial)' }, ...docs];
+  assert.deepEqual(L.continuances(s1, later).map(d => parseInt(L.orderLabel(d.documentName), 10)), [1, 2, 3]);
+  assert.equal(L.suspensionExtensionDays(docs), 6); // 10 suspended days, 4 already claimed
+  assert.deepEqual(L.chartItemNames({ barChartJson: JSON.stringify([{ effective: '2026-01-01', items: [{ name: 'Roads' }, { name: 'Drainage' }] }]) }), ['Roads', 'Drainage']);
+  assert.deepEqual(L.chartItemNames({}), []);
+
+  assert.deepEqual(L.orderErrors(ws, blank), ['Type the number of days, in whole days.']);
+  assert.deepEqual(L.orderErrors(te, { ...blank, teDays: '2.5' }), ['Type the number of days, in whole days.']);
+  assert.deepEqual(L.orderErrors(co, blank, undefined), ['No work suspension order is logged yet. Log the suspension first.']);
+  assert.deepEqual(L.orderErrors(co, { ...blank, coDays: '5' }, s1), ['Pick the effectivity date.']);
+  assert.deepEqual(L.orderErrors(vo, { ...blank, voAmount: 'abc' }), ['Type a valid amount.']);
+  assert.deepEqual([L.orderErrors(vo, blank), L.orderErrors(wr, blank), L.orderErrors(te, { ...blank, teDays: ' 30 ' })], [[], [], []]);
+
+  assert.deepEqual(L.orderDocument(ws, { ...blank, wsNo: ' 3 ', wsType: 'Partial', wsDays: '10', wsEffectivity: '2026-11-01', wsReason: ' Flooding ', wsItems: ['Roads', 'Drainage'] }), {
+    documentName: 'Partial Work Suspension Order No. 3', remarks: 'Duration: 10 Days | Effectivity: 2026-11-01 | End: 2026-11-10 | Reason: Flooding | Items: Roads; Drainage',
+  });
+  // A Full suspension names no items, and no effectivity date leaves no End.
+  assert.deepEqual(L.orderDocument(ws, { ...blank, wsNo: '4', wsDays: '7', wsItems: ['Roads'] }), { documentName: 'Work Suspension Order No. 4', remarks: 'Duration: 7 Days | Effectivity: ' });
+  assert.deepEqual(L.orderDocument(co, { ...blank, coType: 'Partial', coDays: '5', coEffectivity: '2026-08-16' }, s1, docs),
+    { documentName: '2nd Partial Continuance of Work Suspension Order No. 1', remarks: 'Duration: 5 Days | Effectivity: 2026-08-16 | End: 2026-08-20' });
+  assert.deepEqual(L.orderDocument(wr, { ...blank, wrNo: '1', wrType: 'Partial', wrEffectivity: '2026-08-21', wrRemarks: 'Cleared' }),
+    { documentName: 'Partial Work Resumption Order No. 1', remarks: 'Effectivity: 2026-08-21 | Remarks: Cleared' });
+  const filed = L.orderDocument(vo, { ...blank, voNo: '2', voType: 'Deductive', voAmount: '1,500,000 .50', voReason: 'Less fill', voDateApproved: '2026-11-05' });
+  assert.deepEqual(filed, { documentName: 'Variation Order No. 2 (Deductive) - PHP 1,500,000.50', remarks: 'Reason: Less fill | Date Approved: 2026-11-05' });
+  assert.deepEqual(L.orderDocument(te, { ...blank, teNo: '2', teDays: ' 30 ', teReason: 'Rain' }), { documentName: 'Time Extension No. 2 - 30 Days', remarks: 'Reason: Rain' });
+
+  const ids = { uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'a', now: 5 };
+  const stamps = { uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 5, updatedByUid: 'a', isDeleted: false };
+  assert.deepEqual(L.newRequestRecord(ids, { requestType: vo, details: 'Letter 12', dateRequested: '', dateReceived: '2026-11-12', datePackaged: '' }), {
+    ...stamps, type: 'developer_requests',
+    data: '{"requestType":"Variation Order","details":"Letter 12","dateRequested":"","dateReceived":"2026-11-12","datePackaged":"","requestFileUrl":""}',
+  });
+  assert.deepEqual(L.newDocumentRecord(ids, filed), {
+    ...stamps, type: 'pending_documents',
+    data: '{"documentName":"Variation Order No. 2 (Deductive) - PHP 1,500,000.50","status":"Pending","remarks":"Reason: Less fill | Date Approved: 2026-11-05","isCoreChecklist":0,"fileUrl":""}',
+  });
+  assert.deepEqual(L.addedDocumentAudit('Time Extension No. 2 - 30 Days'), {
+    actionType: 'Document Upload', details: 'Added document checklist item: Time Extension No. 2 - 30 Days', oldValue: '', newValue: 'Document: Time Extension No. 2 - 30 Days, Status: Pending',
+  });
+});
+
 test('developer request title: a number in the details becomes the order number', () => {
   const t = (requestType, details) => L.requestTitle({ requestType, details });
   assert.equal(t('Work Resumption Order', '1'), 'Work Resumption Order No. 1');
