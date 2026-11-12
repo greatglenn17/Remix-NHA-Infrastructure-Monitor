@@ -1734,3 +1734,27 @@ export function monthlyAudit(month, weeks, edit) {
   return edit ? { actionType: 'Report Creation', details: `Modified report for ${month}`, oldValue: 'Previous report data', newValue: 'Updated report data' }
     : { actionType: 'Report Creation', details: `Submitted Monthly Report for ${month}`, oldValue: '', newValue: `Month: ${month}, Target: ${target}%, Actual: ${actual}%` };
 }
+
+/** Only the Super Admin changes who a project is assigned to (EditProjectDialog, firestore.rules). */
+export const canAssign = claims => claims.role === 'SUPER_ADMIN';
+
+/**
+ * AssignStaffField's options: every account (userRow) A to Z by name, then any assigned uid that has no account,
+ * shown by its uid so saving cannot drop it unnoticed.
+ */
+export function assignableUsers(rows, assigned) {
+  const known = new Set(rows.map(u => u.uid));
+  return [...rows].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+    .concat([...new Set(assigned)].filter(uid => !known.has(uid)).map(uid => ({ uid, name: uid, role: '' })));
+}
+
+/**
+ * AssignmentPolicy.mergeAssignment: the project's `assignedUids` for the ticked `uids` (those already assigned keep
+ * their place, new ones follow) and `assignedStaff`, their names. Empty when the list is unchanged.
+ */
+export function assignmentFields(project, uids, users) {
+  const was = project.assignedUids || [];
+  const list = [...new Set([...was.filter(uid => uids.includes(uid)), ...uids])];
+  if (list.length === was.length && list.every((uid, i) => uid === was[i])) return {};
+  return { assignedUids: list, assignedStaff: list.map(uid => users.find(u => u.uid === uid)?.name ?? uid).join(', ') };
+}

@@ -110,6 +110,13 @@ is read only.
 - **Delete issue** in the Edit issue form (Progress → Issues), for the Super Admin and Engineer Admins, the app's
   DELETE_ISSUE roles (`L.canDeleteIssue`; a form rule only, like Delete report). It asks first, marks the record
   deleted, as the phones sync a delete, and writes the app's "Issue Deletion" audit entry (`L.deletedIssueAudit`).
+- **Assign** on the Project profile card, for the Super Admin only (`L.canAssign`, as in the app and the rules), is
+  the app's assignment checklist on its own (`assignForm`): every account by name, with its role, ticked when the
+  project is assigned to it; an assigned uid with no account stays listed by its uid. Save writes `assignedUids`
+  (those already assigned keep their place) and `assignedStaff`, their names (`L.assignmentFields`), one revision up,
+  with the "Project Edit" audit entry. The `syncProjectAssignmentToRecords` cloud function then copies the list to the
+  project's records, as after an assignment made on a phone; the emulators do not run it. If the account list
+  cannot be loaded there is no Save, so an empty list can never clear the project.
 - **Signatories** on the print page of a weekly or a monthly report, for the people who can edit the project, is the
   app's signatories form: name, position and office for Prepared by, Checked by and Noted by, with the app's
   suggested positions and offices (any other text can be typed). It starts with what the sheet shows

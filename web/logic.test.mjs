@@ -881,3 +881,20 @@ test('monthly report: the record a first save of recommendations makes, and the 
   assert.deepEqual(L.monthlyAudit('September 2026', weeks, true),
     { actionType: 'Report Creation', details: 'Modified report for September 2026', oldValue: 'Previous report data', newValue: 'Updated report data' });
 });
+
+test('assign people: the options, the list and names saved, and nothing saved when the list is unchanged', () => {
+  const rows = [L.userRow('u2', { displayName: 'engr. Reyes', role: 'FIELD_ENGINEER' }), L.userRow('u1', { displayName: 'Engr. Cruz', role: 'ENGINEER_ADMIN' }),
+    L.userRow('u3', { email: 'viewer@nha.test', role: 'VIEWER' })];
+  // A to Z whatever the case; an assigned uid with no account stays, shown by its uid.
+  const users = L.assignableUsers(rows, ['u2', 'gone', 'gone']);
+  assert.deepEqual(users.map(u => [u.uid, u.name]), [['u1', 'Engr. Cruz'], ['u2', 'engr. Reyes'], ['u3', 'viewer@nha.test'], ['gone', 'gone']]);
+  const project = { assignedUids: ['u2', 'gone'], assignedStaff: 'old text' };
+  // Those already assigned keep their place; new ones follow in the order ticked.
+  assert.deepEqual(L.assignmentFields(project, ['u1', 'u2', 'u3', 'gone'], users),
+    { assignedUids: ['u2', 'gone', 'u1', 'u3'], assignedStaff: 'engr. Reyes, gone, Engr. Cruz, viewer@nha.test' });
+  assert.deepEqual(L.assignmentFields(project, ['u2'], users), { assignedUids: ['u2'], assignedStaff: 'engr. Reyes' });
+  assert.deepEqual(L.assignmentFields(project, [], users), { assignedUids: [], assignedStaff: '' });
+  assert.deepEqual(L.assignmentFields(project, ['gone', 'u2'], users), {});
+  assert.deepEqual(L.assignmentFields({}, ['u1'], users), { assignedUids: ['u1'], assignedStaff: 'Engr. Cruz' });
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER', 'SUPER_VIEWER'].map(role => L.canAssign({ role })), [true, false, false, false]);
+});
