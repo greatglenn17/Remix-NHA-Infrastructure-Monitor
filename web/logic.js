@@ -1515,6 +1515,14 @@ export const deletedWeeklyAudit = report => ({ actionType: 'Deleted Weekly Repor
 /** Permission.DELETE_REPORT: the Super Admin and Engineer Admins; a Field Engineer can add and edit reports, not delete them. */
 export const canDeleteReport = claims => ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
 
+/** Permission.DELETE_ISSUE: the same roles. A form rule only, like canDeleteReport. */
+export const canDeleteIssue = canDeleteReport;
+
+/** ProjectViewModel.deleteProjectIssue's audit entry; the phone's "Issue ID" is its own row number, here it is the record's id. */
+export const deletedIssueAudit = issue => ({
+  actionType: 'Issue Deletion', details: `Deleted issue: ${String(issue.description ?? '').slice(0, 30)}...`, oldValue: `Issue ID: ${issue.uuid}`, newValue: '',
+});
+
 /* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
 
 export const WEATHER_KEYS = ['FAIR', 'CLOUDY', 'RAIN_SHOWERS', 'RAINY', 'STORMY'];

@@ -1515,7 +1515,7 @@ function editIssue(c, issue) {
     <label class="check"><input type="checkbox" name="isCritical"${L.isCriticalIssue(issue) ? ' checked' : ''}>Critical issue</label>
     <label class="field">Status<select name="status">${statuses.map(v => opt(v, status)).join('')}</select></label>
     <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="actions">${!isNew && L.canDeleteIssue(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete issue</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => {
@@ -1547,6 +1547,8 @@ function editIssue(c, issue) {
       save.disabled = false;
     }
   };
+  // deleteProjectIssue, with the phone's question.
+  if (!isNew) bindDelete(d, 'Delete this issue entry? This cannot be undone.', () => saveEdits(c, [[issue, null, L.deletedIssueAudit(issue)]], 'issue'));
   document.body.append(d);
   d.showModal();
 }
