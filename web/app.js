@@ -9,7 +9,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig } from './firebase-config.js';
 import * as L from './logic.js';
 import * as P from './print.js';
@@ -1306,7 +1306,7 @@ function editIssue(c, issue) {
 
 /**
  * DeveloperRequestDialog for a request already logged: type, details and dates, including the date packaged.
- * shortcut: no new requests here (the phone also files the order in Documents) and no letter upload (download-only CORS).
+ * shortcut: no new requests here (the phone also files the order in Documents).
  */
 function editRequest(c, r) {
   const d = document.createElement('dialog');
@@ -1321,6 +1321,7 @@ function editRequest(c, r) {
     <label class="field">Date received by NHA<input type="date" name="dateReceived" value="${esc(r.dateReceived || '')}" required></label>
     <label class="field">Date packaged (blank: not yet)<input type="date" name="datePackaged" value="${esc(r.datePackaged || '')}"></label>
     ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
+    ${fileField('requestFileUrl', "Developer's request letter", r.requestFileUrl)}
     <p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
@@ -1331,7 +1332,7 @@ function editRequest(c, r) {
   };
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to this request?')) && done();
+  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm('Discard your changes to this request?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   const packedToday = d.querySelector('[data-today]');
   if (packedToday) packedToday.onclick = () => { form.datePackaged.value = today(); };
@@ -1340,11 +1341,11 @@ function editRequest(c, r) {
     e.preventDefault();
     const f = values(), errors = L.requestErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (JSON.stringify(f) === initial) { done(); return; }
+    if (JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      await saveEdit(c, r, f, 'request', L.requestAudit(f));
+      await saveEdit(c, r, { ...f, ...await uploadPicked(c, form) }, 'request', L.requestAudit(f));
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
@@ -1356,14 +1357,8 @@ function editRequest(c, r) {
 }
 
 /**
- * Writes a record edit (`changes` merged into its data) and its audit log entry in one transaction, the way RecordSync
- * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
- * since the form opened. `noun` names the record in those messages.
- */
-/**
  * ContractorLetterDialog: a new letter (`l` null) or an edit, with its date and subject, when the contractor received
- * it, what the contractor did, and when the contractor replied.
- * shortcut: no receiving copy or reply upload here (download-only CORS); those are attached on the phone.
+ * it and NHA's receiving copy, what the contractor did, and when the contractor replied and the reply letter.
  */
 function editLetter(c, l) {
   const d = document.createElement('dialog');
@@ -1375,9 +1370,10 @@ function editLetter(c, l) {
     <label class="field">Date of letter<input type="date" name="dateSent" value="${esc(l.dateSent || '')}" required></label>
     <label class="field">Subject<input name="subject" value="${esc(l.subject || '')}" required autocomplete="off"></label>
     <label class="field">Date received by the contractor (blank: not yet)<input type="date" name="dateReceived" value="${esc(l.dateReceived || '')}"></label>
+    ${fileField('receivedFileUrl', 'Receiving copy', l.receivedFileUrl)}
     <label class="field">Action taken by contractor<textarea name="actionTaken" rows="3">${esc(l.actionTaken || '')}</textarea></label>
     <label class="field">Date of reply (blank: no reply yet)<input type="date" name="dateReplied" value="${esc(l.dateReplied || '')}"></label>
-    <p class="muted small">Attach the receiving copy and the reply letter on the phone.</p>
+    ${fileField('replyFileUrl', "Contractor's reply letter", l.replyFileUrl)}
     <p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
@@ -1388,18 +1384,23 @@ function editLetter(c, l) {
   };
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?')) && done();
+  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?')) && done();
+  // A signed receiving copy means the contractor has it; a reply letter in hand means the contractor replied.
+  for (const [file, date] of [['receivedFileUrl', 'dateReceived'], ['replyFileUrl', 'dateReplied']]) {
+    form[file].onchange = () => { if (form[file].files[0] && !form[date].value) form[date].value = today(); };
+  }
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.letterErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (!isNew && JSON.stringify(f) === initial) { done(); return; }
+    if (!isNew && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      await (isNew ? addRecord(c, ids => L.newLetterRecord(ids, f), L.letterAudit(f)) : saveEdit(c, l, f, 'letter', L.letterAudit(f)));
+      const saved = { ...f, ...await uploadPicked(c, form) };
+      await (isNew ? addRecord(c, ids => L.newLetterRecord(ids, saved), L.letterAudit(f)) : saveEdit(c, l, saved, 'letter', L.letterAudit(f)));
       done();
     } catch (x) {
       err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
@@ -1408,6 +1409,59 @@ function editLetter(c, l) {
   };
   document.body.append(d);
   d.showModal();
+}
+
+/* ---------- Attaching files (Attachments.store and upload) ---------- */
+
+/** A form's file input for an attachment column; `attached` is the reference the record holds now, if any. */
+const fileField = (name, label, attached) => `<label class="field">${esc(label)} (photo or PDF)<input type="file" name="${name}" accept="image/*,application/pdf">
+  ${attached ? '<small class="muted">A file is attached. Choosing one here replaces it.</small>' : ''}</label>`;
+
+/** A form's text fields, without the files picked in it. */
+const textFields = form => Object.fromEntries([...new FormData(form)].filter(([, v]) => typeof v === 'string'));
+const hasPicked = form => [...form.querySelectorAll('input[type=file]')].some(i => i.files[0]);
+
+/** What the phone keeps of a picked file: a PDF as it is, anything else as a JPEG no larger than a scan. [blob, extension, content type]. */
+async function attachmentBlob(file) {
+  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  if (String.fromCharCode(...head) === '%PDF') {
+    if (file.size >= L.MAX_FILE_BYTES) throw new Error('The file must be smaller than 20 MB.');
+    return [file, 'pdf', 'application/pdf'];
+  }
+  if (file.size > L.MAX_FILE_BYTES * 3) throw new Error('The file must be smaller than 20 MB.');
+  let bitmap;
+  try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { throw new Error('Only photos and PDF files can be attached.'); }
+  const [width, height] = L.scaledSize(bitmap.width, bitmap.height, L.SCAN_MAX_EDGE);
+  const canvas = Object.assign(document.createElement('canvas'), { width, height });
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#fff'; // a see-through PNG would turn black as a JPEG
+  g.fillRect(0, 0, width, height);
+  g.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await new Promise(done => canvas.toBlob(done, 'image/jpeg', 0.85));
+  if (!blob) throw new Error('Only photos and PDF files can be attached.');
+  return [blob, 'jpg', 'image/jpeg'];
+}
+
+/**
+ * Uploads the files picked in a form to attachments/<projectUuid>/<id>.jpg|.pdf, where the phones look for them, and
+ * returns { input name: its `nhafile:` reference } to save on the record.
+ * shortcut: a replaced file, or one whose record then fails to save, stays in the bucket (only the phone that added a file cleans it up).
+ */
+async function uploadPicked(c, form) {
+  const refs = {};
+  for (const input of form.querySelectorAll('input[type=file]')) {
+    if (!input.files[0]) continue;
+    const [blob, ext, contentType] = await attachmentBlob(input.files[0]);
+    const refText = L.newFileRef(c.page.id, crypto.randomUUID(), ext);
+    try {
+      await uploadBytes(ref(storage, L.storagePathOf(refText)), blob, { contentType });
+    } catch (x) {
+      throw x.code === 'storage/unauthorized' ? Object.assign(new Error('denied'), { code: 'permission-denied' }) : new Error('The file could not be uploaded. Check the connection, then save again.');
+    }
+    refs[input.name] = refText;
+  }
+  return refs;
 }
 
 /** A new record (`build` gets its ids and stamps) and its audit entry in one batch, with the project's assignedUids. */
@@ -1423,6 +1477,11 @@ async function addRecord(c, build, entry) {
   await batch.commit();
 }
 
+/**
+ * Writes a record edit (`changes` merged into its data) and its audit log entry in one transaction, the way RecordSync
+ * uploads: revision + 1, this edit's time and editor, the project's assignedUids. It refuses when the record changed
+ * since the form opened. `noun` names the record in those messages.
+ */
 const saveEdit = (c, rec, changes, noun, entry) => saveEdits(c, [[rec, changes, entry]], noun);
 
 /** saveEdit for several records that must change together (`edits`: [record, changes, audit entry] each; null changes delete it), all or none. */
@@ -1561,7 +1620,6 @@ async function addIssue(c, f) {
  * AddPaymentDialog for a new billing or, with `old`, an edit of that one: the same fields, choices and checks, a live
  * gross / retention / net. Save writes a new billing with its share and balance, or the edit with the later balances
  * it moves, each with the app's audit entry.
- * shortcut: no DV scan upload yet (the bucket's CORS allows only downloads); attach it on the phone.
  */
 function billingForm(c, old = null) {
   // An edited billing keeps its type and retention as choices, whatever the project type is now.
@@ -1584,12 +1642,12 @@ function billingForm(c, old = null) {
     <label class="field" data-gross>Gross amount (PHP)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
     <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
     <div class="billing-preview" aria-live="polite"></div>
-    ${old?.fileUrl ? '' : `<p class="muted small">Attach the scanned DV on the phone${old ? '' : ' after saving'}.</p>`}
+    ${fileField('fileUrl', 'Scanned DV', old?.fileUrl)}
     <p class="error" role="alert"></p>
     <div class="actions">${old ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete billing</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
-  const values = () => ({ billingType: '', ...Object.fromEntries(new FormData(form)) });
+  const values = () => ({ billingType: '', ...textFields(form) });
   // Picking a housing type starts its amount from the latest billing of that type.
   const lastPrice = type => [...c.payments].reverse().find(p => p.billingType === type && Number(p.unitPrice) > 0)?.unitPrice;
   const showType = () => {
@@ -1616,7 +1674,7 @@ function billingForm(c, old = null) {
   if (old) { showType(); preview(); }
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
+  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   const failed = x => { err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.'; };
@@ -1635,13 +1693,14 @@ function billingForm(c, old = null) {
     e.preventDefault();
     const f = values(), errors = L.billingErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (old && JSON.stringify(f) === initial) { done(); return; }
+    if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      // Each billing saved gets its own entry, as MoneySection sends each one to updateProjectPayment.
-      await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
-        : addBilling(c, f));
+      const refs = await uploadPicked(c, form);
+      // Each billing saved gets its own entry, as MoneySection sends each one to updateProjectPayment; the scan goes on the edited one.
+      await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, p === old ? { ...changes, ...refs } : changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
+        : addBilling(c, { ...f, ...refs }));
       done();
     } catch (x) { failed(x); save.disabled = false; }
   };

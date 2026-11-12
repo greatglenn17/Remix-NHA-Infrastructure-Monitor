@@ -21,7 +21,7 @@ is read only.
 - **Add billing** is the app's Add Billing / Disbursement Voucher form: name, DV No., date, period covered, what a housing
   project bills for (units × amount per lot or unit, the amount filled in from the latest billing of that type) or the gross,
   and retention. Share and balance are saved from the gross with the current contract cost, as the app saves them, with the
-  app's "Payment Creation" audit entry. The scanned DV is attached on the phone for now: the bucket's CORS allows downloads only.
+  app's "Payment Creation" audit entry. The scanned DV can be attached in the form (see Attachments below).
 - **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
@@ -32,10 +32,16 @@ is read only.
 - **New letter** and **Edit** on a letter to the contractor (Documents → Letters to Contractor) are the app's Letter to
   contractor form: its date and subject, the date the contractor received it, the action the contractor took and
   the date of the reply, with the app's "Letter to Contractor" audit entry. An old "Letter to Contractor No. N" document
-  has no Edit here: the phone turns it into a letter on its first edit. The two attachments are added on the phone.
+  has no Edit here: the phone turns it into a letter on its first edit. The receiving copy and the reply letter can be attached in the form; picking one fills its date with today when blank, as the phone does.
 - **Edit** on a developer request is the app's Developer request form for one already logged: request type, details and
   the request, received and packaged dates ("Packaged today" fills the last), with the app's "Developer Request" audit
   entry. New requests are still added on the phone, since that also files the order in Documents.
+- **Attachments**: the billing, developer request and letter forms take a photo or a PDF for the scanned DV, the
+  developer's request letter, the receiving copy and the reply letter. On Save the file is uploaded where the phones
+  keep attachments, `attachments/<projectUuid>/<id>.jpg|.pdf`, and the record gets its `nhafile:` reference: a PDF as it
+  is (under 20 MB), anything else as a JPEG no larger than 2500 px on its longest side, as the phone stores a scan.
+  storage.rules already lets an assigned writer add these, and uploads through the Firebase SDK need no bucket CORS
+  setting (that is only for reading file bytes). A replaced file stays in the bucket.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.
@@ -139,5 +145,4 @@ touched by this command.
 
 ## Not on the site yet
 
-Adding developer requests, weekly reports and orders; editing lots; uploading files (the bucket's CORS
-allows downloads only).
+Adding developer requests, weekly reports and orders; editing lots; weekly report photos.
