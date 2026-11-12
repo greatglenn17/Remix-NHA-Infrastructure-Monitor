@@ -855,6 +855,8 @@ function drawProject(page) {
   main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
+  const planUpload = document.getElementById('plan-upload');
+  if (planUpload) planUpload.onclick = () => planForm(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
@@ -1245,18 +1247,20 @@ function monthlyView({ page, weekly, of, now }) {
   </section>`;
 }
 
-/* ---------- Lots (SubdivisionPlanTab, read-only) ---------- */
+/* ---------- Lots (SubdivisionPlanTab) ---------- */
 
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null });
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null }); // draw: the corners of a lot being added
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
 function lotsView(c) {
   const st = lotState(c.page);
   const { sites, site } = lotSite(c, st);
-  if (!site) return `<div class="card empty">${icon('home_work')}<p>No subdivision plan uploaded yet</p></div>`;
+  const upload = L.canManagePlans(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="plan-upload">${icon('cloud_upload', 'sm')}Upload plan</button>` : '';
+  if (!site) return `<div class="card empty">${icon('home_work')}<p>No subdivision plan uploaded yet</p>${upload}</div>`;
+  const addLot = !st.draw && site.plan.pdfFileUrl && L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
   const k = L.lotStats(site.lots);
   const tile = (label, value, cls = '') => `<div class="kpi ${cls}"><span>${label}</span><b>${value}</b></div>`;
   const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option${o === st[key] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
@@ -1264,7 +1268,7 @@ function lotsView(c) {
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
     <div class="lots-head"><h3>${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span></h3>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
-        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}</span></div>
+        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${upload}</span></div>
     <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
@@ -1272,7 +1276,9 @@ function lotsView(c) {
     </div>
     <p class="muted lot-count" id="lot-count"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
-    ${site.lots.length ? `<div class="lot-viewer" id="lot-plan">
+    ${st.draw ? `<div class="lot-draw" role="group" aria-label="Add lot"><p class="muted small" id="draw-hint" aria-live="polite"></p>
+      <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">Save lot</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
+    ${site.lots.length || st.draw ? `<div class="lot-viewer${st.draw ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
       <div class="zoom-bar" role="group" aria-label="Zoom">
         ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
@@ -1296,7 +1302,8 @@ function lotCard(l, editable = false) {
       <button class="icon-btn" id="lot-card-close" aria-label="Close">${icon('close', 'sm')}</button></div>
     <p>${esc(line)}</p>
     ${p.lastModifiedBy ? `<p class="lc-upd">Last updated: ${esc(p.lastModifiedDate ? L.displayDate(p.lastModifiedDate) : '')} by ${esc(p.lastModifiedBy)}</p>` : ''}
-    ${editable ? `<button class="btn lc-more" id="lot-edit">${icon('edit', 'sm')}Update progress</button>` : ''}
+    ${editable ? `<button class="btn lc-more" id="lot-edit">${icon('edit', 'sm')}Update progress</button>
+      <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>` : ''}
     <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
 
@@ -1325,7 +1332,7 @@ function lotDetail(l) {
 }
 
 /**
- * UpdateLotProgressDialog without the lot's name and use (those stay on the phone): the progress band (a road lot's
+ * UpdateLotProgressDialog without the lot's name and use (those are lotForm's): the progress band (a road lot's
  * state and drainage), status, activity, remarks and photos, and the M1 and M2 billing marks, saved together.
  * A photo added here has no "Block X Lot Y" stamp.
  */
@@ -1415,11 +1422,143 @@ function editLot(c, lot) {
   d.showModal();
 }
 
+const nowStamp = () => `${today()} ${new Date().toTimeString().slice(0, 5)}`; // "yyyy-MM-dd HH:mm", as the phone stamps a lot
+
+/**
+ * AddLotDialog for a lot drawn on the plan (`polygon`, in page fractions; `area` worked out from the plan's scale, 0
+ * without one), or for a saved `lot` its use, block and lot (UpdateLotProgressDialog's) with Remove lot.
+ */
+function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
+  const use = lot ? L.lotUse(lot) : L.LOT_USES[0], label = lot ? L.lotLabel(lot) : '';
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>${lot ? `${esc(label)} name and use` : 'Save the lot drawn'}</h2>
+    <label class="field">Lot use<select name="use">${L.LOT_USES.map(u => `<option${u === use ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select></label>
+    <label class="field" data-block>Block (e.g. 3)<input name="block" value="${esc(lot?.blockNumber || '')}" autocomplete="off"></label>
+    <label class="field"><span data-lot-label></span><input name="lotNo" value="${esc(lot?.lotNumber || '')}" autocomplete="off"></label>
+    ${lot ? '' : `<label class="field" data-unit>Housing unit (optional)<input name="unit" autocomplete="off"></label>
+    <label class="field">Lot area (sq.m)<input name="area" inputmode="decimal" value="${area > 0 ? area : '50.0'}" autocomplete="off"></label>
+    <label class="field">Description / remarks<input name="description" autocomplete="off"></label>`}
+    <p class="error" role="alert"></p>
+    <div class="actions">${lot ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Remove lot</button>` : ''}
+      <button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+  </form>`;
+  const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
+  // A new road lot or easement has one number and no block of its own; a saved lot keeps the block it has.
+  const fixed = () => (lot ? undefined : L.numberedBlock(el.use.value));
+  const sync = () => {
+    d.querySelector('[data-block]').hidden = Boolean(fixed());
+    d.querySelector('[data-lot-label]').textContent = fixed() ? `${el.use.value} number (e.g. 3)` : 'Lot number (e.g. 25)';
+    if (!lot) d.querySelector('[data-unit]').hidden = el.use.value !== 'Saleable';
+  };
+  el.use.onchange = sync;
+  sync();
+  const values = () => ({ use: el.use.value, block: fixed() || el.block.value, lotNo: el.lotNo.value, unit: el.unit?.value || '', area: el.area?.value, description: el.description?.value || '', polygon });
+  const initial = JSON.stringify(values());
+  const who = () => ({ user: s.profile.name || s.user.email, at: nowStamp() });
+  const done = () => { d.close(); d.remove(); };
+  // A lot not saved yet keeps its corners on the plan, so closing its form loses nothing.
+  const close = () => (!lot || JSON.stringify(values()) === initial || confirm('Discard your changes to this lot?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  bindDelete(d, `Remove ${label}? The lot is taken off the plan on this website and on every phone. Its progress and billing history stay in the audit log.`, async () => {
+    const gone = L.lotRemoved(lot, who());
+    await saveEdit(c, lot, gone.changes, 'lot', gone.audit);
+    Object.assign(lotState(c.page), { sel: null, more: false });
+  });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = values(), problem = L.lotNameError(lot, f.block, f.lotNo, site.lots);
+    if (problem) { err.textContent = problem; return; }
+    const saved = lot ? L.lotNameSave(lot, f, who()) : L.newLot(site.plan, f, who());
+    if (!saved) { done(); return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      await (lot ? saveEdit(c, lot, saved.changes, 'lot', saved.audits) : addRecords(c, [[saved.build, saved.audit]]));
+      done();
+      onSaved();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
+ * AddSdpPlanDialog: the plan PDF as the next revision of the site on screen, which becomes the one in use, or as the
+ * first plan of another site under the contract (naming the first site when it has no name yet).
+ * shortcut: the plan is added after the earlier plans are switched off or the first site is named, not in one write; if
+ * the second step fails the site still shows its latest plan, and saving again finishes it.
+ */
+function planForm(c) {
+  const { sites, site } = lotSite(c, lotState(c.page));
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Upload approved SDP plan</h2>
+    ${site ? `<fieldset class="lot-billing"><legend>This plan is</legend>
+      <label class="check"><input type="radio" name="kind" value="revised" checked>A revised plan for ${esc(site.site || 'Main site')}</label>
+      <label class="check"><input type="radio" name="kind" value="site">Another site under this contract</label>
+      <div data-site hidden>${site.site ? '' : '<label class="field">Name of the site already uploaded<input name="currentSiteName" autocomplete="off"></label>'}
+        <label class="field">Name of the new site<input name="newSite" autocomplete="off"></label></div>
+      <small class="muted" data-revised>A revised plan starts with no lots; the plan it replaces keeps its own.</small></fieldset>` : ''}
+    <label class="field">Plan document name<input name="planName" autocomplete="off"></label>
+    <label class="field">Plan (PDF)<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
+    <label class="field">Description / remarks<input name="description" autocomplete="off"></label>
+    <p class="muted small">Its lots are then drawn here with Add lot, or found on the phone with Find lots.</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save plan</button></div>
+  </form>`;
+  const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
+  const fresh = () => el.kind?.value === 'site';
+  form.onchange = () => { if (site) { d.querySelector('[data-site]').hidden = !fresh(); d.querySelector('[data-revised]').hidden = fresh(); } };
+  const done = () => { d.close(); d.remove(); };
+  const dirty = () => [el.planName, el.description, el.newSite, el.currentSiteName].some(i => i?.value) || el.pdf.files.length > 0;
+  const close = () => (!dirty() || confirm('Discard this plan?')) && done();
+  d.querySelector('[data-cancel]').onclick = close;
+  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const f = { planName: el.planName.value, description: el.description.value, newSite: fresh() ? el.newSite.value : null, currentSiteName: fresh() ? el.currentSiteName?.value || '' : '' };
+    const problem = (fresh() && L.siteNameError(f.newSite, !site.site, f.currentSiteName, sites.map(x => x.site)))
+      || (!f.planName.trim() && 'Enter the plan document name') || (!el.pdf.files[0] && 'Pick the plan PDF');
+    if (problem) { err.textContent = problem; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    save.disabled = true; err.textContent = '';
+    try {
+      // The lots are drawn over the PDF's first page, so a photo of the plan will not do.
+      if (new TextDecoder().decode(await el.pdf.files[0].slice(0, 4).arrayBuffer()) !== '%PDF') throw new Error('The plan must be a PDF file.');
+      const up = L.planUpload(c.records.filter(r => r.type === 'sdp_plans'), site?.site || '', { ...f, pdfFileUrl: await uploadFile(c, await attachmentBlob(el.pdf.files[0])) },
+        { user: s.profile.name || s.user.email, date: today() });
+      if (up.edits.length) await saveEdits(c, up.edits, 'plan');
+      await addRecords(c, [[up.build, up.audit]]);
+      // Shows the new plan, as the phone does.
+      Object.assign(lotState(c.page), { site: up.site, sel: null, more: false, view: null, draw: null });
+      done();
+      drawProject(c.page);
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot upload a plan for this project.' : x.message || 'Could not save. Try again.';
+      save.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
 const planDrawings = new Map();
-/** The plan page (without lots), drawn once per plan. */
-function planBase(site) {
-  const key = [site.plan.uuid, site.plan.pdfFileUrl, site.plan.frame, site.plan.rotation].join('|');
-  if (!planDrawings.has(key)) planDrawings.set(key, planDrawing(site, false).then(d => { if (d.problem) planDrawings.delete(key); return d; }));
+/** The plan page (without lots), drawn once per plan; `whole` is the whole page, so a lot can be drawn anywhere on it. */
+function planBase(site, whole = false) {
+  // Without a saved frame the page is cut around the lots, so a lot added outside it has the plan drawn again.
+  const kind = `${site.plan.uuid}|${whole}|`;
+  const key = kind + [site.plan.pdfFileUrl, whole ? '' : site.plan.frame || L.frameAround(site.lots.map(L.lotPolygon)), site.plan.rotation].join('|');
+  if (!planDrawings.has(key)) {
+    for (const k of [...planDrawings.keys()]) if (k.startsWith(kind)) planDrawings.delete(k);
+    planDrawings.set(key, planDrawing(site, false, whole).then(d => { if (d.problem) planDrawings.delete(key); return d; }));
+  }
   return planDrawings.get(key);
 }
 
@@ -1432,6 +1571,11 @@ async function bindLots(c) {
   const more = document.getElementById('lot-results');
   let d = null, svg = null, stage = null;
 
+  // The lot being added: its corners so far (dots), joined in the order clicked.
+  const draft = () => {
+    const pts = (st.draw || []).map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)));
+    return pts.length ? `<${pts.length > 2 ? 'polygon' : 'polyline'} class="draft" points="${pts.join(' ')}"/>${pts.map(([x, y]) => `<path class="draft" d="M${x} ${y}h0.01"/>`).join('')}` : '';
+  };
   // The lots as shapes over the plan: colour by band, the rest dimmed by the filters, the selection outlined.
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
@@ -1441,7 +1585,13 @@ async function bindLots(c) {
       if (!pts) return '';
       const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
       return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${l.uuid === st.sel ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
-    }).join('');
+    }).join('') + draft();
+    const hint = document.getElementById('draw-hint');
+    if (hint) {
+      hint.textContent = `Click each corner of the lot on the plan, in order (${plural(st.draw.length, 'corner')} so far). Drag moves the plan and the wheel zooms it.`;
+      document.getElementById('draw-save').disabled = st.draw.length < 3;
+      document.getElementById('draw-undo').disabled = !st.draw.length;
+    }
     const sel = site.lots.find(l => l.uuid === st.sel);
     if (card) {
       card.hidden = !sel;
@@ -1449,6 +1599,8 @@ async function bindLots(c) {
       if (sel) {
         const edit = document.getElementById('lot-edit');
         if (edit) edit.onclick = () => editLot(c, sel);
+        const name = document.getElementById('lot-name');
+        if (name) name.onclick = () => lotForm(c, site, sel);
         document.getElementById('lot-card-close').onclick = () => { st.sel = null; st.more = false; paint(); };
         document.getElementById('lot-more').onclick = () => { st.more = !st.more; paint(); if (st.more) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
       }
@@ -1468,7 +1620,16 @@ async function bindLots(c) {
     paint();
   };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; paint(); }; });
-  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; drawProject(c.page); }; });
+  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; st.draw = null; drawProject(c.page); }; });
+  const add = document.getElementById('lot-add');
+  if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null }); drawProject(c.page); };
+  if (st.draw) {
+    document.getElementById('draw-undo').onclick = () => { st.draw.pop(); paint(); };
+    document.getElementById('draw-done').onclick = () => { Object.assign(st, { draw: null, view: null }); drawProject(c.page); };
+    // The next lot is drawn straight after this one is saved.
+    document.getElementById('draw-save').onclick = () => lotForm(c, site, null, st.draw,
+      d && !d.problem ? L.lotAreaSqM(st.draw, ...d.page, Number(site.plan.scaleDenominator) || 0) : 0, () => { st.draw = []; drawProject(c.page); });
+  }
   paint();
   if (!viewer) return;
 
@@ -1489,7 +1650,7 @@ async function bindLots(c) {
   };
   const centreOn = ([cx, cy], s) => { st.view = { s, x: W / 2 - cx * fit * s, y: H / 2 - cy * fit * s }; apply(); };
 
-  d = await planBase(site);
+  d = await planBase(site, Boolean(st.draw));
   if (!viewer.isConnected) return;
   // Each lot's points in plan-image pixels, and its centre for the search.
   d.shapes = new Map(); d.centres = new Map();
@@ -1515,7 +1676,8 @@ async function bindLots(c) {
   viewer.querySelectorAll('[data-zoom-step]').forEach(b => { b.onclick = () => zoomAt(view().s * Number(b.dataset.zoomStep)); });
 
   // Drag to move, two fingers to pinch, a click without a drag picks the lot under it (or clears the selection).
-  const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  // Inside the viewer's border, where the stage is placed; a corner of a new lot lands exactly under the pointer.
+  const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left - viewer.clientLeft, e.clientY - r.top - viewer.clientTop]; };
   const down = new Map();
   let moved = false;
   stage.onpointerdown = e => {
@@ -1545,10 +1707,17 @@ async function bindLots(c) {
     const tap = e.type === 'pointerup' && down.size === 1 && !moved;
     down.delete(e.pointerId);
     if (!tap) return;
+    if (st.draw) {
+      // A corner of the lot being added, as a point of the page; the second click of a double click is not another corner.
+      const [px, py] = local(e), v = view(), k = v.s * fit, pt = d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(n * 1e6) / 1e6);
+      const here = d.place(...pt), last = st.draw.length ? d.place(...st.draw.at(-1)) : null;
+      if (pt.every(n => n >= 0 && n <= 1) && !(last && Math.hypot(here[0] - last[0], here[1] - last[1]) * k < 4)) { st.draw.push(pt); paint(); }
+      return;
+    }
     const hit = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot);
     pick(hit && hit.dataset.lot !== st.sel ? hit.dataset.lot : null);
   };
-  stage.ondblclick = e => { const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
+  stage.ondblclick = e => { if (st.draw) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
   viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };
 }
 
@@ -3023,10 +3192,11 @@ let pdfjs;
 /**
  * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
  * across A4, each lot filled with its colour and outlined (unless `withLots` is false), turned the way the plan is turned
- * on screen. Returns {image: PNG data URI, width, height, place(x, y) → that plan point in image pixels, problem};
- * when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
+ * on screen; `whole` draws the whole page instead of the frame. Returns {image: PNG data URI, width, height, place(x, y) →
+ * that plan point in image pixels, at(px, py) → the plan point under an image pixel, page: the PDF page's size in
+ * points, problem}; when the PDF cannot be loaded, `problem` says why and the lots are drawn alone.
  */
-async function planDrawing({ plan, lots }, withLots = true) {
+async function planDrawing({ plan, lots }, withLots = true, whole = false) {
   let doc = null, problem = '';
   try {
     const data = await planBytes(plan.pdfFileUrl);
@@ -3043,7 +3213,7 @@ async function planDrawing({ plan, lots }, withLots = true) {
     // shortcut: without the PDF its page size is unknown, so the lots go on an A4 landscape page; shapes may stretch.
     const base = pdfPage ? pdfPage.getViewport({ scale: 1 }) : { width: 842, height: 595 };
     const polys = lots.map(l => [l, L.lotPolygon(l)]);
-    const f = L.parseFrame(plan.frame) || L.frameAround(polys.map(p => p[1])) || [0, 0, 1, 1];
+    const f = (!whole && (L.parseFrame(plan.frame) || L.frameAround(polys.map(p => p[1])))) || [0, 0, 1, 1];
     const fw = (f[2] - f[0]) * base.width, fh = (f[3] - f[1]) * base.height;
     const sc = 2800 / Math.max(fw, fh);
     const w = Math.max(1, Math.trunc(fw * sc)), h = Math.max(1, Math.trunc(fh * sc));
@@ -3056,6 +3226,7 @@ async function planDrawing({ plan, lots }, withLots = true) {
       await pdfPage.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
     }
     const px = (x, y) => [(x - f[0]) / (f[2] - f[0]) * w, (y - f[1]) / (f[3] - f[1]) * h];
+    const unpx = (a, b) => [f[0] + a / w * (f[2] - f[0]), f[1] + b / h * (f[3] - f[1])], page = [base.width, base.height];
     ctx.lineWidth = 2;
     for (const [l, pts] of withLots ? polys : []) {
       if (pts.length < 3) continue;
@@ -3069,7 +3240,7 @@ async function planDrawing({ plan, lots }, withLots = true) {
       ctx.stroke();
     }
     const deg = ((Number(plan.rotation) || 0) % 360 + 360) % 360;
-    if (!deg) return { image: canvas.toDataURL('image/png'), width: w, height: h, place: px, problem };
+    if (!deg) return { image: canvas.toDataURL('image/png'), width: w, height: h, place: px, at: unpx, page, problem };
     const rad = deg * Math.PI / 180, cos = Math.abs(Math.cos(rad)), sin = Math.abs(Math.sin(rad));
     const out = Object.assign(document.createElement('canvas'), { width: Math.round(w * cos + h * sin), height: Math.round(w * sin + h * cos) });
     // The same clockwise turn about the centre, for points.
@@ -3081,7 +3252,8 @@ async function planDrawing({ plan, lots }, withLots = true) {
     o.translate(out.width / 2, out.height / 2);
     o.rotate(rad); // clockwise, as Matrix.postRotate on the phone
     o.drawImage(canvas, -w / 2, -h / 2);
-    return { image: out.toDataURL('image/png'), width: out.width, height: out.height, place, problem };
+    const at = (a, b) => { const dx = a - out.width / 2, dy = b - out.height / 2; return unpx(dx * c + dy * sn + w / 2, dy * c - dx * sn + h / 2); };
+    return { image: out.toDataURL('image/png'), width: out.width, height: out.height, place, at, page, problem };
   } finally {
     doc?.destroy();
   }

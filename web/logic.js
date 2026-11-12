@@ -1847,3 +1847,106 @@ export const importNotes = sheet => [`Read ${sheet.items.length} items from the 
 
 /** saveBarChart's audit entry. */
 export const chartAudit = json => ({ actionType: 'Bar Chart', details: json ? 'Saved the approved bar chart' : 'Removed the approved bar chart' });
+
+/* ---------- Plans and lots: upload a plan, draw a lot, name it, remove it (SubdivisionPlanTab, ProjectViewModel) ---------- */
+
+/** MANAGE_SDP_PLANS (the Super Admin and Engineer Admins) on a project the account can edit. */
+export const canManagePlans = canDeleteProject;
+
+/** LOT_USES: what a lot of the plan is for. Only saleable lots are housing units. */
+export const LOT_USES = ['Saleable', 'Open Space', 'Road Lot', 'Breaker / Buffer', 'Easement', 'Facility'];
+/** NUMBERED_LOT_BLOCKS: road lots and easements go by one number, kept as the lot number under this block ("RL", "EA"). */
+export const numberedBlock = use => NUMBERED_USES[use];
+
+/** AddSdpPlanDialog's siteNameError: why another site cannot be saved yet, or null. `naming`: the site on screen has no name yet. */
+export function siteNameError(newSite, naming, currentName, taken) {
+  const site = newSite.trim(), same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (!site) return 'Name the new site';
+  if (naming && !currentName.trim()) return 'Name the site already uploaded';
+  if (naming && same(site, currentName)) return 'The two sites need different names';
+  return taken.some(t => same(t, site)) ? `${site} is already a site of this project` : null;
+}
+
+/**
+ * ProjectViewModel.addSdpPlan: a plan uploaded as the next revision of `site` (the site on screen; '' is the first site,
+ * unnamed), or with `f.newSite` as the first plan of another site under the contract, which can name the unnamed first
+ * site (`f.currentSiteName`). `plans` are the project's sdp_plans records; `f`: { planName, pdfFileUrl, description,
+ * newSite (null for a revision), currentSiteName }. Returns { site, build(ids) → the new sdp_plans record, edits:
+ * [[plan, changes]] (the site's plans in use switched off, or the first site named), audit }.
+ */
+export function planUpload(plans, site, f, { user, date }) {
+  const of = p => p.siteName || '', fresh = f.newSite != null, name = fresh ? f.newSite.trim() : site, called = (f.currentSiteName || '').trim();
+  const edits = !fresh ? plans.filter(p => of(p) === name && on(p.isActive)).map(p => [p, { isActive: 0 }])
+    : !site && called ? plans.filter(p => !of(p)).map(p => [p, { siteName: called }]) : [];
+  const version = Math.max(0, ...plans.filter(p => of(p) === name).map(p => Number(p.version) || 0)) + 1, planName = f.planName.trim();
+  return {
+    site: name, edits,
+    build: ids => newRecord(ids, 'sdp_plans', { planName, pdfFileUrl: f.pdfFileUrl, version, isActive: 1, uploadedDate: date, uploadedBy: user,
+      description: f.description.trim(), scaleDenominator: 0, frame: '', siteName: name, rotation: 0 }),
+    audit: { actionType: 'Document Upload', details: `Uploaded Approved SDP Plan${name ? ` (${name})` : ''} Version ${version}: ${planName}`,
+      newValue: `Plan: ${planName}, Version: ${version}, File: ${f.pdfFileUrl}` },
+  };
+}
+
+/** LotArea.squareMetres: the ground area of an outline in page fractions, on a page of `pageW` x `pageH` PDF points drawn at 1:`scale`; two decimals. */
+export function lotAreaSqM(polygon, pageW, pageH, scale) {
+  if (polygon.length < 3 || !(scale > 0)) return 0;
+  const twice = polygon.reduce((t, [x1, y1], i) => { const [x2, y2] = polygon[(i + 1) % polygon.length]; return t + x1 * pageW * y2 * pageH - x2 * pageW * y1 * pageH; }, 0);
+  const metres = 0.0254 / 72 * scale; // a PDF point is 1/72 inch on paper
+  return Math.round(Math.abs(twice) / 2 * metres * metres * 100) / 100;
+}
+
+const unassigned = l => !(l.blockNumber || '').trim() || !(l.lotNumber || '').trim();
+const lotTag = l => `B${l.blockNumber || ''}-L${l.lotNumber || ''}`;
+
+/**
+ * UpdateLotProgressDialog's nameError, also asked of a lot being added (`lot` null): why the block and lot cannot be
+ * saved, or null. A lot found without a name can stay unnamed; "2-b" and "2-B" are the same lot on the plan.
+ */
+export function lotNameError(lot, block, lotNo, lots) {
+  const b = block.trim(), n = lotNo.trim(), same = (x, y) => String(x ?? '').trim().toLowerCase() === y.toLowerCase();
+  if (lot && unassigned(lot) && !b && !n) return null;
+  if (!b || !n) return "Block and lot can't be blank";
+  return lots.some(l => l.uuid !== lot?.uuid && !unassigned(l) && same(l.blockNumber, b) && same(l.lotNumber, n)) ? `Block ${b} Lot ${n} already exists` : null;
+}
+
+/**
+ * ProjectViewModel.addSdpLot: a lot drawn on `plan`. `f`: { use, block, lotNo, unit, area (text), description, polygon
+ * (page fractions) }; a road lot or easement takes its fixed block, and an area that is not a number is the form's 50.
+ * Returns { build(ids) → the sdp_lots record, audit }.
+ * shortcut: the phone's audit text also names the lot by its local id, which the website does not have.
+ */
+export function newLot(plan, f, { user, at }) {
+  const block = (NUMBERED_USES[f.use] || f.block).trim(), lotNo = f.lotNo.trim(), unit = f.use === 'Saleable' ? f.unit.trim() : '';
+  const typed = String(f.area ?? '').trim(), area = typed !== '' && Number.isFinite(Number(typed)) ? Number(typed) : 50;
+  return {
+    build: ids => newRecord(ids, 'sdp_lots', {
+      blockNumber: block, lotNumber: lotNo, housingUnitNumber: unit, lotAreaSqM: area, polygonNormalizedJson: JSON.stringify(f.polygon), isActive: 1,
+      description: f.description.trim(), lotUse: f.use, createdBy: user, createdDate: at, lastModifiedBy: user, lastModifiedDate: at, _ref_sdpPlanId: plan.uuid,
+    }),
+    audit: { actionType: 'Lot Created', details: `Digitized Lot B${block}-L${lotNo}`,
+      newValue: `${f.use}: Block ${block}, Lot ${lotNo}, Unit: ${unit}, Area: ${Number.isInteger(area) ? area.toFixed(1) : area}sqm` },
+  };
+}
+
+/**
+ * setSdpLotUse and renameSdpLot for one save of a lot's name form: the sdp_lots columns to write and their audit
+ * entries, or null when nothing changed. `f`: { use, block, lotNo }; a blank block or lot keeps the name.
+ */
+export function lotNameSave(lot, f, { user, at }) {
+  const block = f.block.trim(), lotNo = f.lotNo.trim(), was = lotUse(lot);
+  const renamed = Boolean(block && lotNo) && (block !== (lot.blockNumber || '') || lotNo !== (lot.lotNumber || ''));
+  const named = renamed ? { blockNumber: block, lotNumber: lotNo } : {}, used = f.use !== was ? { lotUse: f.use } : {};
+  const audits = [
+    f.use !== was && { actionType: 'Lot Use Changed', details: `Marked 1 lot(s) as ${f.use}: ${lotTag({ ...lot, ...named })}`, oldValue: was, newValue: f.use },
+    renamed && { actionType: 'Lot Renamed', details: `Renamed ${lotTag(lot)} to ${lotTag(named)}`,
+      oldValue: `Block ${lot.blockNumber || ''} Lot ${lot.lotNumber || ''}`, newValue: `Block ${block} Lot ${lotNo}` },
+  ].filter(Boolean);
+  return audits.length ? { changes: { ...used, ...named, lastModifiedBy: user, lastModifiedDate: at }, audits } : null;
+}
+
+/** ProjectViewModel.deactivateSdpLot: the lot taken off the plan (its record stays, switched off) and its audit entry. */
+export const lotRemoved = (lot, { user, at }) => ({
+  changes: { isActive: 0, lastModifiedBy: user, lastModifiedDate: at },
+  audit: { actionType: 'Lot Deactivated', details: `Deactivated Lot ${lotTag(lot)}`, oldValue: 'Active', newValue: 'Deactivated' },
+});

@@ -599,6 +599,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* As on the phone: billed lots get a dashed blue edge, unmatched lots fade, the selected lot is amber. */
 .lot-stage polygon.billed { stroke: var(--primary); stroke-width: 3.5; stroke-dasharray: 14 7; }
 .lot-stage polygon.dim { fill-opacity: 0.08; stroke: #94A3B8; stroke-opacity: 0.25; stroke-width: 0.75; }
+.lot-stage .draft { fill: #1D4ED8; fill-opacity: 0.2; stroke: #1D4ED8; stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.lot-stage polyline.draft { fill: none; }
+.lot-stage path.draft { stroke-width: 10; } /* a corner: a dot the same size at any zoom */
+.lot-viewer.drawing .lot-stage, .lot-viewer.drawing .lot-stage:active { cursor: crosshair; }
+.lot-draw { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 8px; }
+.lot-draw p { flex: 1 1 240px; margin: 0; }
 .lot-stage polygon.sel { fill: var(--watch); fill-opacity: 0.65; stroke: var(--watch); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
 .lot-legend .dot.billed { background: none; border: 2px dashed var(--primary); width: 8px; height: 8px; }
 .zoom-bar { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }

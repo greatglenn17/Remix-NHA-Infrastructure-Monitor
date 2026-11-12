@@ -961,3 +961,68 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].map(role => L.canEditChart(project, 'u1', { role })), [true, true, false]);
   assert.equal(L.canEditChart(project, 'x', { role: 'ENGINEER_ADMIN' }), false);
 });
+
+test('plans and lots: a plan upload, a drawn lot, its name and use, and removing it are written like the phone', () => {
+  const ids = { uuid: 'new', projectUuid: 'p1', assignedUids: ['u1'], uid: 'u1', now: 1794292093231 };
+  const who = { user: 'Engr. Cruz', at: '2026-11-12 09:30' };
+  const plans = [{ uuid: 'a1', siteName: '', version: 1, isActive: 0 }, { uuid: 'a2', siteName: '', version: 2, isActive: 1 }, { uuid: 'b1', siteName: 'Phase 2', version: 1, isActive: 1 }];
+  const f = { planName: ' SDP rev 2 ', pdfFileUrl: 'nhafile:p1/x.pdf', description: ' as approved ', newSite: null, currentSiteName: '' };
+
+  // A revision of the unnamed first site: the next version, in use, and the plan that was in use switched off.
+  const revised = L.planUpload(plans, '', f, { user: 'Engr. Cruz', date: '2026-11-12' });
+  assert.deepEqual([revised.site, revised.edits], ['', [[plans[1], { isActive: 0 }]]]);
+  const plan = revised.build(ids);
+  assert.deepEqual({ ...plan, data: JSON.parse(plan.data) }, { uuid: 'new', type: 'sdp_plans', projectUuid: 'p1', assignedUids: ['u1'], revision: 1, updatedAt: 1794292093231, updatedByUid: 'u1', isDeleted: false,
+    data: { planName: 'SDP rev 2', pdfFileUrl: 'nhafile:p1/x.pdf', version: 3, isActive: 1, uploadedDate: '2026-11-12', uploadedBy: 'Engr. Cruz', description: 'as approved', scaleDenominator: 0, frame: '', siteName: '', rotation: 0 } });
+  assert.deepEqual(revised.audit, { actionType: 'Document Upload', details: 'Uploaded Approved SDP Plan Version 3: SDP rev 2', newValue: 'Plan: SDP rev 2, Version: 3, File: nhafile:p1/x.pdf' });
+  // Another site: version 1 of it, and the first site's plans take the name given to it.
+  const site = L.planUpload(plans, '', { ...f, newSite: ' Phase 3 ', currentSiteName: ' Phase 1 ' }, { user: 'x', date: '2026-11-12' });
+  assert.deepEqual([site.site, site.edits, JSON.parse(site.build(ids).data).version, site.audit.details],
+    ['Phase 3', [[plans[0], { siteName: 'Phase 1' }], [plans[1], { siteName: 'Phase 1' }]], 1, 'Uploaded Approved SDP Plan (Phase 3) Version 1: SDP rev 2']);
+  // From a named site nothing is renamed; the first plan of a project is version 1 of the unnamed site.
+  assert.deepEqual(L.planUpload(plans, 'Phase 2', { ...f, newSite: 'Phase 3' }, { user: 'x', date: 'd' }).edits, []);
+  assert.deepEqual([L.planUpload(plans, 'Phase 2', f, { user: 'x', date: 'd' }).edits, JSON.parse(L.planUpload([], '', f, { user: 'x', date: 'd' }).build(ids).data).version], [[[plans[2], { isActive: 0 }]], 1]);
+  assert.deepEqual([L.siteNameError(' ', false, '', []), L.siteNameError('Phase 3', true, ' ', []), L.siteNameError('phase 1', true, 'Phase 1 ', []), L.siteNameError(' phase 2', false, '', ['', 'Phase 2']), L.siteNameError('Phase 3', true, 'Phase 1', ['', 'Phase 2'])],
+    ['Name the new site', 'Name the site already uploaded', 'The two sites need different names', 'phase 2 is already a site of this project', null]);
+
+  // A lot's area from the plan's scale: 10% x 10% of an A1 sheet (2384 x 1684 pt) at 1:1000.
+  assert.equal(L.lotAreaSqM([[0.1, 0.1], [0.2, 0.1], [0.2, 0.2], [0.1, 0.2]], 2384, 1684, 1000), 4996.33);
+  assert.deepEqual([L.lotAreaSqM([[0, 0], [1, 1]], 100, 100, 1000), L.lotAreaSqM([[0, 0], [1, 0], [1, 1]], 100, 100, 0)], [0, 0]);
+
+  const lots = [{ uuid: 'l1', blockNumber: '3', lotNumber: '2-B', lotUse: 'Saleable', revision: 1, updatedAt: 5 }, { uuid: 'l2', blockNumber: '', lotNumber: '', lotUse: '' }];
+  assert.deepEqual([L.lotNameError(null, '3', ' 2-b ', lots), L.lotNameError(null, '', '4', lots), L.lotNameError(null, '3', '4', lots), L.lotNameError(lots[0], '3', '2-B', lots),
+    L.lotNameError(lots[1], '', '', lots), L.lotNameError(lots[1], '3', '', lots), L.lotNameError(lots[1], '3', '2-b', lots)],
+    ['Block 3 Lot 2-b already exists', "Block and lot can't be blank", null, null, null, "Block and lot can't be blank", 'Block 3 Lot 2-b already exists']);
+
+  // A drawn lot: the sdp_lots row under its plan; a road lot goes by one number under block RL, with no housing unit.
+  const polygon = [[0.1, 0.1], [0.2, 0.1], [0.2, 0.2]];
+  const made = L.newLot({ uuid: 'a2' }, { use: 'Saleable', block: ' 3 ', lotNo: ' 12 ', unit: ' HU-7 ', area: '62.5', description: ' corner lot ', polygon }, who);
+  const lot = made.build(ids);
+  assert.deepEqual({ ...lot, data: JSON.parse(lot.data) }, { uuid: 'new', type: 'sdp_lots', projectUuid: 'p1', assignedUids: ['u1'], revision: 1, updatedAt: 1794292093231, updatedByUid: 'u1', isDeleted: false,
+    data: { blockNumber: '3', lotNumber: '12', housingUnitNumber: 'HU-7', lotAreaSqM: 62.5, polygonNormalizedJson: '[[0.1,0.1],[0.2,0.1],[0.2,0.2]]', isActive: 1, description: 'corner lot', lotUse: 'Saleable',
+      createdBy: 'Engr. Cruz', createdDate: '2026-11-12 09:30', lastModifiedBy: 'Engr. Cruz', lastModifiedDate: '2026-11-12 09:30', _ref_sdpPlanId: 'a2' } });
+  assert.deepEqual(made.audit, { actionType: 'Lot Created', details: 'Digitized Lot B3-L12', newValue: 'Saleable: Block 3, Lot 12, Unit: HU-7, Area: 62.5sqm' });
+  const road = L.newLot({ uuid: 'a2' }, { use: 'Road Lot', block: 'ignored', lotNo: '4', unit: 'HU-9', area: 'abc', description: '', polygon }, who);
+  assert.deepEqual([JSON.parse(road.build(ids).data).blockNumber, JSON.parse(road.build(ids).data).housingUnitNumber, road.audit.newValue], ['RL', '', 'Road Lot: Block RL, Lot 4, Unit: , Area: 50.0sqm']);
+  assert.deepEqual([L.numberedBlock('Road Lot'), L.numberedBlock('Easement'), L.numberedBlock('Saleable')], ['RL', 'EA', undefined]);
+  // The lot it makes reads back as the website shows lots.
+  assert.equal(L.lotLabel(JSON.parse(road.build(ids).data)), 'Road Lot 4');
+
+  // Name and use: only what changed is written, each with the phone's audit entry; nothing changed writes nothing.
+  assert.equal(L.lotNameSave(lots[0], { use: 'Saleable', block: '3', lotNo: '2-B' }, who), null);
+  assert.deepEqual(L.lotNameSave(lots[0], { use: 'Open Space', block: ' 4 ', lotNo: '1' }, who), {
+    changes: { lotUse: 'Open Space', blockNumber: '4', lotNumber: '1', lastModifiedBy: 'Engr. Cruz', lastModifiedDate: '2026-11-12 09:30' },
+    audits: [{ actionType: 'Lot Use Changed', details: 'Marked 1 lot(s) as Open Space: B4-L1', oldValue: 'Saleable', newValue: 'Open Space' },
+      { actionType: 'Lot Renamed', details: 'Renamed B3-L2-B to B4-L1', oldValue: 'Block 3 Lot 2-B', newValue: 'Block 4 Lot 1' }] });
+  // An unnamed lot keeps no name when its boxes are left blank; its use can still change.
+  assert.deepEqual(L.lotNameSave(lots[1], { use: 'Facility', block: '', lotNo: '' }, who), {
+    changes: { lotUse: 'Facility', lastModifiedBy: 'Engr. Cruz', lastModifiedDate: '2026-11-12 09:30' },
+    audits: [{ actionType: 'Lot Use Changed', details: 'Marked 1 lot(s) as Facility: B-L', oldValue: 'Saleable', newValue: 'Facility' }] });
+  assert.deepEqual(L.lotRemoved(lots[0], who), { changes: { isActive: 0, lastModifiedBy: 'Engr. Cruz', lastModifiedDate: '2026-11-12 09:30' },
+    audit: { actionType: 'Lot Deactivated', details: 'Deactivated Lot B3-L2-B', oldValue: 'Active', newValue: 'Deactivated' } });
+  // A removed lot is gone from its site.
+  const records = [{ type: 'sdp_plans', uuid: 'a2', siteName: '', version: 2, isActive: 1, uploadedDate: '2026-03-10' },
+    { type: 'sdp_lots', _ref_sdpPlanId: 'a2', ...lots[0], ...L.lotRemoved(lots[0], who).changes }, { type: 'sdp_lots', uuid: 'l3', _ref_sdpPlanId: 'a2', blockNumber: '1', lotNumber: '1', isActive: 1 }];
+  assert.deepEqual(L.sdpSites(records)[0].lots.map(l => l.uuid), ['l3']);
+  assert.deepEqual(['SUPER_ADMIN', 'ENGINEER_ADMIN', 'FIELD_ENGINEER'].map(role => L.canManagePlans({ assignedUids: ['u1'] }, 'u1', { role })), [true, true, false]);
+});
