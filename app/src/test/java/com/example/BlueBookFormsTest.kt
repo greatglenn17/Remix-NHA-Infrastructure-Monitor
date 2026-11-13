@@ -86,7 +86,7 @@ class BlueBookFormsTest {
     @Test
     fun profile_isA4AndEscapesText() {
         val html = BlueBookForms.projectProfile(project, ContractLogs.from(project, docs), Preparer("Glenn C. Aprovechado", "Principal Engineer C", "Bulacan District Office"), LocalDate.of(2026, 5, 31))
-        assertTrue(html.contains("size: A4"))
+        assertTrue(html.contains("size: A4; margin: 12mm"))
         assertTrue(html.contains("St. Ildephonsus &lt;Phase 1&gt;"))
         assertFalse(html.contains("<Phase 1>"))
         assertTrue(html.contains("September 24, 2018"))
@@ -210,6 +210,9 @@ class BlueBookFormsTest {
             Signatories("Glenn C. Aprovechado", "Principal Engineer C", "Ana Cruz", "District Manager", "", "Regional Manager"),
             banner = "data:image/png;base64,AAAA"
         )
+        // The website's page: 6mm margins, the contract cost on one line, the day counts with their unit.
+        assertTrue(html.contains("size: A4; margin: 6mm"))
+        assertTrue(html.contains("<td class='nw'>Php 495,623,331.00</td><td class='lab'>DAYS ELAPSED:</td><td>10 calendar days</td>"))
         assertEquals(7, Regex("<svg").findAll(html).count())
         // 24 hour slices per clock; days with no log are drawn empty.
         assertEquals(7 * 24, Regex("<path").findAll(html).count())
