@@ -401,8 +401,12 @@ export function storagePathOf(ref) {
   return m[1] ? `attachments/${m[1]}/${m[2]}` : `attachments/${m[2]}`;
 }
 
-/** Attachments.refsIn: every `nhafile:` reference anywhere in `value` (a record, a list of them, a project). */
-export const fileRefsIn = value => JSON.stringify(value ?? '').match(/nhafile:(?:[0-9a-f-]{36}\/)?[0-9a-f-]{36}\.(?:jpg|pdf)/g) || [];
+/**
+ * Attachments.refsIn: every `nhafile:` reference anywhere in `value` (a record, a list of them, a project).
+ * Backslashes are dropped first: a phone writes a list of references as JSON with each / as \/ (org.json), and a
+ * reference read past that would look like a file nothing holds.
+ */
+export const fileRefsIn = value => JSON.stringify(value ?? '').replace(/\\/g, '').match(/nhafile:(?:[0-9a-f-]{36}\/)?[0-9a-f-]{36}\.(?:jpg|pdf)/g) || [];
 
 /**
  * Attachments' orphan cleanup for one save: the files `before` (records as they were) held that nothing holds after it.
