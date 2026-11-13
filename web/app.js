@@ -889,6 +889,7 @@ function drawProject(page) {
   if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
   if (document.getElementById('audit-results')) bindAudit(c);
   loadFiles(main);
+  loadMissingPhotos(c);
 }
 
 /* ---------- Summary (SummarySection) ---------- */
@@ -3326,9 +3327,29 @@ function photosView({ weekly, project }) {
   const albums = weekly.map(r => [r, L.attachmentList(r.attachedPhotoUrlsJson)]).filter(([, p]) => p.length);
   const total = albums.reduce((t, [, p]) => t + p.length, 0);
   if (!total) return `<div class="card empty">${icon('photo_library')}<p>No site update photos uploaded yet</p><small>Update photos attached to weekly reports will appear here.</small></div>`;
-  return `<h2 class="list-title">Project update photo gallery (${plural(total, 'photo')})</h2>${albums.map(([r, refs]) => `
+  return `<h2 class="list-title">Project update photo gallery (${plural(total, 'photo')})</h2><div id="missing-photos"></div>${albums.map(([r, refs]) => `
     <section class="card section album"><div class="section-head">${icon('photo_library')}<h2>${esc(r.reportingWeek)} · ${plural(refs.length, 'photo')}</h2>${editable ? photosButton(r, refs.length) : ''}</div>
       <p class="muted">By ${esc(r.submittedByStaff || '-')}</p>${photoGrid(refs, L.photoDetails(r.photoDetailsJson))}</section>`).join('')}`;
+}
+
+/**
+ * Photos: names the weekly reports that list a photo Storage cannot give, once every photo's address is known
+ * (the gallery asks for each anyway). An editor opens the report's photos from here to take it off and add it again.
+ */
+async function loadMissingPhotos(c) {
+  const box = document.getElementById('missing-photos');
+  if (!box) return;
+  const refs = [...new Set(c.weekly.flatMap(r => L.attachmentList(r.attachedPhotoUrlsJson)))].filter(L.storagePathOf);
+  const urls = await Promise.all(refs.map(photoUrl));
+  const rows = L.missingPhotos(c.weekly, new Set(refs.filter((_, i) => !urls[i])));
+  if (!rows.length || !box.isConnected) return;
+  const total = rows.reduce((t, x) => t + x.count, 0), editable = L.canEdit(c.project, s.user.uid, s.claims);
+  box.innerHTML = `<div class="alert warning missing-photos" role="status">${icon('warning', 'sm')}<div>
+    <b>${plural(total, 'photo')} on ${plural(rows.length, 'weekly report')} ${total === 1 ? 'is' : 'are'} not in the cloud, or this account cannot open ${total === 1 ? 'it' : 'them'}.</b>
+    <ul>${rows.map(({ report, count }) => `<li>${esc(report.reportingWeek)} · ${plural(count, 'photo')}${editable ? photosButton(report, count) : ''}</li>`).join('')}</ul>
+    ${editable ? '<p>To put a photo back, open Edit photos, tick Remove on the one marked Not available, and add it again. One a phone has not sent yet comes back by itself when that phone syncs.</p>' : ''}
+  </div></div>`;
+  box.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => editPhotos(c, c.weekly.find(x => x.uuid === b.dataset.editPhotos)); });
 }
 
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
