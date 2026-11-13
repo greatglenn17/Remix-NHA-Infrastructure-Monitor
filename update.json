@@ -1,8 +1,8 @@
 {
-  "versionCode": 296,
-  "versionName": "2.8.16",
-  "releaseNotes": "v2.8.16: Saving or editing a weekly report for an older week no longer sets the project's target and actual accomplishment back to that week's figures.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.16/NHA_Monitor_v2.8.16_Build296.apk",
-  "apkSha256": "a95ef2cdfdc4015db1ec31f8f30d8f79e63c724e53de596f23f9088023e5d6c1",
+  "versionCode": 297,
+  "versionName": "2.8.17",
+  "releaseNotes": "v2.8.17: The clean-up of unused files no longer deletes the photos a weekly report lists.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.17/NHA_Monitor_v2.8.17_Build297.apk",
+  "apkSha256": "ccdd9d4b6a554c12b7b65e5dc90fb05532f5801def1bb462fdb8dbb40666fbe1",
   "isMandatory": true
 }
