@@ -90,6 +90,26 @@ class RecordSyncRemovalTest {
         assertTrue(reply in recordSync.attachmentRefsOf(id))
     }
 
+    // A weekly report's photo list is saved by Android's JSONArray, which writes "/" as "\/".
+    @Test
+    fun weeklyReportPhoto_inTheListAsThePhoneSavesIt_isAProjectFile() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        val name = "${fileId()}.jpg"
+        val photo = "nhafile:${p.projectUuid}/$name"
+        val saved = org.json.JSONArray(listOf(photo)).toString()
+        assertTrue("the saved list escapes the slash", "${p.projectUuid}\\/" in saved)
+        db.reportDao().insertWeeklyReport(com.example.data.model.WeeklyReport(
+            projectId = id, reportingWeek = "W", daysElapsed = 0, remainingDays = 0,
+            targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0, manpowerJson = "[]", equipmentJson = "[]",
+            activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
+            attachedPhotoUrlsJson = saved, submittedByStaff = "S"
+        ))
+
+        assertEquals(setOf(photo), recordSync.attachmentRefsOf(id))
+        assertEquals(setOf(name), recordSync.attachmentNamesOf(id))
+    }
+
     // A project's audit entry goes to the cloud with who did it; a sign-in has no project, so nothing is built for it.
     @Test
     fun projectAuditEntry_isUploaded_butOneWithoutAProjectIsNot() = runBlocking {
