@@ -694,6 +694,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .edit-form [data-today] { justify-self: start; margin-top: -8px; }
 .edit-form h3 { margin: 6px 0 -10px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--link); }
 .edit-form h3 + p { margin: 0; font-size: 13px; }
+.edit-form .field + .chips { margin: -6px 0 0; }
 .order-fields { display: grid; gap: 14px; }
 .weekly-add { margin: 16px 0 12px; }
 .edit-form [hidden] { display: none; }

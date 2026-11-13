@@ -221,7 +221,7 @@ is read only.
   cannot be loaded there is no Save, so an empty list can never clear the project.
 - **Signatories** on the print page of a weekly or a monthly report, for the people who can edit the project, is the
   app's signatories form: name, position and office for Prepared by, Checked by and Noted by, with the app's
-  suggested positions and offices (any other text can be typed). It starts with what the sheet shows
+  suggested positions and offices as buttons under each box (any other text can be typed). It starts with what the sheet shows
   (`P.weeklySignatories`, `P.monthlySignatories`). Save writes the fields that differ to the project
   (`L.signatoryFields`), one revision up, with the app's "Project Edit" audit entry, and the sheet redraws. Prepared
   by is shared by both reports; the weekly report has its own checker and noter. The phone asks for them each time

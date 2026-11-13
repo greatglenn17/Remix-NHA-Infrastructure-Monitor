@@ -3468,18 +3468,19 @@ function signatoriesForm(c, weekly) {
   const start = (weekly ? P.weeklySignatories : P.monthlySignatories)(c.project, s.profile);
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
-  const list = (id, values) => `<datalist id="${id}">${values.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  // The usual choices as buttons under the box: a suggestion list only offers what matches the text already in it.
+  const pick = (name, label, values) => `<label class="field">${label}<input name="${name}" value="${esc(start[name])}"></label>
+    <div class="chips" role="group" aria-label="${label} choices">${values.map(v => `<button type="button" data-fill="${name}">${esc(v)}</button>`).join('')}</div>`;
   const signer = (title, key, positions) => `<h3>${title}</h3>
     <label class="field">Name<input name="${key}Name" value="${esc(start[`${key}Name`])}"></label>
-    <label class="field">Position<input name="${key}Position" list="sg-${key}" value="${esc(start[`${key}Position`])}"></label>${list(`sg-${key}`, positions)}
-    <label class="field">Office<input name="${key}Office" list="sg-offices" value="${esc(start[`${key}Office`])}"></label>`;
+    ${pick(`${key}Position`, 'Position', positions)}
+    ${pick(`${key}Office`, 'Office', L.SIGNATORY_OFFICES)}`;
   const at = L.SIGNATORY_POSITIONS;
   d.innerHTML = `<form novalidate>
     <h2>${weekly ? 'Weekly' : 'Monthly'} report signatories</h2>
     ${signer('Prepared by', 'prepared', at.prepared)}
     ${signer(weekly ? 'Checked and reviewed by' : 'Checked by', 'checked', weekly ? at.weeklyChecked : at.checked)}
     ${signer('Noted by', 'noted', weekly ? at.weeklyNoted : at.noted)}
-    ${list('sg-offices', L.SIGNATORY_OFFICES)}
     <p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
@@ -3488,6 +3489,10 @@ function signatoriesForm(c, weekly) {
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
   const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the signatories?')) && done();
+  const mark = () => d.querySelectorAll('[data-fill]').forEach(b => b.setAttribute('aria-pressed', form.elements[b.dataset.fill].value.trim() === b.textContent));
+  form.addEventListener('click', e => { const b = e.target.closest('[data-fill]'); if (b) { form.elements[b.dataset.fill].value = b.textContent; mark(); } });
+  form.addEventListener('input', mark);
+  mark();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
