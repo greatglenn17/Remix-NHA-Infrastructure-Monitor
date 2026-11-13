@@ -22,7 +22,6 @@ import com.example.data.model.ProjectPayment
 import com.example.data.model.billingUnitName
 import com.example.data.model.netAmount
 import com.example.ui.theme.LocalNHAColors
-import com.example.ui.theme.TabularNumbers
 import com.example.util.ProjectSchedule
 import com.example.utils.CurrencyFormatter
 
@@ -59,7 +58,7 @@ fun PaymentCard(
                     )
                     Text(
                         "DV ${payment.dvNo.ifBlank { "N/A" }}",
-                        // No tabular digits: Inter then widens the hyphens in "2026-03-0141".
+                        // A reference number, not a measured figure: it stays in the text face.
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant
                     )
@@ -81,7 +80,7 @@ fun PaymentCard(
                 )
                 if (payment.billingType.isNotBlank()) Text(
                     "${payment.billingType} · ${payment.units} ${billingUnitName(payment.billingType)}${if (payment.units == 1) "" else "s"} × ${CurrencyFormatter.formatPhp(payment.unitPrice)}",
-                    style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+                    style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )

@@ -37,50 +37,50 @@ colors:
   bar-link: "#93C5FD"
 typography:
   display:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "34px"
     fontWeight: 600
     lineHeight: 1.15
     letterSpacing: "-0.6px"
   headline:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "24px"
     fontWeight: 600
     letterSpacing: "-0.3px"
   title-lg:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "22px"
     fontWeight: 600
     letterSpacing: "-0.2px"
   title:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 600
     lineHeight: 1.3
   title-sm:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "14px"
     fontWeight: 600
   body:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.45
   body-sm:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "13px"
     fontWeight: 400
   label:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 400
   label-sm:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: "IBM Plex Sans, system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 600
   numeric:
-    fontFamily: "Inter, system-ui, sans-serif"
-    fontFeature: "tnum"
+    fontFamily: "IBM Plex Mono, ui-monospace, monospace"
+    fontWeight: 600
 rounded:
   bar: "5px"
   xs: "4px"
@@ -172,7 +172,7 @@ It rejects the generic admin template (side menu, KPI cards, blue-on-white data 
 - Always dark (`color-scheme: dark`), whatever the device's setting. There is no light theme.
 - Near-black dot-grid canvas, dark hairline panels, 12px card radius, no shadows; cards lift 2px on hover.
 - Blue for interaction and on-plan work, violet for Billed. Status colours are for status only.
-- Inter throughout, two weights only (400 and 600), nothing under 12px, all text at least 4.5:1 contrast (2026-11-10). The Blue Book prints keep their own form styling. Tabular figures only on numbers that line up.
+- IBM Plex Sans for text and IBM Plex Mono for measured figures (user's choice, 2026-11-14, replacing Inter), two weights only (400 and 600), nothing under 12px, all text at least 4.5:1 contrast (2026-11-10). The Blue Book prints keep their own form styling.
 - Material Symbols Outlined icons at 20px (16px small), always next to a text label.
 - One motion: the progress bars fill in when data arrives.
 
@@ -214,17 +214,18 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 
 ## Typography
 
-**Display Font:** Inter (bundled at `web/fonts/Inter.ttf`, OFL, variable weight 100 to 900), falling back to system-ui, sans-serif
-**Body Font:** Inter (same file)
+**Display Font:** IBM Plex Sans (bundled at `web/fonts/IBMPlexSans.ttf`, OFL, variable weight 100 to 700), falling back to system-ui, sans-serif
+**Body Font:** IBM Plex Sans (same file)
+**Figure Font:** IBM Plex Mono (`web/fonts/IBMPlexMono-Regular.ttf` and `-SemiBold.ttf`, OFL), falling back to the system monospace
 
-**Character:** One neutral grotesque at 400 to 700. Titles get slight negative tracking. The hierarchy is built mostly from weight and grey, which matches the app's Type.kt and keeps a projector screen calm.
+**Character:** An engineered grotesque with squared terminals, from IBM's drafting and typewriter heritage, beside its monospace for figures, so a number reads as an instrument readout. Titles get slight negative tracking. The hierarchy is built mostly from weight and grey, which matches the app's Type.kt and keeps a projector screen calm.
 
 ### Hierarchy
 - **Display** (600, 34px, 1.15, -0.6px; 26px under 900px): the sign-in hero headline only, with a measure of about 14ch.
 - **Headline** (600, 24px, -0.3px): the sign-in form title.
 - **Banner Count** (700, 30px, -0.03em, uppercase, tabular; 26px under 600px): the project count in the dashboard banner.
 - **Title Large** (600, 22px, -0.2px): the project name and the large progress figure in the project header.
-- **Card Figure** (700, 17px to 20px, `clamp(17px, 1.25vw, 20px)`, tabular): the Work done and Billed values on project cards, sized to read from the back of a meeting room.
+- **Card Figure** (700, 17px to 20px, `clamp(17px, 1.25vw, 20px)`, IBM Plex Mono): the Work done and Billed values on project cards, sized to read from the back of a meeting room.
 - **Title** (600, 16px, 1.3): project card names, clamped to two lines.
 - **Title Small** (600, 14px): section-card headings and dialog terms.
 - **Body** (400, 15px, 1.45): default text and input values.
@@ -234,7 +235,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 - **Office line** (600, 11px or 12px, uppercase, 0.6px or 1px tracking): the office name under the brand title in the app bar and at the foot of the sign-in hero. It always sits under its title and is never a section label.
 
 ### Named Rules
-**The Tabular-Where-It-Lines-Up Rule.** `font-variant-numeric: tabular-nums` applies only to numeric elements: table number cells, progress values, filter counts, and the portfolio total. Names (contractor, office, engineer) are Inter, never monospace; only money amounts in the Contract cost card and dates on the timeline keep the system monospace. Running text keeps proportional figures. This mirrors Type.kt TabularNumbers.
+**The Figures-In-Mono Rule.** A value that is only a measured figure (an amount, a percentage or a number: `L.isFigure` on the site, `isFigure` in Type.kt) is set in IBM Plex Mono: table number cells, the Work done and Billed values, filter counts, key-value amounts, the Contract cost amounts and the timeline dates. Words, and figures mixed with words ("36.27% behind", "540 days", status badges, table headings), stay in IBM Plex Sans, whose figures are tabular as drawn. Monospace is never used for names or labels.
 
 ## Layout
 
@@ -296,7 +297,7 @@ A small pill in 700 12px, with status colour text on its container. An overdue p
 
 ### Project Summary cards
 - **Needs attention:** one alert box per flag (12px radius, 1px outline). Critical flags (overdue, 15%+ behind) are rose with a pulsing dot (still under reduced motion); warnings are amber with a warning icon.
-- **Project profile:** a 2:1 blueprint placeholder (16px blue grid on deep navy, compass icon, "No site photo yet") until a photo loads, then 16:9. Attribute values are Inter; the contractor is Link Blue; empty values show a faded dash.
+- **Project profile:** a 2:1 blueprint placeholder (16px blue grid on deep navy, compass icon, "No site photo yet") until a photo loads, then 16:9. Attribute values are IBM Plex Sans (a figure on its own is mono); the contractor is Link Blue; empty values show a faded dash.
 - **Key dates:** a vertical timeline. Filled blue dot = date passed (the line after it turns blue), hollow = ahead, rose dot with a halo = a completion date passed on an unfinished project, dashed = not set. Days left is a badge: rose when overdue, without a glow. "No time extension or suspension orders" carries a faded amber warning icon.
 - **Contract cost:** Original cost and Current cost as Field modules, each with a 16px icon label and the amount in bold monospace (22px to 28px).
 - **Latest weekly report:** week, target, actual and submitter, with the open-issues count as a badge (quiet green at 0, amber above). Empty: a faded grid tile, "No weekly reports yet", and the badge.
@@ -311,7 +312,7 @@ The label (14px `text-2`) on the left; the value (Card Figure) and a 13px note o
 - **Do** take type values from the app's theme files, and colours only from the command-center tokens above.
 - **Do** pair Work done (schedule colour) with Billed (violet) wherever a project's progress appears.
 - **Do** put a text label next to every Material Symbols icon, and keep icons at 20px or 16px.
-- **Do** apply tabular figures only to numbers that align (table cells, progress values, counts, totals).
+- **Do** set a value in the mono only when it is a figure on its own (the Figures-In-Mono Rule).
 - **Do** define panels with a 1px hairline over the dot-grid canvas, without shadows.
 - **Do** keep the page dark on every device.
 

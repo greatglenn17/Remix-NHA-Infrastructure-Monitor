@@ -24,7 +24,7 @@ import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.ui.components.DateField
 import com.example.ui.components.LongForm
-import com.example.ui.theme.TabularNumbers
+import com.example.ui.theme.figures
 import com.example.util.BarChart
 import com.example.util.BarChartExcel
 import com.example.util.ContractCost
@@ -78,7 +78,7 @@ private fun MonthTable(version: BarChart.Version) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             values.forEachIndexed { i, v ->
                 Text(
-                    v, style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+                    v, style = MaterialTheme.typography.bodySmall.figures(v),
                     color = if (bold) scheme.onSurfaceVariant else scheme.onSurface,
                     fontWeight = if (bold) FontWeight.SemiBold else null,
                     textAlign = if (i > 0) TextAlign.End else null, modifier = Modifier.weight(1f)

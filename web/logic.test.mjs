@@ -403,6 +403,11 @@ test('weekly report photos: titles, removals and additions, and the project card
   assert.equal(L.latestSitePhoto([{ createdAtTimestamp: 1, attachedPhotoUrlsJson: '[]' }]), '');
 });
 
+test('a figure is an amount, a percentage or a number on its own', () => {
+  for (const v of ['₱30,000,000.00', '-₱500.00', '41.25%', '400', 0, ' 7.50% ']) assert.equal(L.isFigure(v), true, String(v));
+  for (const v of ['No billings yet', '540 days', 'Jan 5, 2026', '2026-10-15', '77.52% · Month 11', '', null, '-']) assert.equal(L.isFigure(v), false, String(v));
+});
+
 test('missing photos: the reports that list one Storage could not give, with how many', () => {
   const a = 'nhafile:p/a.jpg', b = 'nhafile:p/b.jpg', n = 'nhafile:p/n.jpg';
   const weekly = [

@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.TabularNumbers
+import com.example.ui.theme.figures
 
 /** White card with a 1dp outline, a titled header and an optional action (spec "Design system"). */
 @Composable
@@ -64,7 +64,7 @@ fun Field(label: String, value: String, modifier: Modifier = Modifier) {
         Spacer(Modifier.width(12.dp))
         Text(
             value,
-            style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+            style = MaterialTheme.typography.bodySmall.figures(value),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.End,
