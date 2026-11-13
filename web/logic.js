@@ -535,6 +535,9 @@ export const missingPhotos = (weekly, gone) => weekly
 
 export const isPdf = ref => /\.pdf$/i.test(ref || '');
 
+/** Whether a shown value is only a measured figure (an amount, a percentage or a number), which the site sets in its mono face. */
+export const isFigure = v => /^-?₱?\d[\d,.]*%?$/.test(String(v ?? '').trim());
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 /** "Oct 24, 2026" or "October 24, 2026" as UTC ms; null otherwise. */
 function longDay(text) {

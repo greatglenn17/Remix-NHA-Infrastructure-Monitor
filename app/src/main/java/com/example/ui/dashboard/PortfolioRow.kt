@@ -36,7 +36,7 @@ import com.example.data.model.ProjectStatus
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.Motion
 import com.example.ui.theme.NHAColors
-import com.example.ui.theme.TabularNumbers
+import com.example.ui.theme.figures
 import com.example.util.AttentionKind
 import com.example.util.AttentionLevel
 import com.example.util.PortfolioItem
@@ -236,7 +236,7 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
             Row {
                 Text(
                     value.substringBefore(" · "),
-                    style = MaterialTheme.typography.titleLarge.merge(TabularNumbers),
+                    style = MaterialTheme.typography.titleLarge.figures(value.substringBefore(" · ")),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     modifier = Modifier.alignByBaseline()
@@ -245,7 +245,7 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
                     Spacer(Modifier.width(8.dp))
                     Text(
                         rest,
-                        style = MaterialTheme.typography.labelMedium.merge(TabularNumbers),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -258,7 +258,7 @@ internal fun ProgressLine(label: String, value: String, fraction: Float, color: 
             Spacer(Modifier.width(8.dp))
             Text(
                 value,
-                style = MaterialTheme.typography.labelMedium.merge(TabularNumbers),
+                style = MaterialTheme.typography.labelMedium.figures(value),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -316,7 +316,7 @@ internal fun Badge(text: String, color: Color, container: Color) {
     Surface(color = container, shape = RoundedCornerShape(6.dp)) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall.merge(TabularNumbers),
+            style = MaterialTheme.typography.labelSmall.figures(text),
             fontWeight = FontWeight.SemiBold,
             color = color,
             maxLines = 1,

@@ -288,7 +288,7 @@ The layouts, type and components follow the Android app (`app/src/main/java/com/
 The colours are a dark "command center" palette (a #0B0F17 canvas with a faint dot grid, #111827
 panels) with emerald / amber / rose status colours. The site is always dark, even on a device set
 to light mode. The dashboard's attention counts use the app's ProjectAttention
-thresholds. Inter is bundled in `web/fonts/` (SIL Open Font License, see `licenses/Inter-OFL.txt`).
+thresholds. IBM Plex Sans (text) and IBM Plex Mono (figures: `L.isFigure`) are bundled in `web/fonts/` (SIL Open Font License, see `licenses/IBM-Plex-OFL.txt`).
 The icons are Material Symbols from Google Fonts. See `DESIGN.md` at the repo root for the tokens.
 
 Plain HTML and JavaScript modules. There is no build step. The Firebase JS SDK 10.12.2 loads from

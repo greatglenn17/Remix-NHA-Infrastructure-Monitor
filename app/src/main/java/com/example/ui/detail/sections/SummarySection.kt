@@ -33,6 +33,7 @@ import com.example.ui.dashboard.levelIcon
 import com.example.ui.dashboard.levelName
 import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.TabularNumbers
+import com.example.ui.theme.figures
 import com.example.utils.CurrencyFormatter
 import com.example.util.AttentionFlag
 import com.example.util.ContractCost
@@ -367,7 +368,7 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int) {
         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             values.forEachIndexed { i, v ->
                 Text(
-                    v, style = MaterialTheme.typography.bodySmall.merge(TabularNumbers), color = color,
+                    v, style = MaterialTheme.typography.bodySmall.figures(v), color = color,
                     fontWeight = if (bold) FontWeight.SemiBold else null,
                     textAlign = if (i > 0) androidx.compose.ui.text.style.TextAlign.End else null,
                     modifier = Modifier.weight(if (i == 0) 2f else 1f)

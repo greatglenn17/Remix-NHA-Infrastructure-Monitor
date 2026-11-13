@@ -1,9 +1,23 @@
 /* Command-center palette (user's brief, 2026-11-08): a #0B0F17 canvas with a faint dot grid,
    #111827 panels with white 8% hairlines, blue for action, status in emerald / amber / rose. Always dark. */
+/* IBM Plex (SIL OFL, licenses/IBM-Plex-OFL.txt): Sans for text, Mono for measured figures. Its figures are
+   tabular as drawn, so numbers line up without a font feature. */
 @font-face {
-  font-family: Inter;
-  src: url(fonts/Inter.ttf) format('truetype');
-  font-weight: 100 900;
+  font-family: 'IBM Plex Sans';
+  src: url(fonts/IBMPlexSans.ttf) format('truetype');
+  font-weight: 100 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url(fonts/IBMPlexMono-Regular.ttf) format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url(fonts/IBMPlexMono-SemiBold.ttf) format('truetype');
+  font-weight: 600 700;
   font-display: swap;
 }
 
@@ -24,7 +38,8 @@
   --watch-text: #FCD34D; --behind-text: #FDA4AF; --tick: rgb(255 255 255 / 0.07);
   --blueprint: rgb(96 165 250 / 0.08); --blueprint-line: rgb(59 130 246 / 0.1); --blueprint-bg: rgb(23 37 84 / 0.4);
   --ledger-bg: rgb(15 23 42 / 0.5); --ledger-line: rgb(30 41 59 / 0.8);
-  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -34,7 +49,7 @@ body {
   margin: 0; color: var(--text);
   /* taste-skill-ignore: the brief's blueprint dot grid */
   background: radial-gradient(var(--dots) 1px, transparent 1.5px) 0 0 / 22px 22px fixed, var(--bg);
-  font: 15px/1.45 Inter, system-ui, sans-serif;
+  font: 15px/1.45 var(--sans);
   caret-color: var(--link); accent-color: var(--primary);
   scrollbar-color: var(--surface-variant) transparent;
 }
@@ -73,17 +88,17 @@ small { font-size: 12px; }
 main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 
 /* Buttons and fields */
-.btn { font: 600 14px Inter, sans-serif; border: 0; border-radius: 6px; padding: 10px 18px; cursor: pointer;
+.btn { font: 600 14px var(--sans); border: 0; border-radius: 6px; padding: 10px 18px; cursor: pointer;
   background: var(--primary); color: var(--on-primary); display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; }
 .btn:hover { filter: brightness(1.1); }
 .btn:disabled { opacity: 0.6; cursor: progress; }
-.text-btn { font: 600 14px Inter, sans-serif; background: none; border: 0; color: var(--link); cursor: pointer;
+.text-btn { font: 600 14px var(--sans); background: none; border: 0; color: var(--link); cursor: pointer;
   display: inline-flex; align-items: center; gap: 4px; padding: 8px; border-radius: 6px; text-decoration: none; }
 .text-btn:hover { background: var(--primary-container); }
 .text-btn.danger { color: var(--behind); margin-right: auto; }
 .field { display: grid; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-2); }
 .field input, .search input {
-  font: 15px Inter, sans-serif; color: var(--text); background: var(--field);
+  font: 15px var(--sans); color: var(--text); background: var(--field);
   border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px;
 }
 .field input:focus, .search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -99,7 +114,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 /* Segmented My / All projects */
 .seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); }
 .seg[hidden] { display: none; }
-.seg button { font: 400 13px Inter, sans-serif; color: var(--text-2); background: none; border: 0; border-radius: 6px; padding: 7px 12px; min-height: 36px; cursor: pointer; }
+.seg button { font: 400 13px var(--sans); color: var(--text-2); background: none; border: 0; border-radius: 6px; padding: 7px 12px; min-height: 36px; cursor: pointer; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--surface-variant); color: var(--text); }
 
@@ -168,7 +183,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .pf-stats { margin-top: 6px; }
 /* PortfolioCounts: the banner's filters. Red only for overdue and behind; the rest stay quiet with a coloured icon. */
 .pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
-.pill { font: 400 14px Inter, sans-serif; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
+.pill { font: 400 14px var(--sans); display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
   border: 1px solid var(--outline); background: var(--field); color: var(--text); cursor: pointer; transition: border-color 150ms ease-out; }
 .pill:hover { border-color: var(--text-2); }
 .pill b { font-size: 16px; font-weight: 600; }
@@ -234,6 +249,10 @@ body.signed-out main { max-width: none; padding: 0; }
 .ph-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
 .ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 10px; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+/* The mono's full-width point and percent sign are drawn in a little at this size. */
+.pl.big .pl-head .fig { letter-spacing: -0.04em; }
+/* On a phone the note takes its own line under the figure, so "36.27% behind" is never cut. */
+@media (max-width: 600px) { .pl.big .pl-head { flex-wrap: wrap; } .pl.big .pl-head small { flex-basis: 100%; justify-content: flex-end; } .pl.big .pl-head small .icon { margin-right: 0; } }
 /* Header bars: taller, with a tick every 10% so an empty bar still reads as a scale. */
 .pl.big .bar { height: 10px; border-radius: 5px; margin-top: 10px;
   background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--tick) calc(10% - 1px) 10%), var(--track); }
@@ -328,7 +347,9 @@ th { color: var(--text-2); font-weight: 600; }
 tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
 .num { text-align: right; white-space: nowrap; }
 /* Tabular figures only where numbers line up (Type.kt TabularNumbers), so words keep normal hyphens. */
-.num, .pl-head b, .pill b, .portfolio h1 { font-variant-numeric: tabular-nums; }
+/* Measured figures (table numbers, work done and billed, counts) are set in the mono, as instrument readouts. */
+.num, .fig, .pill b { font-family: var(--mono); }
+thead .num { font-family: inherit; }
 .pay .pdate { display: none; }
 
 @media (max-width: 1100px) {
@@ -389,7 +410,7 @@ tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
 @media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } .tabs a .icon { display: none; } }
 /* SectionChips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.chips button { font: 400 13px Inter, sans-serif; min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+.chips button { font: 400 13px var(--sans); min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--outline); background: var(--field); color: var(--text-2); }
 .chips button:hover { color: var(--text); }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
@@ -449,7 +470,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .album > .muted { font-size: 13px; margin-bottom: 10px; }
 /* Monthly */
 .month-head { padding-top: 12px; max-width: 320px; }
-.month-head select, .wx select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
+.month-head select, .wx select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
 .month h3 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
 .month > p { margin-bottom: 12px; }
 
@@ -562,7 +583,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb table.lg th, .bb table.lg td { padding: 1mm 2mm; height: auto; white-space: nowrap; }
 .bb i.sw { display: inline-block; width: 4mm; height: 4mm; border: 0.4pt solid #000; margin-right: 1.5mm; vertical-align: middle; }
 .print-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
-.print-opts select { font: 400 14px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 40px; }
+.print-opts select { font: 400 14px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 40px; }
 .lots-links { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 @page { size: A4; margin: 6mm; }  /* narrow, as the phone's full-page prints (BlueBookForms fullPage) */
 @media print {
@@ -577,16 +598,16 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-n { background: #A3A3A3; }
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lots-head h3 { margin: 0; font-size: 16px; }
-.lots-head select { font: 600 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
+.lots-head select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
 .plan-tools { display: flex; margin: -4px 0 12px; }
 .plan-tools .danger { margin-right: 0; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
 .kpi { background: var(--surface-variant); border-radius: 8px; padding: 8px 10px; }
 .kpi span { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
-.kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.kpi b { display: block; font: 600 20px var(--mono); }
 .kpi.link b { color: var(--link); } .kpi.muted b { color: var(--neutral); } .kpi.ok b { color: var(--ok); } .kpi.watch b { color: var(--watch); }
 .lot-filters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 16px 0 4px; }
-.lot-filters select { font: 400 14px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 8px; min-height: 44px; width: 100%; }
+.lot-filters select { font: 400 14px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 8px; min-height: 44px; width: 100%; }
 @media (max-width: 700px) { .lot-filters { grid-template-columns: repeat(3, 1fr); } .lot-filters .grow { grid-column: 1 / -1; } }
 .lot-count { margin: 8px 0 4px; font-size: 13px; }
 .lot-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
@@ -616,7 +637,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-stage polygon.sel { fill: var(--watch); fill-opacity: 0.65; stroke: var(--watch); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
 .lot-legend .dot.billed { background: none; border: 2px dashed var(--primary); width: 8px; height: 8px; }
 .zoom-bar { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
-.zoom-bar button { font: 600 12px Inter, sans-serif; color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; cursor: pointer; }
+.zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 .zoom-bar b { font-size: 12px; color: var(--link); min-width: 36px; text-align: center; }
 .lot-card { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 16px 16px 0 0; background: var(--surface-variant); }
@@ -696,7 +717,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bc-item .wk-add { margin-top: 0; }
 .order-fields fieldset, fieldset.lot-billing { margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .order-fields legend, .lot-billing legend { padding: 0 4px; font-size: 13px; color: var(--text-2); }
-.field textarea, .field select { font: 15px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }
+.field textarea, .field select { font: 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }
 .field textarea:focus, .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; cursor: pointer; }
 .check input { width: 20px; height: 20px; accent-color: var(--primary); }
@@ -761,7 +782,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-row legend .text-btn { font-size: 12px; min-height: 32px; }
 .wx-hours { display: grid; grid-template-columns: 26px repeat(12, minmax(0, 1fr)); gap: 3px; align-items: center; }
 .wx-hours > span { font-size: 11px; }
-.wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 11px Inter, sans-serif; color: #0B0F17; cursor: pointer; user-select: none; }
+.wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 11px var(--sans); color: #0B0F17; cursor: pointer; user-select: none; }
 .wx-h:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
 .wx-row legend { flex-wrap: wrap; }
-.wx-row legend select { font: 400 12px Inter, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 32px; }
+.wx-row legend select { font: 400 12px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 32px; }

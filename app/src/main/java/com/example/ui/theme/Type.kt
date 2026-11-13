@@ -10,25 +10,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Inter, Figma's own UI face, bundled as one variable font (SIL OFL, licenses/Inter-OFL.txt).
+// IBM Plex Sans, drawn from IBM's drafting and typewriter heritage, bundled as one variable font
+// (SIL OFL, licenses/IBM-Plex-OFL.txt). Its figures are tabular as drawn.
 // Below Android 8 variation settings are ignored and Compose fakes the bolder weights.
 @OptIn(ExperimentalTextApi::class)
-val Inter = FontFamily(
+val PlexSans = FontFamily(
     listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.SemiBold).map { w ->
-        Font(R.font.inter, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight)))
+        Font(R.font.ibm_plex_sans, w, variationSettings = FontVariation.Settings(FontVariation.weight(w.weight)))
     }
+)
+
+// IBM Plex Mono for measured figures (money, percentages, counts): two weights, as the text.
+val PlexMono = FontFamily(
+    Font(R.font.ibm_plex_mono_regular, FontWeight.Normal),
+    Font(R.font.ibm_plex_mono_semibold, FontWeight.SemiBold)
 )
 
 // Material sizes kept (read outdoors on site), with tighter tracking and SemiBold titles.
 // Material's 0.25-0.5sp tracking is dropped.
 private val M3 = Typography().run {
-    fun TextStyle.inter() = copy(fontFamily = Inter)
+    fun TextStyle.plex() = copy(fontFamily = PlexSans)
     Typography(
-        displayLarge.inter(), displayMedium.inter(), displaySmall.inter(),
-        headlineLarge.inter(), headlineMedium.inter(), headlineSmall.inter(),
-        titleLarge.inter(), titleMedium.inter(), titleSmall.inter(),
-        bodyLarge.inter(), bodyMedium.inter(), bodySmall.inter(),
-        labelLarge.inter(), labelMedium.inter(), labelSmall.inter()
+        displayLarge.plex(), displayMedium.plex(), displaySmall.plex(),
+        headlineLarge.plex(), headlineMedium.plex(), headlineSmall.plex(),
+        titleLarge.plex(), titleMedium.plex(), titleSmall.plex(),
+        bodyLarge.plex(), bodyMedium.plex(), bodySmall.plex(),
+        labelLarge.plex(), labelMedium.plex(), labelSmall.plex()
     )
 }
 
@@ -51,5 +58,13 @@ val Typography = Typography(
     labelSmall = M3.labelSmall.copy(fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.2.sp)
 )
 
-// Tabular digits so money and percentages line up in columns.
-val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
+// Money, percentages and counts that line up in columns are set in the mono, as instrument readouts.
+val TabularNumbers = TextStyle(fontFamily = PlexMono)
+
+private val figure = Regex("-?₱?\\d[\\d,.]*%?")
+
+/** Whether a shown value is only a measured figure: an amount, a percentage or a number (the website's `isFigure`). */
+fun isFigure(value: String) = figure.matches(value.trim())
+
+/** The mono for a value that is only a figure; words, and figures mixed with words, stay in the text face. */
+fun TextStyle.figures(value: String): TextStyle = if (isFigure(value)) merge(TabularNumbers) else this

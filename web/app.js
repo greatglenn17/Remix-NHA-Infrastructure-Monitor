@@ -431,10 +431,10 @@ function itemOf(project) {
   return { p, docs, billed, cost, lastUpdate, flags: L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate), waiting: L.waitingApproval(docs) };
 }
 
-/** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. */
+/** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. A figure (`L.isFigure`) is set in the mono; a value in words is not. */
 function progressLine(label, value, note, noteTone, fraction, tone, big = false) {
   return `<div class="pl${big ? ' big' : ''}">
-    <div class="pl-head"><span>${esc(label)}</span><b>${esc(value)}</b>${note ? `<small class="n-${noteTone}">${note}</small>` : ''}</div>
+    <div class="pl-head"><span>${esc(label)}</span><b${L.isFigure(value) ? ' class="fig"' : ''}>${esc(value)}</b>${note ? `<small class="n-${noteTone}">${note}</small>` : ''}</div>
     <div class="bar ${tone}" role="img" aria-label="${esc(label)} ${esc(value)}"><i style="width:${(clamp(fraction) * 100).toFixed(1)}%"></i></div>
   </div>`;
 }
@@ -790,7 +790,7 @@ function renderProject(projectUuid, section, sub) {
 const backLink = `<a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>`;
 const kv = (k, v, cls = '') => {
   const nil = v === '' || v == null || v === '-';
-  return `<div class="kv"><span>${esc(k)}</span><b class="${nil ? 'nil' : cls}">${nil ? '-' : esc(v)}</b></div>`;
+  return `<div class="kv"><span>${esc(k)}</span><b class="${nil ? 'nil' : `${cls}${L.isFigure(v) ? ' fig' : ''}`}">${nil ? '-' : esc(v)}</b></div>`;
 };
 const section = (title, ic, body, cls = '', action = '') => `<section class="card section ${cls}"><div class="section-head">${icon(ic)}<h2>${esc(title)}</h2>${action}</div>${body}</section>`;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
