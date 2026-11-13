@@ -2170,3 +2170,289 @@ export function renumberNotes(lots) {
   return [unnamed && `${unnamed} ${unnamed === 1 ? 'lot has' : 'lots have'} no block and lot yet.`,
     twice.length && `Used twice: ${twice.slice(0, 4).join(', ')}${twice.length > 4 ? ` and ${twice.length - 4} more` : ''}`].filter(Boolean);
 }
+
+/* ---------- Find lots (LotDetector, PlanLabels, ProjectViewModel.addDetectedSdpLots and removeDetectedSdpLots) ---------- */
+
+// LotDetector, ported line for line. The plan page is a picture of its lines: `dark` is a Uint8Array, row by row,
+// 1 where the page is dark. Every closed white area is a candidate; the most common size among the near-rectangular
+// ones is a lot. Lots far from the main group (title block, legend, vicinity map) are dropped, and larger clean
+// rectangles inside the site are kept as open space or facility areas. Roads are the long open strips and are left out.
+const GROW = 2;
+let fillStack = new Int32Array(4096);
+
+/** Thin anti-aliased lines can leave one-pixel gaps; growing walls by a pixel closes them. */
+function thicken(dark, w) {
+  const out = dark.slice();
+  for (let p = 0; p < dark.length; p++) {
+    if (!dark[p]) continue;
+    if (p % w + 1 < w) out[p + 1] = 1;
+    if (p + w < dark.length) out[p + w] = 1;
+  }
+  return out;
+}
+
+// The closed white area around `start`, flood-filled into `labels` as `id`: its size, its box, and how much of a
+// rectangle it is, measured along its own axes (second moments), so tilted lots count as rectangles too.
+function fillRegion(start, id, wall, labels, w, h) {
+  const r = { id, area: 0, minX: w, minY: h, maxX: -1, maxY: -1, touchesEdge: false };
+  let sp = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+  fillStack[sp++] = start;
+  labels[start] = id;
+  while (sp > 0) {
+    const p = fillStack[--sp], x = p % w, y = (p - x) / w;
+    r.area++;
+    sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y;
+    if (x < r.minX) r.minX = x;
+    if (x > r.maxX) r.maxX = x;
+    if (y < r.minY) r.minY = y;
+    if (y > r.maxY) r.maxY = y;
+    if (x === 0 || y === 0 || x === w - 1 || y === h - 1) r.touchesEdge = true;
+    if (sp + 4 > fillStack.length) { const grown = new Int32Array(fillStack.length * 2); grown.set(fillStack); fillStack = grown; }
+    if (x > 0 && !wall[p - 1] && !labels[p - 1]) { labels[p - 1] = id; fillStack[sp++] = p - 1; }
+    if (x < w - 1 && !wall[p + 1] && !labels[p + 1]) { labels[p + 1] = id; fillStack[sp++] = p + 1; }
+    if (y > 0 && !wall[p - w] && !labels[p - w]) { labels[p - w] = id; fillStack[sp++] = p - w; }
+    if (y < h - 1 && !wall[p + w] && !labels[p + w]) { labels[p + w] = id; fillStack[sp++] = p + w; }
+  }
+  const mx = sx / r.area, my = sy / r.area, a = sxx / r.area - mx * mx, b = syy / r.area - my * my, c = sxy / r.area - mx * my;
+  const d = Math.sqrt((a - b) * (a - b) / 4 + c * c), l1 = (a + b) / 2 + d, l2 = Math.max((a + b) / 2 - d, 1 / 12);
+  return Object.assign(r, { fill: r.area / (12 * Math.sqrt(l1 * l2)), aspect: Math.sqrt(l1 / l2),
+    cx: (r.minX + r.maxX) / 2, cy: (r.minY + r.maxY) / 2, w: r.maxX - r.minX + 1, h: r.maxY - r.minY + 1 });
+}
+
+/** Lots are drawn to the middle of their lines: let each area take the line pixels next to it, GROW deep. */
+function growIntoWalls(labels, wall, w) {
+  for (let n = 0; n < GROW; n++) {
+    const before = labels.slice();
+    for (let p = 0; p < labels.length; p++) {
+      if (!wall[p] || before[p]) continue;
+      const x = p % w;
+      labels[p] = (x > 0 && before[p - 1]) || (x < w - 1 && before[p + 1]) || (p >= w && before[p - w]) || (p + w < labels.length && before[p + w]) || 0;
+    }
+  }
+}
+
+/** The most common size, counted on a log scale so lots of slightly different sizes fall together. */
+function typicalArea(regions) {
+  const bins = new Map();
+  for (const r of regions) { const k = Math.round(Math.log(r.area) * 8); bins.set(k, (bins.get(k) || 0) + 1); }
+  let best = null;
+  for (const bin of bins) if (!best || bin[1] > best[1]) best = bin;
+  return Math.exp(best[0] / 8);
+}
+
+// Regions whose boxes are less than `gap` apart, joined into groups.
+function groupsOf(regions, gap) {
+  const parent = regions.map((_, i) => i);
+  const find = i => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const order = regions.map((_, i) => i).sort((a, b) => regions[a].minX - regions[b].minX);
+  for (let a = 0; a < order.length; a++) {
+    const ra = regions[order[a]];
+    for (let b = a + 1; b < order.length; b++) {
+      const rb = regions[order[b]];
+      if (rb.minX - ra.maxX > gap) break;
+      const gx = Math.max(0, rb.minX - ra.maxX, ra.minX - rb.maxX), gy = Math.max(0, rb.minY - ra.maxY, ra.minY - rb.maxY);
+      if (gx < gap && gy < gap) parent[find(order[a])] = find(order[b]);
+    }
+  }
+  const groups = new Map();
+  regions.forEach((r, i) => { const k = find(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  return [...groups.values()];
+}
+
+/** [region, block, lot]: blocks top to bottom, lots in rows along each block's long direction. */
+function numberLots(lots, touchGap) {
+  const least = (list, key) => list.reduce((m, r) => Math.min(m, r[key]), Infinity);
+  const blocks = groupsOf(lots, touchGap).sort((a, b) => least(a, 'minY') - least(b, 'minY') || least(a, 'minX') - least(b, 'minX'));
+  return blocks.flatMap((block, bi) => {
+    const mx = block.reduce((t, r) => t + r.cx, 0) / block.length, my = block.reduce((t, r) => t + r.cy, 0) / block.length;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const r of block) { const dx = r.cx - mx, dy = r.cy - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    // Long axis of the block (principal direction of the lot centres).
+    const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(angle), uy = Math.sin(angle);
+    const rowBand = block.map(r => Math.min(r.w, r.h)).sort((a, b) => a - b)[Math.floor(block.length / 2)] * 0.8;
+    const row = r => Math.round(((r.cx - mx) * -uy + (r.cy - my) * ux) / rowBand), along = r => (r.cx - mx) * ux + (r.cy - my) * uy;
+    return [...block].sort((a, b) => row(a) - row(b) || along(a) - along(b)).map((r, li) => [r, bi + 1, li + 1]);
+  });
+}
+
+/** Left edge top to bottom, then right edge bottom to top: exact for convex lots, close for the rest. */
+function outlineOf(r, labels, w) {
+  const left = [], right = [], h = labels.length / w;
+  for (let y = Math.max(r.minY - GROW, 0); y <= Math.min(r.maxY + GROW, h - 1); y++) {
+    let lo = -1, hi = -1;
+    for (let x = Math.max(r.minX - GROW, 0); x <= Math.min(r.maxX + GROW, w - 1); x++) if (labels[y * w + x] === r.id) { if (lo < 0) lo = x; hi = x; }
+    if (lo < 0) continue;
+    left.push([lo, y]);
+    right.push([hi + 1, y + 1]);
+  }
+  return [...left, ...right.reverse()];
+}
+
+/** Douglas-Peucker on the closed outline, keeping corners further than `eps` pixels from a straight run. */
+function simplify(points, eps) {
+  if (points.length < 4) return points;
+  const keep = new Uint8Array(points.length), stack = [[0, points.length - 1]];
+  keep[0] = keep[points.length - 1] = 1;
+  const distance = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    return len === 0 ? Math.hypot(p[0] - a[0], p[1] - a[1]) : Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0]) / len;
+  };
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let best = -1, bestD = eps;
+    for (let i = a + 1; i < b; i++) { const far = distance(points[i], points[a], points[b]); if (far > bestD) { bestD = far; best = i; } }
+    if (best >= 0) { keep[best] = 1; stack.push([a, best], [best, b]); }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+// An outline in pixels as page fractions, six decimals as a drawn lot's corners are.
+const outlineOnPage = (r, labels, w, h) => simplify(outlineOf(r, labels, w), 1.5).map(([x, y]) => [Math.round(x / w * 1e6) / 1e6, Math.round(y / h * 1e6) / 1e6]);
+
+/**
+ * LotDetector.detect: the lots of a plan page (`dark`: its line pixels, `width` x `height`). Returns the lots first,
+ * numbered block by block (lots that touch form a block; blocks top to bottom, lots row by row along the block), then
+ * the larger areas: [{ block, lot, polygon (page fractions), isLot }]. Empty when the picture has no clear lot pattern
+ * (a scanned plan, say).
+ */
+export function findLots(dark, width, height) {
+  const wall = thicken(dark, width), labels = new Int32Array(width * height), regions = [];
+  for (let p = 0; p < wall.length; p++) if (!wall[p] && !labels[p]) regions.push(fillRegion(p, regions.length + 1, wall, labels, width, height));
+  const candidates = regions.filter(r => !r.touchesEdge && r.area > 50);
+  const rectish = candidates.filter(r => r.fill > 0.55 && r.aspect < 6);
+  if (rectish.length < 5) return [];
+  const typical = typicalArea(rectish);
+  // Lots near each other, in groups at least a tenth the size of the biggest group.
+  const groups = groupsOf(rectish.filter(r => r.area > typical * 0.35 && r.area < typical * 3), Math.sqrt(typical) * 2.5);
+  const biggest = Math.max(0, ...groups.map(g => g.length));
+  const lots = groups.filter(g => g.length >= Math.max(3, Math.floor(biggest / 10))).flat();
+  if (!lots.length) return [];
+  const edge = (pick, key) => lots.reduce((m, r) => pick(m, r[key]), pick === Math.min ? Infinity : -Infinity);
+  const site = [edge(Math.min, 'minX'), edge(Math.min, 'minY'), edge(Math.max, 'maxX'), edge(Math.max, 'maxY')];
+  const large = candidates.filter(r => r.area >= typical * 3 && r.area < typical * 40 && r.fill > 0.6 && r.aspect < 4
+    && r.cx >= site[0] && r.cx <= site[2] && r.cy >= site[1] && r.cy <= site[3]).sort((a, b) => a.cy - b.cy || a.cx - b.cx);
+  growIntoWalls(labels, wall, width);
+  return [...numberLots(lots, Math.trunc(Math.sqrt(typical) * 0.15 + 4)).map(([r, block, lot]) => ({ block, lot, polygon: outlineOnPage(r, labels, width, height), isLot: true })),
+    ...large.map((r, i) => ({ block: 0, lot: i + 1, polygon: outlineOnPage(r, labels, width, height), isLot: false }))];
+}
+
+/**
+ * LotDetector.traceAt: the outline of the closed area around (`x`, `y`), both page fractions, for a lot the user
+ * points at; null when the point is on a line, or the area is open or too big to be one lot.
+ */
+export function traceLot(dark, width, height, x, y) {
+  const wall = thicken(dark, width);
+  const px = Math.min(width - 1, Math.max(0, Math.trunc(x * width))), py = Math.min(height - 1, Math.max(0, Math.trunc(y * height)));
+  // A click can land on the lot line itself; take the nearest open pixel within a few pixels.
+  let start = -1;
+  for (let d = 0; d <= 6 && start < 0; d++) for (let dy = -d; dy <= d && start < 0; dy++) for (let dx = -d; dx <= d && start < 0; dx++) {
+    const cx = px + dx, cy = py + dy;
+    if (cx >= 0 && cx < width && cy >= 0 && cy < height && !wall[cy * width + cx]) start = cy * width + cx;
+  }
+  if (start < 0) return null;
+  const labels = new Int32Array(width * height), r = fillRegion(start, 1, wall, labels, width, height);
+  if (r.touchesEdge || r.area < 50 || r.area > Math.floor(width * height / 50)) return null;
+  growIntoWalls(labels, wall, width);
+  return outlineOnPage(r, labels, width, height);
+}
+
+const NUM = '(\\d{1,4}[A-Z]?)';
+const LOT_WORD = new RegExp(`^(?:LOT|L)?[\\s.#-]*${NUM}$`, 'i'), BLOCK_LABEL = new RegExp(`^(?:BLOCK|BLK|B)[\\s.#-]*${NUM}$`, 'i');
+const BLOCK_AND_LOT = new RegExp(`^(?:BLOCK|BLK|B)[\\s.#-]*${NUM}[\\s.,/#-]*(?:LOT|L)[\\s.#-]*${NUM}$`, 'i');
+const BLOCK_WORD = /^(?:BLOCK|BLK\.?)$/i, NUMBER_WORD = new RegExp(`^${NUM}$`, 'i');
+
+/**
+ * PlanLabels.name: [block, lot] for each of `lots` (outlines in page fractions), in order, from the text printed on
+ * the plan; both '' where the plan does not name the lot, or names two lots the same. A lot's number is printed inside
+ * it ("12", "L-12", "LOT 12", or "B3 L12" with its block); a block's name ("BLOCK 3", "BLK. 3", "B-3") sits inside or
+ * beside its lots. `blocks` are findLots' block numbers (lots that touch), so a label beside a block names each of its
+ * lots. `page`: { words: [{ text, x, y (its centre), size (letter height) }], width, height }, in page points, y down.
+ */
+export function lotNames(lots, blocks, page) {
+  const words = page.words.map(w => ({ ...w, text: w.text.trim().toUpperCase() }));
+  const outlines = lots.map(lot => lot.map(([x, y]) => [x * page.width, y * page.height]));
+  const span = (o, i) => { const v = o.map(p => p[i]); return [Math.min(...v), Math.max(...v)]; };
+  const boxes = outlines.map(o => [...span(o, 0), ...span(o, 1)]), centres = boxes.map(b => [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2]);
+  const to = (w, c) => Math.hypot(w.x - c[0], w.y - c[1]);
+  const nearest = (list, far) => list.reduce((best, x) => (best == null || far(x) < far(best) ? x : best), null);
+  const used = words.map(() => false), labels = [];
+  // Block labels: "BLOCK 3" in one word, or "BLOCK" with its number beside or under it.
+  words.forEach((w, i) => { const m = !BLOCK_AND_LOT.test(w.text) && BLOCK_LABEL.exec(w.text); if (m) { labels.push({ ...w, text: m[1] }); used[i] = true; } });
+  words.forEach((w, i) => {
+    if (!BLOCK_WORD.test(w.text)) return;
+    const n = nearest(words.map((_, k) => k).filter(k => !used[k] && NUMBER_WORD.test(words[k].text)), k => to(words[k], [w.x, w.y]));
+    if (n == null || to(words[n], [w.x, w.y]) > w.size * (w.text.length * 0.5 + 2)) return;
+    used[i] = used[n] = true;
+    labels.push({ text: words[n].text, x: (w.x + words[n].x) / 2, y: (w.y + words[n].y) / 2, size: w.size });
+  });
+  // Each label names the found block whose nearest lot is within two lot widths of it.
+  const shoelace = o => o.reduce((t, [x, y], i) => { const [x2, y2] = o[(i + 1) % o.length]; return t + x * y2 - x2 * y; }, 0) / 2;
+  const typical = outlines.map(o => Math.sqrt(Math.abs(shoelace(o)))).sort((a, b) => a - b)[Math.floor(outlines.length / 2)] ?? 0;
+  const labelsOf = new Map();
+  for (const l of labels) {
+    const i = nearest(centres.map((_, k) => k), k => to(l, centres[k]));
+    if (i != null && to(l, centres[i]) < typical * 2) labelsOf.set(blocks[i], [...(labelsOf.get(blocks[i]) || []), l]);
+  }
+  const contains = (o, x, y) => {
+    let inside = false;
+    for (let i = 0, j = o.length - 1; i < o.length; j = i++) {
+      const [xi, yi] = o[i], [xj, yj] = o[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const names = outlines.map((o, i) => {
+    const b = boxes[i], inside = words.filter((w, k) => !used[k] && w.x >= b[0] && w.x <= b[1] && w.y >= b[2] && w.y <= b[3] && contains(o, w.x, w.y));
+    for (const w of inside) { const m = BLOCK_AND_LOT.exec(w.text); if (m) return [m[1], m[2]]; }
+    // The lot number is the biggest number in the lot (an undecorated area is smaller), else the one nearest its middle.
+    const big = w => Math.round(w.size * 2);
+    const lot = inside.filter(w => LOT_WORD.test(w.text)).reduce((best, w) => (!best || big(w) > big(best) || (big(w) === big(best) && to(w, centres[i]) < to(best, centres[i])) ? w : best), null);
+    const block = nearest(labelsOf.get(blocks[i]) || [], l => to(l, centres[i]));
+    return lot && block ? [block.text, LOT_WORD.exec(lot.text)[1]] : ['', ''];
+  });
+  const count = new Map();
+  for (const [b, l] of names) if (l) count.set(`${b}|${l}`, (count.get(`${b}|${l}`) || 0) + 1);
+  return names.map(([b, l]) => (count.get(`${b}|${l}`) > 1 ? ['', ''] : [b, l]));
+}
+
+/** A lot Find lots added that nobody has renumbered ("Auto-detected…"); one without progress is replaced by the next Find lots. */
+export const foundLot = l => (l.description || '').startsWith('Auto-detected');
+
+/**
+ * ProjectViewModel.addDetectedSdpLots: the `areas` Find lots found (findLots', each with the blockName and lotName the
+ * plan prints on it) as lots of `plan`, replacing the earlier found lots that have no progress yet. `lots`: the plan's
+ * active lots, each with its `progress`. A found area whose middle is inside a lot that stays (drawn by hand,
+ * renumbered, or with progress) is left out, and a name a lot that stays already has is not given again. `page`: the
+ * PDF page's [width, height] in points, for the areas (0 without a scale). Returns { stale: saveEdits' edits that take
+ * the earlier found lots off, builds: [build(ids) → an sdp_lots record], audit }.
+ */
+export function foundLots(plan, lots, areas, page, { user, at }) {
+  const stays = l => !foundLot(l) || Boolean(l.progress);
+  const kept = lots.filter(stays).map(lotPolygon).filter(p => p.length).map(p => [Math.min(...p.map(q => q[0])), Math.min(...p.map(q => q[1])), Math.max(...p.map(q => q[0])), Math.max(...p.map(q => q[1]))]);
+  const keptNames = new Set(lots.filter(l => stays(l) && !unassigned(l)).map(l => `${l.blockNumber}|${l.lotNumber}`));
+  const added = areas.filter(a => {
+    const cx = a.polygon.reduce((t, p) => t + p[0], 0) / a.polygon.length, cy = a.polygon.reduce((t, p) => t + p[1], 0) / a.polygon.length;
+    return !kept.some(b => cx >= b[0] && cx <= b[2] && cy >= b[1] && cy <= b[3]);
+  });
+  return {
+    stale: lots.filter(l => !stays(l)).map(l => [l, { isActive: 0, lastModifiedBy: user, lastModifiedDate: at }, null]),
+    builds: added.map(a => {
+      // The block and lot printed on the plan, else none and the engineer names the lot.
+      const named = Boolean(a.lotName) && !keptNames.has(`${a.blockName}|${a.lotName}`);
+      return ids => newRecord(ids, 'sdp_lots', {
+        blockNumber: named ? a.blockName : '', lotNumber: named ? a.lotName : '', housingUnitNumber: '', lotAreaSqM: page ? lotAreaSqM(a.polygon, ...page, Number(plan.scaleDenominator) || 0) : 0,
+        polygonNormalizedJson: JSON.stringify(a.polygon), isActive: 1, description: a.isLot ? 'Auto-detected' : 'Auto-detected open space or facility', lotUse: a.isLot ? '' : 'Open Space',
+        createdBy: user, createdDate: at, lastModifiedBy: user, lastModifiedDate: at, _ref_sdpPlanId: plan.uuid,
+      });
+    }),
+    audit: { actionType: 'Lot Created', details: `Added ${added.length} lots found in SDP Plan v${plan.version}`,
+      newValue: `${added.filter(a => a.isLot).length} lots, ${added.filter(a => !a.isLot).length} larger areas` },
+  };
+}
+
+/** ProjectViewModel.removeDetectedSdpLots: the plan's found lots without progress taken off, with one audit entry. Returns saveEdits' edits. */
+export function foundLotsRemoved(plan, lots, { user, at }) {
+  const stale = lots.filter(l => foundLot(l) && !l.progress);
+  return stale.map((l, i) => [l, { isActive: 0, lastModifiedBy: user, lastModifiedDate: at },
+    i ? null : { actionType: 'Lot Deactivated', details: `Removed ${stale.length} auto-detected lots from SDP Plan v${plan.version}`, oldValue: 'Active', newValue: 'Deactivated' }]);
+}

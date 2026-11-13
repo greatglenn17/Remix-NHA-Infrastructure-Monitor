@@ -1253,8 +1253,8 @@ function monthlyView({ page, weekly, of, now }) {
 
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null });
-// draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false });
+// draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
@@ -1267,11 +1267,13 @@ function lotsView(c) {
   const busy = st.draw || st.frame;
   const addLot = !busy && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
   // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn.
-  const scale = Number(site.plan.scaleDenominator) || 0;
+  const scale = Number(site.plan.scaleDenominator) || 0, unfound = site.lots.filter(l => L.foundLot(l) && !l.progress).length;
   const tools = busy ? '' : [
     edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '',
     edit ? `<button class="text-btn" id="plan-turn">${icon('rotate_90_degrees_cw', 'sm')}Turn plan</button>` : '',
     edit && site.plan.pdfFileUrl ? '<button class="text-btn" id="plan-frame">Print area</button>' : '',
+    manage && site.plan.pdfFileUrl ? '<button class="text-btn" id="lots-find">Find lots</button>' : '',
+    edit && unfound ? `<button class="text-btn" id="lots-unfind">Remove found lots (${unfound})</button>` : '',
     manage ? `<button class="text-btn" id="plan-site">Make v${esc(site.plan.version ?? 1)} its own site</button>` : '',
     manage ? `<button class="text-btn danger" id="plan-delete">${icon('delete', 'sm')}Delete plan</button>` : '',
   ].join('');
@@ -1296,6 +1298,7 @@ function lotsView(c) {
     <p class="muted lot-count" id="lot-count"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
     ${st.draw ? `<div class="lot-draw" role="group" aria-label="${st.draw.lot ? 'Edit outline' : 'Add lot'}"><p class="muted small" id="draw-hint" aria-live="polite"></p>
+      ${st.draw.lot ? '' : `<button class="pill" id="draw-trace" aria-pressed="${Boolean(st.trace)}">Trace with a click</button>`}
       <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">${st.draw.lot ? 'Save outline' : 'Save lot'}</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
     ${st.frame ? `<div class="lot-draw" role="group" aria-label="Plan area for printing"><p class="muted small" id="frame-hint" aria-live="polite"></p>
       <button class="text-btn" id="frame-close">Close</button><button class="text-btn" id="frame-page">Whole page</button><button class="text-btn" id="frame-fit">Fit to lots</button></div>` : ''}
@@ -1773,6 +1776,71 @@ function ownSiteForm(c, sites, site) {
   d.showModal();
 }
 
+/** Find lots (detectSdpLots): reads the plan PDF for closed lot outlines and the names printed on them, then asks which to add. */
+async function findLots(c, site, el) {
+  el.disabled = true;
+  el.textContent = 'Finding…';
+  try {
+    const scan = await planScan(site.plan);
+    await new Promise(next => setTimeout(next, 30)); // lets "Finding…" show before the page is searched
+    const areas = L.findLots(scan.dark, scan.width, scan.height), lots = areas.filter(a => a.isLot);
+    L.lotNames(lots.map(a => a.polygon), lots.map(a => a.block), scan.page).forEach(([block, lot], i) => Object.assign(lots[i], { blockName: block, lotName: lot }));
+    foundLotsDialog(c, site, areas, [scan.page.width, scan.page.height]);
+  } catch (x) {
+    console.error('Find lots: the plan PDF could not be read', x);
+    alert(`The plan PDF could not be read in this browser (${x.code || x.message || x}).`);
+  }
+  el.disabled = false;
+  el.textContent = 'Find lots';
+}
+
+/** The phone's "Lots found in the plan" review (or "No lots found"): what Find lots found, and what adding it replaces. */
+function foundLotsDialog(c, site, areas, page) {
+  const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, named = lots.filter(a => a.lotName).length;
+  const started = site.lots.filter(l => L.foundLot(l) && l.progress).length;
+  const fix = 'Click a lot and set its block and lot in Name & use, or use Number lots to number a block at once.';
+  const names = named === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block to fix a block.'
+    : named ? `${plural(named, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - named} come in without them. ${fix}`
+      : `The plan's block and lot numbers could not be read, so the lots come in without them. ${fix}`;
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = lots.length ? `<form novalidate>
+    <h2>Lots found in the plan</h2>
+    <p>${esc(`Found ${plural(lots.length, 'lot')} in ${plural(new Set(lots.map(a => a.block)).size, 'block')}${large ? `, and ${plural(large, 'larger area')} (open spaces or facilities)` : ''}.`)}</p>
+    <p class="muted small">${esc(`${names} Earlier found lots with no progress yet are replaced; renumbered lots stay${started ? `; the ${started} with progress stay` : ''}.`)}</p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button>${
+      large ? '<button type="button" class="btn" data-add="all">Add lots and larger areas</button>' : ''}<button type="button" class="btn" data-add="lots">Add lots</button></div>
+  </form>` : `<form novalidate>
+    <h2>No lots found</h2>
+    <p>Find lots works on a plan PDF exported from CAD, where each lot is a closed outline. A scanned plan or a photo has no clear outlines; add its lots by hand with Add lot.</p>
+    <div class="actions"><button type="button" class="btn" data-cancel>OK</button></div>
+  </form>`;
+  const err = d.querySelector('.error'), done = () => { d.close(); d.remove(); };
+  d.querySelector('[data-cancel]').onclick = done;
+  d.addEventListener('cancel', e => { e.preventDefault(); done(); });
+  d.querySelectorAll('[data-add]').forEach(b => { b.onclick = async () => {
+    const saved = L.foundLots(site.plan, site.lots, b.dataset.add === 'all' ? areas : lots, page, lotWho(c));
+    if (!saved.builds.length) { err.textContent = 'Every lot found is already on the plan.'; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then add them again.'; return; }
+    d.querySelectorAll('button').forEach(x => { x.disabled = true; });
+    err.textContent = '';
+    try {
+      // shortcut: 200 records a write, the earlier found lots first, so a save that stops partway leaves some of them; Find lots again finishes it.
+      for (let i = 0; i < saved.stale.length; i += 200) await saveEdits(c, saved.stale.slice(i, i + 200), 'lot');
+      for (let i = 0; i < saved.builds.length; i += 200) await addRecords(c, saved.builds.slice(i, i + 200).map((build, k) => [build, i + k ? [] : saved.audit]));
+      Object.assign(lotState(c.page), { sel: null, more: false, view: null, group: null, renum: null });
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.';
+      d.querySelectorAll('button').forEach(x => { x.disabled = false; });
+    }
+    drawProject(c.page);
+  }; });
+  document.body.append(d);
+  d.showModal();
+}
+
 // One click on the plan's tools with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
 async function planAct(c, el, run) {
   if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); drawProject(c.page); return; }
@@ -1816,6 +1884,14 @@ function bindPlanTools(c) {
   bind('frame-page', 'onclick', el => act(el, () => saveEdit(c, site.plan, { frame: L.planFrame([0, 0], [1, 1]) }, 'plan', null)));
   bind('frame-fit', 'onclick', el => act(el, () => saveEdit(c, site.plan, { frame: '' }, 'plan', null)));
   bind('plan-site', 'onclick', () => ownSiteForm(c, sites, site));
+  bind('lots-find', 'onclick', el => findLots(c, site, el));
+  bind('lots-unfind', 'onclick', el => {
+    const found = site.lots.filter(L.foundLot), n = found.filter(l => !l.progress).length, kept = found.length - n;
+    if (confirm(`Remove ${plural(n, 'found lot')}? Lots Find lots added that have no progress yet are taken off the plan on every phone and the website. Lots you added yourself or renumbered stay${
+      kept ? `, and so ${kept === 1 ? 'does' : 'do'} the ${plural(kept, 'found lot')} that already ${kept === 1 ? 'has' : 'have'} progress` : ''}. Find lots can add them again.`)) {
+      act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); });
+    }
+  });
   bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
   bind('plan-delete', 'onclick', el => {
     const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
@@ -1845,7 +1921,7 @@ async function bindLots(c) {
   const count = document.getElementById('lot-count');
   const card = document.getElementById('lot-card');
   const more = document.getElementById('lot-results');
-  let d = null, svg = null, stage = null;
+  let d = null, svg = null, stage = null, traceNote = ''; // traceNote: what the last traced click found, in place of the hint
 
   // Renumber block: the lots picked and the numbers they would get, from where they sit on the plan as it is turned.
   const numbered = () => {
@@ -1892,7 +1968,7 @@ async function bindLots(c) {
     if (frameHint) frameHint.textContent = st.frame.length ? 'Now click the opposite corner.' : 'The dashed box is what prints. Click one corner of the plan area, then the opposite corner.';
     const hint = document.getElementById('draw-hint');
     if (hint) {
-      hint.textContent = `${st.draw.lot ? 'Drag a corner of the lot to move it; a click adds a corner after the last' : 'Click each corner of the lot on the plan, in order; drag a corner to move it'} (${
+      hint.textContent = traceNote || (st.trace && !st.draw.lot ? 'Click inside a lot on the plan: its outline is traced from the plan\'s lines, and its form opens. Dragging moves the plan and the wheel zooms it.' : '') || `${st.draw.lot ? 'Drag a corner of the lot to move it; a click adds a corner after the last' : 'Click each corner of the lot on the plan, in order; drag a corner to move it'} (${
         plural(st.draw.length, 'corner')} so far). Dragging elsewhere moves the plan and the wheel zooms it.`;
       document.getElementById('draw-save').disabled = st.draw.length < 3;
       document.getElementById('draw-undo').disabled = !st.draw.length;
@@ -1981,6 +2057,8 @@ async function bindLots(c) {
   if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null, group: null, renum: null }); drawProject(c.page); };
   if (st.draw) {
     document.getElementById('draw-undo').onclick = () => { st.draw.pop(); paint(); };
+    const trace = document.getElementById('draw-trace');
+    if (trace) trace.onclick = () => { st.trace = !st.trace; traceNote = ''; trace.setAttribute('aria-pressed', st.trace); paint(); };
     document.getElementById('draw-done').onclick = () => { Object.assign(st, { draw: null, view: null }); drawProject(c.page); };
     document.getElementById('draw-save').onclick = e => {
       const scale = Number(site.plan.scaleDenominator) || 0, page = d && !d.problem ? d.page : null;
@@ -2046,6 +2124,23 @@ async function bindLots(c) {
   const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left - viewer.clientLeft, e.clientY - r.top - viewer.clientTop]; };
   // The point of the page under a place inside the viewer; a place off the page counts as its edge.
   const pageAt = ([px, py]) => { const v = view(), k = v.s * fit; return d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(Math.min(1, Math.max(0, n)) * 1e6) / 1e6); };
+  // traceSdpLot: the closed outline around a click becomes the lot being added, and its form opens (Save lot).
+  const traceAt = async e => {
+    const on = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot), pt = pageAt(local(e));
+    const say = text => { traceNote = text; paint(); };
+    if (on) { say(`${L.lotLabel(site.lots.find(l => l.uuid === on.dataset.lot))} is already a lot. Click a lot that is not shaded.`); return; }
+    say('Reading the plan…');
+    let outline = null;
+    try {
+      const scan = await planScan(site.plan);
+      outline = L.traceLot(scan.dark, scan.width, scan.height, ...pt);
+    } catch (x) { console.error('Trace a lot: the plan PDF could not be read', x); }
+    if (!st.draw || !viewer.isConnected) return;
+    if (!outline) { say('No closed lot outline there. Zoom in and click inside the lot, or turn Trace with a click off and click its corners.'); return; }
+    st.draw = outline;
+    say('');
+    document.getElementById('draw-save').click();
+  };
   const down = new Map();
   let moved = false, grab = -1; // grab: the corner of the outline being drawn that this press took hold of
   stage.onpointerdown = e => {
@@ -2089,6 +2184,7 @@ async function bindLots(c) {
       else if (L.parseFrame(text)) planAct(c, null, () => saveEdit(c, site.plan, { frame: text }, 'plan', null));
       return;
     }
+    if (st.draw && st.trace && !st.draw.lot) { traceAt(e); return; }
     if (st.draw) {
       // A corner of the lot being added, as a point of the page; the second click of a double click is not another corner.
       const [px, py] = local(e), v = view(), k = v.s * fit, pt = d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(n * 1e6) / 1e6);
@@ -3593,6 +3689,58 @@ async function planBytes(refText) {
 }
 
 let pdfjs;
+/** The plan PDF opened with pdf.js; the caller destroys it. */
+async function openPlan(refText) {
+  const data = await planBytes(refText);
+  pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
+  // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
+  return pdfjs.getDocument({ data, isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+}
+
+let planScanned = null; // [plan and file, its scan]: kept for the last plan, so clicks on it are quick
+/**
+ * ProjectViewModel.planMask and PlanLabels.read: the plan PDF's first page as line pixels (`dark`, `width` x `height`,
+ * about 3200 on the long side, where a typical lot is tens of pixels wide) and its words (`page`, in points), for
+ * L.findLots, L.traceLot and L.lotNames.
+ */
+function planScan(plan) {
+  const key = `${plan.uuid}|${plan.pdfFileUrl}`;
+  if (planScanned?.[0] !== key) {
+    const scan = (async () => {
+      const doc = await openPlan(plan.pdfFileUrl);
+      try {
+        const page = await doc.getPage(1), base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: 3200 / Math.max(base.width, base.height) });
+        const width = Math.trunc(viewport.width), height = Math.trunc(viewport.height);
+        const ctx = Object.assign(document.createElement('canvas'), { width, height }).getContext('2d', { willReadFrequently: true });
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        await page.render({ canvasContext: ctx, viewport, intent: 'print' }).promise;
+        const rgba = ctx.getImageData(0, 0, width, height).data, dark = new Uint8Array(width * height);
+        for (let p = 0, i = 0; p < dark.length; p++, i += 4) dark[p] = 299 * rgba[i] + 587 * rgba[i + 1] + 114 * rgba[i + 2] < 225000 ? 1 : 0;
+        // Each word with its middle and letter height, as shown on the page (y down). A run of text is cut at its
+        // spaces, each word placed along the run by its letters. A plan whose text cannot be read names no lot.
+        const words = [];
+        for (const item of (await page.getTextContent().catch(() => ({ items: [] }))).items) {
+          const text = item.str || '', [a, b, up, v, e, f] = item.transform, run = Math.hypot(a, b) || 1, rise = Math.hypot(up, v) || 1;
+          for (const m of text.matchAll(/\S+/g)) {
+            const along = item.width * (m.index + m[0].length / 2) / text.length, above = item.height * 0.35;
+            const [x, y] = base.convertToViewportPoint(e + a / run * along + up / rise * above, f + b / run * along + v / rise * above);
+            words.push({ text: m[0], x, y, size: Math.max(item.height, item.width / text.length / 0.6) });
+          }
+        }
+        return { dark, width, height, page: { words, width: base.width, height: base.height } };
+      } finally {
+        doc.destroy();
+      }
+    })();
+    planScanned = [key, scan];
+    scan.catch(() => { if (planScanned?.[1] === scan) planScanned = null; });
+  }
+  return planScanned[1];
+}
+
 /**
  * ProjectViewModel.sdpPlanImage: the plan's first page inside its frame (saved, or around all lots) at about 300 dpi
  * across A4, each lot filled with its colour and outlined (unless `withLots` is false), turned the way the plan is turned
@@ -3603,11 +3751,7 @@ let pdfjs;
 async function planDrawing({ plan, lots }, withLots = true, whole = false) {
   let doc = null, problem = '';
   try {
-    const data = await planBytes(plan.pdfFileUrl);
-    pdfjs ||= await import('./vendor/pdfjs/pdf.min.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.mjs';
-    // shortcut: no CJK cmaps are bundled; a plan with CJK text in non-embedded fonts would draw that text wrong.
-    doc = await pdfjs.getDocument({ data, isEvalSupported: false, standardFontDataUrl: 'vendor/pdfjs/standard_fonts/' }).promise;
+    doc = await openPlan(plan.pdfFileUrl);
   } catch (e) {
     console.error('SDP print: the plan PDF could not be loaded', e);
     problem = e.code || e.message || String(e);
