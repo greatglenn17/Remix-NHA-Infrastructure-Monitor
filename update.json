@@ -1,8 +1,8 @@
 {
-  "versionCode": 297,
-  "versionName": "2.8.17",
-  "releaseNotes": "v2.8.17: The clean-up of unused files no longer deletes the photos a weekly report lists.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.17/NHA_Monitor_v2.8.17_Build297.apk",
-  "apkSha256": "ccdd9d4b6a554c12b7b65e5dc90fb05532f5801def1bb462fdb8dbb40666fbe1",
+  "versionCode": 298,
+  "versionName": "2.8.18",
+  "releaseNotes": "v2.8.18: New typeface. The app is now set in IBM Plex Sans, with amounts, percentages and numbers in IBM Plex Mono.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.18/NHA_Monitor_v2.8.18_Build298.apk",
+  "apkSha256": "9cb93ab8338cb2d1e3b6411d655f548d76d634217e39f0afef51a3a38277946d",
   "isMandatory": true
 }
