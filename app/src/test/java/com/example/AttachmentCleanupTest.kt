@@ -10,6 +10,7 @@ import com.example.data.model.ContractorLetter
 import com.example.data.model.DeveloperRequest
 import com.example.data.model.Project
 import com.example.data.model.SyncOutboxEvent
+import com.example.data.model.WeeklyReport
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -82,6 +83,50 @@ class AttachmentCleanupTest {
             .query("SELECT entityUuid FROM sync_outbox WHERE entityType = 'file' AND operation = 'DELETE'")
             .use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
         assertEquals("only the unused file's cloud copy is deleted", listOf("$project/0f8fad5b-d9cb-469f-a165-70867728950d.jpg"), cloudDeletes)
+    }
+
+    private fun weeklyReport(projectId: Long, photos: List<String>) = WeeklyReport(
+        projectId = projectId, reportingWeek = "W", daysElapsed = 0, remainingDays = 0,
+        targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0, manpowerJson = "[]", equipmentJson = "[]",
+        activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]", documentsIssuedReceivedJson = "[]",
+        // As the weekly report form saves it: Android's JSONArray writes "/" as "\/".
+        attachedPhotoUrlsJson = org.json.JSONArray(photos).toString(), submittedByStaff = "S"
+    )
+
+    @Test
+    fun weeklyReportPhoto_inTheListAsThePhoneSavesIt_isKept() = runBlocking {
+        val projectId = db.projectDao().insertProject(project())
+        val photo = oldAttachment("0f8fad5b-d9cb-469f-a165-70867728950e.jpg")
+        val report = weeklyReport(projectId, listOf(photo))
+        assertTrue("the saved list escapes the slash", "$project\\/" in report.attachedPhotoUrlsJson)
+        db.reportDao().insertWeeklyReport(report)
+
+        Attachments.collectGarbage(context, db)
+
+        assertTrue("a photo its weekly report still lists", file(photo).exists())
+        assertEquals("its cloud copy is not deleted", 0, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'file' AND operation = 'DELETE'"))
+    }
+
+    @Test
+    fun movedProject_takesWeeklyReportPhotosAlong() = runBlocking {
+        RecordSyncSchema.install(sql)
+        val p = project()
+        val projectId = db.projectDao().insertProject(p)
+        val old = p.projectUuid
+        val new = "9b2e7c41-5d3a-4f6e-8a1b-2c3d4e5f6a7b"
+        val name = "0f8fad5b-d9cb-469f-a165-70867728950e.jpg"
+        val report = weeklyReport(projectId, listOf("nhafile:$old/$name"))
+        db.reportDao().insertWeeklyReport(report)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+
+        db.runInTransaction {
+            sql.execSQL("UPDATE projects SET projectUuid = ? WHERE id = ?", arrayOf<Any>(new, projectId))
+            Attachments.moveProjectRefs(sql, old, new)
+        }
+
+        assertEquals(listOf("nhafile:$new/$name"), Attachments.parseList(stringOf("SELECT attachedPhotoUrlsJson FROM weekly_reports WHERE uuid = ?", report.uuid)))
+        assertEquals("the photo gets a copy at the new project's path", 1,
+            count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'file' AND entityUuid = ? AND state = 'PENDING'", "$new/$name"))
     }
 
     /** As a project that takes the cloud's uuid, or is merged into its duplicate (Attachments.moveProjectRefs). */

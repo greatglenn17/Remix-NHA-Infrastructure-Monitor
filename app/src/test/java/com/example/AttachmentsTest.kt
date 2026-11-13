@@ -3,6 +3,7 @@ package com.example
 import com.example.data.files.Attachments
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,6 +44,14 @@ class AttachmentsTest {
     @Test
     fun refsIn_findsProjectAndLegacyReferences() {
         assertEquals(listOf(newRef, legacyPdf), Attachments.refsIn("""["$newRef","$legacyPdf","nhafile:../x.jpg","nhafile:$projectUuid/../x.jpg"]"""))
+    }
+
+    // Android's JSONArray writes "/" as "\/": that is how a weekly report's photo list is saved.
+    @Test
+    fun refsIn_readsAListAsAndroidSavesIt() {
+        val saved = Attachments.toJson(listOf(newRef, legacyPdf))
+        assertTrue("the saved list escapes the slash: $saved", "$projectUuid\\/$fileId" in saved)
+        assertEquals(listOf(newRef, legacyPdf), Attachments.refsIn(saved))
     }
 
     @Test

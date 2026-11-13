@@ -103,8 +103,11 @@ object Attachments {
 
     fun contentTypeOf(name: String) = if (name.endsWith(".pdf")) "application/pdf" else "image/jpeg"
 
-    /** Every reference in a text column, e.g. a weekly report's photo list. */
-    fun refsIn(text: String): List<String> = refPattern.findAll(text).map { it.value }.toList()
+    /**
+     * Every reference in a text column, e.g. a weekly report's photo list, in its plain form.
+     * Backslashes are dropped first: Android's JSONArray saves the list with "/" written as "\/".
+     */
+    fun refsIn(text: String): List<String> = refPattern.findAll(text.replace("\\", "")).map { it.value }.toList()
 
     /**
      * The photo list stored on a weekly report. Older versions saved it in several shapes
@@ -340,19 +343,22 @@ object Attachments {
      */
     fun moveProjectRefs(sql: androidx.sqlite.db.SupportSQLiteDatabase, oldUuid: String, newUuid: String) {
         if (oldUuid == newUuid || !projectUuidPattern.matches(oldUuid) || !projectUuidPattern.matches(newUuid)) return
-        val from = "$SCHEME:$oldUuid/"
-        val to = "$SCHEME:$newUuid/"
         val movedNames = linkedSetOf<String>()
-        for ((table, column) in referencingColumns) {
-            sql.query("SELECT `$column` FROM `$table` WHERE instr(`$column`, ?) > 0", arrayOf<Any>(from)).use { c ->
-                while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { ref ->
-                    split(ref)?.let { (project, name) -> if (project == oldUuid) movedNames.add(name) }
+        // A weekly report's photo list is saved by Android's JSONArray, which writes "/" as "\/".
+        for (slash in listOf("/", "\\/")) {
+            val from = "$SCHEME:$oldUuid$slash"
+            val to = "$SCHEME:$newUuid$slash"
+            for ((table, column) in referencingColumns) {
+                sql.query("SELECT `$column` FROM `$table` WHERE instr(`$column`, ?) > 0", arrayOf<Any>(from)).use { c ->
+                    while (c.moveToNext()) refsIn(c.getString(0).orEmpty()).forEach { ref ->
+                        split(ref)?.let { (project, name) -> if (project == oldUuid) movedNames.add(name) }
+                    }
                 }
+                sql.execSQL(
+                    "UPDATE `$table` SET `$column` = REPLACE(`$column`, ?, ?) WHERE instr(`$column`, ?) > 0",
+                    arrayOf(from, to, from)
+                )
             }
-            sql.execSQL(
-                "UPDATE `$table` SET `$column` = REPLACE(`$column`, ?, ?) WHERE instr(`$column`, ?) > 0",
-                arrayOf(from, to, from)
-            )
         }
 
         val oldPrefix = "$oldUuid/"
