@@ -571,7 +571,8 @@ object BlueBookForms {
         td.c { text-align: center; }
         td.nw { white-space: nowrap; }
         td.day { font-weight: bold; width: 18%; }
-        td.rec { height: 30mm; }
+        /* Room to write a few lines; typed recommendations make it taller. Short, so the sign-offs fit under section VII. */
+        td.rec { height: 15mm; }
         td.empty { text-align: center; color: #555; }
         tr.tot { break-before: avoid; }
         tr.tot td { font-weight: bold; }
