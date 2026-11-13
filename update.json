@@ -1,8 +1,8 @@
 {
-  "versionCode": 298,
-  "versionName": "2.8.18",
-  "releaseNotes": "v2.8.18: New typeface. The app is now set in IBM Plex Sans, with amounts, percentages and numbers in IBM Plex Mono.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.18/NHA_Monitor_v2.8.18_Build298.apk",
-  "apkSha256": "9cb93ab8338cb2d1e3b6411d655f548d76d634217e39f0afef51a3a38277946d",
+  "versionCode": 299,
+  "versionName": "2.8.19",
+  "releaseNotes": "v2.8.19: The weekly and monthly reports print with the website's page margins, so more fits on each page.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.19/NHA_Monitor_v2.8.19_Build299.apk",
+  "apkSha256": "2fc18c84abff3e0f0112487a121f0a4dce6a9012476bf5fd8bfb6ff5cabbb2ad",
   "isMandatory": true
 }
