@@ -219,6 +219,17 @@ is read only.
   with the "Project Edit" audit entry. The `syncProjectAssignmentToRecords` cloud function then copies the list to the
   project's records, as after an assignment made on a phone; the emulators do not run it. If the account list
   cannot be loaded there is no Save, so an empty list can never clear the project.
+- **Copy files to Google Drive** at the foot of the Project profile card, for the Super Admin only (`L.canAssign`),
+  copies the project's photos and PDFs into the Drive of the Google account picked in the sign-in window
+  (`driveForm`, `web/drive.js`): `NHA Monitor / <project> / Weekly Reports / <first day> to <last day>` for a report's
+  photos (numbered in the report's order, named by their captions), then `Billings`, `Documents`,
+  `Letters to Contractor`, `Developer Requests`, `Subdivision Plan`. It is a one-way copy: Firebase stays the working
+  store, and nothing is read back, renamed or deleted in Drive. Everything it makes is tagged (`appProperties`), so a
+  later run finds its folders wherever they were moved and skips the files already there; a file or folder put in the
+  bin is copied again. A file Storage cannot give is named and left out. The sign-in asks only for `drive.file`
+  (the files this site makes), and the token lives in the page for the copy and is never saved. The phone's
+  **Copy files to Google Drive** (Project profile card, Super Admin) opens `#/p/<project>/drive` here, which shows this dialog.
+  It needs the one-time Google setup below; until then the dialog says Drive is not set up.
 - **Signatories** on the print page of a weekly or a monthly report, for the people who can edit the project, is the
   app's signatories form: name, position and office for Prepared by, Checked by and Noted by, with the app's
   suggested positions and offices as buttons under each box (any other text can be typed). It starts with what the sheet shows
@@ -327,6 +338,27 @@ node --test "web/*.test.mjs"
    `firebase apps:sdkconfig WEB 1:1091951535339:web:9f23ffea71ebca0f868aae`.
 2. Authentication > Settings > **Authorized domains**: `nha-monitor-bulacan-2026.web.app` and
    `localhost` are there by default. Add any custom domain you use.
+
+## Copy to Google Drive: one-time Google setup
+
+Done by the owner of the Google Cloud project, once. Until `driveClientId` is filled in, the copy says it is not set up.
+
+1. Open https://console.cloud.google.com and pick the project `nha-monitor-bulacan-2026` (the Firebase project).
+2. **APIs & Services > Library**: find **Google Drive API** and press **Enable**.
+3. **APIs & Services > OAuth consent screen** (Google Auth Platform): app name `NHA Monitor`, your email as support
+   and developer contact, audience **External**. Under **Data access** add the scope `.../auth/drive.file`. Then
+   either press **Publish app** (this scope needs no Google review), or leave it in Testing and add, under
+   **Audience > Test users**, each Google account that will receive the files.
+4. **APIs & Services > Credentials > Create credentials > OAuth client ID**, type **Web application**, name
+   `NHA Monitor Web`. Under **Authorized redirect URIs** add exactly
+   `https://nha-monitor-bulacan-2026.web.app/drive-auth.html` (and `http://127.0.0.1:5000/drive-auth.html` to try it
+   on the emulators). Create it and copy the **Client ID** (it ends in `.apps.googleusercontent.com`; the client
+   secret is not used).
+5. Paste the Client ID into `driveClientId` in `web/firebase-config.js` and deploy the site.
+
+The sign-in opens in its own window and comes back to `drive-auth.html`, which hands the answer to the waiting page
+(`BroadcastChannel`) and closes. No Google script is loaded and the Content-Security-Policy is unchanged
+(`www.googleapis.com` is already allowed for data).
 
 ## Security headers
 

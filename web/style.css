@@ -96,6 +96,8 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
   display: inline-flex; align-items: center; gap: 4px; padding: 8px; border-radius: 6px; text-decoration: none; }
 .text-btn:hover { background: var(--primary-container); }
 .text-btn.danger { color: var(--behind); margin-right: auto; }
+/* A card's own action under its content, lined up with the text above it. */
+.foot-btn { margin: 8px 0 0 -8px; }
 .field { display: grid; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-2); }
 .field input, .search input {
   font: 15px var(--sans); color: var(--text); background: var(--field);

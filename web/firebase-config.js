@@ -9,3 +9,7 @@ export const firebaseConfig = {
   messagingSenderId: '1091951535339',
   appId: '1:1091951535339:web:9f23ffea71ebca0f868aae',
 };
+
+// Copy to Google Drive: the OAuth client ID (Web application) from Google Cloud > APIs & Services > Credentials, also
+// public by design. Empty = the copy says it is not set up. The steps are in README.md, "Copy to Google Drive".
+export const driveClientId = '';

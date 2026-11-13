@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
 import com.example.data.model.ProjectStatus
@@ -14,6 +15,7 @@ import com.example.ui.detail.sections.needsThisWeeksReport
 import com.example.ui.theme.NHATheme
 import com.example.util.SdpSummary
 import java.time.LocalDate
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -62,19 +64,32 @@ class SummaryReportPromptTest {
         assertFalse(needsThisWeeksReport(project.copy(dateStarted = "2026-11-02"), emptyList(), today))
     }
 
-    private fun summary(onAdd: (() -> Unit)?) = rule.setContent {
+    private fun summary(onAdd: (() -> Unit)?, role: UserRole = UserRole.FIELD_ENGINEER) = rule.setContent {
         NHATheme(themeMode = AppThemeMode.LIGHT) {
             SummarySection(
                 project, emptyList(), emptyList(), null, openIssues = 0, canEditProject = false, onEditProject = {},
-                currentUserRole = UserRole.FIELD_ENGINEER, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
+                currentUserRole = role, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
                 today = today, weeklyReports = emptyList(), onAddWeeklyReport = onAdd
             )
         }
     }
 
+    @Test fun copyToDrive_opensTheWebsitesCopyForThisProject() {
+        summary(null, UserRole.SUPER_ADMIN)
+        // By its action, not a tap: the card can sit below the screen here.
+        rule.onNodeWithTag("copy_to_drive_button").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        val opened = org.robolectric.Shadows.shadowOf(org.robolectric.RuntimeEnvironment.getApplication()).nextStartedActivity
+        assertEquals("https://nha-monitor-bulacan-2026.web.app/#/p/${project.projectUuid}/drive", opened.dataString)
+    }
+
+    @Test fun copyToDrive_onlyForTheSuperAdmin() {
+        summary(null, UserRole.ENGINEER_ADMIN)
+        rule.onNodeWithTag("copy_to_drive_button").assertDoesNotExist()
+    }
+
     @Test fun prompt_opensTheWeeklyForm() {
         var opened = false
-        summary { opened = true }
+        summary({ opened = true })
         rule.onNodeWithText("No report yet for this week").assertExists()
         rule.onNodeWithText("Oct 24, 2026 - Oct 30, 2026").assertExists()
         rule.onNodeWithTag("summary_add_weekly_report").performClick()
