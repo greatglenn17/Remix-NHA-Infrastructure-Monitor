@@ -1073,6 +1073,12 @@ test('files: a delete or an edit names the files nothing holds any more, and no 
   assert.deepEqual(L.fileRefsIn({ fileUrl: pdf(1), photosJson: JSON.stringify([jpg(2), { url: jpg(3) }]), old: `nhafile:${id(4)}.jpg`, web: 'https://example.com/a.jpg', bad: 'nhafile:x.jpg' }),
     [pdf(1), jpg(2), jpg(3), `nhafile:${id(4)}.jpg`]);
   assert.deepEqual([L.fileRefsIn(null), L.fileRefsIn([])], [[], []]);
+  // A list a phone saved writes each / as \/ (org.json): its files are held all the same, and go when it is deleted.
+  const phone = { uuid: 'w9', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(7), jpg(8)]).replaceAll('/', '\\/') };
+  assert.equal(phone.attachedPhotoUrlsJson.includes('\\/'), true);
+  assert.deepEqual(L.fileRefsIn(phone), [jpg(7), jpg(8)]);
+  assert.deepEqual(L.unusedFiles([{ uuid: 'w8', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(7), jpg(9)]) }], [], [phone], null), [jpg(9)]);
+  assert.deepEqual(L.unusedFiles([phone], [], [phone], null), [jpg(7), jpg(8)]);
 
   const report = { uuid: 'w1', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(1), jpg(2), jpg(3)]) };
   const letter = { uuid: 'c1', type: 'contractor_letters', replyFileUrl: pdf(4), receivedFileUrl: pdf(5) };
