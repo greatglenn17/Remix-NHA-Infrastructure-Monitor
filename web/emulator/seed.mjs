@@ -200,7 +200,11 @@ await weekly(1, 'Oct 31, 2026 - Nov 6, 2026', '2026-10-31', 301, 45, 41.25, {
   attachedPhotoUrlsJson: JSON.stringify([photo1, photo2, photo3]),
   photoDetailsJson: JSON.stringify({ [photo1]: { title: 'Footings, Block 3', takenAt: 'Nov 2, 2026 9:14 AM' }, [photo2]: { title: 'Rebar works' } }),
 });
-await weekly(8, 'Oct 24, 2026 - Oct 30, 2026', '2026-10-24', 294, 43, 40.1, { attachedPhotoUrlsJson: JSON.stringify([photo2]), photoDetailsJson: '{}' });
+// A photo whose file is not in Storage (Photos names the report), in a list as a phone saves it: each / as \/.
+const lostPhoto = `nhafile:${A}/${fid(99)}.jpg`;
+await weekly(8, 'Oct 24, 2026 - Oct 30, 2026', '2026-10-24', 294, 43, 40.1, {
+  attachedPhotoUrlsJson: JSON.stringify([photo2, lostPhoto]).replaceAll('/', '\\/'), photoDetailsJson: '{}',
+});
 await weekly(9, 'Week 42: October 17 - October 23, 2026', '2026-10-17', 287, 41, 39, { attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', issuesJson: '[]', _weather: [] });
 await record(rid(10), 'monthly_reports', A, [engineer], { reportingMonth: 'September 2026', scopeWeightPct: 100, scopeTargetPct: 38, scopeActualPct: 36,
   paymentsJson: '[]', unworkableDaysCount: 2, workableDaysCount: 28, cpesIssuesJson: '[]', recommendations: '' });

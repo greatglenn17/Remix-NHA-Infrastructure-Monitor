@@ -403,6 +403,18 @@ test('weekly report photos: titles, removals and additions, and the project card
   assert.equal(L.latestSitePhoto([{ createdAtTimestamp: 1, attachedPhotoUrlsJson: '[]' }]), '');
 });
 
+test('missing photos: the reports that list one Storage could not give, with how many', () => {
+  const a = 'nhafile:p/a.jpg', b = 'nhafile:p/b.jpg', n = 'nhafile:p/n.jpg';
+  const weekly = [
+    { uuid: 'w1', attachedPhotoUrlsJson: '["nhafile:p\\/a.jpg","nhafile:p\\/b.jpg"]' }, // as a phone saves the list
+    { uuid: 'w2', attachedPhotoUrlsJson: JSON.stringify([n]) },
+    { uuid: 'w3', attachedPhotoUrlsJson: '[]' },
+    { uuid: 'w4', attachedPhotoUrlsJson: JSON.stringify([b]) },
+  ];
+  assert.deepEqual(L.missingPhotos(weekly, new Set([a, b])).map(x => [x.report.uuid, x.count]), [['w1', 2], ['w4', 1]]);
+  assert.deepEqual(L.missingPhotos(weekly, new Set()), []);
+});
+
 test('new developer request: the order it files is named and worded as the phone does', () => {
   const blank = { wsNo: '', wsType: 'Full', wsDays: '', wsEffectivity: '', wsReason: '', wsItems: [], coType: 'Full', coDays: '', coEffectivity: '',
     wrNo: '', wrType: 'Full', wrEffectivity: '', wrRemarks: '', voNo: '', voType: 'Additive', voAmount: '', voReason: '', voDateApproved: '', teNo: '', teDays: '', teReason: '' };

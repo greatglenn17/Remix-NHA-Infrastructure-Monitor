@@ -528,6 +528,11 @@ export function editedPhotos(report, { titles = {}, removed = [], added = [] }) 
 export const latestSitePhoto = weekly => [...weekly].sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0))
   .map(r => attachmentList(r.attachedPhotoUrlsJson)[0]).find(Boolean) || '';
 
+/** The weekly reports that list a photo in `gone` (the references Storage could not give), in report order, each with how many. */
+export const missingPhotos = (weekly, gone) => weekly
+  .map(report => ({ report, count: attachmentList(report.attachedPhotoUrlsJson).filter(ref => gone.has(ref)).length }))
+  .filter(x => x.count);
+
 export const isPdf = ref => /\.pdf$/i.test(ref || '');
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

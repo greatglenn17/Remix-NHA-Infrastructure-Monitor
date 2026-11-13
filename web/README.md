@@ -239,6 +239,13 @@ is read only.
   (`latestUpdatePhotoUrl` on `projects/{id}`, one revision up) at the newest report photo left, as the app's
   `refreshSitePhoto` does. This is the site's only write to a project document. A photo added here has no time or GPS
   (the site does not read EXIF) and no geo-tag stamp.
+- **Photos** opens with a notice when a weekly report lists a photo Storage cannot give (`loadMissingPhotos`,
+  `L.missingPhotos`): how many, and each report by its week, with **Edit photos** for the people who can edit, to take
+  the photo off and add it again. It reads the addresses the gallery already asks for, so it costs no extra request. A
+  file that is gone and one this account cannot open look the same, and a photo a phone has not uploaded yet is counted
+  until that phone syncs and the page is reloaded. Phones before v2.8.17 deleted weekly report photos a day after they
+  were added; this is how to find them. shortcut: one project at a time, on its Photos tab; the dashboard does not
+  say which projects have any.
 - **Delete request** and **Delete letter**, in those forms, ask first, then mark the record `isDeleted` (one revision up)
   as a phone's delete is uploaded, with the app's audit entry for that deletion.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
