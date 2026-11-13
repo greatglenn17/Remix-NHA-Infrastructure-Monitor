@@ -171,7 +171,7 @@ object BlueBookForms {
     ): String {
         val b = StringBuilder()
         b.append(header("For the Week of ${esc(report.reportingWeek.replace(Regex("^Week \\d+: "), ""))}"))
-        b.append(basicInfo(project, "DAYS ELAPSED:", "${report.daysElapsed}", "REMAINING DAYS:", "${report.remainingDays}", logs))
+        b.append(basicInfo(project, "DAYS ELAPSED:", "${report.daysElapsed} calendar days", "REMAINING DAYS:", "${report.remainingDays} calendar days", logs))
 
         // II. The app's own 24-hour weather clock per day, as on the Weather tab.
         b.append("<table><tr><th class='sec'>II. DAILY WEATHER CHART</th></tr><tr><td>")
@@ -246,7 +246,7 @@ object BlueBookForms {
 
         b.append("<div class='keep'><p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on a weekly basis.</p>")
         b.append(signatures(signatories, "Checked and Reviewed by")).append("</div>")
-        return page("Weekly Project Engineer's Report", b.toString(), banner)
+        return page("Weekly Project Engineer's Report", b.toString(), banner, narrow = true)
     }
 
     /**
@@ -337,7 +337,7 @@ object BlueBookForms {
         b.append("<div class='keep'><table><tr><th class='sec'>VIII. RECOMMENDATIONS (If any)</th></tr><tr><td class='rec'>${esc(saved?.recommendations ?: "").replace("\n", "<br>")}</td></tr></table>")
         b.append("<p class='note'>This form must be submitted to NHA Regional Office, duly accomplished and signed by the concerned personnel on or before end of each month.</p>")
         b.append(signatures(signatories)).append("</div>")
-        return page("Monthly Project Engineer's Report", b.toString(), banner)
+        return page("Monthly Project Engineer's Report", b.toString(), banner, narrow = true)
     }
 
     /** One site's plan for [sdpPlan]: [image] is the framed plan as a data URI. */
@@ -413,8 +413,8 @@ object BlueBookForms {
           <tr><td class='lab'>IMPLEMENTING OFFICE</td><td colspan='3'>${esc(project.implementingOffice)}</td></tr>
           <tr><td class='lab'>CONTRACTOR</td><td colspan='3'>${esc(project.contractor)}</td></tr>
           <tr><td class='lab'>SCOPE OF WORK</td><td colspan='3'>${scopeText(project.scopeOfWork)}</td></tr>
-          <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td>${esc(peso(logs.originalCost))}</td><td class='lab'>$label1</td><td>$value1</td></tr>
-          <tr><td class='lab'>CONTRACT COST (REVISED)</td><td>${esc(peso(logs.revisedCost ?: logs.originalCost))}</td><td class='lab'>$label2</td><td>$value2</td></tr>
+          <tr><td class='lab'>CONTRACT COST (ORIGINAL)</td><td class='nw'>${esc(peso(logs.originalCost))}</td><td class='lab'>$label1</td><td>$value1</td></tr>
+          <tr><td class='lab'>CONTRACT COST (REVISED)</td><td class='nw'>${esc(peso(logs.revisedCost ?: logs.originalCost))}</td><td class='lab'>$label2</td><td>$value2</td></tr>
           <tr><td class='lab'>CONTRACT DURATION</td><td colspan='3'>${project.contractDurationDays} calendar days</td></tr>
           <tr><td class='lab'>DATE STARTED</td><td>${esc(date(project.dateStarted))}</td><td class='lab'>TIME EXTENSION/S</td><td>$te</td></tr>
           <tr><td class='lab'>COMPLETION DATE (ORIGINAL)</td><td>${esc(date(project.completionDateOriginal))}</td><td class='lab'>REVISED COMPLETION DATE</td><td>${esc(date(logs.revisedCompletion))}</td></tr>
@@ -551,12 +551,13 @@ object BlueBookForms {
 
     // Print ink, not app colours: black text on white A4 paper.
     // [banner] is the NHA header image as a data URI; blank leaves it out.
-    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false, landscape: Boolean = false) = """
+    // [narrow] is the website's 6mm page margin (web/style.css @page), so both print the same pages; the profile keeps 12mm.
+    private fun page(title: String, body: String, banner: String, fullPage: Boolean = false, landscape: Boolean = false, narrow: Boolean = fullPage) = """
         <!doctype html><html><head><meta charset='utf-8'><title>${esc(title)}</title><style>
-        @page { ${if (landscape) LANDSCAPE_PAGE else "size: A4"}; margin: ${if (fullPage) "6mm" else "12mm"}; }
+        @page { ${if (landscape) LANDSCAPE_PAGE else "size: A4"}; margin: ${if (narrow) "6mm" else "12mm"}; }
         body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000; background: #fff; margin: 0; }
         /* On screen (the app's print preview) the form sits on an A4-wide sheet; printing ignores this. */
-        @media screen { html { background: #9e9e9e; } body { width: ${if (landscape) "285mm" else if (fullPage) "198mm" else "186mm"}; padding: ${if (fullPage) "6mm" else "12mm"}; margin: 6mm auto; } }
+        @media screen { html { background: #9e9e9e; } body { width: ${if (landscape) "285mm" else if (narrow) "198mm" else "186mm"}; padding: ${if (narrow) "6mm" else "12mm"}; margin: 6mm auto; } }
         table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; page-break-inside: auto; }
         tr { page-break-inside: avoid; }
         /* A title or column-header row never ends a page: it moves on with the rows below it. */
@@ -568,6 +569,7 @@ object BlueBookForms {
         td.lab { font-weight: bold; width: 22%; }
         td.n { text-align: right; white-space: nowrap; }
         td.c { text-align: center; }
+        td.nw { white-space: nowrap; }
         td.day { font-weight: bold; width: 18%; }
         td.rec { height: 30mm; }
         td.empty { text-align: center; color: #555; }
