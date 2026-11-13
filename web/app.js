@@ -1253,7 +1253,7 @@ function monthlyView({ page, weekly, of, now }) {
 
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null }); // draw: the corners of a lot being added
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null }); // draw: the corners of a lot being added; group: the lots picked for one update
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
@@ -1318,12 +1318,27 @@ function lotCard(l, editable = false) {
     <p>${esc(line)}</p>
     ${p.lastModifiedBy ? `<p class="lc-upd">Last updated: ${esc(p.lastModifiedDate ? L.displayDate(p.lastModifiedDate) : '')} by ${esc(p.lastModifiedBy)}</p>` : ''}
     ${editable ? `<button class="btn lc-more" id="lot-edit">${icon('edit', 'sm')}Update progress</button>
-      <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>` : ''}
+      <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>
+      <button class="btn lc-more" id="lot-inspect">${icon('assignment', 'sm')}Record inspection</button>
+      <button class="btn lc-more" id="lot-group">${icon('add_circle', 'sm')}Select more lots</button>` : ''}
     <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button>`;
 }
 
-/** LotInfoDialog's current status, read-only. */
-function lotDetail(l) {
+/** The group-select bar (the phone's "N lots selected" sheet): the lots picked get one use, or one progress update. */
+const groupCard = n => `<div class="lc-head"><b>${plural(n, 'lot')} selected</b>
+    <button class="icon-btn" id="group-cancel" aria-label="Cancel">${icon('close', 'sm')}</button></div>
+  <p>Click lots on the plan to add or remove them.</p>
+  <div class="lc-group"><label class="field">Set use<select id="group-use"${n ? '' : ' disabled'}><option value="">Choose…</option>${L.LOT_USES.map(u => `<option>${esc(u)}</option>`).join('')}</select></label>
+    <button class="btn lc-more" id="group-update"${n ? '' : ' disabled'}>${icon('edit', 'sm')}Update progress</button></div>`;
+
+/** LotInfoDialog's current status and inspection history (`inspections`: L.lotInspections), read-only. */
+function lotDetail(l, inspections) {
+  const pctOf = x => Number(x.physicalProgress) || 0;
+  const history = !inspections.length ? emptyLine('No inspection recorded yet.')
+    : `<p class="muted small">Timeline: ${esc([...inspections].reverse().map(x => `${pctOf(x)}%`).join(' → '))}</p>${inspections.map(x => `<div class="insp">
+      <i class="dot lot-${L.lotBand(pctOf(x))}"></i><b>${esc(`${pctOf(x)}% • ${x.constructionStatus || ''}`)}</b><span>${esc(x.billingStatus || 'NOT BILLED')}</span>
+      <p>${esc(`${x.inspectionDate || ''} by ${x.inspectedBy || ''}${x.change ? ` (${x.change})` : ''}`)}</p>
+      ${(x.remarks || '').trim() ? `<p>Remarks: ${esc(x.remarks)}</p>` : ''}</div>`).join('')}`;
   const p = l.progress || {};
   const road = L.lotUse(l) === 'Road Lot';
   const photos = L.attachmentList(p.photosJson);
@@ -1343,6 +1358,7 @@ function lotDetail(l) {
     ${kv('Start date', p.startDate && L.displayDate(p.startDate))}${kv('Target completion', p.targetCompletionDate && L.displayDate(p.targetCompletionDate))}
     ${kv('Remarks', p.remarks)}
     ${photos.length ? `<h4>Lot photos (${photos.length})</h4>${photoGrid(photos, {})}` : ''}
+    <h4>Inspection history (${inspections.length})</h4>${history}
   </div>`;
 }
 
@@ -1438,6 +1454,100 @@ function editLot(c, lot) {
 }
 
 const nowStamp = () => `${today()} ${new Date().toTimeString().slice(0, 5)}`; // "yyyy-MM-dd HH:mm", as the phone stamps a lot
+const lotWho = c => ({ user: s.profile.name || s.user.email, at: nowStamp(), contractor: c.project.contractor || '' });
+
+/**
+ * RecordInspectionSnapshotDialog and GroupProgressDialog: a progress band (a road lot's state) with its status,
+ * activity and remarks, and the contractor when one is given. `save` gets them as lotSave's `f`.
+ */
+function progressDialog({ title, note, pct = 0, road = false, status = 'Not Started', activity = '', contractor = null, remarksLabel = 'Remarks', saveLabel = 'Save' }, save) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>${esc(title)}</h2>
+    <p class="muted small">${esc(note)}</p>
+    <label class="field">${road ? 'Road' : 'Physical progress'}<select name="band">${(road ? L.ROAD_STATES : L.LOT_BANDS).map((o, i) =>
+      `<option value="${i}"${i === (road ? L.roadState(pct) : L.lotBand(pct)) ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
+    <label class="field">Construction status<input name="constructionStatus" value="${esc(status)}" autocomplete="off"></label>
+    <label class="field">Current activity (e.g. rebar, concreting)<input name="currentActivity" value="${esc(activity)}" autocomplete="off"></label>
+    ${contractor == null ? '' : `<label class="field">Contractor<input name="contractor" value="${esc(contractor)}" autocomplete="off"></label>`}
+    <label class="field">${esc(remarksLabel)}<input name="remarks" autocomplete="off"></label>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${esc(saveLabel)}</button></div>
+  </form>`;
+  const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), button = d.querySelector('.btn');
+  const picked = () => L.pickedProgress(pct, Number(el.band.value), road);
+  // The status follows the band picked; it can still be retyped.
+  el.band.onchange = () => { el.constructionStatus.value = L.statusForProgress(picked()); };
+  const done = () => { d.close(); d.remove(); };
+  d.querySelector('[data-cancel]').onclick = done;
+  d.addEventListener('cancel', e => { e.preventDefault(); done(); });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    button.disabled = true; err.textContent = '';
+    try {
+      await save({ progress: picked(), constructionStatus: el.constructionStatus.value, currentActivity: el.currentActivity.value, remarks: el.remarks.value,
+        ...(contractor == null ? {} : { contractor: el.contractor.value }) });
+      done();
+    } catch (x) {
+      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      button.disabled = false;
+    }
+  };
+  document.body.append(d);
+  d.showModal();
+}
+
+/**
+ * Saves lotSave results (`saves`: [[lot, saved]]): a lot's progress record is edited, or added when it has none.
+ * shortcut: 100 lots a write (Firestore takes 500 changes in one), so a save that stops partway leaves the earlier lots
+ * saved; saving again skips those and finishes the rest.
+ */
+async function saveLots(c, saves) {
+  const edits = saves.filter(([lot]) => lot.progress).map(([lot, x]) => [lot.progress, x.changes, x.audits]);
+  const adds = saves.filter(([lot]) => !lot.progress).map(([lot, x]) => [ids => L.newLotProgressRecord(ids, lot, x.changes), x.audits]);
+  for (let i = 0; i < edits.length; i += 100) await saveEdits(c, edits.slice(i, i + 100), 'lot');
+  for (let i = 0; i < adds.length; i += 100) await addRecords(c, adds.slice(i, i + 100));
+}
+
+/** Record inspection on a lot's card: the snapshot joins the lot's inspection history, and the lot's progress is set to match it. */
+function inspectLot(c, lot) {
+  const p = lot.progress || {};
+  progressDialog({
+    title: `Record inspection: ${L.lotLabel(lot)}`, note: 'This keeps a snapshot of the lot as inspected, for its inspection history, and sets the lot\'s progress to match.',
+    pct: L.lotProgress(lot), road: L.lotUse(lot) === 'Road Lot', status: p.constructionStatus ?? 'Not Started', activity: p.currentActivity || '',
+    contractor: p.contractor || c.project.contractor || '', remarksLabel: 'Inspection field remarks', saveLabel: 'Record inspection',
+  }, async f => {
+    const x = L.lotInspection(lot, f, lotWho(c));
+    if (x.progress) await saveLots(c, [[lot, x.progress]]);
+    await addRecords(c, [[x.build, x.audit]]);
+  });
+}
+
+/** Update progress for the lots picked with group select: one progress, status, activity and remarks for all of them. */
+function groupProgress(c, lots, done) {
+  progressDialog({
+    title: `Update ${plural(lots.length, 'lot')}`, saveLabel: `Save to ${plural(lots.length, 'lot')}`,
+    note: 'Every lot picked gets this progress, status, activity and remarks. Each keeps its own dates, contractor, photos and billing.',
+  }, async f => { await saveLots(c, L.lotsProgressSave(lots, f, lotWho(c))); done(); });
+}
+
+/** Set use for the lots picked with group select, after a confirmation; a failure is an alert, as there is no form. */
+async function groupUse(c, lots, select, done) {
+  const use = select.value, edits = L.lotsUseSave(lots, use, lotWho(c));
+  select.value = '';
+  if (!edits.length) { alert(`The lots picked are already ${use}.`); return; }
+  if (!confirm(`Mark ${plural(edits.length, 'lot')} as ${use}?`)) return;
+  if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); return; }
+  try {
+    for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot');
+    done();
+  } catch (x) {
+    alert(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.');
+    drawProject(c.page);
+  }
+}
 
 /**
  * AddLotDialog for a lot drawn on the plan (`polygon`, in page fractions; `area` worked out from the plan's scale, 0
@@ -1679,7 +1789,7 @@ async function bindLots(c) {
       const pts = d.shapes.get(l.uuid);
       if (!pts) return '';
       const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
-      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${l.uuid === st.sel ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
+      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${(st.group ? st.group.includes(l.uuid) : l.uuid === st.sel) ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>`;
     }).join('') + draft();
     const hint = document.getElementById('draw-hint');
     if (hint) {
@@ -1687,11 +1797,22 @@ async function bindLots(c) {
       document.getElementById('draw-save').disabled = st.draw.length < 3;
       document.getElementById('draw-undo').disabled = !st.draw.length;
     }
-    const sel = site.lots.find(l => l.uuid === st.sel);
+    const group = st.group && site.lots.filter(l => st.group.includes(l.uuid));
+    const sel = group ? null : site.lots.find(l => l.uuid === st.sel);
     if (card) {
-      card.hidden = !sel;
-      card.innerHTML = sel ? lotCard(sel, L.canEdit(c.project, s.user.uid, s.claims)) : '';
+      card.hidden = !sel && !group;
+      card.innerHTML = group ? groupCard(group.length) : sel ? lotCard(sel, L.canEdit(c.project, s.user.uid, s.claims)) : '';
+      if (group) {
+        const saved = () => { st.group = null; drawProject(c.page); };
+        document.getElementById('group-cancel').onclick = () => { st.group = null; paint(); };
+        document.getElementById('group-update').onclick = () => groupProgress(c, group, saved);
+        document.getElementById('group-use').onchange = e => groupUse(c, group, e.target, saved);
+      }
       if (sel) {
+        const inspect = document.getElementById('lot-inspect');
+        if (inspect) inspect.onclick = () => inspectLot(c, sel);
+        const many = document.getElementById('lot-group');
+        if (many) many.onclick = () => { Object.assign(st, { group: [sel.uuid], sel: null, more: false }); paint(); };
         const edit = document.getElementById('lot-edit');
         if (edit) edit.onclick = () => editLot(c, sel);
         const name = document.getElementById('lot-name');
@@ -1700,7 +1821,7 @@ async function bindLots(c) {
         document.getElementById('lot-more').onclick = () => { st.more = !st.more; paint(); if (st.more) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
       }
     }
-    more.innerHTML = sel && st.more ? lotDetail(sel) : '';
+    more.innerHTML = sel && st.more ? lotDetail(sel, L.lotInspections(c.records, sel)) : '';
     loadFiles(more);
     const close = document.getElementById('lot-close');
     if (close) close.onclick = () => { st.more = false; paint(); };
@@ -1715,9 +1836,9 @@ async function bindLots(c) {
     paint();
   };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; paint(); }; });
-  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; st.draw = null; drawProject(c.page); }; });
+  main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { st.site = b.dataset.lotSite; st.sel = null; st.more = false; st.view = null; st.draw = null; st.group = null; drawProject(c.page); }; });
   const add = document.getElementById('lot-add');
-  if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null }); drawProject(c.page); };
+  if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null, group: null }); drawProject(c.page); };
   if (st.draw) {
     document.getElementById('draw-undo').onclick = () => { st.draw.pop(); paint(); };
     document.getElementById('draw-done').onclick = () => { Object.assign(st, { draw: null, view: null }); drawProject(c.page); };
@@ -1810,6 +1931,11 @@ async function bindLots(c) {
       return;
     }
     const hit = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot);
+    if (st.group) {
+      // Group select: a click adds the lot to the lots picked, or takes it out.
+      if (hit) { const id = hit.dataset.lot; st.group = st.group.includes(id) ? st.group.filter(x => x !== id) : [...st.group, id]; paint(); }
+      return;
+    }
     pick(hit && hit.dataset.lot !== st.sel ? hit.dataset.lot : null);
   };
   stage.ondblclick = e => { if (st.draw) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
