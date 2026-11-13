@@ -1,8 +1,8 @@
 {
-  "versionCode": 299,
-  "versionName": "2.8.19",
-  "releaseNotes": "v2.8.19: The weekly and monthly reports print with the website's page margins, so more fits on each page.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.19/NHA_Monitor_v2.8.19_Build299.apk",
-  "apkSha256": "2fc18c84abff3e0f0112487a121f0a4dce6a9012476bf5fd8bfb6ff5cabbb2ad",
+  "versionCode": 300,
+  "versionName": "2.8.20",
+  "releaseNotes": "v2.8.20: On the monthly report, the recommendations and signatures now fit on page 2.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.20/NHA_Monitor_v2.8.20_Build300.apk",
+  "apkSha256": "8084aa9ae1c6f4379b04b8eeb35644fc92aab0752a3610ef6737df3966abe153",
   "isMandatory": true
 }
