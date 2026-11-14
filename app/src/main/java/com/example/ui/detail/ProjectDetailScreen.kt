@@ -437,6 +437,17 @@ fun ProjectDetailScreen(
                         actualPercent = currentProject.actualAccomplishment,
                         currentUserRole = currentUser.role,
                         isHousing = isHousingProject,
+                        landPerLot = { date ->
+                            com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, runCatching { java.time.LocalDate.parse(date) }.getOrNull())[1] /
+                                com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)
+                        },
+                        billingCheck = { new, old -> com.example.util.BillingAbstract.aheadErrors(currentProject, pendingDocuments, projectPayments, weeklyReports, new, old) },
+                        onPrintAbstract = { payment ->
+                            val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
+                            printWithSignatories = false to { s: com.example.util.Signatories ->
+                                printForm("Abstract of Physical Accomplishment - ${payment.name}") { viewModel.billingAbstractForm(currentProject, payment, saleable, s) }
+                            }
+                        },
                         onAddPayment = { viewModel.addProjectPayment(it.copy(projectId = currentProject.id)) },
                         onUpdatePayment = { payment ->
                             viewModel.updateProjectPayment(payment)

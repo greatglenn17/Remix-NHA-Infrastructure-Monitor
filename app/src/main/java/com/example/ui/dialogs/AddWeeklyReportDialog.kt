@@ -83,7 +83,9 @@ fun AddWeeklyReportDialog(
     onSubmit: WeeklySubmit,
     today: java.time.LocalDate = java.time.LocalDate.now(),
     // The project's orders, so a bar chart target skips Full suspensions.
-    documents: List<com.example.data.model.PendingDocument> = emptyList()
+    documents: List<com.example.data.model.PendingDocument> = emptyList(),
+    // The project's saved reports: a new one starts from the latest week's actual.
+    reports: List<com.example.data.model.WeeklyReport> = emptyList()
 ) {
     // Only new reports keep a draft; editing a saved report works as before.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -106,7 +108,7 @@ fun AddWeeklyReportDialog(
         )
         return
     }
-    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents)
+    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents, reports)
 }
 
 @Composable
@@ -118,7 +120,8 @@ private fun WeeklyReportForm(
     onDismiss: () -> Unit,
     onSubmit: WeeklySubmit,
     today: java.time.LocalDate,
-    documents: List<com.example.data.model.PendingDocument>
+    documents: List<com.example.data.model.PendingDocument>,
+    reports: List<com.example.data.model.WeeklyReport>
 ) {
     // A draft fills the form the same way a saved report does when editing.
     val seed = existingReport ?: draft?.report
@@ -205,7 +208,9 @@ private fun WeeklyReportForm(
                     put(it.itemDescription, Pair(twoDecimals(it.targetPct), twoDecimals(it.actualPct)))
                 }
             } else {
-                scopeItems.forEach { put(it.name, Pair("0.00", "0.00")) }
+                // A week without a new abstract keeps the last actual.
+                val carried = com.example.util.BillingAbstract.carriedActuals(reports)
+                scopeItems.forEach { put(it.name, Pair("0.00", twoDecimals(carried[it.name] ?: 0.0))) }
             }
         }
     }
@@ -299,6 +304,33 @@ private fun WeeklyReportForm(
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         geoTag = granted.values.any { it }
         if (!geoTag) android.widget.Toast.makeText(context, "Location permission is needed to geo-tag photos", android.widget.Toast.LENGTH_LONG).show()
+    }
+
+    // Fill from Abstract (Excel): the week of its "As of" date and the three lines' actual, for review before Save.
+    var abstractNote by remember { mutableStateOf("") }
+    val abstractPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        photoScope.launch {
+            val read = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.use { com.example.util.AbstractExcel.read(it) } }
+            }
+            val found = read.getOrNull()
+            abstractNote = when {
+                read.isFailure -> "That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx)."
+                found == null -> "No Abstract of Physical Accomplishment was found in that file."
+                found.billing -> "That is the billing abstract. Pick the abstract of the actual accomplishment."
+                else -> {
+                    if (existingReport == null && found.asOf != null) reportingWeek = WeekRange.containing(found.asOf)
+                    com.example.util.AbstractExcel.actuals(found.parts).forEach { (name, actual) ->
+                        if (scopeItems.any { it.name == name }) accomplishmentMap[name] = Pair(accomplishmentMap[name]?.first ?: "0.00", twoDecimals(actual))
+                    }
+                    val week = com.example.util.BlueBookForms.weekStart(reportingWeek)
+                    "Filled from the abstract" + found.asOf?.let { " as of ${com.example.util.ProjectSchedule.displayDate(it.toString())}" }.orEmpty() +
+                        found.overallPct?.let { " (its overall: ${twoDecimals(it)}%)" }.orEmpty() + ". Check the figures, then Save." +
+                        if (existingReport == null && reports.any { com.example.util.BlueBookForms.weekStart(it.reportingWeek) == week }) " This week already has a report: to change that one, cancel and use its Edit." else ""
+                }
+            }
+        }
     }
 
     // Daily Weather State for 7 Days of the Week (24 Hours per Day)
@@ -475,6 +507,17 @@ private fun WeeklyReportForm(
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
                 
+                OutlinedButton(
+                    onClick = { abstractPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().testTag("fill_from_abstract")
+                ) { Text("Fill from Abstract (Excel)") }
+                if (abstractNote.isNotBlank()) Text(
+                    abstractNote,
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                    modifier = Modifier.testTag("abstract_note")
+                )
+
                 // Header
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Item", modifier = Modifier.weight(2f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))

@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.ProjectPayment
+import com.example.data.model.billedByAmount
 import com.example.data.model.billingUnitName
+import com.example.data.model.unitsText
 import com.example.ui.components.DateField
 import com.example.ui.components.rememberDiscardGuard
 import com.example.ui.theme.LocalNHAColors
@@ -50,7 +52,11 @@ fun AddPaymentDialog(
     // Housing projects bill land per lot and M1/M2 per housing unit.
     isHousing: Boolean = false,
     // Earlier billings; the latest of a type prefills its amount per lot or unit.
-    previous: List<ProjectPayment> = emptyList()
+    previous: List<ProjectPayment> = emptyList(),
+    // The contract amount of land development per lot on a billing date: where its amount per lot starts without an earlier billing.
+    landPerLot: (date: String) -> Double = { 0.0 },
+    // Why this billing cannot be saved (it would pass the actual accomplishment); empty when it can.
+    check: (ProjectPayment) -> List<String> = { emptyList() }
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var dvNo by remember { mutableStateOf(existing?.dvNo ?: "") }
@@ -66,11 +72,14 @@ fun AddPaymentDialog(
     val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
 
     val nha = LocalNHAColors.current
-    val byUnit = type.isNotBlank()
+    // Land development is billed by the amount accomplished: its lots are the gross over the amount per lot.
+    val typed = type.isNotBlank()
+    val byUnit = typed && !billedByAmount(type)
     val units = unitsStr.trim().toIntOrNull()?.takeIf { it > 0 }
     val amountErr = if (byUnit) null else FormValidation.amountError(amountStr, true)
     val unitsErr = if (!byUnit) null else if (unitsStr.isBlank()) "Required" else if (units == null) "Enter a whole number" else null
-    val priceErr = if (byUnit) FormValidation.amountError(priceStr, true) else null
+    val priceErr = if (typed) FormValidation.amountError(priceStr, true) else null
+    var ahead by remember(type, amountStr, unitsStr, priceStr, date) { mutableStateOf("") }
     val gross = if (byUnit) (units ?: 0) * (FormValidation.parseAmount(priceStr) ?: 0.0) else FormValidation.parseAmount(amountStr) ?: 0.0
     val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) }
     val initial = remember { snapshot() }
@@ -111,7 +120,7 @@ fun AddPaymentDialog(
                     label = { Text("Period Covered") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (isHousing || byUnit) {
+                if (isHousing || typed) {
                     Text("Billed for", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (HOUSING_BILLING_TYPES + "").forEach { t ->
@@ -121,7 +130,9 @@ fun AddPaymentDialog(
                                     if (t != type) {
                                         type = t
                                         priceStr = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
-                                            .maxByOrNull { it.id }?.let { "%.2f".format(java.util.Locale.US, it.unitPrice) } ?: ""
+                                            .maxByOrNull { it.id }?.unitPrice
+                                            .let { it ?: if (billedByAmount(t)) landPerLot(date).takeIf { per -> per > 0 && per.isFinite() } else null }
+                                            ?.let { "%.2f".format(java.util.Locale.US, it) } ?: ""
                                     }
                                 },
                                 label = { Text(t.ifBlank { "Other" }) },
@@ -130,9 +141,9 @@ fun AddPaymentDialog(
                         }
                     }
                 }
-                if (byUnit) {
+                if (typed) {
                     val unit = billingUnitName(type)
-                    OutlinedTextField(
+                    if (byUnit) OutlinedTextField(
                         value = unitsStr, onValueChange = { unitsStr = it },
                         label = { Text("Number of ${unit}s") },
                         isError = unitsErr != null,
@@ -150,7 +161,8 @@ fun AddPaymentDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-                } else {
+                }
+                if (!byUnit) {
                     OutlinedTextField(
                         value = amountStr, onValueChange = { amountStr = it },
                         label = { Text("Gross Amount (PHP)") },
@@ -174,6 +186,8 @@ fun AddPaymentDialog(
                     }
                 }
                 if (gross > 0) Column {
+                    val perLot = FormValidation.parseAmount(priceStr) ?: 0.0
+                    if (typed && !byUnit && perLot > 0) Field("Lots", unitsText(Math.round(gross / perLot * 100) / 100.0))
                     Field("Gross amount", CurrencyFormatter.formatPhp(gross))
                     if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(gross * retention / 100))
                     Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100)))
@@ -223,17 +237,21 @@ fun AddPaymentDialog(
                         DvSourceButtons(attachDv)
                     }
                 }
+                if (ahead.isNotBlank()) Text(ahead, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("billing_ahead_error"))
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     val base = existing ?: ProjectPayment(projectId = 0, name = "", date = "", periodCovered = "", grossAmount = 0.0, percentage = 0.0, balanceAmount = 0.0, balancePercentage = 0.0)
-                    onSubmit(base.copy(
+                    val payment = base.copy(
                         name = name.ifBlank { type }, dvNo = dvNo, date = date, periodCovered = periodCovered, grossAmount = gross, fileUrl = fileUrl,
                         billingType = type, units = if (byUnit) units ?: 0 else 0,
-                        unitPrice = if (byUnit) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = retention
-                    ))
+                        unitPrice = if (typed) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = retention
+                    )
+                    val errors = check(payment)
+                    if (errors.isEmpty()) onSubmit(payment)
+                    else ahead = errors.joinToString(" ") + " Save the newer weekly report first, or lower this billing."
                 },
                 enabled = amountErr == null && unitsErr == null && priceErr == null,
                 shape = RoundedCornerShape(50.dp)

@@ -41,7 +41,7 @@ function ref(r) {
 }
 
 /** A cell's text as a number, as Kotlin's toDoubleOrNull reads it; null when it is not one. */
-const number = text => (text != null && /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text) ? Number(text) : null);
+export const number = text => (text != null && /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text) ? Number(text) : null);
 
 /** Consecutive cells (0 = Month 1's first) as bars in contract days. */
 function runs(cells) {
@@ -57,10 +57,9 @@ function runs(cells) {
   return bars;
 }
 
-/** One sheet as a chart: its items with their bars, and the Duration column to check the bars against; null when it is not laid out as one. */
-function sheetChart(name, xml, strings, filled) {
-  const key = (row, col) => row * 100000 + col;
-  const cells = new Map(), merges = []; // key -> cell; [row1, col1, row2, col2]
+/** A sheet's cells (row * 100000 + column -> { row, col, style, text }) and its merged ranges as [row1, col1, row2, col2]. */
+export function sheetCells(xml, strings) {
+  const cells = new Map(), merges = [];
   let cur = null, capture = false;
   for (const e of xmlEvents(xml)) {
     if (e.open === 'c') {
@@ -69,8 +68,8 @@ function sheetChart(name, xml, strings, filled) {
       const [row, col] = ref(e.attrs.r);
       cur = { row, col, shared: e.attrs.t === 's', style: parseInt(e.attrs.s, 10) || 0, raw: '' };
     } else if (e.close === 'c') {
-      // The text of a <c>: its <v>, or its inline <is><t>.
-      if (cur) cells.set(key(cur.row, cur.col), { row: cur.row, col: cur.col, style: cur.style, text: (cur.shared ? strings[parseInt(cur.raw, 10)] ?? '' : cur.raw).trim() });
+      // The text of a <c>: its <v> (a formula's is its last worked-out value), or its inline <is><t>.
+      if (cur) cells.set(cur.row * 100000 + cur.col, { row: cur.row, col: cur.col, style: cur.style, text: (cur.shared ? strings[parseInt(cur.raw, 10)] ?? '' : cur.raw).trim() });
       cur = null;
     } else if (e.open === 'v' || e.open === 't') capture = cur != null;
     else if (e.close === 'v' || e.close === 't') capture = false;
@@ -80,6 +79,13 @@ function sheetChart(name, xml, strings, filled) {
       if (ends.length === 2) merges.push([...ref(ends[0]), ...ref(ends[1])]);
     }
   }
+  return { cells, merges };
+}
+
+/** One sheet as a chart: its items with their bars, and the Duration column to check the bars against; null when it is not laid out as one. */
+function sheetChart(name, xml, strings, filled) {
+  const key = (row, col) => row * 100000 + col;
+  const { cells, merges } = sheetCells(xml, strings);
   const all = [...cells.values()].sort((a, b) => key(a.row, a.col) - key(b.row, b.col));
   const same = (text, other) => text.toLowerCase() === other.toLowerCase(), starts = (text, prefix) => text.toLowerCase().startsWith(prefix.toLowerCase());
   const header = all.find(c => same(c.text, 'ITEM NO.'));
@@ -154,16 +160,24 @@ function filledStyles(xml) {
   return new Set(xfFills.flatMap((fill, i) => (coloured[fill] ? [i] : [])));
 }
 
-/** BarChartExcel.read on the unzipped parts (`files`: path -> XML text): the sheets laid out as a bar chart, in workbook order. */
-export function chartSheets(files) {
+/** The unzipped workbook's sheets as [name, xml] in workbook order, and its shared strings. */
+export function workbookSheets(files) {
   const workbook = files['xl/workbook.xml'];
   if (workbook == null) throw new NotAnExcelFile();
   const targets = relationships(files['xl/_rels/workbook.xml.rels']);
-  const strings = sharedStrings(files['xl/sharedStrings.xml']), filled = filledStyles(files['xl/styles.xml']);
-  return sheetList(workbook).flatMap(([name, rel]) => {
+  const sheets = sheetList(workbook).flatMap(([name, rel]) => {
     const target = targets[rel];
     const xml = target == null ? null : files[target.startsWith('/') ? target.slice(1) : `xl/${target}`];
-    const chart = xml == null ? null : sheetChart(name, xml, strings, filled);
+    return xml == null ? [] : [[name, xml]];
+  });
+  return { sheets, strings: sharedStrings(files['xl/sharedStrings.xml']) };
+}
+
+/** BarChartExcel.read on the unzipped parts (`files`: path -> XML text): the sheets laid out as a bar chart, in workbook order. */
+export function chartSheets(files) {
+  const { sheets, strings } = workbookSheets(files), filled = filledStyles(files['xl/styles.xml']);
+  return sheets.flatMap(([name, xml]) => {
+    const chart = sheetChart(name, xml, strings, filled);
     return chart?.items.length ? [chart] : [];
   });
 }

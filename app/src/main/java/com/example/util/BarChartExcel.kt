@@ -21,21 +21,33 @@ object BarChartExcel {
     /** The workbook's sheets laid out as a bar chart, in workbook order; others are left out. */
     fun read(input: InputStream): List<Sheet> {
         val files = unzip(input)
-        val workbook = files["xl/workbook.xml"] ?: throw NotAnExcelFile()
-        val targets = relationships(files["xl/_rels/workbook.xml.rels"])
         val strings = sharedStrings(files["xl/sharedStrings.xml"])
         val filled = filledStyles(files["xl/styles.xml"])
+        return sheetXml(files).mapNotNull { (name, xml) -> chart(name, xml, strings, filled)?.takeIf { it.items.isNotEmpty() } }
+    }
+
+    /** Every sheet's cells as text by (row, column), in workbook order: what the other readers (AbstractExcel) start from. */
+    internal fun sheetTexts(input: InputStream): List<Map<Pair<Int, Int>, String>> {
+        val files = unzip(input)
+        val strings = sharedStrings(files["xl/sharedStrings.xml"])
+        return sheetXml(files).map { (_, xml) -> cells(xml, strings, mutableListOf()).mapValues { it.value.text } }
+    }
+
+    /** The workbook's sheets as (name, xml), in workbook order. */
+    private fun sheetXml(files: Map<String, ByteArray>): List<Pair<String, ByteArray>> {
+        val workbook = files["xl/workbook.xml"] ?: throw NotAnExcelFile()
+        val targets = relationships(files["xl/_rels/workbook.xml.rels"])
         return sheets(workbook).mapNotNull { (name, rel) ->
             val path = targets[rel]?.let { if (it.startsWith("/")) it.removePrefix("/") else "xl/$it" } ?: return@mapNotNull null
-            files[path]?.let { chart(name, it, strings, filled) }?.takeIf { it.items.isNotEmpty() }
+            files[path]?.let { name to it }
         }
     }
 
     private class Cell(val text: String, val style: Int)
 
-    private fun chart(name: String, xml: ByteArray, strings: List<String>, filled: Set<Int>): Sheet? {
-        val cells = HashMap<Pair<Int, Int>, Cell>() // (row, column) -> cell
-        val merges = mutableListOf<IntArray>() // row1, col1, row2, col2
+    /** A sheet's cells by (row, column); a formula's text is its last worked-out value. Merged ranges go to [merges] as row1, col1, row2, col2. */
+    private fun cells(xml: ByteArray, strings: List<String>, merges: MutableList<IntArray>): Map<Pair<Int, Int>, Cell> {
+        val cells = HashMap<Pair<Int, Int>, Cell>()
         parse(xml) { p ->
             when (p.name) {
                 "c" -> {
@@ -52,6 +64,12 @@ object BarChartExcel {
                 }
             }
         }
+        return cells
+    }
+
+    private fun chart(name: String, xml: ByteArray, strings: List<String>, filled: Set<Int>): Sheet? {
+        val merges = mutableListOf<IntArray>()
+        val cells = cells(xml, strings, merges)
         fun find(test: (String) -> Boolean) = cells.entries.filter { test(it.value.text) }.minByOrNull { it.key.first * 100000 + it.key.second }?.key
         val header = find { it.equals("ITEM NO.", ignoreCase = true) } ?: return null
         fun column(prefix: String) = cells.entries.firstOrNull { it.key.first == header.first && it.value.text.startsWith(prefix, ignoreCase = true) }?.key?.second

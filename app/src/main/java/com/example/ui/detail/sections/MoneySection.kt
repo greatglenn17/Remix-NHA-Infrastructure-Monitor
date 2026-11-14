@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.netAmount
 import com.example.data.model.netBillings
 import com.example.data.model.ProjectPayment
@@ -32,6 +33,11 @@ fun MoneySection(
     currentUserRole: UserRole,
     // Housing projects bill land and housing units by count; see HOUSING_BILLING_TYPES.
     isHousing: Boolean = false,
+    // The contract amount of land development per lot on a billing date; see AddPaymentDialog.
+    landPerLot: (date: String) -> Double = { 0.0 },
+    // Why a billing (in place of the old one when editing) cannot be saved; see BillingAbstract.aheadErrors.
+    billingCheck: (ProjectPayment, ProjectPayment?) -> List<String> = { _, _ -> emptyList() },
+    onPrintAbstract: (ProjectPayment) -> Unit = {},
     onAddPayment: (ProjectPayment) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
     onDeletePayment: (ProjectPayment) -> Unit
@@ -77,7 +83,8 @@ fun MoneySection(
                                 },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 canEdit = canManagePayments,
-                                onEdit = { paymentToEdit = payment }
+                                onEdit = { paymentToEdit = payment },
+                                onPrintAbstract = if (payment.billingType in HOUSING_BILLING_TYPES) ({ onPrintAbstract(payment) }) else null
                             )
                         }
                         if (row.size < perRow) Spacer(Modifier.weight(1f))
@@ -100,6 +107,8 @@ fun MoneySection(
             onDismiss = { showAddDialog = false },
             isHousing = isHousing,
             previous = payments,
+            landPerLot = landPerLot,
+            check = { billingCheck(it, null) },
             onSubmit = { p ->
                 val gross = p.grossAmount
                 val pct = if (contractCost > 0) (gross / contractCost) * 100 else 0.0
@@ -119,6 +128,8 @@ fun MoneySection(
             onDismiss = { paymentToEdit = null },
             isHousing = isHousing,
             previous = payments,
+            landPerLot = landPerLot,
+            check = { billingCheck(it, old) },
             onSubmit = { new ->
                 editedBillings(payments, old, new, contractCost).forEach(onUpdatePayment)
                 paymentToEdit = null

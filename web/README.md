@@ -22,6 +22,23 @@ is read only.
   project bills for (units × amount per lot or unit, the amount filled in from the latest billing of that type) or the gross,
   and retention. Share and balance are saved from the gross with the current contract cost, as the app saves them, with the
   app's "Payment Creation" audit entry. The scanned DV can be attached in the form (see Attachments below).
+  **Land development** is billed by the amount accomplished: its form takes the gross and the amount per lot (started
+  from the contract amount per lot), and its lots are the gross over that amount (`L.billedByAmount`, `L.billedUnits`;
+  saved with `units` 0). The other housing types stay whole lots or units × amount.
+- **What is billed never passes the work done** (`L.billingAheadErrors`, the phone's `BillingAbstract.aheadErrors`): a
+  new billing with a housing type, or an edit that raises one, is refused when the billed share of its part
+  (Land Acquisition, Land Development, Housing Construction: its billings over the part's contract amount) or of all
+  parts (over the contract cost) would be higher than the actual of the latest weekly report, at 2 decimals; equal is
+  allowed. A part's contract amount is the bar chart's in force, else the Scope of Works' (`L.partAmounts`). Billings
+  without a type (an advance payment) are not counted, and a billing already saved can still be corrected.
+- **Print abstract** on a billing with a housing type is its Abstract of Physical Accomplishment in the district's
+  billing format (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`) for
+  `#/p/<id>/print/apa-<billing>`: a landscape A4 sheet headed by the billing's period covered, each line (land
+  acquisition, land development, Milestone 1 at 80% and Milestone 2 at 20% of housing) with its contract quantity, unit
+  cost and amount, what was billed before, in this billing and to date as quantity, amount and share, the balance,
+  subtotals and the grand total. Nothing is uploaded: every figure comes from the billings (`L.billingAbstract`). The
+  quantity is the project's Number of Units, else its saleable lots. Its "actual" is what is billed to date; Prepared,
+  Checked and Approved by are the monthly report's signatories.
 - **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
@@ -166,6 +183,14 @@ is read only.
   record (`L.newWeeklyReport`), sets the project's target and actual accomplishment, and writes the
   app's "Report Creation" audit entry. The new report has no photos and no weather log: add them with **Add photos**
   and **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
+  A new report's Actual % boxes start from the report of the latest week (`L.carriedActuals`), so a week without a new
+  abstract keeps the last actual.
+- **Fill from Abstract (Excel)** in that form reads the district's Abstract of Physical Accomplishment of the actual
+  work, the "as of" one (`apa-excel.js`, the port of `util/AbstractExcel.kt`; change both together): the "As of" date
+  and, for each part (item no. 1, 2, 3), the TO DATE "% WT" on the part's own subtotal row, as the sheet prints it.
+  A new report moves to the week holding that date; the three Actual % boxes are filled for review and nothing is
+  saved until Save. The pay items stay in Excel. The billing format is told apart and refused. The overall figure is
+  each line by its weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures).
 - **Edit** on a weekly report opens the same form on the saved report (`L.weeklyStart`, `L.editedWeeklyReport`), with
   the app's "Edited Weekly Report" audit entry. The project's target and actual follow a report added or edited here
   only when no other report is for a later week, so a late entry or a fix to an older week does not set the project

@@ -15,6 +15,7 @@ import { DRIVE_SCOPE, driveFiles, copyToDrive } from './drive.js';
 import * as L from './logic.js';
 import * as P from './print.js';
 import { readChartWorkbook } from './chart-excel.js';
+import { readAbstractWorkbook } from './apa-excel.js';
 
 // `?emulator` on localhost talks to `firebase emulators:start --project demo-nha` instead of the live project.
 const emulator = new URLSearchParams(location.search).has('emulator') && ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -3011,7 +3012,7 @@ function editPhotos(c, report) {
 function weeklyForm(c, report = null) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
-  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: [], equipment: [], activities: [{}], issues: [],
+  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: L.carriedActuals(c.weekly), equipment: [], activities: [{}], issues: [],
     manpower: L.MANPOWER_START.map(designation => ({ designation, count: 0 })) };
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   // A saved value outside the list stays a choice, so opening and saving does not change it.
@@ -3041,6 +3042,9 @@ function weeklyForm(c, report = null) {
     <p class="muted small" id="wk-week"></p>
     <h3>Weekly accomplishment</h3>
     <p class="muted small" id="wk-note"></p>
+    <button type="button" class="text-btn wk-add" data-abstract>${icon('upload_file', 'sm')}Fill from Abstract (Excel)</button>
+    <input type="file" accept=".xlsx" data-abstract-file hidden>
+    <p class="muted small" id="wk-abstract" aria-live="polite">${report || !start.lines.length ? '' : 'Actual starts from the latest weekly report. Type over it, or fill it from the Abstract of Physical Accomplishment.'}</p>
     <div class="wk-rows" id="wk-lines"></div>
     <p class="wk-total" id="wk-total" aria-live="polite"></p>
     ${list('manpower', 'Manpower', 'Add designation')}
@@ -3082,6 +3086,28 @@ function weeklyForm(c, report = null) {
   };
   form.first.onchange = drawLines;
   box.oninput = total;
+  // The abstract of the actual work: its three parts fill the Actual % boxes; a new report moves to the week of its "As of" date.
+  const abstractFile = d.querySelector('[data-abstract-file]'), abstractNote = d.querySelector('#wk-abstract');
+  d.querySelector('[data-abstract]').onclick = () => abstractFile.click();
+  abstractFile.onchange = async () => {
+    const file = abstractFile.files[0];
+    if (!file) return;
+    let found; // undefined: not a workbook; null: no abstract in it
+    try { if (file.size <= 20 * 1024 * 1024) found = await readAbstractWorkbook(await file.arrayBuffer()); } catch { /* the note below says so */ }
+    abstractFile.value = ''; // so the same file, saved again, can be picked again
+    if (!found || found.billing) {
+      abstractNote.textContent = found === undefined ? 'That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx).'
+        : found ? 'That is the billing abstract. Pick the abstract of the actual accomplishment.' : 'No Abstract of Physical Accomplishment was found in that file.';
+      return;
+    }
+    if (!report && found.asOf) form.first.value = L.weekSaturday(found.asOf);
+    drawLines();
+    const actuals = L.abstractActuals(found.parts);
+    box.querySelectorAll('[data-actual]').forEach((el, k) => { if (actuals[k] != null) el.value = actuals[k]; });
+    total();
+    abstractNote.textContent = `Filled from the abstract${found.asOf ? ` as of ${L.displayDate(found.asOf)}` : ''}${found.overallPct != null ? ` (its overall: ${pct(found.overallPct)})` : ''}. Check the figures, then Save.`
+      + (!report && c.weekly.some(r => L.weekDays(r.reportingWeek)[0] === form.first.value) ? ' This week already has a report: to change that one, cancel and use its Edit.' : '');
+  };
   form.onclick = e => {
     const kind = e.target.closest('[data-add-row]')?.dataset.addRow;
     if (kind) {
@@ -3343,23 +3369,26 @@ function billingForm(c, old = null) {
   // Picking a housing type starts its amount from the latest billing of that type.
   const lastPrice = type => [...c.payments].reverse().find(p => p.billingType === type && Number(p.unitPrice) > 0)?.unitPrice;
   const showType = () => {
-    const type = values().billingType, unit = L.billingUnitName(type);
+    const type = values().billingType, unit = L.billingUnitName(type), byAmount = L.billedByAmount(type);
     // .field sets its own display, so the hidden attribute would not hide it.
     const [units, price] = d.querySelectorAll('[data-by-unit]');
-    for (const el of [units, price]) el.style.display = type ? '' : 'none';
-    d.querySelector('[data-gross]').style.display = type ? 'none' : '';
+    units.style.display = type && !byAmount ? '' : 'none';
+    price.style.display = type ? '' : 'none';
+    d.querySelector('[data-gross]').style.display = type && !byAmount ? 'none' : '';
     units.firstChild.textContent = `Number of ${unit}s`;
     price.firstChild.textContent = `Amount per ${unit} (PHP)`;
   };
   const onType = () => {
     showType();
-    const last = lastPrice(values().billingType);
+    const type = values().billingType;
+    // Land development starts from its contract amount per lot, so its lots come out as on the abstract.
+    const last = lastPrice(type) ?? (L.billedByAmount(type) && L.partAmounts(c.project, c.documents, form.date.value)[1] / L.abstractUnits(c.project, L.lotSummary(c.records).saleable));
     form.unitPrice.value = last ? Number(last).toFixed(2) : '';
   };
   const preview = () => {
-    const f = values(), gross = L.billingGross(f), r = Number(f.retentionPct) || 0;
+    const f = values(), gross = L.billingGross(f), r = Number(f.retentionPct) || 0, lots = L.billedByAmount(f.billingType) ? L.billedUnits({ grossAmount: gross, unitPrice: L.parseAmount(f.unitPrice) }) : 0;
     d.querySelector('.billing-preview').innerHTML = gross > 0
-      ? `${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${kv('Net amount', L.formatPhp(gross * (1 - r / 100)))}` : '';
+      ? `${lots ? kv('Lots', String(lots)) : ''}${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${kv('Net amount', L.formatPhp(gross * (1 - r / 100)))}` : '';
   };
   if (housing) form.billingType.onchange = () => { onType(); preview(); };
   form.oninput = preview;
@@ -3386,6 +3415,8 @@ function billingForm(c, old = null) {
     const f = values(), errors = L.billingErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
     if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
+    const ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old);
+    if (ahead.length) { err.textContent = `${ahead.join(' ')} Save the newer weekly report first, or lower this billing.`; return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
@@ -3446,7 +3477,7 @@ async function loadMissingPhotos(c) {
 
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
 
-function paymentsBody({ project, payments, cost, billed }) {
+function paymentsBody({ page, project, payments, cost, billed }) {
   const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
@@ -3456,7 +3487,7 @@ function paymentsBody({ project, payments, cost, billed }) {
     ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
-    const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = Number(p.units) || 0;
+    const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
       <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">DV ${esc(p.dvNo || 'N/A')}</p></div>
         ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
@@ -3467,6 +3498,7 @@ function paymentsBody({ project, payments, cost, billed }) {
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}
+      ${L.HOUSING_BILLING_TYPES.includes(p.billingType) ? `<a class="text-btn entry-edit" href="#/p/${esc(page.id)}/print/apa-${esc(p.uuid)}">${icon('print', 'sm')}Print abstract</a>` : ''}
       ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`;
   }).join('')}</ul></div>`;
@@ -3656,6 +3688,7 @@ async function drawPrint(c) {
   if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
   if (c.page.sub === 'profile') return drawProfilePrint(c);
+  if (/^apa-/.test(c.page.sub || '')) return drawAbstractPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -3699,6 +3732,25 @@ function drawProfilePrint({ page, project, documents }) {
       preparer: { name: s.profile.name || '', title: s.profile.title || '', office: s.profile.office || 'Bulacan District Office' },
     })}</div></div>`;
   document.getElementById('do-print').onclick = () => window.print();
+}
+
+/** A billing's Abstract of Physical Accomplishment (BlueBookForms.billingAbstract, Print abstract on the billing) for `#/p/<id>/print/apa-<billing>`. */
+function drawAbstractPrint(c) {
+  const { page, project, records, documents, payments } = c;
+  const payment = payments.find(p => p.uuid === page.sub.slice(4));
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/payments">${icon('arrow_back', 'sm')}Billings</a>`;
+  if (!payment) { main.innerHTML = `${back}<p class="muted">This billing was deleted or does not exist.</p>`; return; }
+  document.title = `Abstract of Physical Accomplishment - ${payment.name || payment.billingType}`;
+  main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+    <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.billingAbstractHtml({
+      project, docs: documents, payments, payment, units: L.abstractUnits(project, L.lotSummary(records).saleable),
+      signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
+    })}</div></div>`;
+  bindSignatories(c, false);
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.onclick = () => window.print();
 }
 
 /** The monthly form (BlueBookForms.monthlyReport) for `#/p/<id>/print/2026-09`. */

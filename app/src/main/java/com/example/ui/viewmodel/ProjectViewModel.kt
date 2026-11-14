@@ -2002,6 +2002,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
+    /** A billing's Abstract of Physical Accomplishment; [saleable] is the project's saleable lots, for one without a number of units. */
+    suspend fun billingAbstractForm(project: Project, payment: com.example.data.model.ProjectPayment, saleable: Int, signatories: com.example.util.Signatories): String =
+        com.example.util.BlueBookForms.billingAbstract(
+            project, repository.getPendingDocuments(project.id).first(), repository.getProjectPaymentsForProject(project.id).first(), payment,
+            com.example.util.BillingAbstract.units(project, saleable), signatories, blueBookBanner
+        )
+
     /** Saves the approved bar chart ([json] from BarChart.toJson; blank removes it). */
     fun saveBarChart(projectId: Long, json: String) {
         viewModelScope.launch(missingProjectGuard) {
