@@ -13,10 +13,8 @@ import com.example.data.local.barChartPayload
 import com.example.data.model.*
 import kotlinx.coroutines.tasks.await
 import com.example.data.remote.AssignmentPolicy
-import com.example.data.remote.DriveSyncResult
 import com.example.data.remote.FirestoreSyncManager
 import com.example.data.auth.isEmailName
-import com.example.data.remote.GoogleDriveSyncManager
 import com.example.data.repository.ProjectRepository
 import com.example.util.AppNotificationManager
 import com.example.util.AttentionFlag
@@ -70,7 +68,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private lateinit var database: AppDatabase
     private lateinit var weeklyReportWeatherWriter: WeeklyReportWeatherWriter
     private val repository: ProjectRepository
-    private val googleDriveSyncManager: GoogleDriveSyncManager
     private val firestoreSyncManager: FirestoreSyncManager
     private val authManager: AuthManager = AuthManager(application)
 
@@ -86,12 +83,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
     private val _authSuccessMessage = MutableStateFlow<String?>(null)
     val authSuccessMessage: StateFlow<String?> = _authSuccessMessage.asStateFlow()
-
-    // Google Drive Sync State
-    val isDriveSyncing: StateFlow<Boolean>
-    val lastDriveSyncTime: StateFlow<String?>
-    val isAutoSyncEnabled: StateFlow<Boolean>
-    val driveAccountEmail: StateFlow<String>
 
     // Theme Mode State (System, Light, Dark)
     private val _appThemeMode = MutableStateFlow(authManager.getSavedAppThemeMode())
@@ -320,7 +311,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         syncOutboxDao = database.syncOutboxDao()
         weeklyReportWeatherWriter = WeeklyReportWeatherWriter(database, reportDao)
         repository = ProjectRepository(projectDao, reportDao)
-        googleDriveSyncManager = GoogleDriveSyncManager(application, database)
         firestoreSyncManager = FirestoreSyncManager(application, database, viewModelScope)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -352,11 +342,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
         val prefs = application.getSharedPreferences("user_prefs", android.content.Context.MODE_PRIVATE)
         val isCleared = prefs.getBoolean("placeholders_cleared_v105", false)
-
-        isDriveSyncing = googleDriveSyncManager.isSyncing
-        lastDriveSyncTime = googleDriveSyncManager.lastSyncTime
-        isAutoSyncEnabled = googleDriveSyncManager.isAutoSyncEnabled
-        driveAccountEmail = googleDriveSyncManager.driveAccountEmail
 
         // Restore persisted user session on startup
         val savedSession = authManager.getSavedUserSession()
@@ -2743,83 +2728,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    val driveSyncStatusMessage: StateFlow<String?> = googleDriveSyncManager.syncStatusMessage
-
-    // Google Drive Sync Operations
-    fun backupToGoogleDrive(accessToken: String? = null, onResult: (DriveSyncResult) -> Unit = {}) {
-        viewModelScope.launch(missingProjectGuard) {
-            if (currentUserAccount.value.isDemoAccount) {
-                onResult(DriveSyncResult.Error("Google Drive Sync is disabled for Quick Demo Access. Please sign in with your official NHA account to upload to Google Drive."))
-                return@launch
-            }
-            val result = googleDriveSyncManager.backupToGoogleDrive(accessToken)
-            val success = result is DriveSyncResult.Success
-            val msg = when (result) {
-                is DriveSyncResult.Success -> result.message
-                is DriveSyncResult.Error -> result.message
-            }
-            logAuditAction(
-                projectId = null,
-                actionType = "Backup",
-                details = "Google Drive Database Backup: $msg",
-                oldValue = "",
-                newValue = if (success) "Backup Completed" else "Backup Failed: $msg"
-            )
-            logAuditAction(
-                projectId = null,
-                actionType = "Sync Event",
-                details = "Google Drive Sync event triggered",
-                oldValue = "",
-                newValue = msg
-            )
-            onResult(result)
-        }
-    }
-
-    fun restoreFromGoogleDrive(accessToken: String? = null, onResult: (DriveSyncResult) -> Unit = {}) {
-        viewModelScope.launch(missingProjectGuard) {
-            val result = googleDriveSyncManager.restoreFromGoogleDrive(accessToken)
-            val success = result is DriveSyncResult.Success
-            val msg = when (result) {
-                is DriveSyncResult.Success -> result.message
-                is DriveSyncResult.Error -> result.message
-            }
-            logAuditAction(
-                projectId = null,
-                actionType = "Restore",
-                details = "Google Drive Database Restore: $msg",
-                oldValue = "Previous local database state",
-                newValue = if (success) "Restore Succeeded" else "Restore Failed: $msg"
-            )
-            logAuditAction(
-                projectId = null,
-                actionType = "Sync Event",
-                details = "Google Drive Sync event triggered",
-                oldValue = "",
-                newValue = msg
-            )
-            onResult(result)
-        }
-    }
-
-    fun toggleDriveAutoSync(enabled: Boolean) {
-        googleDriveSyncManager.setAutoSync(enabled)
-        logAuditAction(
-            projectId = null,
-            actionType = "Sync Event",
-            details = "Google Drive Auto-Sync set to $enabled",
-            oldValue = "AutoSync: ${!enabled}",
-            newValue = "AutoSync: $enabled"
-        )
-    }
-
-    /** The empty dashboard's "Sync from Cloud": restart the cloud listener, send queued changes, restore from Drive. */
+    /** The empty dashboard's "Sync from Cloud": restart the cloud listener and send queued changes. */
     fun syncFromCloud(onComplete: () -> Unit = {}) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 firestoreSyncManager.startRealtimeSync()
                 firestoreSyncManager.flushOutbox()
-                restoreFromGoogleDrive()
                 logAuditAction(
                     projectId = null,
                     actionType = "Sync Event",

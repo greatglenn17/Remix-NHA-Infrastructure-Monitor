@@ -135,7 +135,6 @@ fun TopAppBarHeader(
     sync: SyncChip = SyncChip.Synced,
     lastSyncedAt: Long? = null,
     onRetrySync: (() -> Unit)? = null,
-    onOpenDriveSync: (() -> Unit)? = null,
     onEditProfileClick: (() -> Unit)? = null,
     onSignOut: (() -> Unit)? = null,
     unreadNotificationCount: Int = 0,
@@ -262,19 +261,6 @@ fun TopAppBarHeader(
                                 onClick = { showSyncDialog = true },
                                 isSpinning = sync is SyncChip.Uploading
                             )
-
-                            // No screen passes this until Google Drive sign-in is implemented, so the badge stays hidden.
-                            if (onOpenDriveSync != null) {
-                                HeaderBadge(
-                                    text = "MANUAL BACKUP",
-                                    icon = Icons.Default.CloudSync,
-                                    iconTint = MaterialTheme.colorScheme.primary,
-                                    textColor = MaterialTheme.colorScheme.primary,
-                                    backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                    onClick = onOpenDriveSync
-                                )
-                            }
                         }
                     }
                 }
