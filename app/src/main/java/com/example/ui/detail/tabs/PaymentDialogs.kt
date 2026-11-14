@@ -53,8 +53,8 @@ fun AddPaymentDialog(
     isHousing: Boolean = false,
     // Earlier billings; the latest of a type prefills its amount per lot or unit.
     previous: List<ProjectPayment> = emptyList(),
-    // The contract amount of land development per lot: where its amount per lot starts without an earlier billing.
-    landPerLot: Double = 0.0,
+    // The contract amount of land development per lot on a billing date: where its amount per lot starts without an earlier billing.
+    landPerLot: (date: String) -> Double = { 0.0 },
     // Why this billing cannot be saved (it would pass the actual accomplishment); empty when it can.
     check: (ProjectPayment) -> List<String> = { emptyList() }
 ) {
@@ -120,7 +120,7 @@ fun AddPaymentDialog(
                     label = { Text("Period Covered") },
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (isHousing || byUnit) {
+                if (isHousing || typed) {
                     Text("Billed for", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (HOUSING_BILLING_TYPES + "").forEach { t ->
@@ -131,7 +131,7 @@ fun AddPaymentDialog(
                                         type = t
                                         priceStr = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
                                             .maxByOrNull { it.id }?.unitPrice
-                                            .let { it ?: landPerLot.takeIf { per -> billedByAmount(t) && per > 0 } }
+                                            .let { it ?: if (billedByAmount(t)) landPerLot(date).takeIf { per -> per > 0 && per.isFinite() } else null }
                                             ?.let { "%.2f".format(java.util.Locale.US, it) } ?: ""
                                     }
                                 },

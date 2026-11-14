@@ -52,7 +52,7 @@ object BillingAbstract {
         project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, weekly: List<WeeklyReport>,
         new: ProjectPayment, old: ProjectPayment? = null
     ): List<String> {
-        if (new.billingType.isBlank() || (old != null && old.billingType == new.billingType && new.grossAmount <= old.grossAmount)) return emptyList()
+        if (new.billingType.isBlank() || (old != null && old.billingType == new.billingType && round2(new.grossAmount) <= round2(old.grossAmount))) return emptyList()
         val last = latestWeekly(weekly)
         val actuals = last?.let { parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty()
         val billed = payments.filter { it.billingType.isNotBlank() && it.uuid != old?.uuid } + new
@@ -83,10 +83,13 @@ object BillingAbstract {
     /** [targetPct] is the plan on the billing's date. */
     data class Abstract(val targetPct: Double, val parts: List<Part>)
 
-    /** The abstract for [payment]. Earlier billings are those dated before it, then as entered. */
+    /**
+     * The abstract for [payment]. Earlier billings are those dated before it; on the same date by uuid, which the
+     * website holds too and an edit does not change.
+     */
     fun of(project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, payment: ProjectPayment): Abstract {
         val (acquisition, development, housing) = partAmounts(project, documents, day(payment.date))
-        val ordered = payments.sortedWith(compareBy({ it.date }, { it.id }))
+        val ordered = payments.sortedWith(compareBy({ it.date }, { it.uuid }))
         val before = ordered.take(ordered.indexOfFirst { it.uuid == payment.uuid }.coerceAtLeast(0))
         fun line(no: String, name: String, unit: String, type: String, amount: Double) = Line(
             no, name, unit, type, amount,

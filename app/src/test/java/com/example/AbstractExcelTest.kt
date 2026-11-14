@@ -98,5 +98,6 @@ class AbstractExcelTest {
         assertEquals(LocalDate.of(2026, 10, 30), AbstractExcel.asOfDate("As of October 30, 2026"))
         assertEquals(LocalDate.of(2026, 5, 5), AbstractExcel.asOfDate(" as of  May 5 2026 "))
         assertNull(AbstractExcel.asOfDate("As of last week"))
+        assertNull(AbstractExcel.asOfDate("As of September 31, 2026")) // no such day
     }
 }

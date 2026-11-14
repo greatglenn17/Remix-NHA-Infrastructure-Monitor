@@ -75,6 +75,8 @@ class BillingAbstractTest {
             listOf("Land Development: billed to date 25.22% would pass the actual 25.21% of Mar 8, 2025 - Mar 14, 2025."),
             ahead(payments[2].copy(grossAmount = 504_400.0), payments[2])
         )
+        // An old billing saved as lots x price: its gross at 2 decimals parses a hair above the saved one, which is not a raise.
+        assertEquals(emptyList<String>(), ahead(payments[2].copy(grossAmount = 35_219_729.88), payments[2].copy(grossAmount = 81 * 434_811.48), emptyList()))
     }
 
     @Test fun latestWeekPartAmountsUnitsAndCarriedActuals() {
@@ -108,6 +110,11 @@ class BillingAbstractTest {
             ),
             abstract.parts.flatMap { it.lines }
         )
+        // Billings of the same date go by uuid, on the site and the phone alike, whatever order they were entered in.
+        val y = billing(7, "Land development", 5.0, "2025-03-01").copy(uuid = "y")
+        val x = billing(8, "Land development", 7.0, "2025-03-01").copy(uuid = "x")
+        assertEquals(7.0, BillingAbstract.of(project, emptyList(), listOf(y, x), y).parts[1].lines[0].previous, 0.0)
+        assertEquals(0.0, BillingAbstract.of(project, emptyList(), listOf(y, x), x).parts[1].lines[0].previous, 0.0)
         // A project without housing has no housing lines.
         val land = project.copy(scopeOfWork = """[{"name":"Land Development","amount":500,"weightPct":100}]""")
         assertEquals(listOf("Land Development"), BillingAbstract.of(land, emptyList(), payments, payments[2]).parts.map { it.name })

@@ -1341,10 +1341,13 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   assert.deepEqual(ahead({ ...form, grossAmount: '300000' }, payments[2], []), []);
   assert.deepEqual(ahead({ ...form, grossAmount: '504,400' }, payments[2]), ['Land Development: billed to date 25.22% would pass the actual 25.21% of Mar 8, 2025 - Mar 14, 2025.']);
 
+  // An old billing saved as lots x price: its gross at 2 decimals parses a hair above the saved one, which is not a raise.
+  assert.deepEqual(ahead({ ...form, grossAmount: '35219729.88' }, { ...payments[2], grossAmount: 81 * 434811.48 }, []), []);
+
   assert.equal(L.abstractUnits(project), 100);
   assert.equal(L.abstractUnits({ numberOfUnits: '' }, 42), 42);
   assert.equal(L.abstractUnits({}), 1);
-  const abstract = L.billingAbstract(project, [], [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1 }], payments[2]);
+  const abstract = L.billingAbstract(project, [], [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }], payments[2]);
   assert.equal(abstract.targetPct, 12);
   assert.deepEqual(abstract.parts.map(p => [p.name, p.heading]), [['Land Acquisition Cost', undefined], ['Land Development', undefined], ['Housing Construction', ['3', 'HOUSING CONSTRUCTION']]]);
   assert.deepEqual(abstract.parts.flatMap(p => p.lines), [
@@ -1353,6 +1356,10 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
     { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 0, thisPeriod: 0 },
     { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 0 },
   ]);
+  // Billings of the same date go by uuid, on the site and the phone alike, whatever order the list is in.
+  const same = [{ uuid: 'y', billingType: 'Land development', grossAmount: 5, date: '2025-03-01' }, { uuid: 'x', billingType: 'Land development', grossAmount: 7, date: '2025-03-01' }];
+  assert.equal(L.billingAbstract(project, [], same, same[0]).parts[1].lines[0].previous, 7);
+  assert.equal(L.billingAbstract(project, [], same, same[1]).parts[1].lines[0].previous, 0);
   // A project without housing has no housing lines.
   assert.deepEqual(L.billingAbstract({ scopeOfWork: JSON.stringify([{ name: 'Land Development', amount: 500, weightPct: 100 }]) }, [], payments, payments[2]).parts.map(p => p.name), ['Land Development']);
 });

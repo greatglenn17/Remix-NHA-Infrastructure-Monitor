@@ -64,8 +64,19 @@ test('abstract Excel: the billing format is told apart, and other sheets are not
   assert.throws(() => abstractOf({ 'word/document.xml': '<document/>' }), NotAnExcelFile);
 });
 
+test('abstract Excel: a workbook with both formats gives the actual one, wherever its sheet is', () => {
+  const billing = [...HEAD, ['A23', 3], ['B23', 'HOUSING CONSTRUCTION'], ['B24', 'MILESTONE 1 (80%)'], ['B25', 'Subtotal (Housing Construction)'], ['H25', 7000000], ['Q25', 0]];
+  const files = { ...workbook(sheet(billing)), 'xl/worksheets/sheet2.xml': sheet(ACTUAL),
+    'xl/workbook.xml': '<workbook xmlns:r="x"><sheets><sheet name="APA" sheetId="1" r:id="rId1"/><sheet name="MONITORING" sheetId="2" r:id="rId2"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>' };
+  assert.equal(abstractOf(workbook(sheet(billing))).billing, true);
+  assert.equal(abstractOf(files).billing, false);
+  assert.equal(abstractOf(files).asOf, '2025-03-14');
+});
+
 test('abstract Excel: the as-of line', () => {
   assert.equal(asOfDate('As of October 30, 2026'), '2026-10-30');
   assert.equal(asOfDate(' as of  May 5 2026 '), '2026-05-05');
   assert.equal(asOfDate('As of last week'), null);
+  assert.equal(asOfDate('As of September 31, 2026'), null); // no such day
 });

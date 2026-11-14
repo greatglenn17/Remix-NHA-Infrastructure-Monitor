@@ -16,8 +16,12 @@ object AbstractExcel {
     /** [billing] is true for the billing format, which is not the actual work. */
     data class Abstract(val asOf: LocalDate?, val parts: List<Part>, val overallPct: Double?, val billing: Boolean)
 
-    /** The first sheet laid out as an abstract, or null without one; a file that is not a workbook throws [BarChartExcel.NotAnExcelFile]. */
-    fun read(input: InputStream): Abstract? = BarChartExcel.sheetTexts(input).firstNotNullOfOrNull(::abstract)
+    /**
+     * The sheet laid out as an abstract, or null without one; a file that is not a workbook throws
+     * [BarChartExcel.NotAnExcelFile]. A workbook can hold both formats: the actual one wins wherever its sheet is.
+     */
+    fun read(input: InputStream): Abstract? =
+        BarChartExcel.sheetTexts(input).mapNotNull(::abstract).let { all -> all.firstOrNull { !it.billing } ?: all.firstOrNull() }
 
     private val AS_OF = Regex("^as of\\s+([a-z]+)\\s+(\\d{1,2}),?\\s+(\\d{4})$", RegexOption.IGNORE_CASE)
     private val MONTHS = listOf("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")

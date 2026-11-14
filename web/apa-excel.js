@@ -9,7 +9,9 @@ const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 
 /** "As of October 30, 2026" as "2026-10-30"; null for anything else. */
 export function asOfDate(text) {
   const m = /^as of\s+([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/i.exec(text.trim()), month = m ? MONTHS.indexOf(m[1].toLowerCase()) : -1;
-  return month < 0 ? null : `${m[3]}-${String(month + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  // A day the month does not have ("September 31") is no date, as on the phone.
+  if (month < 0 || new Date(Date.UTC(Number(m[3]), month, Number(m[2]))).getUTCDate() !== Number(m[2])) return null;
+  return `${m[3]}-${String(month + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`;
 }
 
 /** One sheet as an abstract; null when it is not laid out as one. */
@@ -49,8 +51,9 @@ function sheetAbstract(xml, strings) {
  */
 export function abstractOf(files) {
   const { sheets, strings } = workbookSheets(files);
-  for (const [, xml] of sheets) { const found = sheetAbstract(xml, strings); if (found) return found; }
-  return null;
+  // A workbook can hold both formats: the actual one wins wherever its sheet is.
+  const all = sheets.map(([, xml]) => sheetAbstract(xml, strings)).filter(Boolean);
+  return all.find(a => !a.billing) ?? all[0] ?? null;
 }
 
 /** AbstractExcel.read: the abstract in an .xlsx file's bytes. */

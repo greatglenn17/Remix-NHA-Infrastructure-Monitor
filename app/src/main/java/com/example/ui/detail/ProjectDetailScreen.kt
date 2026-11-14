@@ -437,8 +437,10 @@ fun ProjectDetailScreen(
                         actualPercent = currentProject.actualAccomplishment,
                         currentUserRole = currentUser.role,
                         isHousing = isHousingProject,
-                        landPerLot = com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, java.time.LocalDate.now())[1] /
-                            com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count),
+                        landPerLot = { date ->
+                            com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, runCatching { java.time.LocalDate.parse(date) }.getOrNull())[1] /
+                                com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)
+                        },
                         billingCheck = { new, old -> com.example.util.BillingAbstract.aheadErrors(currentProject, pendingDocuments, projectPayments, weeklyReports, new, old) },
                         onPrintAbstract = { payment ->
                             val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count

@@ -1315,7 +1315,7 @@ export function partAmounts(project, docs, asOf) {
  */
 export function billingAheadErrors(project, docs, payments, weekly, f, old = null) {
   const gross = billingGross(f);
-  if (!f.billingType || (old && old.billingType === f.billingType && gross <= (Number(old.grossAmount) || 0))) return [];
+  if (!f.billingType || (old && old.billingType === f.billingType && Math.round(gross * 100) <= Math.round((Number(old.grossAmount) || 0) * 100))) return [];
   const last = latestWeekly(weekly), actuals = last ? accomplishmentOf(last.accomplishmentItemsJson) : [];
   const billed = [...payments.filter(p => p.billingType && p.uuid !== old?.uuid), { billingType: f.billingType, grossAmount: gross }];
   const sum = list => list.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0), round = v => Math.round(v * 100) / 100;
@@ -1338,7 +1338,10 @@ export const abstractUnits = (project, saleable = 0) => Number.parseInt(String(p
  */
 export function billingAbstract(project, docs, payments, payment) {
   const [acquisition, development, housing] = partAmounts(project, docs, payment.date);
-  const before = payments.slice(0, Math.max(0, payments.findIndex(p => p.uuid === payment.uuid)));
+  // Earlier billings: those dated before it; on the same date by uuid, which both copies hold and an edit does not change.
+  const key = p => [String(p.date || ''), String(p.uuid || '')], cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const ordered = [...payments].sort((a, b) => cmp(key(a)[0], key(b)[0]) || cmp(key(a)[1], key(b)[1]));
+  const before = ordered.slice(0, Math.max(0, ordered.findIndex(p => p.uuid === payment.uuid)));
   const round = v => Math.round(v * 100) / 100;
   const line = (no, name, unit, type, amount) => ({ no, name, unit, type, amount,
     previous: round(before.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0)),
