@@ -194,6 +194,7 @@ class BillingAbstractTest {
         // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
         has("GRAND TOTAL", "", "", "100,000.00", "10,000,000.00", "", "400,000.00", "4.00%", "", "310,000.00", "3.10%", "", "710,000.00", "7.10%", "", "9,290,000.00")
         assertTrue(html.contains("TARGET ACCOMPLISHMENT</td><td class='pc'>:</td><td>12.00%"))
+        assertTrue(html.contains("<th colspan='2' rowspan='2'>BALANCE</th>")) // the billing format keeps its BALANCE columns
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>7.10%"))
         assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-4.90%"))
         assertTrue(html.contains("Approved by:"))

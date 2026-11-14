@@ -157,8 +157,9 @@ class ProjectDetailScreenshotTest {
         captureRoboImage("src/test/screenshots/detail_documents_${width}_$theme.png") { frame(mode) { Documents() } }
     }
 
-    // The Actual Accomplishment tab on a small phone: the five tabs, the target/actual table, the buttons and the pay items.
-    @Config(qualifiers = "w360dp-h800dp")
+    // The Actual Accomplishment tab on a small phone: the five tabs, the buttons, the target/actual table and the pay
+    // items' table with its headings (the frame is tall enough to reach its rows).
+    @Config(qualifiers = "w360dp-h1100dp")
     @Test fun actual_tab_360_light() = captureRoboImage("src/test/screenshots/detail_actual_360_light.png") {
         val none = "[null,null,null]"
         val abstract = com.example.data.model.ProjectAbstract(
