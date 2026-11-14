@@ -111,6 +111,139 @@ object ProjectAbstracts {
     fun projectActualAfter(abstracts: List<ProjectAbstract>, weekly: List<WeeklyReport>, current: Double): Double =
         latest(abstracts)?.overallPct ?: BillingAbstract.latestWeekly(weekly)?.actualAccomplishmentPct ?: current
 
+    /* The next abstract, made in the app from the one before it, by the sheet's own formulas. web/logic.js has the
+       website's copy (isPayLine, abstractCover, nextAbstractProblem, nextAbstractSource, nextAbstractTyped,
+       nextAbstractRows, nextAbstractErrors, nextAbstractFields, nextAbstractNote, quantityText); change both together. */
+
+    private fun round4(v: Double) = Math.round(v * 10000) / 10000.0
+
+    /** A row the engineer types a quantity for: a pay item, or a part that is its own pay item (Land Acquisition), with a quantity and an amount. */
+    fun isPayLine(r: AbstractExcel.Row): Boolean = (r.kind == "item" || r.kind == "part") && (r.qty ?: 0.0) > 0 && r.amount != null
+
+    /**
+     * For each subtotal and the grand total (by row index), the indexes of the pay lines it adds up. A subtotal right
+     * after another one is its part's (every line since the part row); any other, the lines since the subtotal before
+     * it or the part row; the grand total, every line.
+     */
+    fun cover(rows: List<AbstractExcel.Row>): Map<Int, List<Int>> {
+        val cover = linkedMapOf<Int, List<Int>>()
+        var part = 0
+        var group = 0
+        rows.forEachIndexed { i, r ->
+            if (r.kind == "part") { part = i; group = i }
+            if (r.kind != "subtotal" && r.kind != "total") return@forEachIndexed
+            val from = if (r.kind == "total") 0 else if (rows.getOrNull(i - 1)?.kind == "subtotal") part else group
+            cover[i] = (from until i).filter { isPayLine(rows[it]) }
+            group = i + 1
+        }
+        return cover
+    }
+
+    /** Why the next abstract cannot be made from [abstract], "" when it can: its subtotals must add up from its pay items. */
+    fun nextProblem(abstract: ProjectAbstract): String {
+        val rows = rows(abstract.rowsJson)
+        val from = "the abstract as of ${ProjectSchedule.displayDate(abstract.asOf)}"
+        val off = cover(rows).entries.firstOrNull { (i, lines) -> Math.abs(lines.sumOf { rows[it].amount ?: 0.0 } - (rows[i].amount ?: 0.0)) > 1 }
+        return when {
+            rows.none { it.kind == "total" } || rows.none(::isPayLine) -> "There are no pay items with a grand total in $from, so the next one cannot be made from it. Upload the next abstract instead."
+            off != null -> "\"${rows[off.key].name}\" does not add up from its items in $from, so the next one cannot be made from it. Upload the next abstract instead."
+            else -> ""
+        }
+    }
+
+    /** What an abstract made in the app continues: [source], whose TO DATE is the new PREVIOUS; [same], the one already filed for that date; [error], why the date cannot be used. */
+    data class NextSource(val source: ProjectAbstract?, val same: ProjectAbstract?, val error: String)
+
+    /** The abstract of [asOf] (yyyy-MM-dd) continues the latest one dated before it; saving replaces the one already filed for that date. */
+    fun nextSource(abstracts: List<ProjectAbstract>, asOf: String): NextSource {
+        val latest = latest(abstracts) ?: return NextSource(null, null, "No abstract uploaded yet.")
+        val source = latest(abstracts.filter { it.asOf < asOf })
+        val error = when {
+            asOf.isEmpty() -> "Pick the \"As of\" date."
+            asOf < latest.asOf -> "The date must not be before the latest abstract's, ${ProjectSchedule.displayDate(latest.asOf)}."
+            source == null -> "The date must be after ${ProjectSchedule.displayDate(latest.asOf)}, the first abstract's."
+            else -> nextProblem(source)
+        }
+        return NextSource(source, latest(abstracts.filter { it.asOf == asOf }), error)
+    }
+
+    /** This period's quantities of [same] (the abstract of the date being made again) by row index; empty when its rows are not the source's. */
+    fun nextTyped(sourceRows: List<AbstractExcel.Row>, same: ProjectAbstract?): Map<Int, Double> {
+        val rows = same?.let { rows(it.rowsJson) }.orEmpty()
+        if (rows.size != sourceRows.size || rows.indices.any { rows[it].kind != sourceRows[it].kind || rows[it].no != sourceRows[it].no || rows[it].name != sourceRows[it].name }) return emptyMap()
+        return rows.indices.filter { isPayLine(rows[it]) && rows[it].period.getOrNull(0) != null }.associateWith { rows[it].period[0]!! }
+    }
+
+    /**
+     * The rows of the next abstract. [rows] are the source's, [typed] this period's quantity by row index (none typed
+     * is no work this period). As on the sheet: PREVIOUS is the source's TO DATE; a pay line's THIS PERIOD amount is
+     * the quantity at its unit cost and its % that amount over the line's amount; TO DATE is previous plus this
+     * period; BALANCE the rest; the equivalent units the quantity's share of [equivUnits]. Subtotals and the grand
+     * total add up their pay lines' THIS PERIOD amounts. Cells the sheet leaves blank stay blank.
+     */
+    fun nextRows(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>, equivUnits: Double = 0.0): List<AbstractExcel.Row> {
+        val out = rows.toMutableList()
+        rows.forEachIndexed { i, r ->
+            if (!isPayLine(r)) return@forEachIndexed
+            val qty = r.qty ?: return@forEachIndexed
+            val contract = r.amount ?: return@forEachIndexed
+            val q = typed[i]
+            val n = q?.takeIf { it.isFinite() } ?: 0.0
+            val prev = List(3) { r.toDate.getOrNull(it) ?: 0.0 }
+            val amount = round2(n * (r.unitCost ?: (contract / qty)))
+            val share = if (contract != 0.0) round2(amount / contract * 100) else 0.0
+            val toDate = listOf(round4(prev[0] + n), round2(prev[1] + amount), round2(prev[2] + share))
+            val done = round2(toDate[0] / qty * equivUnits)
+            out[i] = r.copy(
+                prev = prev, period = listOf(q, amount, share), toDate = toDate, balance = listOf(round4(qty - toDate[0]), round2(contract - toDate[1])),
+                equiv = if (equivUnits > 0) listOf(round2(prev[0] / qty * equivUnits), done, round2(equivUnits - done)) else listOf(null, null, null)
+            )
+        }
+        for ((i, lines) in cover(rows)) {
+            val r = rows[i]
+            val contract = r.amount ?: 0.0
+            val amount = round2(lines.sumOf { out[it].period.getOrNull(1) ?: 0.0 })
+            val share = if (contract != 0.0) round2(amount / contract * 100) else 0.0
+            val before = listOf(r.toDate.getOrNull(1) ?: 0.0, r.toDate.getOrNull(2) ?: 0.0)
+            val done = round2(before[0] + amount)
+            out[i] = r.copy(
+                prev = listOf(null, before[0], before[1].takeIf { r.prev.getOrNull(2) != null }), period = listOf(null, amount, share.takeIf { r.period.getOrNull(2) != null }),
+                toDate = listOf(null, done, round2(before[1] + share)), balance = listOf(null, r.balance.getOrNull(1)?.let { round2(contract - done) }), equiv = listOf(null, null, null)
+            )
+        }
+        return out
+    }
+
+    /** A quantity as the abstract shows it: up to 4 decimals, with commas. */
+    fun quantityText(v: Double): String = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).format(v)
+
+    /** What stops the typed quantities from being saved, one line per pay line (a NaN is a box that is not a number); empty when they can. */
+    fun nextErrors(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>): List<String> {
+        val next = nextRows(rows, typed)
+        return rows.indices.filter { isPayLine(rows[it]) }.mapNotNull { i ->
+            val label = "${rows[i].no} ${rows[i].name}".trim()
+            val qty = rows[i].qty ?: 0.0
+            val done = next[i].toDate[0] ?: 0.0
+            when {
+                typed[i]?.isFinite() == false -> "$label: this period must be a number."
+                done < 0 -> "$label: to date would go below zero."
+                done > qty -> "$label: to date ${quantityText(done)} would pass the quantity ${quantityText(qty)}."
+                else -> null
+            }
+        }
+    }
+
+    /** The record of the abstract of [asOf] made from [source] with [rows] (nextRows); it has no file. */
+    fun nextRecord(source: ProjectAbstract, rows: List<AbstractExcel.Row>, asOf: String, uploadedBy: String) = ProjectAbstract(
+        projectId = source.projectId, asOf = asOf, overallPct = rows.firstOrNull { it.kind == "total" }?.toDate?.getOrNull(2) ?: 0.0,
+        rowsJson = rowsJson(rows), fileName = "", uploadedBy = uploadedBy, equivUnits = source.equivUnits
+    )
+
+    /** The New abstract form's line: the overall its quantities give and what it continues, word for word on the website. */
+    fun nextNote(source: ProjectAbstract, same: ProjectAbstract?, rows: List<AbstractExcel.Row>): String =
+        "Overall to date ${pct(rows.firstOrNull { it.kind == "total" }?.toDate?.getOrNull(2) ?: 0.0)}, from ${pct(source.overallPct)} as of ${ProjectSchedule.displayDate(source.asOf)}." +
+            if (same != null) " Saving replaces the abstract already filed for this date." else ""
+
     /** "Mar 14, 2025: overall 10.73%", the wording the messages and the audit entries share. */
     fun summary(abstract: ProjectAbstract): String = "${ProjectSchedule.displayDate(abstract.asOf)}: overall ${pct(abstract.overallPct)}"
 

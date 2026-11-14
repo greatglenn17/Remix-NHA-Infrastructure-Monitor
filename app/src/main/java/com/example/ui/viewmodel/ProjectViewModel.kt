@@ -2509,7 +2509,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val overall = com.example.util.ProjectAbstracts.pct(record.overallPct)
             logAuditAction(
                 projectId = record.projectId,
-                actionType = if (old == null) "Abstract Upload" else "Updated abstract",
+                // One made in the app (ProjectAbstracts.nextRecord) has no file.
+                actionType = if (old != null) "Updated abstract" else if (record.fileName.isNotEmpty()) "Abstract Upload" else "New abstract",
                 details = "Abstract as of ${com.example.util.ProjectAbstracts.summary(record)}",
                 // logAuditAction drops an entry whose old and new values are the same, and a replacement must still be logged.
                 oldValue = old?.let { com.example.util.ProjectAbstracts.pct(it.overallPct) }?.takeIf { it != overall }.orEmpty(),

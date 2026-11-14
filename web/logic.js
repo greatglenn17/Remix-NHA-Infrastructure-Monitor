@@ -1648,7 +1648,7 @@ export function abstractCover(rows) {
   rows.forEach((r, i) => {
     if (r.kind === 'part') part = group = i;
     if (r.kind !== 'subtotal' && r.kind !== 'total') return;
-    const from = r.kind === 'total' ? 0 : rows[i - 1].kind === 'subtotal' ? part : group;
+    const from = r.kind === 'total' ? 0 : rows[i - 1]?.kind === 'subtotal' ? part : group;
     cover.set(i, rows.slice(from, i).flatMap((x, k) => (isPayLine(x) ? [from + k] : [])));
     group = i + 1;
   });
