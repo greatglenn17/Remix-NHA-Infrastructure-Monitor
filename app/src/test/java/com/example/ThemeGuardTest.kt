@@ -50,7 +50,6 @@ class ThemeGuardTest {
             "ui/dialogs/DateRangePickerDialog.kt",
             "ui/dialogs/EditProfileDialog.kt",
             "ui/dialogs/EditProjectDialog.kt",
-            "ui/dialogs/GoogleDriveSyncDialog.kt",
             "ui/dialogs/ManageUsersDialog.kt",
             "ui/dialogs/NotificationsDialog.kt",
             "ui/dialogs/ScopeOfWorksEditor.kt",
