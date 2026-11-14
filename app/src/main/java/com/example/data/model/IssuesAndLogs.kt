@@ -136,4 +136,14 @@ fun netBillings(payments: List<ProjectPayment>): List<ProjectPayment> {
 /** What a housing project bills for; land is billed per lot, M1 and M2 per housing unit. */
 val HOUSING_BILLING_TYPES = listOf("Land acquisition", "Land development", "M1 - Housing unit", "M2 - Housing unit")
 
+/** Land development is billed by the amount accomplished; the other housing types by whole lots or units. */
+fun billedByAmount(type: String): Boolean = type == "Land development"
+
+/** A billing's lots or units as typed; for one billed by amount, its gross over the amount per lot (2 decimals). */
+val ProjectPayment.billedUnits: Double
+    get() = if (units != 0) units.toDouble() else if (unitPrice > 0) Math.round(grossAmount / unitPrice * 100) / 100.0 else 0.0
+
+/** A count of lots or units as text: "40", "7.23". */
+fun unitsText(count: Double): String = java.math.BigDecimal.valueOf(count).stripTrailingZeros().toPlainString()
+
 fun billingUnitName(type: String): String = if (type.startsWith("Land")) "lot" else "housing unit"

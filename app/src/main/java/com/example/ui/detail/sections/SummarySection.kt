@@ -19,6 +19,8 @@ import com.example.data.model.PendingDocument
 import com.example.data.model.Permission
 import com.example.data.model.Project
 import com.example.data.model.ProjectPayment
+import com.example.data.model.billedUnits
+import com.example.data.model.unitsText
 import com.example.data.model.ProjectStatus
 import com.example.ui.dialogs.WeekRange
 import com.example.data.model.UserRole
@@ -383,10 +385,10 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int) {
     Cells(listOf("Billed for", "Lots billed", "% of $total"), bold = true, color = scheme.onSurfaceVariant)
     HorizontalDivider(color = scheme.outlineVariant)
     HOUSING_BILLING_TYPES.forEach { type ->
-        val units = payments.filter { it.billingType == type }.sumOf { it.units }
+        val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }
         // M1 bills 80% of a housing unit and M2 the last 20%.
         val label = type + when { type.startsWith("M1") -> " (80%)"; type.startsWith("M2") -> " (20%)"; else -> "" }
-        Cells(listOf(label, "$units", if (total > 0) "%.2f%%".format(units * 100.0 / total) else "-"))
+        Cells(listOf(label, unitsText(Math.round(units * 100) / 100.0), if (total > 0) "%.2f%%".format(units * 100.0 / total) else "-"))
         HorizontalDivider(color = scheme.outlineVariant)
     }
 }

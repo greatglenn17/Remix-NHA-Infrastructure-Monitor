@@ -3743,7 +3743,7 @@ function drawAbstractPrint(c) {
   document.title = `Abstract of Physical Accomplishment - ${payment.name || payment.billingType}`;
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
-    <div class="bb-scroll"><div class="bb land" id="sheet">${P.billingAbstractHtml({
+    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.billingAbstractHtml({
       project, docs: documents, payments, payment, units: L.abstractUnits(project, L.lotSummary(records).saleable),
       signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
     })}</div></div>`;

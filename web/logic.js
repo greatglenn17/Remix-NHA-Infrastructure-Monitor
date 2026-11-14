@@ -1510,7 +1510,7 @@ export function weeklyLines(project, docs, asOf) {
   return ACCOMPLISHMENT_LINES.map((name, k) => ({ name, weightPct: lines[k]?.weightPct ?? 0, targetPct: total > 0 ? Math.round((lines[k]?.targetPct ?? 0) * 100) / 100 : null }));
 }
 
-/** WeeklyDrafts.carriedActuals: a new report's Actual % boxes start from the latest report's, so a week without a new abstract keeps the last actual. */
+/** BillingAbstract.carriedActuals: a new report's Actual % boxes start from the latest report's, so a week without a new abstract keeps the last actual. */
 export const carriedActuals = weekly => { const last = latestWeekly(weekly); return last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => ({ actual: a.actualPct.toFixed(2) })) : []; };
 
 /**

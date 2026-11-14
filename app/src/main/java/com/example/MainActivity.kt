@@ -184,6 +184,7 @@ class MainActivity : ComponentActivity() {
                                 projectId = pId,
                                 existingReport = reportToEdit,
                                 documents = viewModel.pendingDocuments.collectAsState().value,
+                                reports = viewModel.weeklyReports.collectAsState().value,
                                 onDismiss = { 
                                     showAddWeeklyReportDialog = false
                                     viewModel.weeklyReportToEdit.value = null

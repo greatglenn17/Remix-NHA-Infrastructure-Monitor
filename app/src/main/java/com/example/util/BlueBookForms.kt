@@ -398,6 +398,71 @@ object BlueBookForms {
         )
     }
 
+    /**
+     * The Abstract of Physical Accomplishment of [payment] on a landscape sheet, laid out as the district's billing
+     * format: each line's contract quantity, unit cost and amount, what was billed before, in this billing and to date
+     * (quantity, amount, share of the line), and the balance. [units] is the project's lots or housing units; "actual"
+     * here is what is billed to date. web/print.js billingAbstractHtml prints the same page.
+     */
+    fun billingAbstract(
+        project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, payment: ProjectPayment,
+        units: Int, signatories: Signatories, banner: String = ""
+    ): String {
+        val abstract = BillingAbstract.of(project, documents, payments, payment)
+        fun money(v: Double) = "%,.2f".format(Locale.US, v)
+        // A quantity: 2 decimals at most, none when whole.
+        val quantity = java.text.DecimalFormat("#,##0.##", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
+        fun qty(v: Double) = quantity.format(v)
+        class Row(val amount: Double, val previous: Double, val thisPeriod: Double)
+        fun sumOf(lines: List<BillingAbstract.Line>) = Row(lines.sumOf { it.amount }, lines.sumOf { it.previous }, lines.sumOf { it.thisPeriod })
+        // Previous, this period, to date: quantity (a line's only), amount, share of the row's contract amount.
+        fun billed(r: Row, unitCost: Double) = listOf(r.previous, r.thisPeriod, r.previous + r.thisPeriod).joinToString("") { x ->
+            "<td class='n'>${if (unitCost > 0) qty(x / unitCost) else ""}</td><td class='n'>${money(x)}</td><td class='n'>${if (r.amount > 0) pct(x / r.amount * 100) else ""}</td>"
+        }
+        fun line(l: BillingAbstract.Line): String {
+            val unitCost = l.amount / units
+            val left = l.amount - l.previous - l.thisPeriod
+            return "<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units.toDouble())}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>" +
+                "${billed(Row(l.amount, l.previous, l.thisPeriod), unitCost)}<td class='n'>${if (unitCost > 0) qty(left / unitCost) else ""}</td><td class='n'>${money(left)}</td></tr>"
+        }
+        fun total(label: String, r: Row) = "<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>" +
+            "${billed(r, 0.0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>"
+        val all = sumOf(abstract.parts.flatMap { it.lines })
+        val actual = if (all.amount > 0) (all.previous + all.thisPeriod) / all.amount * 100 else 0.0
+        fun info(label: String, value: String, label2: String = "", value2: String = "") =
+            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
+        val rows = abstract.parts.joinToString("") { p ->
+            (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='16'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
+        }
+        return page(
+            "Abstract of Physical Accomplishment",
+            """
+            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
+            <div class='period'>Period covered: ${esc(payment.periodCovered.ifBlank { date(payment.date) })}</div>
+            <table class='apa-info'>
+              ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}
+              ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
+              ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
+              ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
+              ${info("TARGET ACCOMPLISHMENT", pct(abstract.targetPct))}
+              ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}
+              ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(abstract.targetPct * 100) / 100.0))}
+            </table>
+            <table class='apa'>
+              <tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>
+              <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
+              <tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>
+              $rows
+              ${total("GRAND TOTAL", all)}
+            </table>
+            <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
+            """,
+            banner,
+            fullPage = true,
+            landscape = true
+        )
+    }
+
     private fun header(period: String) = """
         <h1>PROJECT ENGINEER&#8217;S REPORT</h1><div class='period'>$period</div>
     """
@@ -424,11 +489,11 @@ object BlueBookForms {
 
     private fun office(name: String) = if (name.isBlank()) "" else "<br>${esc(name.trim())}"
 
-    private fun signatures(s: Signatories, checkedTitle: String = "Checked by") = """
+    private fun signatures(s: Signatories, checkedTitle: String = "Checked by", notedTitle: String = "Noted by") = """
         <table class='sig'><tr>
           <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}${office(s.preparedOffice)}</td>
           <td>$checkedTitle:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}${office(s.checkedOffice)}</td>
-          <td>Noted by:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}${office(s.notedOffice)}</td>
+          <td>$notedTitle:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}${office(s.notedOffice)}</td>
         </tr></table>
     """
 
@@ -592,6 +657,11 @@ object BlueBookForms {
         table.profile td.ps { font-weight: normal; padding-left: 10mm; }
         td.pc { width: 3%; }
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
+        table.apa-info { width: auto; }
+        table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
+        table.apa-info td:nth-child(3) { padding-right: 20mm; }
+        table.apa { font-size: 7.5pt; }
+        table.apa th, table.apa td { padding: 1mm 0.8mm; }
         img.banner { display: block; width: 100%; margin-bottom: 3mm; }
         table.sig { margin-top: 6mm; }
         table.sig td { border: none; width: 33%; }
