@@ -459,8 +459,9 @@ object BlueBookForms {
         "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
 
     /**
-     * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract and
-     * its target, actual and advance/slippage, the last as the two at 2 decimals each. web/print.js apaTop.
+     * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
+     * (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
+     * advance/slippage, the last as the two at 2 decimals each. web/print.js apaTop.
      */
     private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double): String {
         fun info(label: String, value: String, label2: String = "", value2: String = "") =
@@ -473,6 +474,7 @@ object BlueBookForms {
               ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
               ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
               ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
+              <tr><td colspan='5'>&nbsp;</td></tr>
               ${info("TARGET ACCOMPLISHMENT", pct(targetPct))}
               ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}
               ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(targetPct * 100) / 100.0))}
@@ -709,9 +711,9 @@ object BlueBookForms {
         table.profile td.ps { font-weight: normal; padding-left: 10mm; }
         td.pc { width: 3%; }
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
-        table.apa-info { width: auto; }
         table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
-        table.apa-info td:nth-child(3) { padding-right: 20mm; }
+        /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge, above BALANCE. */
+        table.apa-info td:nth-child(3) { width: 100%; }
         table.apa { font-size: 7.5pt; }
         table.apa th, table.apa td { padding: 1mm 0.8mm; }
         img.banner { display: block; width: 100%; margin-bottom: 3mm; }

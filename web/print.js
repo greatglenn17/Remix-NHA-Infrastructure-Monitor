@@ -248,7 +248,8 @@ const APA_HEAD = `<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPT
 
 /**
  * The top of both abstracts (BlueBookForms.apaTop): the banner, the title, the `period` line, then the project, its
- * contract and its target, actual and advance/slippage, the last as the two at 2 decimals each.
+ * contract (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
+ * advance/slippage, the last as the two at 2 decimals each.
  */
 function apaTop(banner, period, project, docs, targetPct, actual) {
   const info = (label, value, label2 = '', value2 = '') => `<tr><td class='pl'>${label}</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>${label2}</td><td>${label2 ? `: ${esc(value2)}` : ''}</td></tr>`;
@@ -260,6 +261,7 @@ function apaTop(banner, period, project, docs, targetPct, actual) {
       ${info('LOCATION', project.location, 'DATE STARTED', longDate(project.dateStarted))}
       ${info('CONTRACTOR', project.contractor, 'COMPLETION DATE', longDate(L.effectiveCompletion(project)))}
       ${info('CONTRACT COST', peso(L.currentCost(project, docs)))}
+      <tr><td colspan='5'>&nbsp;</td></tr>
       ${info('TARGET ACCOMPLISHMENT', pct(targetPct))}
       ${info('ACTUAL ACCOMPLISHMENT', pct(actual))}
       ${info('ADVANCE/SLIPPAGE', pct(Math.round(actual * 100) / 100 - Math.round(targetPct * 100) / 100))}
