@@ -884,10 +884,15 @@ export const HOUSING_BILLING_TYPES = ['Land acquisition', 'Land development', 'M
 
 /** SummarySection.BillingStatus: lots or units billed per housing billing type, and their share of `total` saleable units. */
 export const billingStatus = (payments, total) => HOUSING_BILLING_TYPES.map(type => {
-  const units = payments.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.units) || 0), 0);
+  const units = Math.round(payments.filter(p => p.billingType === type).reduce((t, p) => t + billedUnits(p), 0) * 100) / 100;
   const label = type + (type.startsWith('M1') ? ' (80%)' : type.startsWith('M2') ? ' (20%)' : '');
   return { label, units, share: total > 0 ? `${(units * 100 / total).toFixed(2)}%` : '-' };
 });
+
+/** billedByAmount: land development is billed by the amount accomplished; the other housing types by whole lots or units. */
+export const billedByAmount = type => type === 'Land development';
+/** billedUnits: a billing's lots or units as typed; for one billed by amount, its gross over the amount per lot (2 decimals). */
+export const billedUnits = p => Number(p.units) || (Number(p.unitPrice) > 0 ? Math.round((Number(p.grossAmount) || 0) / Number(p.unitPrice) * 100) / 100 : 0);
 
 /** billingUnitName. */
 export const billingUnitName = type => (/^land/i.test(type || '') ? 'lot' : 'housing unit');
@@ -1261,28 +1266,91 @@ export function monthPeriod(day) {
   return `${month} 1 - ${new Date(Date.UTC(y, m, 0)).getUTCDate()}, ${y}`;
 }
 
-/** AddPaymentDialog's gross: units × amount per lot or unit for a housing billing type, else the gross typed. */
-export const billingGross = f => (f.billingType ? (Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) : parseAmount(f.grossAmount) ?? 0);
+const billedByUnit = f => Boolean(f.billingType) && !billedByAmount(f.billingType);
+/** AddPaymentDialog's gross: units × amount per lot or unit for a housing billing type counted in whole ones, else the gross typed. */
+export const billingGross = f => (billedByUnit(f) ? (Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) : parseAmount(f.grossAmount) ?? 0);
 
 /** AddPaymentDialog's checks (FormValidation.amountError), plus a valid date. */
 export function billingErrors(f) {
-  const byUnit = Boolean(f.billingType);
+  const byUnit = billedByUnit(f);
   const units = String(f.units ?? '').trim();
   return [
     !/^\d{4}-\d{2}-\d{2}$/.test(f.date || '') && 'Pick the date.',
     !byUnit && (!String(f.grossAmount ?? '').trim() ? 'Type the gross amount.' : parseAmount(f.grossAmount) == null && 'The gross amount must be a number.'),
     byUnit && (!units ? `Type the number of ${billingUnitName(f.billingType)}s.` : !/^\d+$/.test(units) || Number(units) < 1 ? 'The number must be a whole number.' : false),
-    byUnit && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
+    f.billingType && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
   ].filter(Boolean);
 }
 
 /** What AddPaymentDialog's form sets on a billing; share, balance and the scanned DV are not among them. */
 function billingFields(f) {
-  const byUnit = Boolean(f.billingType);
+  const byUnit = billedByUnit(f);
   return {
     name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount: billingGross(f),
-    billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: byUnit ? parseAmount(f.unitPrice) : 0,
+    billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: f.billingType ? parseAmount(f.unitPrice) : 0,
     retentionPct: Number(f.retentionPct) || 0,
+  };
+}
+
+/** BillingAbstract.latestWeekly: the report of the latest week, the one the project's target and actual follow; undefined with none. */
+export const latestWeekly = weekly => weekly.reduce((best, r) =>
+  (best == null || (weekStart(r.reportingWeek) ?? -Infinity) > (weekStart(best.reportingWeek) ?? -Infinity) ? r : best), undefined);
+
+/**
+ * BillingAbstract.partAmounts: the contract amount of each accomplishment line on `asOf`, from the bar chart in force;
+ * without one from the Scope of Works (an item without an amount takes its weight of the current cost).
+ */
+export function partAmounts(project, docs, asOf) {
+  const plan = planOn(project, docs, asOf), cost = currentCost(project, docs);
+  const items = plan && chartTotal(plan.version) > 0 ? plan.version.items
+    : String(project.scopeOfWork ?? '').trim() ? scopeItems(project.scopeOfWork).map(i => ({ name: i.name, amount: i.amount > 0 ? i.amount : i.weightPct * cost / 100 })) : [];
+  return ACCOMPLISHMENT_LINES.map(line => Math.round(items.filter(i => accomplishmentLine(i.name) === line).reduce((t, i) => t + (Number(i.amount) || 0), 0) * 100) / 100);
+}
+
+/**
+ * BillingAbstract.aheadErrors: what is billed never passes the work done. With the form `f` saved (in place of `old`
+ * when editing), the billed share of its part's contract amount, and of the contract cost for all parts, against the
+ * actual of the latest weekly report, at 2 decimals. Only billings with a housing type count, and only a new or raised
+ * one is checked, so a billing already saved can still be corrected.
+ */
+export function billingAheadErrors(project, docs, payments, weekly, f, old = null) {
+  const gross = billingGross(f);
+  if (!f.billingType || (old && old.billingType === f.billingType && gross <= (Number(old.grossAmount) || 0))) return [];
+  const last = latestWeekly(weekly), actuals = last ? accomplishmentOf(last.accomplishmentItemsJson) : [];
+  const billed = [...payments.filter(p => p.billingType && p.uuid !== old?.uuid), { billingType: f.billingType, grossAmount: gross }];
+  const sum = list => list.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0), round = v => Math.round(v * 100) / 100;
+  const line = accomplishmentLine(f.billingType), k = ACCOMPLISHMENT_LINES.indexOf(line);
+  return [
+    [line, sum(billed.filter(p => accomplishmentLine(p.billingType) === line)), partAmounts(project, docs, f.date)[k], actuals[k]?.actualPct ?? 0],
+    ['Overall', sum(billed), currentCost(project, docs), Number(last ? last.actualAccomplishmentPct : project.actualAccomplishment) || 0],
+  ].flatMap(([name, amount, of, actual]) => (of > 0 && round(amount / of * 100) > round(actual)
+    ? [`${name}: billed to date ${round(amount / of * 100).toFixed(2)}% would pass the actual ${round(actual).toFixed(2)}%${last ? ` of ${last.reportingWeek}` : ''}.`] : []));
+}
+
+/** BillingAbstract.units: the project's number of units as typed ("370 units"), else its saleable lots, else 1 (a lump sum). */
+export const abstractUnits = (project, saleable = 0) => Number.parseInt(String(project.numberOfUnits ?? '').replace(/,/g, '').match(/\d+/)?.[0] ?? '', 10) || saleable || 1;
+
+/**
+ * BillingAbstract.of: the Abstract of Physical Accomplishment for `payment` (the district's billing format). Each part
+ * with a contract amount has its lines { no, name, unit, type, amount, previous, thisPeriod }: `previous` is what
+ * the billings of that type before this one came to, `thisPeriod` this billing. Housing is billed as Milestone 1 (80%)
+ * and Milestone 2 (20%). `targetPct` is the plan on the billing's date.
+ */
+export function billingAbstract(project, docs, payments, payment) {
+  const [acquisition, development, housing] = partAmounts(project, docs, payment.date);
+  const before = payments.slice(0, Math.max(0, payments.findIndex(p => p.uuid === payment.uuid)));
+  const round = v => Math.round(v * 100) / 100;
+  const line = (no, name, unit, type, amount) => ({ no, name, unit, type, amount,
+    previous: round(before.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0)),
+    thisPeriod: payment.billingType === type ? Number(payment.grossAmount) || 0 : 0 });
+  return {
+    targetPct: plannedTarget(project, docs, payment.date) ?? (Number(project.targetAccomplishment) || 0),
+    parts: [
+      { name: 'Land Acquisition Cost', lines: [line('1', 'LAND ACQUISITION COST', 'LOT', HOUSING_BILLING_TYPES[0], acquisition)] },
+      { name: 'Land Development', lines: [line('2', 'LAND DEVELOPMENT', 'LOT', HOUSING_BILLING_TYPES[1], development)] },
+      { name: 'Housing Construction', heading: ['3', 'HOUSING CONSTRUCTION'], lines: [
+        line('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], round(housing * 0.8)), line('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - round(housing * 0.8)))] },
+    ].filter(part => part.lines.some(l => l.amount > 0)),
   };
 }
 
@@ -1441,6 +1509,16 @@ export function weeklyLines(project, docs, asOf) {
   const lines = accomplishmentLines(items.map(i => ({ itemDescription: i.name, weightPct: i.weightPct, targetPct: total > 0 ? plan.itemTargets[i.name] ?? 0 : 0, actualPct: 0 })));
   return ACCOMPLISHMENT_LINES.map((name, k) => ({ name, weightPct: lines[k]?.weightPct ?? 0, targetPct: total > 0 ? Math.round((lines[k]?.targetPct ?? 0) * 100) / 100 : null }));
 }
+
+/** WeeklyDrafts.carriedActuals: a new report's Actual % boxes start from the latest report's, so a week without a new abstract keeps the last actual. */
+export const carriedActuals = weekly => { const last = latestWeekly(weekly); return last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => ({ actual: a.actualPct.toFixed(2) })) : []; };
+
+/**
+ * AbstractExcel.actuals: the abstract's parts ([{ name, amount, actualPct }]) as the three lines' Actual % boxes;
+ * null for a line the abstract has no part for. Parts of one line are averaged by their contract amounts.
+ */
+export const abstractActuals = parts => (parts.length ? accomplishmentLines(parts.map(p => ({ itemDescription: p.name, weightPct: p.amount, targetPct: 0, actualPct: p.actualPct })))
+  .map(l => (l.weightPct > 0 ? l.actualPct.toFixed(2) : null)) : ACCOMPLISHMENT_LINES.map(() => null));
 
 /** FormValidation.percentError's reading: blank is 0, else 0 to 100; NaN for anything else. */
 const percent = text => {

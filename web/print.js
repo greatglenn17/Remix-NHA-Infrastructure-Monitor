@@ -1,5 +1,5 @@
 // The Blue Book forms as the phone prints them: BlueBookForms.projectProfile, the weekly and monthly Project Engineer's
-// Reports (.weeklyReport, .monthlyReport) and the pieces they use (ContractLogs, weekDocuments, weatherClock, workableDays). Change both
+// Reports (.weeklyReport, .monthlyReport), a billing's Abstract of Physical Accomplishment (.billingAbstract) and the pieces they use (ContractLogs, weekDocuments, weatherClock, workableDays). Change both
 // together. Pure: no Firebase.
 import * as L from './logic.js';
 
@@ -201,10 +201,56 @@ function basicInfo(project, docs, label1, value1, label2, value2) {
 }
 
 /** BlueBookForms.signatures. */
-function signatures(s, checkedTitle) {
+function signatures(s, checkedTitle, notedTitle = 'Noted by') {
   const office = name => ((name || '').trim() ? `<br>${esc(name.trim())}` : '');
   const sign = (title, name, position, off) => `<td>${title}:<br><br><br><b>${esc((name || '').toUpperCase())}</b><div class='line'></div>${esc(position)}${office(off)}</td>`;
-  return `<table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign(checkedTitle, s.checkedName, s.checkedPosition, s.checkedOffice)}${sign('Noted by', s.notedName, s.notedPosition, s.notedOffice)}</tr></table>`;
+  return `<table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign(checkedTitle, s.checkedName, s.checkedPosition, s.checkedOffice)}${sign(notedTitle, s.notedName, s.notedPosition, s.notedOffice)}</tr></table>`;
+}
+
+/* ---------- A billing's Abstract of Physical Accomplishment (BlueBookForms.billingAbstract) ---------- */
+
+const money = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** A quantity: 2 decimals at most, none when whole. */
+const qty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+/**
+ * The abstract of `payment` on a landscape sheet, laid out as the district's billing format: each line's contract
+ * quantity, unit cost and amount, what was billed before, in this billing and to date (quantity, amount, share of the
+ * line), and the balance. `units` is the project's lots or housing units; "actual" here is what is billed to date.
+ */
+export function billingAbstractHtml({ project, docs, payments, payment, units, signatories, banner }) {
+  const { parts, targetPct } = L.billingAbstract(project, docs, payments, payment);
+  const sumOf = lines => Object.fromEntries(['amount', 'previous', 'thisPeriod'].map(k => [k, lines.reduce((t, l) => t + l[k], 0)]));
+  // Previous, this period, to date: quantity (a line's only), amount, share of the row's contract amount.
+  const billed = (r, unitCost) => [r.previous, r.thisPeriod, r.previous + r.thisPeriod].map(x =>
+    `<td class='n'>${unitCost > 0 ? qty(x / unitCost) : ''}</td><td class='n'>${money(x)}</td><td class='n'>${r.amount > 0 ? pct(x / r.amount * 100) : ''}</td>`).join('');
+  const line = l => {
+    const unitCost = l.amount / units, left = l.amount - l.previous - l.thisPeriod;
+    return `<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units)}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>${billed(l, unitCost)}<td class='n'>${unitCost > 0 ? qty(left / unitCost) : ''}</td><td class='n'>${money(left)}</td></tr>`;
+  };
+  const total = (label, r) => `<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>${billed(r, 0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>`;
+  const all = sumOf(parts.flatMap(p => p.lines)), actual = all.amount > 0 ? (all.previous + all.thisPeriod) / all.amount * 100 : 0;
+  const info = (label, value, label2 = '', value2 = '') => `<tr><td class='pl'>${label}</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>${label2}</td><td>${label2 ? `: ${esc(value2)}` : ''}</td></tr>`;
+  return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
+    <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
+    <div class='period'>Period covered: ${esc(payment.periodCovered || longDate(payment.date))}</div>
+    <table class='apa-info'>
+      ${info('PROJECT NAME', project.name, 'CONTRACT DURATION', `${project.contractDurationDays ?? 0} C.D.`)}
+      ${info('LOCATION', project.location, 'DATE STARTED', longDate(project.dateStarted))}
+      ${info('CONTRACTOR', project.contractor, 'COMPLETION DATE', longDate(L.effectiveCompletion(project)))}
+      ${info('CONTRACT COST', peso(L.currentCost(project, docs)))}
+      ${info('TARGET ACCOMPLISHMENT', pct(targetPct))}
+      ${info('ACTUAL ACCOMPLISHMENT', pct(actual))}
+      ${info('ADVANCE/SLIPPAGE', pct(Math.round(actual * 100) / 100 - Math.round(targetPct * 100) / 100))}
+    </table>
+    <table class='apa'>
+      <tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>
+      <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
+      <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>
+      ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='16'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
+      ${total('GRAND TOTAL', all)}
+    </table>
+    <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
 }
 
 /* ---------- The Project Profile sheet (BlueBookForms.projectProfile) ---------- */

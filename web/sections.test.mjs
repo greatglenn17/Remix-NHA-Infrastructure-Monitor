@@ -136,6 +136,9 @@ test('lots status: six bands, plans in use only, saleable lots only, latest prog
   assert.deepEqual(billing.map(b => [b.label, b.units, b.share]), [
     ['Land acquisition', 0, '0.00%'], ['Land development', 0, '0.00%'], ['M1 - Housing unit (80%)', 4, '50.00%'], ['M2 - Housing unit (20%)', 0, '0.00%']]);
   assert.equal(L.billingStatus([], 0)[0].share, '-');
+  // Land development billed by amount counts as its gross over the amount per lot.
+  assert.deepEqual(L.billingStatus([{ billingType: 'Land development', units: 0, unitPrice: 20000, grossAmount: 310000 }, { billingType: 'Land development', units: 2 }], 100)[1],
+    { label: 'Land development', units: 17.5, share: '17.50%' });
 });
 
 test('print: activities in Saturday-to-Friday order with blank weekdays kept', () => {
@@ -389,4 +392,27 @@ test('project profile: orders listed under their headings, revised cost only aft
     /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>90 calendar days<br>May 26, 2026 to August 23, 2026<br>\(EO 110\)/);
   assert.match(html([{ documentName: 'Work Resumption Order No. 1', status: 'Pending', remarks: 'Effectivity: 2026-08-16' }]),
     /Work Resumption Order No. 1<\/td><td class='pc'>:<\/td><td>August 16, 2026 \(for approval\)/);
+});
+
+test('billing abstract: each line as quantity, amount and share before, in this billing and to date, with subtotals and the grand total', () => {
+  const project = { name: 'P', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12,
+    scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000 }, { name: 'Land Development', amount: 2000000 }, { name: 'Housing Units', amount: 7000000 }]) };
+  const payments = [{ uuid: 'a', billingType: 'Land acquisition', grossAmount: 400000, date: '2025-02-01' }, { uuid: 'adv', billingType: '', grossAmount: 1500000, date: '2025-02-02' },
+    { uuid: 'b', billingType: 'Land development', grossAmount: 310000, date: '2025-03-01', periodCovered: 'February 1 - 28, 2025' }];
+  const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
+  const html = P.billingAbstractHtml({ project, docs: [], payments, payment: payments[2], units: 100, signatories });
+  const row = (...cells) => new RegExp(cells.map(c => `>${c.replace(/[.()%]/g, '\\$&')}</td>`).join('<td[^>]*'));
+  assert.match(html, /Period covered: February 1 - 28, 2025/);
+  // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
+  assert.match(html, row('1', 'LAND ACQUISITION COST', '100', 'LOT', '10,000.00', '1,000,000.00', '40', '400,000.00', '40.00%', '0', '0.00', '0.00%', '40', '400,000.00', '40.00%', '60', '600,000.00'));
+  // Land development is billed by amount: 310,000 at 20,000 a lot is 15.5 lots.
+  assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%', '84.5', '1,690,000.00'));
+  assert.match(html, row('3.1', 'MILESTONE 1 (80%)', '100', 'UNIT', '56,000.00', '5,600,000.00'));
+  assert.match(html, row('Subtotal (Housing Construction)', '', '', '70,000.00', '7,000,000.00'));
+  // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
+  assert.match(html, row('GRAND TOTAL', '', '', '100,000.00', '10,000,000.00', '', '400,000.00', '4.00%', '', '310,000.00', '3.10%', '', '710,000.00', '7.10%', '', '9,290,000.00'));
+  assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
+  assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
+  assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
+  assert.match(html, /Approved by:/);
 });

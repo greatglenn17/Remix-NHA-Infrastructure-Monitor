@@ -289,7 +289,15 @@ test('website edits: a new billing is the record the app uploads, with share and
   assert.deepEqual(L.billingErrors({ ...f, grossAmount: '' }), ['Type the gross amount.']);
   assert.deepEqual(L.billingErrors({ ...f, grossAmount: '12a', date: '' }), ['Pick the date.', 'The gross amount must be a number.']);
   assert.deepEqual(L.billingErrors({ ...unit, units: '2.5', unitPrice: '' }), ['The number must be a whole number.', 'Type the amount per housing unit.']);
-  assert.deepEqual(L.billingErrors({ ...unit, billingType: 'Land development', units: '' }), ['Type the number of lots.']);
+  assert.deepEqual(L.billingErrors({ ...unit, billingType: 'Land acquisition', units: '' }), ['Type the number of lots.']);
+  // Land development is billed by the amount accomplished; its lots are worked out from the amount per lot.
+  const dev = { ...f, name: '', billingType: 'Land development', grossAmount: '622,031.70', units: '', unitPrice: '86000' };
+  assert.equal(L.billingGross(dev), 622031.7);
+  assert.deepEqual(L.billingErrors(dev), []);
+  const saved = JSON.parse(L.newPaymentRecord(ctx, dev, [], 0).data);
+  assert.deepEqual([saved.name, saved.units, saved.unitPrice, saved.grossAmount, L.billedUnits(saved)], ['Land development', 0, 86000, 622031.7, 7.23]);
+  assert.deepEqual(L.billingErrors({ ...dev, grossAmount: '', unitPrice: '' }), ['Type the gross amount.', 'Type the amount per lot.']);
+  assert.equal(L.billedUnits({ units: 5, unitPrice: 800000, grossAmount: 4000000 }), 5);
   assert.equal(L.parseAmount(' 1,234.5 '), 1234.5);
   assert.equal(L.parseAmount('-5'), null);
   assert.equal(L.monthPeriod('2026-02-14'), 'February 1 - 28, 2026');
@@ -1296,4 +1304,55 @@ test('find lots: the closed outlines of a plan page become lots, numbered and na
   assert.deepEqual(L.foundLotsRemoved(plan, [drawn, old, started], who), [[old, { isActive: 0, lastModifiedBy: 'Engr. Web', lastModifiedDate: '2026-11-13 11:00' },
     { actionType: 'Lot Deactivated', details: 'Removed 1 auto-detected lots from SDP Plan v2', oldValue: 'Active', newValue: 'Deactivated' }]]);
   assert.deepEqual([drawn, old, started].map(L.foundLot), [false, true, true]);
+});
+
+test('abstracts: what is billed never passes the actual, and the billing abstract is made from the billings', () => {
+  const project = { scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000, weightPct: 10 }, { name: 'Land Development', amount: 2000000, weightPct: 20 },
+    { name: 'Construction of Housing Units', amount: 7000000, weightPct: 70 }]), targetAccomplishment: 12, actualAccomplishment: 10.74, numberOfUnits: '100 units' };
+  const lines = (a, b, c) => JSON.stringify([['Land Acquisition', a, 10], ['Land Development', b, 20], ['Housing Construction', c, 70]].map(([itemDescription, actualPct, weightPct]) => ({ itemDescription, targetPct: 0, actualPct, weightPct })));
+  // Newest first, as the site lists them; the latest is the one of the latest week, whenever it was typed.
+  const weekly = [{ uuid: 'late', reportingWeek: 'Mar 1, 2025 - Mar 7, 2025', actualAccomplishmentPct: 9, accomplishmentItemsJson: lines(50, 20, 0) },
+    { uuid: 'w2', reportingWeek: 'Mar 8, 2025 - Mar 14, 2025', actualAccomplishmentPct: 10.74, accomplishmentItemsJson: lines(50, 25.21, 1) }];
+  assert.equal(L.latestWeekly(weekly).uuid, 'w2');
+  assert.equal(L.latestWeekly([]), undefined);
+  assert.deepEqual(L.carriedActuals(weekly), [{ actual: '50.00' }, { actual: '25.21' }, { actual: '1.00' }]);
+  assert.deepEqual(L.carriedActuals([]), []);
+  assert.deepEqual(L.partAmounts(project, [], '2025-03-14'), [1000000, 2000000, 7000000]);
+  assert.deepEqual(L.partAmounts({ scopeOfWork: '' }, [], '2025-03-14'), [0, 0, 0]);
+  // The abstract's parts fill the three Actual % boxes; a part it does not have leaves its box alone.
+  assert.deepEqual(L.abstractActuals([{ name: 'LAND ACQUISITION COST', amount: 1000000, actualPct: 50 }, { name: 'LAND DEVELOPMENT', amount: 2000000, actualPct: 25.21 },
+    { name: 'HOUSING CONSTRUCTION', amount: 7000000, actualPct: 1 }]), ['50.00', '25.21', '1.00']);
+  assert.deepEqual(L.abstractActuals([{ name: 'LAND DEVELOPMENT', amount: 2000000, actualPct: 25.21 }]), [null, '25.21', null]);
+  assert.deepEqual(L.abstractActuals([]), [null, null, null]);
+
+  const payments = [{ uuid: 'a', billingType: 'Land acquisition', grossAmount: 400000, date: '2025-02-01' }, { uuid: 'adv', billingType: '', grossAmount: 1500000, date: '2025-02-02' },
+    { uuid: 'b', billingType: 'Land development', grossAmount: 300000, unitPrice: 20000, date: '2025-03-01', periodCovered: 'February 1 - 28, 2025' }];
+  const form = { date: '2025-03-15', billingType: 'Land development', grossAmount: '204,200', units: '', unitPrice: '20000' };
+  const ahead = (f, old, w = weekly) => L.billingAheadErrors(project, [], payments, w, f, old);
+  assert.deepEqual(ahead(form), []); // 504,200 of 2,000,000 is 25.21%, the actual: equal is allowed
+  assert.deepEqual(ahead({ ...form, grossAmount: '204400' }), ['Land Development: billed to date 25.22% would pass the actual 25.21% of Mar 8, 2025 - Mar 14, 2025.']);
+  assert.deepEqual(ahead({ ...form, billingType: 'M1 - Housing unit', units: '1', unitPrice: '80000' }), ['Housing Construction: billed to date 1.14% would pass the actual 1.00% of Mar 8, 2025 - Mar 14, 2025.']);
+  // The advance payment has no type, so it is not in the abstract and not counted.
+  assert.deepEqual(ahead({ ...form, billingType: '', grossAmount: '9000000' }), []);
+  assert.deepEqual(ahead({ ...form, billingType: 'Land acquisition', units: '1', unitPrice: '100000' }, null, [{ ...weekly[1], actualAccomplishmentPct: 7.5 }]),
+    ['Overall: billed to date 8.00% would pass the actual 7.50% of Mar 8, 2025 - Mar 14, 2025.']);
+  assert.deepEqual(ahead(form, null, []), ['Land Development: billed to date 25.21% would pass the actual 0.00%.']);
+  // An edit is checked only when it raises the billing, so one already saved can still be corrected.
+  assert.deepEqual(ahead({ ...form, grossAmount: '300000' }, payments[2], []), []);
+  assert.deepEqual(ahead({ ...form, grossAmount: '504,400' }, payments[2]), ['Land Development: billed to date 25.22% would pass the actual 25.21% of Mar 8, 2025 - Mar 14, 2025.']);
+
+  assert.equal(L.abstractUnits(project), 100);
+  assert.equal(L.abstractUnits({ numberOfUnits: '' }, 42), 42);
+  assert.equal(L.abstractUnits({}), 1);
+  const abstract = L.billingAbstract(project, [], [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1 }], payments[2]);
+  assert.equal(abstract.targetPct, 12);
+  assert.deepEqual(abstract.parts.map(p => [p.name, p.heading]), [['Land Acquisition Cost', undefined], ['Land Development', undefined], ['Housing Construction', ['3', 'HOUSING CONSTRUCTION']]]);
+  assert.deepEqual(abstract.parts.flatMap(p => p.lines), [
+    { no: '1', name: 'LAND ACQUISITION COST', unit: 'LOT', type: 'Land acquisition', amount: 1000000, previous: 400000, thisPeriod: 0 },
+    { no: '2', name: 'LAND DEVELOPMENT', unit: 'LOT', type: 'Land development', amount: 2000000, previous: 0, thisPeriod: 300000 },
+    { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 0, thisPeriod: 0 },
+    { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 0 },
+  ]);
+  // A project without housing has no housing lines.
+  assert.deepEqual(L.billingAbstract({ scopeOfWork: JSON.stringify([{ name: 'Land Development', amount: 500, weightPct: 100 }]) }, [], payments, payments[2]).parts.map(p => p.name), ['Land Development']);
 });
