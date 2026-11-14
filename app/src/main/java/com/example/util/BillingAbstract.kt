@@ -14,9 +14,10 @@ import java.time.LocalDate
 import java.util.Locale
 
 /**
- * A billing's Abstract of Physical Accomplishment (the district's billing format, by period covered), made from the
- * billings, and the rule that what is billed never passes the work done. web/logic.js has the website's copy
- * (latestWeekly, partAmounts, billingAheadErrors, abstractUnits, billingAbstract); change both together.
+ * The Abstract of Physical Accomplishment the contractor attaches before a billing (the district's billing format),
+ * printed from an uploaded abstract on the Actual Accomplishment tab, and the rule that what is billed never passes
+ * the work done. web/logic.js has the website's copy (latestWeekly, partAmounts, billingAheadErrors, abstractUnits,
+ * billingAbstract); change both together.
  */
 object BillingAbstract {
     private fun round2(v: Double) = Math.round(v * 100) / 100.0
@@ -82,37 +83,47 @@ object BillingAbstract {
     fun units(project: Project, saleable: Int = 0): Int =
         Regex("\\d+").find(project.numberOfUnits.replace(",", ""))?.value?.toIntOrNull()?.takeIf { it > 0 } ?: saleable.takeIf { it > 0 } ?: 1
 
-    /** A line of the abstract: [previous] is what the billings of its type before this one came to, [thisPeriod] this billing. */
+    /** A line of the abstract: [previous] is what the saved billings of its type came to, [thisPeriod] this billing as typed. */
     data class Line(val no: String, val name: String, val unit: String, val type: String, val amount: Double, val previous: Double, val thisPeriod: Double)
 
     /** A part with a contract amount; housing has a [heading] row (item no., name) over its two milestones. */
     data class Part(val name: String, val heading: Pair<String, String>?, val lines: List<Line>)
 
-    /** [targetPct] is the plan on the billing's date. */
+    /** [targetPct] is the plan on the abstract's "As of" date. */
     data class Abstract(val targetPct: Double, val parts: List<Part>)
 
     /**
-     * The abstract for [payment]. Earlier billings are those dated before it; on the same date by uuid, which the
-     * website holds too and an edit does not change.
+     * This billing as typed on the tab, never saved: the period [covered], the land acquisition [lots], the land
+     * [development] amount in pesos, and the Milestone 1 and 2 housing units. A negative figure counts as 0.
      */
-    fun of(project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, payment: ProjectPayment): Abstract {
-        val (acquisition, development, housing) = partAmounts(project, documents, day(payment.date))
-        val ordered = payments.sortedWith(compareBy({ it.date }, { it.uuid }))
-        val before = ordered.take(ordered.indexOfFirst { it.uuid == payment.uuid }.coerceAtLeast(0))
-        fun line(no: String, name: String, unit: String, type: String, amount: Double) = Line(
+    data class Period(val covered: String = "", val lots: Double = 0.0, val development: Double = 0.0, val m1: Double = 0.0, val m2: Double = 0.0)
+
+    /**
+     * The billing abstract of the uploaded [abstract]. The amounts are the abstract's own (ProjectAbstracts.lineAmounts),
+     * housing as Milestone 1 (80%) and Milestone 2 (20%). Previous is the gross of the saved billings of each type dated
+     * on or before its "As of" date; this period is [period], a quantity as quantity x (line amount / [units]).
+     */
+    fun of(project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, abstract: ProjectAbstract, period: Period, units: Int): Abstract {
+        val (acquisition, development, housing) = ProjectAbstracts.lineAmounts(abstract)
+        val asOf = day(abstract.asOf)
+        // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
+        val before = payments.filter { p -> day(p.date)?.let { asOf != null && !it.isAfter(asOf) } == true }
+        fun line(no: String, name: String, unit: String, type: String, amount: Double, thisPeriod: Double) = Line(
             no, name, unit, type, amount,
             previous = round2(before.filter { it.billingType == type }.sumOf { it.grossAmount }),
-            thisPeriod = if (payment.billingType == type) payment.grossAmount else 0.0
+            thisPeriod = round2(thisPeriod)
         )
+        fun counted(no: String, name: String, unit: String, type: String, amount: Double, quantity: Double) =
+            line(no, name, unit, type, amount, quantity.coerceAtLeast(0.0) * (amount / units))
         val m1 = round2(housing * 0.8)
         return Abstract(
-            targetPct = day(payment.date)?.let { BarChart.targetOn(project, documents, it) } ?: project.targetAccomplishment,
+            targetPct = asOf?.let { BarChart.targetOn(project, documents, it) } ?: project.targetAccomplishment,
             parts = listOf(
-                Part("Land Acquisition Cost", null, listOf(line("1", "LAND ACQUISITION COST", "LOT", HOUSING_BILLING_TYPES[0], acquisition))),
-                Part("Land Development", null, listOf(line("2", "LAND DEVELOPMENT", "LOT", HOUSING_BILLING_TYPES[1], development))),
+                Part("Land Acquisition Cost", null, listOf(counted("1", "LAND ACQUISITION COST", "LOT", HOUSING_BILLING_TYPES[0], acquisition, period.lots))),
+                Part("Land Development", null, listOf(line("2", "LAND DEVELOPMENT", "LOT", HOUSING_BILLING_TYPES[1], development, period.development.coerceAtLeast(0.0)))),
                 Part("Housing Construction", "3" to "HOUSING CONSTRUCTION", listOf(
-                    line("3.1", "MILESTONE 1 (80%)", "UNIT", HOUSING_BILLING_TYPES[2], m1),
-                    line("3.2", "MILESTONE 2 (20%)", "UNIT", HOUSING_BILLING_TYPES[3], round2(housing - m1))
+                    counted("3.1", "MILESTONE 1 (80%)", "UNIT", HOUSING_BILLING_TYPES[2], m1, period.m1),
+                    counted("3.2", "MILESTONE 2 (20%)", "UNIT", HOUSING_BILLING_TYPES[3], round2(housing - m1), period.m2)
                 ))
             ).filter { part -> part.lines.any { it.amount > 0 } }
         )

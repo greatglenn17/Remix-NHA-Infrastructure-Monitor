@@ -287,6 +287,7 @@ class WebEditSyncTest {
         assertEquals(5.0, saved.overallPct, 0.0)
         assertEquals("abstract.xlsx", saved.fileName)
         assertEquals("Engr. Web", saved.uploadedBy)
+        assertEquals(0.0, saved.equivUnits, 0.0) // a record from before the column, or one the website made without it
         assertEquals("5d2f8b1a-6c3e-4a7d-9b0f-1e2d3c4b5a69", saved.uuid)
         assertEquals(listOf(0.0, 25.21, 0.0), com.example.util.ProjectAbstracts.lineActuals(saved))
         assertEquals(listOf(0.25, 100000.0, 25.0), com.example.util.ProjectAbstracts.rows(saved.rowsJson)[1].period)

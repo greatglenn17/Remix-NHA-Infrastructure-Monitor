@@ -6,6 +6,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -17,12 +20,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.data.model.ACCOMPLISHMENT_LINES
+import com.example.data.model.PendingDocument
+import com.example.data.model.Project
 import com.example.data.model.ProjectAbstract
 import com.example.ui.theme.figures
 import com.example.util.AbstractExcel
+import com.example.util.BillingAbstract
+import com.example.util.FormValidation
 import com.example.util.ProjectAbstracts
 import com.example.util.ProjectSchedule
 import java.util.Locale
@@ -42,20 +51,88 @@ private fun figuresLine(amount: Double?, toDate: Double?, pct: Double?): String 
     }
 ).joinToString(" · ")
 
+/** A row of the summary card's table: the name, then Target, Actual and +/-. */
+@Composable
+private fun StandingRow(name: String, cells: List<String>, header: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).semantics(mergeDescendants = true) {}.testTag("standing_$name")) {
+        Text(name, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1.7f))
+        cells.forEach { cell ->
+            Text(
+                cell, style = MaterialTheme.typography.bodySmall.figures(cell), fontWeight = if (header) null else FontWeight.SemiBold,
+                color = if (header) scheme.onSurfaceVariant else scheme.onSurface, textAlign = TextAlign.End, modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/**
+ * "This billing": the figures typed for the billing abstract of [abstract] (the one the contractor attaches before a
+ * billing), then Print. Nothing typed here is saved. A line the abstract has no amount for has no box.
+ */
+@Composable
+private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Unit, onPrint: (BillingAbstract.Period) -> Unit) {
+    val amounts = remember(abstract.rowsJson) { ProjectAbstracts.lineAmounts(abstract) }
+    var covered by remember { mutableStateOf("") }
+    var lots by remember { mutableStateOf("") }
+    // Land development starts from the abstract's own this-period amount; the rest start empty (0).
+    var development by remember { mutableStateOf(ProjectAbstracts.periodAmounts(abstract)[1].takeIf { it > 0 }?.let { "%.2f".format(Locale.US, it) }.orEmpty()) }
+    var m1 by remember { mutableStateOf("") }
+    var m2 by remember { mutableStateOf("") }
+    // A blank or unreadable number is 0, and so is a negative.
+    fun number(text: String) = FormValidation.parseAmount(text) ?: 0.0
+    @Composable fun FigureBox(label: String, value: String, tag: String, number: Boolean = true, onChange: (String) -> Unit) = OutlinedTextField(
+        value = value, onValueChange = onChange, label = { Text(label) }, singleLine = true,
+        keyboardOptions = if (number) KeyboardOptions(keyboardType = KeyboardType.Decimal) else KeyboardOptions.Default,
+        modifier = Modifier.fillMaxWidth().testTag(tag)
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("This billing") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FigureBox("Period covered", covered, "billing_covered", number = false) { covered = it }
+                if (amounts[0] > 0) FigureBox("Land acquisition (lots)", lots, "billing_lots") { lots = it }
+                if (amounts[1] > 0) FigureBox("Land development (amount)", development, "billing_development") { development = it }
+                if (amounts[2] > 0) {
+                    FigureBox("Milestone 1 (units)", m1, "billing_m1") { m1 = it }
+                    FigureBox("Milestone 2 (units)", m2, "billing_m2") { m2 = it }
+                }
+                Text(
+                    "Previous is what the billings saved up to ${ProjectSchedule.displayDate(abstract.asOf)} came to. Nothing typed here is saved.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onPrint(BillingAbstract.Period(covered, number(lots), number(development), number(m1), number(m2))) },
+                modifier = Modifier.testTag("confirm_print_billing_abstract")
+            ) { Text("Print") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
 /**
  * Actual Accomplishment: the uploaded Abstracts of Physical Accomplishment of the actual work, each kept under its
- * "As of" date; the latest is the project's actual. Shows the chosen one's figures and every pay item, the parts
- * folding. [onSave] and [onDelete] are null for roles that cannot upload.
+ * "As of" date; the latest is the project's actual. Shows the chosen one's target, actual and advance/slippage by
+ * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]) and every pay item, the parts
+ * folding; "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
+ * [onSave] and [onDelete] are null for roles that cannot upload.
  */
 @Composable
 fun ActualAccomplishmentSection(
-    projectId: Long,
+    project: Project,
+    documents: List<PendingDocument>,
     abstracts: List<ProjectAbstract>,
     uploadedBy: String,
     onSave: ((ProjectAbstract) -> Unit)?,
     onDelete: ((ProjectAbstract) -> Unit)?,
-    onViewTable: (ProjectAbstract) -> Unit
+    onViewTable: (ProjectAbstract) -> Unit,
+    onPrintBilling: (ProjectAbstract, BillingAbstract.Period) -> Unit
 ) {
+    val projectId = project.id
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,6 +144,8 @@ fun ActualAccomplishmentSection(
     var noteIsError by remember(projectId) { mutableStateOf(false) }
     var replacing by remember { mutableStateOf<ProjectAbstract?>(null) }
     var deleting by remember { mutableStateOf<ProjectAbstract?>(null) }
+    var billing by remember { mutableStateOf<ProjectAbstract?>(null) }
+    billing?.let { record -> BillingFiguresDialog(record, onDismiss = { billing = null }) { period -> billing = null; onPrintBilling(record, period) } }
 
     fun save(record: ProjectAbstract, replaced: Boolean) {
         onSave?.invoke(record)
@@ -164,11 +243,14 @@ fun ActualAccomplishmentSection(
         item {
             SectionCard("Abstract of Physical Accomplishment", Icons.Default.TableChart) {
                 Field("As of", ProjectSchedule.displayDate(shown.asOf))
-                Field("Overall", ProjectAbstracts.pct(shown.overallPct))
-                ACCOMPLISHMENT_LINES.zip(ProjectAbstracts.lineActuals(shown)).forEach { (line, actual) -> Field(line, ProjectAbstracts.pct(actual)) }
+                StandingRow("", listOf("Target", "Actual", "+/-"), header = true)
+                remember(project, documents, shown) { ProjectAbstracts.standing(project, documents, shown) }.forEach { row ->
+                    StandingRow(row.name, listOf(row.target?.let(ProjectAbstracts::pct) ?: "-", ProjectAbstracts.pct(row.actual), ProjectAbstracts.diffText(row.diff)))
+                }
                 Field("File", shown.fileName.ifBlank { "-" })
                 Field("Uploaded by", shown.uploadedBy.ifBlank { "-" })
                 OutlinedButton(onClick = { onViewTable(shown) }, modifier = Modifier.padding(top = 8.dp).testTag("view_abstract_table")) { Text("View full table") }
+                OutlinedButton(onClick = { billing = shown }, modifier = Modifier.testTag("print_billing_abstract")) { Text("Print billing abstract") }
             }
         }
         var part = -1

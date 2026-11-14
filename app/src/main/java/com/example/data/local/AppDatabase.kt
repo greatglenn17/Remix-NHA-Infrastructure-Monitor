@@ -425,7 +425,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `project_abstracts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `projectId` INTEGER NOT NULL, " +
                         "`asOf` TEXT NOT NULL, `overallPct` REAL NOT NULL, `rowsJson` TEXT NOT NULL, `fileName` TEXT NOT NULL, `uploadedBy` TEXT NOT NULL, " +
-                        "`uuid` TEXT NOT NULL, `revision` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                        "`equivUnits` REAL NOT NULL DEFAULT 0, `uuid` TEXT NOT NULL, `revision` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
                         "FOREIGN KEY(`projectId`) REFERENCES `projects`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)"
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_project_abstracts_projectId` ON `project_abstracts` (`projectId`)")

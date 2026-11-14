@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -209,6 +210,8 @@ data class ProjectAbstract(
     val rowsJson: String,
     val fileName: String = "",
     val uploadedBy: String = "",
+    // The N of the sheet's "EQUIVALENT TO N UNITS" columns, 0 without them; a record saved without it reads as 0.
+    @ColumnInfo(defaultValue = "0") val equivUnits: Double = 0.0,
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,

@@ -425,7 +425,8 @@ fun ProjectDetailScreen(
                     ProjectSection.ACTUAL -> {
                         val canUpload = currentUser.role.hasPermission(Permission.SUBMIT_REPORT)
                         com.example.ui.detail.sections.ActualAccomplishmentSection(
-                            projectId = currentProject.id,
+                            project = currentProject,
+                            documents = pendingDocuments,
                             abstracts = projectAbstracts,
                             uploadedBy = account.name,
                             onSave = (viewModel::saveAbstract).takeIf { canUpload },
@@ -433,6 +434,14 @@ fun ProjectDetailScreen(
                             onViewTable = { abstract ->
                                 printForm("Abstract of Physical Accomplishment - as of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
                                     viewModel.actualAbstractForm(currentProject, abstract)
+                                }
+                            },
+                            onPrintBilling = { abstract, period ->
+                                val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
+                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                    printForm("Abstract of Physical Accomplishment - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
+                                        viewModel.billingAbstractForm(currentProject, abstract, period, saleable, s)
+                                    }
                                 }
                             }
                         )
@@ -450,12 +459,6 @@ fun ProjectDetailScreen(
                         billingCheck = { new, old ->
                             com.example.util.BillingAbstract.aheadErrors(currentProject, pendingDocuments, projectPayments, weeklyReports, new, old, projectAbstracts)
                                 .let { errors -> if (errors.isEmpty()) errors else errors + com.example.util.BillingAbstract.aheadHint(projectAbstracts) }
-                        },
-                        onPrintAbstract = { payment ->
-                            val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
-                            printWithSignatories = false to { s: com.example.util.Signatories ->
-                                printForm("Abstract of Physical Accomplishment - ${payment.name}") { viewModel.billingAbstractForm(currentProject, payment, saleable, s) }
-                            }
                         },
                         onAddPayment = { viewModel.addProjectPayment(it.copy(projectId = currentProject.id)) },
                         onUpdatePayment = { payment ->

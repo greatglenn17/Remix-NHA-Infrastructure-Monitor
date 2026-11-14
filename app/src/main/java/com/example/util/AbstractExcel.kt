@@ -8,7 +8,8 @@ import java.time.LocalDate
  * Reads the Abstract of Physical Accomplishment of the actual work (the "as of" one) from its Excel file (.xlsx).
  * Under the "ITEM NO. / ITEM DESCRIPTION / AMOUNT" header, every row with a description down to the GRAND TOTAL
  * (parts, groups, pay items, subtotals) and the "As of" date; the parts (item no. 1, 2, 3, with the contract amount
- * and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows.
+ * and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows. The sheet's last three columns,
+ * under "EQUIVALENT TO 370 UNITS" (PREVIOUS, TO DATE, BALANCE), are each row's equiv.
  * web/apa-excel.js is the website's copy; change both together.
  */
 object AbstractExcel {
@@ -16,27 +17,31 @@ object AbstractExcel {
 
     /**
      * A row of the sheet. [kind] is "part" (item no. 1, 2, 3), "group" (a heading such as 2.1 ROADWORKS), "item",
-     * "subtotal" or "total". [prev], [period] and [toDate] are quantity, amount, %; [balance] quantity, amount.
-     * Null is an empty cell. Kept as the record's rowsJson (see [ProjectAbstracts]).
+     * "subtotal" or "total". [prev], [period] and [toDate] are quantity, amount, %; [balance] quantity, amount; [equiv]
+     * previous, to date, balance in equivalent units. Null is an empty cell. Kept as the record's rowsJson (see [ProjectAbstracts]).
      */
     data class Row(
         val kind: String, val no: String, val name: String, val qty: Double?, val unit: String, val unitCost: Double?, val amount: Double?,
-        val prev: List<Double?>, val period: List<Double?>, val toDate: List<Double?>, val balance: List<Double?>
+        val prev: List<Double?>, val period: List<Double?>, val toDate: List<Double?>, val balance: List<Double?>,
+        val equiv: List<Double?> = listOf(null, null, null)
     )
 
-    /** [billing] is true for the billing format, which is not the actual work. */
-    data class Abstract(val asOf: LocalDate?, val parts: List<Part>, val overallPct: Double?, val billing: Boolean, val rows: List<Row>)
+    /** [billing] is true for the billing format, which is not the actual work; [equivUnits] is the N of the sheet's "EQUIVALENT TO N UNITS" columns, 0 without them. */
+    data class Abstract(val asOf: LocalDate?, val parts: List<Part>, val overallPct: Double?, val billing: Boolean, val rows: List<Row>, val equivUnits: Double = 0.0)
 
-    /** Each part with the amount and % to date of its own subtotal: the last one before the next part, so it overwrites its groups'. */
-    fun parts(rows: List<Row>): List<Part> {
-        val parts = mutableListOf<Part>()
+    /** Each part row with its own subtotal row: the last one before the next part, so it overwrites its groups'. */
+    fun partSubtotals(rows: List<Row>): List<Pair<Row, Row?>> {
+        val parts = mutableListOf<Pair<Row, Row?>>()
         for (row in rows) {
-            if (row.kind == "part") parts += Part(row.name, 0.0, 0.0)
-            else if (row.kind == "subtotal" && parts.isNotEmpty())
-                parts[parts.lastIndex] = parts.last().copy(amount = row.amount ?: 0.0, actualPct = row.toDate.getOrNull(2) ?: 0.0)
+            if (row.kind == "part") parts += row to null
+            else if (row.kind == "subtotal" && parts.isNotEmpty()) parts[parts.lastIndex] = parts.last().first to row
         }
         return parts
     }
+
+    /** Each part with the amount and % to date of its own subtotal. */
+    fun parts(rows: List<Row>): List<Part> =
+        partSubtotals(rows).map { (part, subtotal) -> Part(part.name, subtotal?.amount ?: 0.0, subtotal?.toDate?.getOrNull(2) ?: 0.0) }
 
     /**
      * The sheet laid out as an abstract, or null without one; a file that is not a workbook throws
@@ -46,6 +51,9 @@ object AbstractExcel {
         BarChartExcel.sheetTexts(input).mapNotNull(::abstract).let { all -> all.firstOrNull { !it.billing } ?: all.firstOrNull() }
 
     private val AS_OF = Regex("^as of\\s+([a-z]+)\\s+(\\d{1,2}),?\\s+(\\d{4})$", RegexOption.IGNORE_CASE)
+    private val EQUIVALENT = Regex("^equivalent to\\s+([\\d,.]+)\\s+units?$", RegexOption.IGNORE_CASE)
+    // Excel keeps a typed 2.2 as 2.2000000000000002.
+    private val FLOAT_TAIL = Regex("^\\d+\\.\\d{7,}$")
     private val MONTHS = listOf("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
 
     /** "As of October 30, 2026" as that day; null for anything else. */
@@ -80,13 +88,17 @@ object AbstractExcel {
         fun money(row: Int, col: Int?) = number(row, col, 100.0)
         fun qty(row: Int, col: Int?) = number(row, col, 10000.0)
         fun figures(row: Int, block: Pair<Int, Int>?) = block?.second.let { c -> listOf(qty(row, c), money(row, c?.plus(1)), number(row, c?.plus(2), 10000.0, 100.0)) }
+        // "EQUIVALENT TO 370 UNITS" in the header row: the number of units, and the first of its three columns.
+        val equivCol = inHeader { EQUIVALENT.matches(it.trim()) }
+        val equivUnits = equivCol?.let { EQUIVALENT.find(at(header.first, it).trim())?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull() } ?: 0.0
         val rows = mutableListOf<Row>()
         var billing = false
         for (row in all.map { it.key.first }.filter { it > toDate.first + 1 }.distinct()) {
             val name = at(row, descCol)
             if (name.isEmpty()) continue
             if (name.startsWith("milestone", ignoreCase = true)) billing = true // the billing format's lines
-            val no = at(row, header.second)
+            // An item no. with a float tail is the number at 6 decimals, written plainly.
+            val no = at(row, header.second).let { if (FLOAT_TAIL.matches(it)) java.math.BigDecimal(it).setScale(6, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() else it }
             val amount = money(row, amountCol)
             val kind = when {
                 name.startsWith("grand total", ignoreCase = true) -> "total"
@@ -101,12 +113,13 @@ object AbstractExcel {
                 done = done.take(2) + done[1]?.let { Math.round(it / amount * 10000) / 100.0 }
             rows += Row(
                 kind, no, name, qty(row, qtyCol), at(row, unitCol), money(row, unitCostCol), amount,
-                figures(row, prev), figures(row, period), done, listOf(qty(row, balanceCol), money(row, balanceCol?.plus(1)))
+                figures(row, prev), figures(row, period), done, listOf(qty(row, balanceCol), money(row, balanceCol?.plus(1))),
+                List(3) { i -> money(row, equivCol?.plus(i)) }
             )
             if (kind == "total") break
         }
         val parts = parts(rows)
         if (parts.isEmpty()) return null
-        return Abstract(all.firstNotNullOfOrNull { asOfDate(it.value) }, parts, rows.lastOrNull { it.kind == "total" }?.toDate?.get(2), billing, rows)
+        return Abstract(all.firstNotNullOfOrNull { asOfDate(it.value) }, parts, rows.lastOrNull { it.kind == "total" }?.toDate?.get(2), billing, rows, equivUnits)
     }
 }

@@ -34,14 +34,28 @@ is read only.
   "Upload the newer abstract first, or lower this billing."); a project without an abstract keeps the latest weekly
   report's. A part's contract amount is the bar chart's in force, else the Scope of Works' (`L.partAmounts`). Billings
   without a type (an advance payment) are not counted, and a billing already saved can still be corrected.
-- **Print abstract** on a billing with a housing type is its Abstract of Physical Accomplishment in the district's
-  billing format (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`) for
-  `#/p/<id>/print/apa-<billing>`: a landscape A4 sheet headed by the billing's period covered, each line (land
-  acquisition, land development, Milestone 1 at 80% and Milestone 2 at 20% of housing) with its contract quantity, unit
-  cost and amount, what was billed before, in this billing and to date as quantity, amount and share, the balance,
-  subtotals and the grand total. Nothing is uploaded: every figure comes from the billings (`L.billingAbstract`). The
-  quantity is the project's Number of Units, else its saleable lots. Its "actual" is what is billed to date; Prepared,
-  Checked and Approved by are the monthly report's signatories.
+- **The billing abstract is printed before the billing, from the Actual Accomplishment tab**, not from a billing: the
+  contractor attaches it to the billing it asks for. **Print billing abstract** on the tab, for anyone who can open
+  it, opens `#/p/<id>/print/apa-<as-of date>`: the abstract shown there in the district's billing format
+  (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`), a landscape A4 sheet with each line (1 land
+  acquisition, 2 land development, 3.1 Milestone 1 at 80% and 3.2 Milestone 2 at 20% of housing) as its contract
+  quantity, unit cost and amount, what was billed before, in this billing and to date as quantity, amount and share,
+  the balance, subtotals and the grand total. It has no equivalent-units columns. Its figures (`L.billingAbstract`,
+  the phone's `BillingAbstract.of`):
+  - **The part amounts** are the uploaded abstract's own, its parts' contract amounts by accomplishment line
+    (`L.abstractLineAmounts`), not the bar chart's or the Scope of Works'. A line without an amount is left out.
+  - **Previous** is the gross of the saved billings of that billing type dated on or before the abstract's "As of"
+    date (a billing without a date is not counted).
+  - **This billing** is typed in the boxes above the sheet and never saved: "Period covered", "Land acquisition
+    (lots)", "Land development (amount)", "Milestone 1 (units)" and "Milestone 2 (units)". A line the abstract has no
+    amount for has no box. Lots and units become an amount as quantity x (line amount / the project's Number of Units,
+    else its saleable lots), at 2 decimals; land development is typed as an amount and starts from the abstract's own
+    THIS PERIOD amount for that part (`L.abstractPeriodAmounts`). A blank, unreadable or negative figure is 0. Only
+    the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
+    leaving the page.
+  - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
+    bar chart's plan on the "As of" date, else the project's stored target; its "actual" is what is billed to date.
+    Prepared, Checked and Approved by are the monthly report's signatories.
 - **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
@@ -201,19 +215,32 @@ is read only.
   `util/AbstractExcel.kt`; change both together): the "As of" date and every row with a description under the
   ITEM NO. header down to the GRAND TOTAL, each as its kind (part, group, item, subtotal, total), item no.,
   description, quantity, unit, unit cost, amount, PREVIOUS / THIS PERIOD / TO DATE as quantity, amount and % (0 to
-  100), and the balance. Amounts are kept at 2 decimals, quantities at 4, an empty cell as null. A part's figures are
-  those of its own subtotal row, as the sheet prints them (`L.abstractParts`). The billing format, a file without an
+  100), the balance, and the sheet's last three columns: under the header "EQUIVALENT TO 370 UNITS" (the number
+  varies; it is the read's `equivUnits`, 0 on a sheet without that header), each row's PREVIOUS, TO DATE and BALANCE
+  in equivalent units (`equiv`, at 2 decimals). Amounts are kept at 2 decimals, quantities at 4, an empty cell as
+  null. An item no. Excel stored with a float tail ("2.2000000000000002" for a typed 2.2) is read as the number at 6
+  decimals ("2.2"). A part's figures are those of its own subtotal row, as the sheet prints them
+  (`L.abstractParts`). The billing format, a file without an
   abstract and an abstract without an "As of" date are refused, each with its own message (`L.abstractProblem`).
   - **The record** is a `project_abstracts` record (`L.newAbstractRecord`, the phone's `ProjectAbstract` row): `asOf`
     (yyyy-MM-dd), `overallPct` (the grand total's % to date; without one the parts' by their amounts), `rowsJson`
-    (those rows), `fileName` and `uploadedBy`. The file itself is not kept. Every upload stays under its "As of" date;
+    (those rows), `fileName`, `uploadedBy` and `equivUnits` (the N of "EQUIVALENT TO N UNITS"; a record from before
+    the column, or from a sheet without it, counts as 0). The file itself is not kept. Every upload stays under its
+    "As of" date;
     uploading a date already filed asks first, then replaces that record (`saveEdits`) instead of adding a second.
     The audit entries are the phone's: "Abstract Upload", "Updated abstract" and "Deleted abstract" (`L.abstractAudit`,
     `L.deletedAbstractAudit`).
-  - **The tab** opens on the latest abstract; the **As of** menu picks an earlier one. It shows the date, the overall,
-    the three lines, the file's name and who uploaded it, then every pay item in the sheet's columns
-    (`P.abstractItemsHtml`): each part folds, groups are headings, subtotals are bold, and the grand total comes last.
-    **Delete**, for the same people, asks first and marks the record deleted.
+  - **The tab** opens on the latest abstract; the **As of** menu picks an earlier one. Under the date a small table
+    (`L.abstractStanding`, the phone's `ProjectAbstracts.standing`) gives Target, Actual and +/- for Land
+    Acquisition, Land Development, Housing Construction and Overall. A line's target is the weekly form's: the
+    approved bar chart's plan for that line on the "As of" date ("-" without a chart); the overall target is the
+    chart's plan that day, else the project's stored target. The actuals are the abstract's. +/- is the actual less
+    the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). The file's
+    name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
+    folds, groups are headings, subtotals are bold, and the grand total comes last. A record with `equivUnits` above
+    0 has three more columns after BALANCE, under "EQUIVALENT TO 370 UNITS": PREVIOUS, TO DATE and BALANCE, 2
+    decimals at most. **Print billing abstract** is described under the billings above.
+    **Delete**, for the people who can edit, asks first and marks the record deleted.
   - **The uploaded abstract is the project's actual accomplishment** (`L.projectActualAfter`, the phone's
     `ProjectAbstracts.projectActualAfter`): saving or deleting one sets the project's actual, in the same write, to
     the latest abstract's overall (by "As of" date, then the last saved); with none left, to the latest weekly

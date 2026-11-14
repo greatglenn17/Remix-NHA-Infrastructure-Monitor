@@ -2008,12 +2008,16 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    /** A billing's Abstract of Physical Accomplishment; [saleable] is the project's saleable lots, for one without a number of units. */
-    suspend fun billingAbstractForm(project: Project, payment: com.example.data.model.ProjectPayment, saleable: Int, signatories: com.example.util.Signatories): String =
-        com.example.util.BlueBookForms.billingAbstract(
-            project, repository.getPendingDocuments(project.id).first(), repository.getProjectPaymentsForProject(project.id).first(), payment,
-            com.example.util.BillingAbstract.units(project, saleable), signatories, blueBookBanner
-        )
+    /**
+     * The billing-format Abstract of Physical Accomplishment of an uploaded [abstract] with the typed [period];
+     * [saleable] is the project's saleable lots, for one without a number of units.
+     */
+    suspend fun billingAbstractForm(
+        project: Project, abstract: ProjectAbstract, period: com.example.util.BillingAbstract.Period, saleable: Int, signatories: com.example.util.Signatories
+    ): String = com.example.util.BlueBookForms.billingAbstract(
+        project, repository.getPendingDocuments(project.id).first(), repository.getProjectPaymentsForProject(project.id).first(), abstract, period,
+        com.example.util.BillingAbstract.units(project, saleable), signatories, blueBookBanner
+    )
 
     /** An uploaded abstract of the actual work with every column of the Excel file, for the print preview. */
     fun actualAbstractForm(project: Project, abstract: ProjectAbstract): String =
@@ -2500,7 +2504,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             val old = projectDao.getProjectAbstractsForProject(record.projectId).first().firstOrNull { it.asOf == record.asOf }
             if (old == null) projectDao.insertProjectAbstract(record)
-            else projectDao.updateProjectAbstract(old.copy(overallPct = record.overallPct, rowsJson = record.rowsJson, fileName = record.fileName, uploadedBy = record.uploadedBy))
+            else projectDao.updateProjectAbstract(old.copy(overallPct = record.overallPct, rowsJson = record.rowsJson, fileName = record.fileName, uploadedBy = record.uploadedBy, equivUnits = record.equivUnits))
             followAbstracts(record.projectId)
             val overall = com.example.util.ProjectAbstracts.pct(record.overallPct)
             logAuditAction(

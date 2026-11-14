@@ -1334,28 +1334,31 @@ export function billingAheadErrors(project, docs, payments, weekly, f, old = nul
 export const abstractUnits = (project, saleable = 0) => Number.parseInt(String(project.numberOfUnits ?? '').replace(/,/g, '').match(/\d+/)?.[0] ?? '', 10) || saleable || 1;
 
 /**
- * BillingAbstract.of: the Abstract of Physical Accomplishment for `payment` (the district's billing format). Each part
- * with a contract amount has its lines { no, name, unit, type, amount, previous, thisPeriod }: `previous` is what
- * the billings of that type before this one came to, `thisPeriod` this billing. Housing is billed as Milestone 1 (80%)
- * and Milestone 2 (20%). `targetPct` is the plan on the billing's date.
+ * BillingAbstract.of: the Abstract of Physical Accomplishment the contractor attaches before a billing (the district's
+ * billing format), printed from the uploaded `abstract` on the Actual Accomplishment tab. Each part with a contract
+ * amount has its lines { no, name, unit, type, amount, previous, thisPeriod }. The amounts are the abstract's own
+ * (abstractLineAmounts), housing as Milestone 1 (80%) and Milestone 2 (20%). `previous` is the gross of the saved
+ * billings of that type dated on or before the abstract's "As of" date. `thisPeriod` is typed and never saved:
+ * `period` is { covered, lots, development, m1, m2 }, this billing's land acquisition lots, land development amount
+ * and Milestone 1 and 2 housing units; a quantity is an amount as quantity x (line amount / `units`), and anything
+ * that is not a number above 0 counts as 0. `targetPct` is the plan on the "As of" date.
  */
-export function billingAbstract(project, docs, payments, payment) {
-  const [acquisition, development, housing] = partAmounts(project, docs, payment.date);
-  // Earlier billings: those dated before it; on the same date by uuid, which both copies hold and an edit does not change.
-  const key = p => [String(p.date || ''), String(p.uuid || '')], cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-  const ordered = [...payments].sort((a, b) => cmp(key(a)[0], key(b)[0]) || cmp(key(a)[1], key(b)[1]));
-  const before = ordered.slice(0, Math.max(0, ordered.findIndex(p => p.uuid === payment.uuid)));
-  const round = v => Math.round(v * 100) / 100;
-  const line = (no, name, unit, type, amount) => ({ no, name, unit, type, amount,
-    previous: round(before.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0)),
-    thisPeriod: payment.billingType === type ? Number(payment.grossAmount) || 0 : 0 });
+export function billingAbstract(project, docs, payments, abstract, period, units) {
+  const [acquisition, development, housing] = abstractLineAmounts(abstract), asOf = isoDay(abstract.asOf);
+  // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
+  const before = payments.filter(p => { const day = isoDay(p.date); return day != null && asOf != null && day <= asOf; });
+  const round = v => Math.round(v * 100) / 100, typed = v => Math.max(0, Number(v) || 0);
+  const line = (no, name, unit, type, amount, thisPeriod) => ({ no, name, unit, type, amount,
+    previous: round(before.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0)), thisPeriod: round(thisPeriod) });
+  const counted = (no, name, unit, type, amount, quantity) => line(no, name, unit, type, amount, typed(quantity) * (amount / units));
+  const m1 = round(housing * 0.8);
   return {
-    targetPct: plannedTarget(project, docs, payment.date) ?? (Number(project.targetAccomplishment) || 0),
+    targetPct: plannedTarget(project, docs, abstract.asOf) ?? (Number(project.targetAccomplishment) || 0),
     parts: [
-      { name: 'Land Acquisition Cost', lines: [line('1', 'LAND ACQUISITION COST', 'LOT', HOUSING_BILLING_TYPES[0], acquisition)] },
-      { name: 'Land Development', lines: [line('2', 'LAND DEVELOPMENT', 'LOT', HOUSING_BILLING_TYPES[1], development)] },
+      { name: 'Land Acquisition Cost', lines: [counted('1', 'LAND ACQUISITION COST', 'LOT', HOUSING_BILLING_TYPES[0], acquisition, period.lots)] },
+      { name: 'Land Development', lines: [line('2', 'LAND DEVELOPMENT', 'LOT', HOUSING_BILLING_TYPES[1], development, typed(period.development))] },
       { name: 'Housing Construction', heading: ['3', 'HOUSING CONSTRUCTION'], lines: [
-        line('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], round(housing * 0.8)), line('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - round(housing * 0.8)))] },
+        counted('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], m1, period.m1), counted('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - m1), period.m2)] },
     ].filter(part => part.lines.some(l => l.amount > 0)),
   };
 }
@@ -1552,20 +1555,55 @@ export function abstractInWeek(abstracts, reportingWeek) {
 }
 
 /** An abstract's three Actual % as the weekly form shows them (abstractActuals of its parts); 0.00 for a line it has no part for. */
-export const abstractLineActuals = abstract => abstractActuals(abstractParts(abstractRows(abstract.rowsJson))).map(v => v ?? '0.00');
+export const abstractLineActuals = abstract => abstractActuals(abstractParts(abstractRows(abstract.rowsJson))).map(v => Math.min(100, Number(v ?? 0)).toFixed(2)); // an overrun part reads 100: the weekly form takes 0 to 100
+
+/** Each accomplishment line's sum, at 2 decimals, of `of(row)` over the own subtotal rows (the last before the next part) of the abstract's parts of that line. */
+function abstractLineSums(abstract, of) {
+  const parts = [];
+  for (const r of abstractRows(abstract.rowsJson)) {
+    if (r.kind === 'part') parts.push([accomplishmentLine(r.name), 0]);
+    else if (r.kind === 'subtotal' && parts.length) parts.at(-1)[1] = Number(of(r)) || 0;
+  }
+  return ACCOMPLISHMENT_LINES.map(line => Math.round(parts.filter(p => p[0] === line).reduce((t, p) => t + p[1], 0) * 100) / 100);
+}
+
+/** ProjectAbstracts.lineAmounts: the contract amount of each accomplishment line as the abstract has it (its parts' amounts). */
+export const abstractLineAmounts = abstract => abstractLineSums(abstract, r => r.amount);
+
+/** ProjectAbstracts.periodAmounts: each accomplishment line's THIS PERIOD amount on the abstract; 0 where the sheet has none. */
+export const abstractPeriodAmounts = abstract => abstractLineSums(abstract, r => r.period?.[1]);
 
 /**
- * ProjectAbstracts.fields: a read workbook (apa-excel.js) as the five columns of its record. The overall is the grand
- * total's; without one the parts' by their amounts, else 0.
+ * ProjectAbstracts.standing: the tab's Target / Actual / +/- table for an abstract, as four rows { name, target,
+ * actual, diff }: the three accomplishment lines, then "Overall". A line's target is the weekly form's (the approved
+ * bar chart's plan for that line on the "As of" date; null without a chart), the overall the chart's plan that day,
+ * else the project's stored target. The actuals are the abstract's. `diff` is the actual less the target, each at 2
+ * decimals; null without a target.
+ */
+export function abstractStanding(project, docs, abstract) {
+  const round = v => Math.round(v * 100) / 100;
+  const targets = weeklyLines(project, docs, abstract.asOf), actuals = abstractLineActuals(abstract);
+  const row = (name, target, actual) => ({ name, target, actual, diff: target == null ? null : round(round(actual) - round(target)) });
+  return [...ACCOMPLISHMENT_LINES.map((name, k) => row(name, targets[k].targetPct, Number(actuals[k]))),
+    row('Overall', plannedTarget(project, docs, abstract.asOf) ?? (Number(project.targetAccomplishment) || 0), Number(abstract.overallPct) || 0)];
+}
+
+/** A standing row's +/- as shown: "+4.66%", "-7.58%", "0.00%"; "-" without a target. */
+export const standingDiffText = diff => (diff == null ? '-' : `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`);
+
+/**
+ * ProjectAbstracts.fields: a read workbook (apa-excel.js) as the six columns of its record. The overall is the grand
+ * total's; without one the parts' by their amounts, else 0. `equivUnits` is the N of the sheet's "EQUIVALENT TO N
+ * UNITS" columns, 0 without them (a record from before the column reads as 0 too).
  */
 export function abstractFields(found, fileName, uploadedBy) {
   const total = found.parts.reduce((t, p) => t + p.amount, 0);
   const overallPct = found.overallPct ?? (total > 0 ? Math.round(found.parts.reduce((t, p) => t + p.actualPct * p.amount, 0) / total * 100) / 100 : 0);
-  return { asOf: found.asOf, overallPct, rowsJson: JSON.stringify(found.rows), fileName: fileName || '', uploadedBy: uploadedBy || '' };
+  return { asOf: found.asOf, overallPct, rowsJson: JSON.stringify(found.rows), fileName: fileName || '', uploadedBy: uploadedBy || '', equivUnits: found.equivUnits || 0 };
 }
 
 /** A new project_abstracts record: the ProjectAbstract row, every column (all NOT NULL on the phone). */
-export const newAbstractRecord = (ids, f) => newRecord(ids, 'project_abstracts', { asOf: f.asOf, overallPct: f.overallPct, rowsJson: f.rowsJson, fileName: f.fileName, uploadedBy: f.uploadedBy });
+export const newAbstractRecord = (ids, f) => newRecord(ids, 'project_abstracts', { asOf: f.asOf, overallPct: f.overallPct, rowsJson: f.rowsJson, fileName: f.fileName, uploadedBy: f.uploadedBy, equivUnits: f.equivUnits });
 
 /**
  * ProjectAbstracts.projectActualAfter: the project's actual once its abstracts are `abstracts`: the latest one's
@@ -1590,7 +1628,7 @@ export const abstractSavedNote = (f, replaced) => `${replaced ? 'Replaced' : 'Sa
 export const abstractWeekNote = abstract => `Actual % is from the abstract as of ${displayDate(abstract.asOf)} (Actual Accomplishment tab).`;
 /** ProjectViewModel.saveAbstract's audit entry, word for word; `old` is the abstract of the same date it replaced. */
 export const abstractAudit = (f, old = null) => ({
-  actionType: old ? 'Updated abstract' : 'Abstract Upload', details: `Abstract ${abstractLabel(f)}`, oldValue: old ? overallText(old) : '', newValue: overallText(f),
+  actionType: old ? 'Updated abstract' : 'Abstract Upload', details: `Abstract ${abstractLabel(f)}`, oldValue: old && overallText(old) !== overallText(f) ? overallText(old) : '', newValue: overallText(f), // the phone's log drops an entry whose old and new are equal
 });
 /** ProjectViewModel.deleteAbstract's audit entry, word for word. */
 export const deletedAbstractAudit = a => ({ actionType: 'Deleted abstract', details: `Abstract ${abstractLabel(a)}`, oldValue: overallText(a), newValue: '' });

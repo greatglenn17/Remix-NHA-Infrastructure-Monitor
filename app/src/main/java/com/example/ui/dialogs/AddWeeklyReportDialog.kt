@@ -370,10 +370,12 @@ private fun WeeklyReportForm(
     val initial = remember { snapshot() }
     val current = snapshot()
     val dirty = current != initial || draft != null
-    fun accItemsJson() = JSONArray(scopeItems.map { item ->
+    // A saved report stores the Actual % the boxes show (the abstract's when the week has one). A draft keeps what was
+    // [typed] under them, so the boxes go back to it when the week is moved to one without an abstract, as on the website.
+    fun accItemsJson(typed: Boolean = false) = JSONArray(scopeItems.map { item ->
         JSONObject().put("itemDescription", item.name)
             .put("targetPct", targetText(item.name).toDoubleOrNull() ?: 0.0)
-            .put("actualPct", actualText(item.name).toDoubleOrNull() ?: 0.0)
+            .put("actualPct", (if (typed) accomplishmentMap[item.name]?.second else actualText(item.name))?.toDoubleOrNull() ?: 0.0)
             .put("weightPct", item.weightPct)
     }).toString()
     // Saved or discarded: no more draft writes, even one already waiting.
@@ -389,7 +391,7 @@ private fun WeeklyReportForm(
                 targetAccomplishmentPct = overallTarget, actualAccomplishmentPct = overallActual,
                 manpowerJson = encodeManpowerList(manpowerItems), equipmentJson = encodeEquipmentList(equipmentItems),
                 activitiesJson = encodeActivitiesList(activityItems), issuesJson = encodeIssuesList(issuesItems),
-                accomplishmentItemsJson = accItemsJson(), documentsIssuedReceivedJson = "[]",
+                accomplishmentItemsJson = accItemsJson(typed = true), documentsIssuedReceivedJson = "[]",
                 attachedPhotoUrlsJson = JSONArray(photoUrls.toList()).toString(),
                 photoDetailsJson = com.example.data.files.PhotoDetails.toJson(photoDetails.filterKeys { it in photoUrls }),
                 submittedByStaff = ""

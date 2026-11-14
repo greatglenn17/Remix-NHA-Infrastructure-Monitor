@@ -1317,8 +1317,8 @@ const ABSTRACT_ROWS = [
   { kind: 'part', no: '2', name: 'LAND DEVELOPMENT', amount: null, toDate: [null, null, null] },
   { kind: 'group', no: '2.2', name: 'ROADWORKS', amount: null, toDate: [null, null, null] },
   { kind: 'item', no: '2.2.1', name: 'Road Excavation', amount: 1600000, toDate: [null, 404000, 25.25] },
-  { kind: 'subtotal', no: '', name: 'Subtotal (Roadworks)', amount: 1600000, toDate: [null, 404000, 25.25] },
-  { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, toDate: [null, 504000, 25.21] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Roadworks)', amount: 1600000, period: [null, 80000, 5], toDate: [null, 404000, 25.25] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, period: [null, 104000, 5.2], toDate: [null, 504000, 25.21] },
   { kind: 'part', no: '3', name: 'HOUSING CONSTRUCTION', amount: null, toDate: [null, null, null] },
   { kind: 'subtotal', no: '', name: 'Subtotal (Housing Construction)', amount: 7000000, toDate: [null, 70000, 1] },
   { kind: 'total', no: '', name: 'GRAND TOTAL', amount: 10000000, toDate: [null, 1074000, 10.73] },
@@ -1331,15 +1331,16 @@ test('uploaded abstracts: the record, the latest and a week\'s, the project\'s a
   assert.deepEqual(L.abstractParts(ABSTRACT_ROWS), parts);
   assert.deepEqual(L.abstractParts([{ kind: 'subtotal', amount: 5 }, { kind: 'part', name: 'A' }]), [{ name: 'A', amount: 0, actualPct: 0 }]);
 
-  const found = { asOf: '2025-03-14', parts, overallPct: 10.73, billing: false, rows: ABSTRACT_ROWS };
+  const found = { asOf: '2025-03-14', parts, overallPct: 10.73, billing: false, equivUnits: 100, rows: ABSTRACT_ROWS };
   const fields = L.abstractFields(found, 'APA March.xlsx', 'Engr. Web');
-  assert.deepEqual(fields, { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS), fileName: 'APA March.xlsx', uploadedBy: 'Engr. Web' });
+  assert.deepEqual(fields, { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS), fileName: 'APA March.xlsx', uploadedBy: 'Engr. Web', equivUnits: 100 });
+  assert.equal(L.abstractFields({ ...found, equivUnits: undefined }, '', '').equivUnits, 0); // a sheet without the equivalent-units columns
   // No grand total on the sheet: the parts by their amounts; no file name or uploader is '' (the columns are NOT NULL on the phone).
   assert.deepEqual((({ overallPct, fileName, uploadedBy }) => [overallPct, fileName, uploadedBy])(L.abstractFields({ ...found, overallPct: null }, undefined, null)), [10.74, '', '']);
   assert.equal(L.abstractFields({ ...found, overallPct: null, parts: [] }, '', '').overallPct, 0);
   const record = L.newAbstractRecord({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'me', now: 5 }, fields);
   assert.deepEqual(record, { uuid: 'u1', type: 'project_abstracts', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 5, updatedByUid: 'me', isDeleted: false, data: JSON.stringify(fields) });
-  assert.deepEqual(Object.keys(JSON.parse(record.data)), ['asOf', 'overallPct', 'rowsJson', 'fileName', 'uploadedBy']);
+  assert.deepEqual(Object.keys(JSON.parse(record.data)), ['asOf', 'overallPct', 'rowsJson', 'fileName', 'uploadedBy', 'equivUnits']);
 
   const feb = { uuid: 'feb', asOf: '2025-02-28', overallPct: 8, updatedAt: 9 }, mar = { uuid: 'mar', asOf: '2025-03-14', overallPct: 10.73, updatedAt: 2 };
   const again = { uuid: 'again', asOf: '2025-03-14', overallPct: 11, updatedAt: 3 };
@@ -1353,6 +1354,12 @@ test('uploaded abstracts: the record, the latest and a week\'s, the project\'s a
   assert.equal(L.abstractInWeek([feb, mar], 'no dates'), null);
   assert.deepEqual(L.abstractLineActuals(fields), ['50.00', '25.21', '1.00']);
   assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }), ['0.00', '25.21', '0.00']);
+  // Two parts of one line averaged to 25.215 (stored just under it) read 25.21 on both sides; an overrun part reads 100.
+  const sub = (amount, pct) => ({ kind: 'subtotal', no: '', name: 'Subtotal', amount, toDate: [null, null, pct] });
+  const tie = [{ kind: 'part', no: '2', name: 'LAND DEVELOPMENT' }, sub(300000, 25.21), { kind: 'part', no: '4', name: 'SITE GRADING' }, sub(100000, 25.23)];
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(tie) }), ['0.00', '25.21', '0.00']);
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify([tie[0], sub(1000, 100.5)]) }), ['0.00', '100.00', '0.00']);
+  assert.equal(L.abstractAudit(fields, mar).oldValue, ''); // replaced by a file of the same overall
 
   // The project's actual: the latest abstract's overall, else the latest weekly report's, else as it is.
   const weekly = [{ reportingWeek: 'Mar 1, 2025 - Mar 7, 2025', actualAccomplishmentPct: 9 }, { reportingWeek: 'Mar 8, 2025 - Mar 14, 2025', actualAccomplishmentPct: 10.5 }];
@@ -1373,7 +1380,28 @@ test('uploaded abstracts: the record, the latest and a week\'s, the project\'s a
   assert.deepEqual(L.deletedAbstractAudit(mar), { actionType: 'Deleted abstract', details: 'Abstract as of Mar 14, 2025: overall 10.73%', oldValue: '10.73%', newValue: '' });
 });
 
-test('abstracts: what is billed never passes the actual, and the billing abstract is made from the billings', () => {
+test('uploaded abstracts: target, actual and advance/slippage of the three lines and overall', () => {
+  const abstract = { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS) };
+  // The approved bar chart on March 14, 2025 (contract day 73): roads 73% planned, housing 23%, overall 53%; it has no land acquisition.
+  const project = { dateStarted: '2025-01-01', targetAccomplishment: 12,
+    barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) };
+  assert.deepEqual(L.abstractStanding(project, [], abstract), [
+    { name: 'Land Acquisition', target: 0, actual: 50, diff: 50 },
+    { name: 'Land Development', target: 73, actual: 25.21, diff: -47.79 },
+    { name: 'Housing Construction', target: 23, actual: 1, diff: -22 },
+    { name: 'Overall', target: 53, actual: 10.73, diff: -42.27 },
+  ]);
+  // Without a chart a line has no target; the overall target is the project's stored one.
+  assert.deepEqual(L.abstractStanding({ targetAccomplishment: 12 }, [], abstract), [
+    { name: 'Land Acquisition', target: null, actual: 50, diff: null },
+    { name: 'Land Development', target: null, actual: 25.21, diff: null },
+    { name: 'Housing Construction', target: null, actual: 1, diff: null },
+    { name: 'Overall', target: 12, actual: 10.73, diff: -1.27 },
+  ]);
+  assert.deepEqual([4.66, -7.58, 0, -0, null].map(L.standingDiffText), ['+4.66%', '-7.58%', '0.00%', '0.00%', '-']);
+});
+
+test('abstracts: what is billed never passes the actual, and the billing abstract is made from the uploaded abstract', () => {
   const project = { scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000, weightPct: 10 }, { name: 'Land Development', amount: 2000000, weightPct: 20 },
     { name: 'Construction of Housing Units', amount: 7000000, weightPct: 70 }]), targetAccomplishment: 12, actualAccomplishment: 10.74, numberOfUnits: '100 units' };
   const lines = (a, b, c) => JSON.stringify([['Land Acquisition', a, 10], ['Land Development', b, 20], ['Housing Construction', c, 70]].map(([itemDescription, actualPct, weightPct]) => ({ itemDescription, targetPct: 0, actualPct, weightPct })));
@@ -1428,19 +1456,30 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   assert.equal(L.abstractUnits(project), 100);
   assert.equal(L.abstractUnits({ numberOfUnits: '' }, 42), 42);
   assert.equal(L.abstractUnits({}), 1);
-  const abstract = L.billingAbstract(project, [], [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }], payments[2]);
-  assert.equal(abstract.targetPct, 12);
+
+  // The billing abstract is printed from the uploaded abstract: its own part amounts, and its this-period amounts to start from.
+  assert.deepEqual(L.abstractLineAmounts(uploaded), [1000000, 2000000, 7000000]);
+  assert.deepEqual(L.abstractPeriodAmounts(uploaded), [0, 104000, 0]); // a part's own subtotal, not its groups'
+  assert.deepEqual([L.abstractLineAmounts({ rowsJson: '' }), L.abstractPeriodAmounts({ rowsJson: '' })], [[0, 0, 0], [0, 0, 0]]);
+  // Previous: the saved billings dated on or before the As-of date (March 14); the one of April 1 is not in it, the one of the day is.
+  const saved = [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }, { uuid: 'd', billingType: 'M1 - Housing unit', grossAmount: 56000, date: ' 2025-03-14 ' },
+    { uuid: 'e', billingType: 'Land development', grossAmount: 9, date: '' }];
+  // Typed for this billing: 5 lots, the abstract's 104,000 of land development, 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
+  const period = { covered: 'March 1 - 14, 2025', lots: 5, development: L.abstractPeriodAmounts(uploaded)[1], m1: 2, m2: 1 };
+  const abstract = L.billingAbstract(project, [], saved, uploaded, period, 100);
+  assert.equal(abstract.targetPct, 12); // no bar chart: the project's stored target
   assert.deepEqual(abstract.parts.map(p => [p.name, p.heading]), [['Land Acquisition Cost', undefined], ['Land Development', undefined], ['Housing Construction', ['3', 'HOUSING CONSTRUCTION']]]);
   assert.deepEqual(abstract.parts.flatMap(p => p.lines), [
-    { no: '1', name: 'LAND ACQUISITION COST', unit: 'LOT', type: 'Land acquisition', amount: 1000000, previous: 400000, thisPeriod: 0 },
-    { no: '2', name: 'LAND DEVELOPMENT', unit: 'LOT', type: 'Land development', amount: 2000000, previous: 0, thisPeriod: 300000 },
-    { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 0, thisPeriod: 0 },
-    { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 0 },
+    { no: '1', name: 'LAND ACQUISITION COST', unit: 'LOT', type: 'Land acquisition', amount: 1000000, previous: 400000, thisPeriod: 50000 },
+    { no: '2', name: 'LAND DEVELOPMENT', unit: 'LOT', type: 'Land development', amount: 2000000, previous: 300000, thisPeriod: 104000 },
+    { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 56000, thisPeriod: 112000 },
+    { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 14000 },
   ]);
-  // Billings of the same date go by uuid, on the site and the phone alike, whatever order the list is in.
-  const same = [{ uuid: 'y', billingType: 'Land development', grossAmount: 5, date: '2025-03-01' }, { uuid: 'x', billingType: 'Land development', grossAmount: 7, date: '2025-03-01' }];
-  assert.equal(L.billingAbstract(project, [], same, same[0]).parts[1].lines[0].previous, 7);
-  assert.equal(L.billingAbstract(project, [], same, same[1]).parts[1].lines[0].previous, 0);
-  // A project without housing has no housing lines.
-  assert.deepEqual(L.billingAbstract({ scopeOfWork: JSON.stringify([{ name: 'Land Development', amount: 500, weightPct: 100 }]) }, [], payments, payments[2]).parts.map(p => p.name), ['Land Development']);
+  // A blank, unreadable or negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
+  assert.deepEqual(L.billingAbstract(project, [], [], uploaded, { covered: '', lots: 1, development: -5, m1: 'x', m2: '' }, 3).parts.flatMap(p => p.lines.map(l => l.thisPeriod)), [333333.33, 0, 0, 0]);
+  // The target is the bar chart's plan on the As-of date when the project has one.
+  assert.equal(L.billingAbstract({ dateStarted: '2025-01-01', targetAccomplishment: 12, barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) },
+    [], [], uploaded, period, 100).targetPct, 53);
+  // An abstract without housing has no housing lines.
+  assert.deepEqual(L.billingAbstract(project, [], payments, { ...uploaded, rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }, period, 100).parts.map(p => p.name), ['Land Development']);
 });

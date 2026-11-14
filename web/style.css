@@ -456,7 +456,7 @@ span.file.gone { text-decoration: none; }
 /* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns and scroll sideways. */
 .apa-tools { align-items: end; margin-bottom: 6px; }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
-.apa-part { padding: 0 16px; }
+.apa-part { padding: 0 16px; min-width: 0; } /* min-width: the wide table scrolls inside its card instead of widening the page */
 div.apa-part { padding-top: 16px; }
 .apa-part summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 48px; cursor: pointer; list-style: none; }
 .apa-part summary::-webkit-details-marker { display: none; }
@@ -468,6 +468,14 @@ div.apa-part { padding-top: 16px; }
 .apa-items thead th { text-align: center; }
 .apa-items td:nth-child(2) { white-space: normal; min-width: 220px; }
 .apa-group td, .apa-subtotal td, .apa-total td { font-weight: 600; }
+/* The tab's target / actual / advance or slippage table, and the boxes typed above the printed billing abstract. */
+.apa-standing { max-width: 520px; margin-bottom: 8px; }
+.apa-standing thead td { border: none; }
+.apa-standing tbody th { text-align: left; font-weight: 400; }
+.apa-typed { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin-bottom: 8px; }
+.apa-typed .field { flex: 1 1 170px; }
+.apa-typed .field:first-child { flex-basis: 100%; }
+.print-note + .section { margin-bottom: 12px; }
 /* Photos: two across on a phone, more on wider screens; each opens full size. */
 /* ul only: the print form's table.photos must keep its table layout. */
 ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }

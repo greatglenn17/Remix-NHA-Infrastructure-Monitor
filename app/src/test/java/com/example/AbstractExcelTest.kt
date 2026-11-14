@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 // The workbook of web/apa-excel.test.mjs: a made-up abstract laid out like the district's (three header rows, parts 1
-// to 3 with their groups and subtotals, the grand total, then the small target table).
+// to 3 with their groups and subtotals, the equivalent-units columns, the grand total, then the small target table).
 @RunWith(RobolectricTestRunner::class)
 class AbstractExcelTest {
     /** Cells of ref to value as a workbook: numbers as they are, text as a formula's worked-out string. */
@@ -49,16 +49,17 @@ class AbstractExcelTest {
         "A27" to 2.1, "B27" to "GENERAL REQUIREMENTS",
         "A28" to "2.1.1", "B28" to "Mobilization/Demobilization", "H28" to 400000, "P28" to 100000, "Q28" to 0.25,
         "E28" to 1, "F28" to "l.s.", "G28" to 400000, "I28" to 0, "J28" to 0, "K28" to 0, "L28" to 0.25, "M28" to 100000, "N28" to 0.25, "O28" to 0.25,
-        "S28" to 0.75, "T28" to 300000,
+        "S28" to 0.75, "T28" to 300000, "V28" to 0, "W28" to 25, "X28" to 75,
         "B29" to "Subtotal (General Requrements)", "H29" to 400000, "P29" to 100000,
-        "A30" to 2.2, "B30" to "ROADWORKS",
-        "A31" to "2.2.1", "B31" to "Road Excavation", "H31" to 1600000, "P31" to 404000, "Q31" to 0.2525,
+        // A typed 2.2 and 3.1 as Excel stores them: the item no. loses the tail.
+        "A30" to "2.2000000000000002", "B30" to "ROADWORKS",
+        "A31" to "2.2.1", "B31" to "Road Excavation", "H31" to 1600000, "P31" to 404000, "Q31" to 0.2525, "V31" to 12.5, "W31" to 25.25, "X31" to 74.75,
         "B32" to "Subtotal (Roadworks)", "H32" to 1600000, "P32" to 404000,
         // 504,000 of 2,000,000 is 25.20%; the sheet says 25.21% (two rounded figures added), and that is what is printed.
         "B33" to "Subtotal (Land Development)", "H33" to 2000000, "P33" to 504000, "Q33" to 0.25210000000000005,
         "A35" to 3, "B35" to "HOUSING CONSTRUCTION",
-        "A36" to 3.1, "B36" to "STRUCTURAL WORKS",
-        "A37" to "3.1.1", "B37" to "Column Footing", "H37" to 7000000, "P37" to 70000, "Q37" to 0.01,
+        "A36" to "3.0999999999999996", "B36" to "STRUCTURAL WORKS",
+        "A37" to "3.1.1", "B37" to "Column Footing", "H37" to 7000000, "P37" to 70000, "Q37" to 0.01, "W37" to 3.14159,
         "B38" to "Subtotal (Structural Works)", "H38" to 7000000, "P38" to 70000,
         "B39" to "Subtotal (Housing Construction)", "H39" to 7000000, "P39" to 70000,
         "B40" to "GRAND TOTAL", "H40" to 10000000, "P40" to 1074000, "Q40" to 0.1073,
@@ -70,6 +71,7 @@ class AbstractExcelTest {
         assertEquals(LocalDate.of(2025, 3, 14), found.asOf)
         assertEquals(10.73, found.overallPct!!, 0.0)
         assertEquals(false, found.billing)
+        assertEquals(100.0, found.equivUnits, 0.0)
         assertEquals(
             listOf(
                 AbstractExcel.Part("LAND ACQUISITION COST", 1000000.0, 50.0),
@@ -94,18 +96,24 @@ class AbstractExcelTest {
         assertEquals(
             AbstractExcel.Row(
                 "item", "2.1.1", "Mobilization/Demobilization", 1.0, "l.s.", 400000.0, 400000.0,
-                prev = listOf(0.0, 0.0, 0.0), period = listOf(0.25, 100000.0, 25.0), toDate = listOf(0.25, 100000.0, 25.0), balance = listOf(0.75, 300000.0)
+                prev = listOf(0.0, 0.0, 0.0), period = listOf(0.25, 100000.0, 25.0), toDate = listOf(0.25, 100000.0, 25.0), balance = listOf(0.75, 300000.0),
+                equiv = listOf(0.0, 25.0, 75.0)
             ),
             rows[4]
         )
         assertEquals(
             AbstractExcel.Row(
                 "item", "2.2.1", "Road Excavation", null, "", null, 1600000.0,
-                prev = listOf(null, null, null), period = listOf(null, null, null), toDate = listOf(null, 404000.0, 25.25), balance = listOf(null, null)
+                prev = listOf(null, null, null), period = listOf(null, null, null), toDate = listOf(null, 404000.0, 25.25), balance = listOf(null, null),
+                equiv = listOf(12.5, 25.25, 74.75)
             ),
             rows[7]
         )
+        // The sheet's last three columns (equivalent units) at 2 decimals; every other row has none.
+        assertEquals(listOf(null, 3.14, null), rows.single { it.no == "3.1.1" }.equiv)
+        assertEquals(emptyList<AbstractExcel.Row>(), rows.filter { it.no !in listOf("2.1.1", "2.2.1", "3.1.1") && it.equiv != listOf<Double?>(null, null, null) })
         assertEquals(listOf("1", "", "2", "2.1"), rows.take(4).map { it.no })
+        assertEquals(listOf("2.1", "2.2", "3.1"), rows.filter { it.kind == "group" }.map { it.no })
         val landDevelopment = rows.single { it.name == "Subtotal (Land Development)" }
         assertEquals(2000000.0, landDevelopment.amount!!, 0.0)
         assertEquals(listOf(null, 504000.0, 25.21), landDevelopment.toDate) // the sheet's own % WT
@@ -116,6 +124,15 @@ class AbstractExcelTest {
         assertEquals(found.parts, AbstractExcel.parts(rows))
         assertEquals(10.73, found.overallPct!!, 0.0)
         assertNull(read(actual.filterNot { it.first.endsWith("40") })!!.overallPct) // no GRAND TOTAL row
+
+        // A sheet without the quantity, unit cost, balance, PREVIOUS, THIS PERIOD and equivalent-units columns still reads: those cells are null.
+        val narrow = read(listOf(
+            "A1" to "ITEM NO.", "B1" to "ITEM DESCRIPTION", "C1" to "AMOUNT", "D2" to "TO DATE", "F3" to "% WT",
+            "A4" to 1, "B4" to "LAND DEVELOPMENT", "B5" to "Subtotal (Land Development)", "C5" to 500, "E5" to 125, "B6" to "Signed by"
+        ))!!
+        assertEquals(listOf(AbstractExcel.Part("LAND DEVELOPMENT", 500.0, 25.0)), narrow.parts)
+        assertEquals(0.0, narrow.equivUnits, 0.0) // no "EQUIVALENT TO ... UNITS" header
+        assertEquals(listOf(null, null, null), narrow.rows[1].equiv)
     }
 
     @Test fun tellsTheBillingFormatApartAndRefusesOtherSheets() {

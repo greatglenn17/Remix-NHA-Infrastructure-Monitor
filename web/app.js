@@ -155,7 +155,7 @@ function route() {
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
-    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null, note: '' });
+    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null, note: '', billing: null });
     freshScreen();
     return drawProject(s.page);
   }
@@ -3470,23 +3470,28 @@ function abstractsOf(c) {
   return { list, shown: list.find(a => a.asOf === c.page.sub) || list[0] };
 }
 
-/** `#/p/<id>/actual[/<as-of date>]`: the abstract of that date, the latest without one: its summary, then every pay item (P.abstractItemsHtml). */
+/**
+ * `#/p/<id>/actual[/<as-of date>]`: the abstract of that date, the latest without one: its target, actual and
+ * advance/slippage by line (L.abstractStanding), then every pay item (P.abstractItemsHtml). Print billing abstract,
+ * for anyone who can open the tab, is the billing format made from it (drawAbstractPrint).
+ */
 function actualBody(c) {
   const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
   const tools = `<div class="toolbar apa-tools">
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
       ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
+      ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
       ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
-  const lines = L.abstractLineActuals(shown);
+  const figure = v => (v == null ? '-' : pct(v));
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
-      ${kv('Overall', pct(shown.overallPct))}
-      ${L.ACCOMPLISHMENT_LINES.map((name, k) => kv(name, `${lines[k]}%`)).join('')}
+      <div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+        <tbody>${L.abstractStanding(c.project, c.documents, shown).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
       ${kv('File', shown.fileName)}${kv('Uploaded by', shown.uploadedBy)}`)}
-    ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
+    ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson), Number(shown.equivUnits) || 0)}</div>`;
 }
 
 /**
@@ -3543,7 +3548,7 @@ function bindActual(c) {
 
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
 
-function paymentsBody({ page, project, payments, cost, billed }) {
+function paymentsBody({ project, payments, cost, billed }) {
   const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
@@ -3564,7 +3569,6 @@ function paymentsBody({ page, project, payments, cost, billed }) {
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}
-      ${L.HOUSING_BILLING_TYPES.includes(p.billingType) ? `<a class="text-btn entry-edit" href="#/p/${esc(page.id)}/print/apa-${esc(p.uuid)}">${icon('print', 'sm')}Print abstract</a>` : ''}
       ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`;
   }).join('')}</ul></div>`;
@@ -3800,19 +3804,44 @@ function drawProfilePrint({ page, project, documents }) {
   document.getElementById('do-print').onclick = () => window.print();
 }
 
-/** A billing's Abstract of Physical Accomplishment (BlueBookForms.billingAbstract, Print abstract on the billing) for `#/p/<id>/print/apa-<billing>`. */
+/**
+ * The billing abstract the contractor attaches before a billing (BlueBookForms.billingAbstract, Print billing abstract
+ * on the Actual Accomplishment tab) for `#/p/<id>/print/apa-<as-of date>`: the uploaded abstract of that date in the
+ * district's billing format. This billing's figures are typed above the sheet and never saved; they are kept on the
+ * page (page.billing) so a redraw for an arriving record keeps them, and only the sheet redraws as they are typed.
+ */
 function drawAbstractPrint(c) {
-  const { page, project, records, documents, payments } = c;
-  const payment = payments.find(p => p.uuid === page.sub.slice(4));
-  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/payments">${icon('arrow_back', 'sm')}Billings</a>`;
-  if (!payment) { main.innerHTML = `${back}<p class="muted">This billing was deleted or does not exist.</p>`; return; }
-  document.title = `Abstract of Physical Accomplishment - ${payment.name || payment.billingType}`;
+  const { page, project, records, documents, payments } = c, asOf = page.sub.slice(4);
+  const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
+  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`;
+  const [acquisition, development, housing] = L.abstractLineAmounts(abstract), start = L.abstractPeriodAmounts(abstract)[1];
+  // Land development starts from the abstract's own this-period amount; the rest start empty (0).
+  const typed = page.billing ??= { covered: '', lots: '', development: start > 0 ? start.toFixed(2) : '', m1: '', m2: '' };
+  const box = (name, label, attrs = ' inputmode="decimal" placeholder="0"') => `<label class="field">${label}<input name="${name}" autocomplete="off" value="${esc(typed[name])}"${attrs}></label>`;
+  // The box being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
+  const active = document.activeElement?.closest?.('#apa-typed') ? document.activeElement : null;
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
-    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.billingAbstractHtml({
-      project, docs: documents, payments, payment, units: L.abstractUnits(project, L.lotSummary(records).saleable),
+    ${section('This billing', 'receipt_long', `<div class="apa-typed" id="apa-typed">${box('covered', 'Period covered', '')}
+        ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (amount)') : ''}
+        ${housing > 0 ? box('m1', 'Milestone 1 (units)') + box('m2', 'Milestone 2 (units)') : ''}</div>
+      <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>`, 'no-print')}
+    <div class="bb-scroll"><div class="bb full land" id="sheet"></div></div>`;
+  // A blank or unreadable number is 0 (parseAmount takes no minus sign, so a negative is 0 too).
+  const number = text => L.parseAmount(text) ?? 0;
+  const drawSheet = () => {
+    document.getElementById('sheet').innerHTML = P.billingAbstractHtml({
+      project, docs: documents, payments, abstract, units: L.abstractUnits(project, L.lotSummary(records).saleable),
+      period: { covered: typed.covered, lots: number(typed.lots), development: number(typed.development), m1: number(typed.m1), m2: number(typed.m2) },
       signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
-    })}</div></div>`;
+    });
+  };
+  drawSheet();
+  const boxes = document.getElementById('apa-typed');
+  boxes.oninput = e => { typed[e.target.name] = e.target.value; drawSheet(); };
+  if (active) { const again = boxes.querySelector(`[name="${active.name}"]`); again?.focus(); again?.setSelectionRange(active.selectionStart, active.selectionEnd); }
   bindSignatories(c, false);
   const btn = document.getElementById('do-print');
   btn.disabled = false;
