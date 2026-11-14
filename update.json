@@ -1,8 +1,8 @@
 {
-  "versionCode": 300,
-  "versionName": "2.8.20",
-  "releaseNotes": "v2.8.20: On the monthly report, the recommendations and signatures now fit on page 2.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.20/NHA_Monitor_v2.8.20_Build300.apk",
-  "apkSha256": "8084aa9ae1c6f4379b04b8eeb35644fc92aab0752a3610ef6737df3966abe153",
+  "versionCode": 301,
+  "versionName": "2.8.21",
+  "releaseNotes": "v2.8.21: For the Super Admin, Copy files to Google Drive on the Project profile card.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.21/NHA_Monitor_v2.8.21_Build301.apk",
+  "apkSha256": "db9dffb1b2b28f7b0bcd8b3347e570c1d237e2f99d332fc23312fa3abed0f406",
   "isMandatory": true
 }
