@@ -168,6 +168,8 @@ class ProjectAbstractsTest {
         assertTrue(html.contains("<div class='period'>As of March 14, 2025</div>"))
         assertTrue(html.contains("PROJECT NAME</td><td class='pc'>:</td><td>P</td><td class='pl'>CONTRACT DURATION</td><td>: 360 C.D.</td>"))
         // Without a bar chart the target is the project's stored one; the actual is the abstract's, not what was billed.
+        // One blank line between the contract cost and the target.
+        assertTrue(Regex("CONTRACT COST</td>.*</tr>\\s*<tr><td colspan='5'>&nbsp;</td></tr>\\s*<tr><td class='pl'>TARGET ACCOMPLISHMENT").containsMatchIn(html))
         assertTrue(html.contains("TARGET ACCOMPLISHMENT</td><td class='pc'>:</td><td>12.00%"))
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>10.73%"))
         assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-1.27%"))

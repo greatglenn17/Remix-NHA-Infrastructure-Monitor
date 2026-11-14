@@ -418,6 +418,8 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(html, row('Subtotal (Housing Construction)', '', '', '70,000.00', '7,000,000.00'));
   // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
   assert.match(html, row('GRAND TOTAL', '', '', '100,000.00', '10,000,000.00', '', '400,000.00', '4.00%', '', '310,000.00', '3.10%', '', '710,000.00', '7.10%', '', '9,290,000.00'));
+  // One blank line between the contract cost and the target.
+  assert.match(html, /CONTRACT COST<\/td>.*<\/tr>\s*<tr><td colspan='5'>&nbsp;<\/td><\/tr>\s*<tr><td class='pl'>TARGET ACCOMPLISHMENT/);
   assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
@@ -442,6 +444,8 @@ test('abstract of the actual work: the billing format\'s top with the tab\'s tar
   assert.match(html, /<h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT<\/h1>\s*<div class='period'>As of March 14, 2025<\/div>/);
   assert.match(html, /PROJECT NAME<\/td><td class='pc'>:<\/td><td>P &amp; Q<\/td><td class='pl'>CONTRACT DURATION<\/td><td>: 360 C.D.<\/td>/);
   // Without a bar chart the target is the project's stored one; the actual is the abstract's, not what was billed.
+  // One blank line between the contract cost and the target.
+  assert.match(html, /CONTRACT COST<\/td>.*<\/tr>\s*<tr><td colspan='5'>&nbsp;<\/td><\/tr>\s*<tr><td class='pl'>TARGET ACCOMPLISHMENT/);
   assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
