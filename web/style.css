@@ -408,8 +408,12 @@ thead .num { font-family: inherit; }
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
 .tabs a[aria-current="page"] .icon { color: var(--link); }
-/* On a phone the four labels share the row without icons, so Documents never hides off the edge. */
-@media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } .tabs a .icon { display: none; } }
+/* The five labels share the row so Documents never hides off the edge: "Actual" alone and no icons where the row is short, tighter still on a phone. */
+@media (max-width: 900px) { .tabs .tab-long { display: none; } }
+@media (max-width: 720px) { .tabs a .icon { display: none; } }
+@media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } }
+@media (max-width: 420px) { .tabs { gap: 0; } .tabs a { padding: 10px 3px; font-size: 13px; } }
+@media (max-width: 340px) { .tabs a { padding: 10px 1px; font-size: 12px; } }
 /* SectionChips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .chips button { font: 400 13px var(--sans); min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
@@ -453,6 +457,32 @@ span.file.gone { text-decoration: none; }
 /* Every cell boxed, so the report tables read like the printed form. */
 .grid-table th, .grid-table td { border: 1px solid var(--outline); padding: 8px 10px; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns and scroll sideways. */
+.apa-tools { align-items: end; margin-bottom: 6px; }
+.apa-tools + p { min-height: 16px; margin-bottom: 12px; }
+.apa-part { padding: 0 16px; min-width: 0; } /* min-width: the wide table scrolls inside its card instead of widening the page */
+div.apa-part { padding-top: 16px; }
+.apa-part summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 48px; cursor: pointer; list-style: none; }
+.apa-part summary::-webkit-details-marker { display: none; }
+.apa-part summary b { flex: 1 1 200px; font-weight: 600; }
+.apa-part summary .icon { transition: transform 150ms ease-out; }
+.apa-part[open] summary .icon { transform: rotate(180deg); }
+.apa-part .scroll { margin-bottom: 16px; }
+.apa-items { white-space: nowrap; }
+.apa-items thead th { text-align: center; }
+.apa-items td:nth-child(2) { white-space: normal; min-width: 220px; }
+.apa-group td, .apa-subtotal td, .apa-total td { font-weight: 600; }
+/* The tab's target / actual / advance or slippage table, and the boxes typed above the printed billing abstract. */
+.apa-standing { max-width: 520px; margin-bottom: 8px; }
+.apa-standing thead td { border: none; }
+.apa-standing tbody th { text-align: left; font-weight: 400; }
+.apa-next td:nth-child(2) { min-width: 200px; }
+.apa-next input { width: 110px; text-align: right; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.apa-next input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.apa-typed { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin-bottom: 8px; }
+.apa-typed .field { flex: 1 1 170px; }
+.apa-typed .field:first-child { flex-basis: 100%; }
+.print-note + .section { margin-bottom: 12px; }
 /* Photos: two across on a phone, more on wider screens; each opens full size. */
 /* ul only: the print form's table.photos must keep its table layout. */
 ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }

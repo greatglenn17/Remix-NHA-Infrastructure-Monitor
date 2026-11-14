@@ -395,19 +395,26 @@ test('project profile: orders listed under their headings, revised cost only aft
 });
 
 test('billing abstract: each line as quantity, amount and share before, in this billing and to date, with subtotals and the grand total', () => {
-  const project = { name: 'P', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12,
-    scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000 }, { name: 'Land Development', amount: 2000000 }, { name: 'Housing Units', amount: 7000000 }]) };
+  const project = { name: 'P', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12 };
+  // The uploaded abstract gives the part amounts; the billing of March 15 is after its As-of date, so it is not in "previous".
+  const abstract = { asOf: '2025-03-14', equivUnits: 100, rowsJson: JSON.stringify([{ kind: 'part', name: 'LAND ACQUISITION COST' }, { kind: 'subtotal', amount: 1000000, equiv: [1, 2, 3] },
+    { kind: 'part', name: 'LAND DEVELOPMENT' }, { kind: 'subtotal', amount: 2000000 }, { kind: 'part', name: 'HOUSING CONSTRUCTION' }, { kind: 'subtotal', amount: 7000000 }]) };
   const payments = [{ uuid: 'a', billingType: 'Land acquisition', grossAmount: 400000, date: '2025-02-01' }, { uuid: 'adv', billingType: '', grossAmount: 1500000, date: '2025-02-02' },
-    { uuid: 'b', billingType: 'Land development', grossAmount: 310000, date: '2025-03-01', periodCovered: 'February 1 - 28, 2025' }];
+    { uuid: 'late', billingType: 'Land development', grossAmount: 99, date: '2025-03-15' }];
   const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
-  const html = P.billingAbstractHtml({ project, docs: [], payments, payment: payments[2], units: 100, signatories });
+  const sheet = period => P.billingAbstractHtml({ project, docs: [], payments, abstract, period, units: 100, signatories });
+  const html = sheet({ covered: ' February 1 - 28, 2025 ', lots: 0, development: 310000, m1: 0, m2: 0 });
   const row = (...cells) => new RegExp(cells.map(c => `>${c.replace(/[.()%]/g, '\\$&')}</td>`).join('<td[^>]*'));
-  assert.match(html, /Period covered: February 1 - 28, 2025/);
+  assert.match(html, /<div class='period'>Period covered: February 1 - 28, 2025<\/div>/);
+  assert.match(sheet({ covered: ' ', lots: 0, development: 0, m1: 0, m2: 0 }), /<div class='period'>As of March 14, 2025<\/div>/); // no period typed
+  assert.ok(!/equivalent/i.test(html)); // the billing format has no equivalent-units columns
   // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
   assert.match(html, row('1', 'LAND ACQUISITION COST', '100', 'LOT', '10,000.00', '1,000,000.00', '40', '400,000.00', '40.00%', '0', '0.00', '0.00%', '40', '400,000.00', '40.00%', '60', '600,000.00'));
-  // Land development is billed by amount: 310,000 at 20,000 a lot is 15.5 lots.
+  // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
   assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%', '84.5', '1,690,000.00'));
   assert.match(html, row('3.1', 'MILESTONE 1 (80%)', '100', 'UNIT', '56,000.00', '5,600,000.00'));
+  // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
+  assert.match(sheet({ covered: '', lots: 0, development: 0, m1: 0, m2: 2 }), row('3.2', 'MILESTONE 2 (20%)', '100', 'UNIT', '14,000.00', '1,400,000.00', '0', '0.00', '0.00%', '2', '28,000.00', '2.00%'));
   assert.match(html, row('Subtotal (Housing Construction)', '', '', '70,000.00', '7,000,000.00'));
   // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
   assert.match(html, row('GRAND TOTAL', '', '', '100,000.00', '10,000,000.00', '', '400,000.00', '4.00%', '', '310,000.00', '3.10%', '', '710,000.00', '7.10%', '', '9,290,000.00'));
@@ -415,4 +422,78 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
   assert.match(html, /Approved by:/);
+});
+
+test('abstract of the actual work: the billing format\'s top with the tab\'s target, every row in the abstract\'s columns, then the signatures', () => {
+  const none = [null, null, null], blank = { qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] };
+  const project = { name: 'P & Q', location: 'Pandi', contractor: 'C', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12 };
+  const abstract = { asOf: '2025-03-14', overallPct: 10.73, equivUnits: 100, rowsJson: JSON.stringify([
+    { ...blank, kind: 'part', no: '2', name: 'LAND DEVELOPMENT' },
+    { ...blank, kind: 'group', no: '2.1', name: 'GENERAL <REQUIREMENTS>' },
+    { kind: 'item', no: '2.1.1', name: 'Mobilization/Demobilization', qty: 1, unit: 'l.s.', unitCost: 400000, amount: 400000, prev: [0, 0, 0], period: [0.25, 100000, 25], toDate: [0.25, 100000, 25], balance: [0.75, 300000], equiv: [0, 342.5, 1027.5] },
+    { ...blank, kind: 'item', no: '2.2.1', name: 'Road Excavation', qty: 1234.56789, unit: 'cu.m.', amount: 1600000, toDate: [null, 404000, 25.25] },
+    { ...blank, kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, toDate: [null, 504000, 25.21] },
+    { ...blank, kind: 'total', no: '', name: 'GRAND TOTAL', amount: 10000000, toDate: [null, 1074000, 10.73] },
+  ]) };
+  const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
+  const html = P.actualAbstractHtml({ project, docs: [], abstract, signatories, banner: 'b.png' });
+  const row = (...cells) => new RegExp(`${cells.map(c => `>${c.replace(/[.()%/]/g, '\\$&')}</td>`).join('<td[^>]*')}</tr>`);
+  assert.match(html, /^<img class='banner' src='b.png'/);
+  assert.match(html, /<h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT<\/h1>\s*<div class='period'>As of March 14, 2025<\/div>/);
+  assert.match(html, /PROJECT NAME<\/td><td class='pc'>:<\/td><td>P &amp; Q<\/td><td class='pl'>CONTRACT DURATION<\/td><td>: 360 C.D.<\/td>/);
+  // Without a bar chart the target is the project's stored one; the actual is the abstract's, not what was billed.
+  assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
+  assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
+  assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
+  // The header rows are a thead, so they repeat on every page of a long abstract.
+  assert.match(html, /<thead><tr><th rowspan='3'>ITEM NO\.<\/th>.*<th>QTY<\/th><th>AMOUNT<\/th><\/tr><\/thead>/s);
+  assert.ok(html.includes("<tr><td class='c'>2</td><td><b>LAND DEVELOPMENT</b></td>"));
+  assert.ok(html.includes("<td class='c'>2.1</td><td><b>GENERAL &lt;REQUIREMENTS&gt;</b></td>"));
+  // Every column of the row, ending at BALANCE: the equivalent units it carries are not shown.
+  assert.match(html, row('2.1.1', 'Mobilization/Demobilization', '1', 'l.s.', '400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%', '0.75', '300,000.00'));
+  assert.ok(!/equivalent/i.test(html));
+  // Empty cells stay blank; a quantity shows 4 decimals at most; subtotals and the grand total are bold rows.
+  assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', ''));
+  assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%', '', '').source}`));
+  assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
+});
+
+test('actual accomplishment tab: every pay item of an uploaded abstract in the sheet\'s columns, a part to a block, then the grand total', () => {
+  const none = [null, null, null];
+  const rows = [
+    { kind: 'part', no: '2', name: 'LAND DEVELOPMENT', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'group', no: '2.1', name: 'GENERAL <REQUIREMENTS>', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'item', no: '2.1.1', name: 'Mobilization/Demobilization', qty: 1, unit: 'l.s.', unitCost: 400000, amount: 400000, prev: [0, 0, 0], period: [0.25, 100000, 25], toDate: [0.25, 100000, 25], balance: [0.75, 300000], equiv: [0, 342.5, 1027.5] },
+    { kind: 'item', no: '2.2.1', name: 'Road Excavation', qty: 1234.56789, unit: 'cu.m.', unitCost: null, amount: 1600000, prev: none, period: none, toDate: [null, 404000, 25.25], balance: [null, null] },
+    { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', qty: null, unit: '', unitCost: null, amount: 2000000, prev: none, period: none, toDate: [null, 504000, 25.21], balance: [null, null] },
+    { kind: 'part', no: '3', name: 'HOUSING CONSTRUCTION', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'total', no: '', name: 'GRAND TOTAL', qty: null, unit: '', unitCost: null, amount: 9000000, prev: none, period: none, toDate: [null, 504000, 5.6], balance: [null, null] },
+  ];
+  const html = P.abstractItemsHtml(rows);
+  const cells = (...list) => list.map(c => `<td class="num">${c}</td>`).join('');
+  // A part heads its block with its own subtotal's amount and % to date; one without a subtotal shows zeros and no table.
+  assert.match(html, /<details class="card apa-part" open><summary>.*<b>2 LAND DEVELOPMENT<\/b>\s*<span class="num">2,000,000.00<\/span><span class="num">25.21%<\/span><\/summary><div class="scroll">/);
+  assert.match(html, /<b>3 HOUSING CONSTRUCTION<\/b>\s*<span class="num">0.00<\/span><span class="num">0.00%<\/span><\/summary><\/details>/);
+  assert.equal(html.match(/<details /g).length, 2);
+  assert.ok(html.includes('<tr class="apa-group"><td>2.1</td><td colspan="16">GENERAL &lt;REQUIREMENTS&gt;</td></tr>'));
+  assert.ok(html.includes(`<tr class="apa-item"><td>2.1.1</td><td>Mobilization/Demobilization</td>${cells('1')}<td>l.s.</td>${cells('400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%', '0.75', '300,000.00')}</tr>`));
+  // Empty cells stay blank; a quantity shows 4 decimals at most.
+  assert.ok(html.includes(`<tr class="apa-item"><td>2.2.1</td><td>Road Excavation</td>${cells('1,234.5679')}<td>cu.m.</td>${cells('', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', '')}</tr>`));
+  assert.ok(html.includes(`<tr class="apa-subtotal"><td></td><td>Subtotal (Land Development)</td>${cells('')}<td></td>${cells('', '2,000,000.00', '', '', '', '', '', '', '', '504,000.00', '25.21%', '', '')}</tr>`));
+  // The grand total comes last, after the parts.
+  assert.ok(html.lastIndexOf('<tr class="apa-total"><td></td><td>GRAND TOTAL</td>') > html.lastIndexOf('</details>'));
+  assert.equal(html.match(/<th colspan="3">TO DATE<\/th>/g).length, 2);
+  // The table ends at BALANCE: the sheet's equivalent-units columns are not shown, though the rows carry them.
+  assert.ok(rows.some(r => r.equiv?.some(v => v != null)));
+  assert.ok(!html.includes('EQUIVALENT'));
+  assert.ok(html.includes('<th>QTY</th><th>AMOUNT</th></tr></thead>'));
+  assert.equal(P.abstractItemsHtml([]), '');
+});
+
+test('a part that is its own pay item shows its quantity and figures under its heading', () => {
+  const none = [null, null, null];
+  const html = P.abstractItemsHtml([
+    { kind: 'part', no: '1', name: 'LAND ACQUISITION COST', qty: 520, unit: 'LOT', unitCost: 65250.5, amount: 33930260, prev: none, period: none, toDate: [420, 27405210, 80.77], balance: [100, 6525050], equiv: none },
+    { kind: 'subtotal', no: '', name: 'Subtotal (Land Acquisition Cost)', qty: null, unit: '', unitCost: null, amount: 33930260, prev: none, period: none, toDate: [null, 27405210, 80.77], balance: [null, null], equiv: none }]);
+  assert.match(html, /<tr class="apa-item"><td>1<\/td><td>LAND ACQUISITION COST<\/td><td class="num">520<\/td><td>LOT<\/td>/);
 });

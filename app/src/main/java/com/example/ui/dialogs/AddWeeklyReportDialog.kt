@@ -85,7 +85,9 @@ fun AddWeeklyReportDialog(
     // The project's orders, so a bar chart target skips Full suspensions.
     documents: List<com.example.data.model.PendingDocument> = emptyList(),
     // The project's saved reports: a new one starts from the latest week's actual.
-    reports: List<com.example.data.model.WeeklyReport> = emptyList()
+    reports: List<com.example.data.model.WeeklyReport> = emptyList(),
+    // The project's uploaded abstracts: a week that has one takes its Actual % from it.
+    abstracts: List<com.example.data.model.ProjectAbstract> = emptyList()
 ) {
     // Only new reports keep a draft; editing a saved report works as before.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -108,7 +110,7 @@ fun AddWeeklyReportDialog(
         )
         return
     }
-    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents, reports)
+    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents, reports, abstracts)
 }
 
 @Composable
@@ -121,7 +123,8 @@ private fun WeeklyReportForm(
     onSubmit: WeeklySubmit,
     today: java.time.LocalDate,
     documents: List<com.example.data.model.PendingDocument>,
-    reports: List<com.example.data.model.WeeklyReport>
+    reports: List<com.example.data.model.WeeklyReport>,
+    abstracts: List<com.example.data.model.ProjectAbstract>
 ) {
     // A draft fills the form the same way a saved report does when editing.
     val seed = existingReport ?: draft?.report
@@ -222,9 +225,15 @@ private fun WeeklyReportForm(
             ?.let { t -> com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 }) }
     }
     fun targetText(name: String) = chartTargets?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.first ?: "0.00"
+    // A week with an uploaded abstract (Actual Accomplishment tab) takes the three actuals from it, not typed; a line it has no part for is 0.
+    val weekAbstract = remember(reportingWeek, abstracts) { com.example.util.ProjectAbstracts.inWeek(abstracts, reportingWeek) }
+    val abstractActuals = remember(weekAbstract) {
+        weekAbstract?.let { com.example.data.model.ACCOMPLISHMENT_LINES.zip(com.example.util.ProjectAbstracts.lineActuals(it)).toMap() }
+    }
+    fun actualText(name: String) = abstractActuals?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.second ?: "0.00"
     val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
-    val overallActual by remember { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (accomplishmentMap[it.name]?.second?.toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
-    val overallVariance by remember { androidx.compose.runtime.derivedStateOf { overallActual - overallTarget } }
+    val overallActual by remember(abstractActuals) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (actualText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
+    val overallVariance = overallActual - overallTarget
     
     // When editing, start from the report's saved rows instead of blank defaults.
     var activityItems by remember {
@@ -306,33 +315,6 @@ private fun WeeklyReportForm(
         if (!geoTag) android.widget.Toast.makeText(context, "Location permission is needed to geo-tag photos", android.widget.Toast.LENGTH_LONG).show()
     }
 
-    // Fill from Abstract (Excel): the week of its "As of" date and the three lines' actual, for review before Save.
-    var abstractNote by remember { mutableStateOf("") }
-    val abstractPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        photoScope.launch {
-            val read = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching { context.contentResolver.openInputStream(uri)?.use { com.example.util.AbstractExcel.read(it) } }
-            }
-            val found = read.getOrNull()
-            abstractNote = when {
-                read.isFailure -> "That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx)."
-                found == null -> "No Abstract of Physical Accomplishment was found in that file."
-                found.billing -> "That is the billing abstract. Pick the abstract of the actual accomplishment."
-                else -> {
-                    if (existingReport == null && found.asOf != null) reportingWeek = WeekRange.containing(found.asOf)
-                    com.example.util.AbstractExcel.actuals(found.parts).forEach { (name, actual) ->
-                        if (scopeItems.any { it.name == name }) accomplishmentMap[name] = Pair(accomplishmentMap[name]?.first ?: "0.00", twoDecimals(actual))
-                    }
-                    val week = com.example.util.BlueBookForms.weekStart(reportingWeek)
-                    "Filled from the abstract" + found.asOf?.let { " as of ${com.example.util.ProjectSchedule.displayDate(it.toString())}" }.orEmpty() +
-                        found.overallPct?.let { " (its overall: ${twoDecimals(it)}%)" }.orEmpty() + ". Check the figures, then Save." +
-                        if (existingReport == null && reports.any { com.example.util.BlueBookForms.weekStart(it.reportingWeek) == week }) " This week already has a report: to change that one, cancel and use its Edit." else ""
-                }
-            }
-        }
-    }
-
     // Daily Weather State for 7 Days of the Week (24 Hours per Day)
     val daysOfWeek = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     val dailyHourlyWeather = remember {
@@ -379,7 +361,8 @@ private fun WeeklyReportForm(
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }
 
     var step by remember { mutableStateOf(WeeklyStep.WEEK) }
-    val errors = weeklyErrors(accomplishmentMap, scopeItems.map { it.name })
+    // The figures as the boxes show them: a typed one that the chart or the abstract replaced is not checked.
+    val errors = weeklyErrors(scopeItems.associate { it.name to Pair(targetText(it.name), actualText(it.name)) }, scopeItems.map { it.name })
     fun snapshot() = listOf(
         reportingWeek, accomplishmentMap.toMap(), activityItems, photoUrls.toList(), photoDetails.toMap(),
         dailyHourlyWeather.mapValues { it.value.toList() }, manpowerItems, equipmentItems, issuesItems
@@ -387,11 +370,12 @@ private fun WeeklyReportForm(
     val initial = remember { snapshot() }
     val current = snapshot()
     val dirty = current != initial || draft != null
-    fun accItemsJson() = JSONArray(scopeItems.map { item ->
-        val vals = accomplishmentMap[item.name] ?: Pair("0.00", "0.00")
+    // A saved report stores the Actual % the boxes show (the abstract's when the week has one). A draft keeps what was
+    // [typed] under them, so the boxes go back to it when the week is moved to one without an abstract, as on the website.
+    fun accItemsJson(typed: Boolean = false) = JSONArray(scopeItems.map { item ->
         JSONObject().put("itemDescription", item.name)
             .put("targetPct", targetText(item.name).toDoubleOrNull() ?: 0.0)
-            .put("actualPct", vals.second.toDoubleOrNull() ?: 0.0)
+            .put("actualPct", (if (typed) accomplishmentMap[item.name]?.second else actualText(item.name))?.toDoubleOrNull() ?: 0.0)
             .put("weightPct", item.weightPct)
     }).toString()
     // Saved or discarded: no more draft writes, even one already waiting.
@@ -407,7 +391,7 @@ private fun WeeklyReportForm(
                 targetAccomplishmentPct = overallTarget, actualAccomplishmentPct = overallActual,
                 manpowerJson = encodeManpowerList(manpowerItems), equipmentJson = encodeEquipmentList(equipmentItems),
                 activitiesJson = encodeActivitiesList(activityItems), issuesJson = encodeIssuesList(issuesItems),
-                accomplishmentItemsJson = accItemsJson(), documentsIssuedReceivedJson = "[]",
+                accomplishmentItemsJson = accItemsJson(typed = true), documentsIssuedReceivedJson = "[]",
                 attachedPhotoUrlsJson = JSONArray(photoUrls.toList()).toString(),
                 photoDetailsJson = com.example.data.files.PhotoDetails.toJson(photoDetails.filterKeys { it in photoUrls }),
                 submittedByStaff = ""
@@ -506,14 +490,8 @@ private fun WeeklyReportForm(
                     "Target % is from the approved bar chart as of ${com.example.util.ProjectSchedule.displayDate(chartAsOf.orEmpty())}.",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
-                
-                OutlinedButton(
-                    onClick = { abstractPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth().testTag("fill_from_abstract")
-                ) { Text("Fill from Abstract (Excel)") }
-                if (abstractNote.isNotBlank()) Text(
-                    abstractNote,
+                if (weekAbstract != null) Text(
+                    "Actual % is from the abstract as of ${com.example.util.ProjectSchedule.displayDate(weekAbstract.asOf)} (Actual Accomplishment tab).",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                     modifier = Modifier.testTag("abstract_note")
                 )
@@ -549,16 +527,17 @@ private fun WeeklyReportForm(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         OutlinedTextField(
-                            value = vals.second,
+                            value = actualText(item.name),
                             onValueChange = { accomplishmentMap[item.name] = Pair(vals.first, it) },
-                            modifier = Modifier.weight(1f),
-                            isError = FormValidation.percentError(vals.second) != null,
-                            supportingText = FormValidation.percentError(vals.second)?.let { { Text(it) } },
+                            modifier = Modifier.weight(1f).testTag("weekly_actual_${item.name}"),
+                            readOnly = abstractActuals != null,
+                            isError = FormValidation.percentError(actualText(item.name)) != null,
+                            supportingText = FormValidation.percentError(actualText(item.name))?.let { { Text(it) } },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
                         val targetVal = targetText(item.name).toDoubleOrNull() ?: 0.0
-                        val actualVal = vals.second.toDoubleOrNull() ?: 0.0
+                        val actualVal = actualText(item.name).toDoubleOrNull() ?: 0.0
                         val variance = actualVal - targetVal
                         val varColor = varianceColor(variance, LocalNHAColors.current)
                         Text(

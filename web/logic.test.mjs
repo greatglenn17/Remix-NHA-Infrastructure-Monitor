@@ -687,6 +687,9 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   // A report for a later week is already saved: this late entry leaves the project's figures alone.
   assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }]).projectFields, null);
   assert.notEqual(L.newWeeklyReport(f, project, 'x', [{ uuid: 'older', reportingWeek: 'Week 6: February 7 - February 13, 2026' }]).projectFields, null);
+  // The project has an uploaded abstract: its actual is the abstract's, so only the target follows the report.
+  assert.deepEqual(L.newWeeklyReport(f, project, 'x', [], [{ asOf: '2026-01-30' }]).projectFields, { targetAccomplishment: data.targetAccomplishmentPct });
+  assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }], [{ asOf: '2026-01-30' }]).projectFields, null);
   // No dates on the project: day counts are 0, as on the phone.
   assert.deepEqual((({ daysElapsed, remainingDays }) => [daysElapsed, remainingDays])(JSON.parse(L.newWeeklyReport(f, {}, 'x').build({}).data)), [0, 0]);
 });
@@ -737,6 +740,7 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   const others = [report, { uuid: 'r2', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }];
   assert.equal(L.editedWeeklyReport(report, f, project, others).projectFields, null);
   assert.deepEqual(L.editedWeeklyReport(report, f, project, [report]).projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5 });
+  assert.deepEqual(L.editedWeeklyReport(report, f, project, [report], [{ asOf: '2026-01-30' }]).projectFields, { targetAccomplishment: 20 });
   assert.notEqual(L.editedWeeklyReport(report, { ...f, first: '2026-02-28' }, project, others).projectFields, null);
 
   assert.deepEqual(L.deletedWeeklyAudit(report), { actionType: 'Deleted Weekly Report', details: 'Deleted report for Week 7: February 14 - February 20, 2026' });
@@ -1306,7 +1310,98 @@ test('find lots: the closed outlines of a plan page become lots, numbered and na
   assert.deepEqual([drawn, old, started].map(L.foundLot), [false, true, true]);
 });
 
-test('abstracts: what is billed never passes the actual, and the billing abstract is made from the billings', () => {
+// A made-up abstract's rows as the record keeps them: three parts at 50, 25.21 and 1, overall 10.73.
+const ABSTRACT_ROWS = [
+  { kind: 'part', no: '1', name: 'LAND ACQUISITION COST', amount: 1000000, toDate: [null, 500000, 50] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Land Acquisition Cost)', amount: 1000000, toDate: [null, 500000, 50] },
+  { kind: 'part', no: '2', name: 'LAND DEVELOPMENT', amount: null, toDate: [null, null, null] },
+  { kind: 'group', no: '2.2', name: 'ROADWORKS', amount: null, toDate: [null, null, null] },
+  { kind: 'item', no: '2.2.1', name: 'Road Excavation', amount: 1600000, toDate: [null, 404000, 25.25] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Roadworks)', amount: 1600000, period: [null, 80000, 5], toDate: [null, 404000, 25.25] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, period: [null, 104000, 5.2], toDate: [null, 504000, 25.21] },
+  { kind: 'part', no: '3', name: 'HOUSING CONSTRUCTION', amount: null, toDate: [null, null, null] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Housing Construction)', amount: 7000000, toDate: [null, 70000, 1] },
+  { kind: 'total', no: '', name: 'GRAND TOTAL', amount: 10000000, toDate: [null, 1074000, 10.73] },
+];
+
+test('uploaded abstracts: the record, the latest and a week\'s, the project\'s actual, and the words shown', () => {
+  const parts = [{ name: 'LAND ACQUISITION COST', amount: 1000000, actualPct: 50 }, { name: 'LAND DEVELOPMENT', amount: 2000000, actualPct: 25.21 }, { name: 'HOUSING CONSTRUCTION', amount: 7000000, actualPct: 1 }];
+  assert.deepEqual(L.abstractRows(JSON.stringify(ABSTRACT_ROWS)), ABSTRACT_ROWS);
+  assert.deepEqual([L.abstractRows('not json'), L.abstractRows(''), L.abstractRows('{"a":1}'), L.abstractRows('[null,1]')], [[], [], [], []]);
+  assert.deepEqual(L.abstractParts(ABSTRACT_ROWS), parts);
+  assert.deepEqual(L.abstractParts([{ kind: 'subtotal', amount: 5 }, { kind: 'part', name: 'A' }]), [{ name: 'A', amount: 0, actualPct: 0 }]);
+
+  const found = { asOf: '2025-03-14', parts, overallPct: 10.73, billing: false, equivUnits: 100, rows: ABSTRACT_ROWS };
+  const fields = L.abstractFields(found, 'APA March.xlsx', 'Engr. Web');
+  assert.deepEqual(fields, { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS), fileName: 'APA March.xlsx', uploadedBy: 'Engr. Web', equivUnits: 100 });
+  assert.equal(L.abstractFields({ ...found, equivUnits: undefined }, '', '').equivUnits, 0); // a sheet without the equivalent-units columns
+  // No grand total on the sheet: the parts by their amounts; no file name or uploader is '' (the columns are NOT NULL on the phone).
+  assert.deepEqual((({ overallPct, fileName, uploadedBy }) => [overallPct, fileName, uploadedBy])(L.abstractFields({ ...found, overallPct: null }, undefined, null)), [10.74, '', '']);
+  assert.equal(L.abstractFields({ ...found, overallPct: null, parts: [] }, '', '').overallPct, 0);
+  const record = L.newAbstractRecord({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'me', now: 5 }, fields);
+  assert.deepEqual(record, { uuid: 'u1', type: 'project_abstracts', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 5, updatedByUid: 'me', isDeleted: false, data: JSON.stringify(fields) });
+  assert.deepEqual(Object.keys(JSON.parse(record.data)), ['asOf', 'overallPct', 'rowsJson', 'fileName', 'uploadedBy', 'equivUnits']);
+
+  const feb = { uuid: 'feb', asOf: '2025-02-28', overallPct: 8, updatedAt: 9 }, mar = { uuid: 'mar', asOf: '2025-03-14', overallPct: 10.73, updatedAt: 2 };
+  const again = { uuid: 'again', asOf: '2025-03-14', overallPct: 11, updatedAt: 3 };
+  assert.equal(L.latestAbstract([mar, feb]).uuid, 'mar');
+  assert.equal(L.latestAbstract([again, mar, feb]).uuid, 'again'); // two devices filed the same date: the last saved
+  assert.equal(L.latestAbstract([mar, again]).uuid, 'again');
+  assert.equal(L.latestAbstract([]), undefined);
+  assert.equal(L.abstractInWeek([feb, mar], 'Mar 8, 2025 - Mar 14, 2025').uuid, 'mar');
+  assert.equal(L.abstractInWeek([feb, mar, again], 'Week 11: March 8 - March 14, 2025').uuid, 'again');
+  assert.equal(L.abstractInWeek([feb, mar], 'Mar 15, 2025 - Mar 21, 2025'), null);
+  assert.equal(L.abstractInWeek([feb, mar], 'no dates'), null);
+  assert.deepEqual(L.abstractLineActuals(fields), ['50.00', '25.21', '1.00']);
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }), ['0.00', '25.21', '0.00']);
+  // Two parts of one line averaged to 25.215 (stored just under it) read 25.21 on both sides; an overrun part reads 100.
+  const sub = (amount, pct) => ({ kind: 'subtotal', no: '', name: 'Subtotal', amount, toDate: [null, null, pct] });
+  const tie = [{ kind: 'part', no: '2', name: 'LAND DEVELOPMENT' }, sub(300000, 25.21), { kind: 'part', no: '4', name: 'SITE GRADING' }, sub(100000, 25.23)];
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(tie) }), ['0.00', '25.21', '0.00']);
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify([tie[0], sub(1000, 100.5)]) }), ['0.00', '100.00', '0.00']);
+  assert.equal(L.abstractAudit(fields, mar).oldValue, ''); // replaced by a file of the same overall
+
+  // The project's actual: the latest abstract's overall, else the latest weekly report's, else as it is.
+  const weekly = [{ reportingWeek: 'Mar 1, 2025 - Mar 7, 2025', actualAccomplishmentPct: 9 }, { reportingWeek: 'Mar 8, 2025 - Mar 14, 2025', actualAccomplishmentPct: 10.5 }];
+  assert.equal(L.projectActualAfter([feb, mar], weekly, 3), 10.73);
+  assert.equal(L.projectActualAfter([], weekly, 3), 10.5);
+  assert.equal(L.projectActualAfter([], [], 3), 3);
+
+  assert.equal(L.abstractProblem(undefined), 'That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx).');
+  assert.equal(L.abstractProblem(null), 'No Abstract of Physical Accomplishment was found in that file.');
+  assert.equal(L.abstractProblem({ ...found, billing: true }), 'That is the billing abstract. Pick the abstract of the actual accomplishment.');
+  assert.equal(L.abstractProblem({ ...found, asOf: null }), 'That abstract has no "As of" date, so it cannot be filed. Check the line under its title.');
+  assert.equal(L.abstractProblem(found), '');
+  assert.equal(L.abstractSavedNote(fields, false), 'Saved the abstract as of Mar 14, 2025: overall 10.73%.');
+  assert.equal(L.abstractSavedNote({ ...fields, overallPct: 11 }, true), 'Replaced the abstract as of Mar 14, 2025: overall 11.00%.');
+  assert.equal(L.abstractWeekNote(mar), 'Actual % is from the abstract as of Mar 14, 2025 (Actual Accomplishment tab).');
+  assert.deepEqual(L.abstractAudit(fields), { actionType: 'Abstract Upload', details: 'Abstract as of Mar 14, 2025: overall 10.73%', oldValue: '', newValue: '10.73%' });
+  assert.deepEqual(L.abstractAudit({ ...fields, overallPct: 11 }, mar), { actionType: 'Updated abstract', details: 'Abstract as of Mar 14, 2025: overall 11.00%', oldValue: '10.73%', newValue: '11.00%' });
+  assert.deepEqual(L.deletedAbstractAudit(mar), { actionType: 'Deleted abstract', details: 'Abstract as of Mar 14, 2025: overall 10.73%', oldValue: '10.73%', newValue: '' });
+});
+
+test('uploaded abstracts: target, actual and advance/slippage of the three lines and overall', () => {
+  const abstract = { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS) };
+  // The approved bar chart on March 14, 2025 (contract day 73): roads 73% planned, housing 23%, overall 53%; it has no land acquisition.
+  const project = { dateStarted: '2025-01-01', targetAccomplishment: 12,
+    barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) };
+  assert.deepEqual(L.abstractStanding(project, [], abstract), [
+    { name: 'Land Acquisition', target: 0, actual: 50, diff: 50 },
+    { name: 'Land Development', target: 73, actual: 25.21, diff: -47.79 },
+    { name: 'Housing Construction', target: 23, actual: 1, diff: -22 },
+    { name: 'Overall', target: 53, actual: 10.73, diff: -42.27 },
+  ]);
+  // Without a chart a line has no target; the overall target is the project's stored one.
+  assert.deepEqual(L.abstractStanding({ targetAccomplishment: 12 }, [], abstract), [
+    { name: 'Land Acquisition', target: null, actual: 50, diff: null },
+    { name: 'Land Development', target: null, actual: 25.21, diff: null },
+    { name: 'Housing Construction', target: null, actual: 1, diff: null },
+    { name: 'Overall', target: 12, actual: 10.73, diff: -1.27 },
+  ]);
+  assert.deepEqual([4.66, -7.58, 0, -0, null].map(L.standingDiffText), ['+4.66%', '-7.58%', '0.00%', '0.00%', '-']);
+});
+
+test('abstracts: what is billed never passes the actual, and the billing abstract is made from the uploaded abstract', () => {
   const project = { scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000, weightPct: 10 }, { name: 'Land Development', amount: 2000000, weightPct: 20 },
     { name: 'Construction of Housing Units', amount: 7000000, weightPct: 70 }]), targetAccomplishment: 12, actualAccomplishment: 10.74, numberOfUnits: '100 units' };
   const lines = (a, b, c) => JSON.stringify([['Land Acquisition', a, 10], ['Land Development', b, 20], ['Housing Construction', c, 70]].map(([itemDescription, actualPct, weightPct]) => ({ itemDescription, targetPct: 0, actualPct, weightPct })));
@@ -1344,22 +1439,131 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   // An old billing saved as lots x price: its gross at 2 decimals parses a hair above the saved one, which is not a raise.
   assert.deepEqual(ahead({ ...form, grossAmount: '35219729.88' }, { ...payments[2], grossAmount: 81 * 434811.48 }, []), []);
 
+  // With an uploaded abstract the actual is the latest abstract's, whatever the weekly reports say.
+  const uploaded = { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS) };
+  const byAbstract = (f, a = uploaded, w = []) => L.billingAheadErrors(project, [], payments, w, f, null, [a]);
+  const acquisition = { ...form, billingType: 'Land acquisition', units: '1', unitPrice: '100000' };
+  assert.deepEqual(byAbstract(form), []);
+  assert.deepEqual(byAbstract({ ...form, grossAmount: '204,400' }), ['Land Development: billed to date 25.22% would pass the actual 25.21% of the abstract as of Mar 14, 2025.']);
+  assert.deepEqual(byAbstract(acquisition, { ...uploaded, overallPct: 7.5 }), ['Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025.']);
+  // The weekly reports say 10.74% overall and would let this one through: the abstract wins.
+  assert.deepEqual(ahead(acquisition), []);
+  assert.deepEqual(byAbstract(acquisition, { ...uploaded, overallPct: 7.5 }, weekly), ['Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025.']);
+  // A line the abstract has no part for has no work done.
+  assert.deepEqual(byAbstract({ ...form, grossAmount: '1' }, { ...uploaded, rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(0, 2)) }),
+    ['Land Development: billed to date 15.00% would pass the actual 0.00% of the abstract as of Mar 14, 2025.']);
+
   assert.equal(L.abstractUnits(project), 100);
   assert.equal(L.abstractUnits({ numberOfUnits: '' }, 42), 42);
   assert.equal(L.abstractUnits({}), 1);
-  const abstract = L.billingAbstract(project, [], [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }], payments[2]);
-  assert.equal(abstract.targetPct, 12);
+
+  // The billing abstract is printed from the uploaded abstract: its own part amounts, and its this-period amounts to start from.
+  assert.deepEqual(L.abstractLineAmounts(uploaded), [1000000, 2000000, 7000000]);
+  assert.deepEqual(L.abstractPeriodAmounts(uploaded), [0, 104000, 0]); // a part's own subtotal, not its groups'
+  assert.deepEqual([L.abstractLineAmounts({ rowsJson: '' }), L.abstractPeriodAmounts({ rowsJson: '' })], [[0, 0, 0], [0, 0, 0]]);
+  // Previous: the saved billings dated on or before the As-of date (March 14); the one of April 1 is not in it, the one of the day is.
+  const saved = [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }, { uuid: 'd', billingType: 'M1 - Housing unit', grossAmount: 56000, date: ' 2025-03-14 ' },
+    { uuid: 'e', billingType: 'Land development', grossAmount: 9, date: '' }];
+  // Typed for this billing: 5 lots, the abstract's 104,000 of land development, 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
+  const period = { covered: 'March 1 - 14, 2025', lots: 5, development: L.abstractPeriodAmounts(uploaded)[1], m1: 2, m2: 1 };
+  const abstract = L.billingAbstract(project, [], saved, uploaded, period, 100);
+  assert.equal(abstract.targetPct, 12); // no bar chart: the project's stored target
   assert.deepEqual(abstract.parts.map(p => [p.name, p.heading]), [['Land Acquisition Cost', undefined], ['Land Development', undefined], ['Housing Construction', ['3', 'HOUSING CONSTRUCTION']]]);
   assert.deepEqual(abstract.parts.flatMap(p => p.lines), [
-    { no: '1', name: 'LAND ACQUISITION COST', unit: 'LOT', type: 'Land acquisition', amount: 1000000, previous: 400000, thisPeriod: 0 },
-    { no: '2', name: 'LAND DEVELOPMENT', unit: 'LOT', type: 'Land development', amount: 2000000, previous: 0, thisPeriod: 300000 },
-    { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 0, thisPeriod: 0 },
-    { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 0 },
+    { no: '1', name: 'LAND ACQUISITION COST', unit: 'LOT', type: 'Land acquisition', amount: 1000000, previous: 400000, thisPeriod: 50000 },
+    { no: '2', name: 'LAND DEVELOPMENT', unit: 'LOT', type: 'Land development', amount: 2000000, previous: 300000, thisPeriod: 104000 },
+    { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 56000, thisPeriod: 112000 },
+    { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 14000 },
   ]);
-  // Billings of the same date go by uuid, on the site and the phone alike, whatever order the list is in.
-  const same = [{ uuid: 'y', billingType: 'Land development', grossAmount: 5, date: '2025-03-01' }, { uuid: 'x', billingType: 'Land development', grossAmount: 7, date: '2025-03-01' }];
-  assert.equal(L.billingAbstract(project, [], same, same[0]).parts[1].lines[0].previous, 7);
-  assert.equal(L.billingAbstract(project, [], same, same[1]).parts[1].lines[0].previous, 0);
-  // A project without housing has no housing lines.
-  assert.deepEqual(L.billingAbstract({ scopeOfWork: JSON.stringify([{ name: 'Land Development', amount: 500, weightPct: 100 }]) }, [], payments, payments[2]).parts.map(p => p.name), ['Land Development']);
+  // A blank, unreadable or negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
+  assert.deepEqual(L.billingAbstract(project, [], [], uploaded, { covered: '', lots: 1, development: -5, m1: 'x', m2: '' }, 3).parts.flatMap(p => p.lines.map(l => l.thisPeriod)), [333333.33, 0, 0, 0]);
+  // The target is the bar chart's plan on the As-of date when the project has one.
+  assert.equal(L.billingAbstract({ dateStarted: '2025-01-01', targetAccomplishment: 12, barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) },
+    [], [], uploaded, period, 100).targetPct, 53);
+  // An abstract without housing has no housing lines.
+  assert.deepEqual(L.billingAbstract(project, [], payments, { ...uploaded, rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }, period, 100).parts.map(p => p.name), ['Land Development']);
+});
+
+// A made-up project: Land Acquisition is a part that is its own pay line; group subtotals carry no % on the sheet.
+const NEXT_ROWS = (() => {
+  const none = [null, null, null];
+  const line = (kind, no, name, qty, unit, unitCost, toDate) => ({ kind, no, name, qty, unit, unitCost, amount: Math.round(qty * unitCost * 100) / 100,
+    prev: [0, 0, 0], period: [null, 0, 0], toDate, balance: [0, 0], equiv: [0, 0, 0] });
+  const head = (kind, no, name) => ({ kind, no, name, qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null], equiv: none });
+  const sum = (kind, name, amount, done, pct, shown) => ({ ...head(kind, '', name), amount, prev: [null, 0, shown ? 0 : null], period: [null, 0, shown ? 0 : null], toDate: [null, done, pct] });
+  return [
+    line('part', '1', 'LAND ACQUISITION COST', 520, 'LOT', 65250.5, [420, 27405210, 80.77]),
+    sum('subtotal', 'Subtotal (Land Acquisition Cost)', 33930260, 27405210, 80.77, true),
+    head('part', '2', 'LAND DEVELOPMENT'),
+    head('group', '2.1', 'GENERAL REQUIREMENTS'),
+    line('item', '2.1.1', 'Mobilization/Demobilization', 1, 'LOT', 2150000.75, [0.6, 1290000.45, 60]),
+    line('item', '2.1.2', 'Permits & Licences', 1, 'P.S.', 350000, [1, 350000, 100]),
+    sum('subtotal', 'Subtotal (General Requirements)', 2500000.75, 1640000.45, 65.6, false),
+    head('group', '2.2', 'DRAINAGE WORKS'),
+    line('item', '2.2.1', 'Catch basin', 96, 'unit', 18500, [36, 666000, 37.5]),
+    sum('subtotal', 'Subtotal (Drainage Works)', 1776000, 666000, 37.5, false),
+    sum('subtotal', 'Subtotal (Land Development)', 4276000.75, 2306000.45, 53.93, true),
+    sum('total', 'GRAND TOTAL', 38206260.75, 29711210.45, 77.77, true),
+  ];
+})();
+
+test('the next abstract is made from the one before it: previous is its to date, the typed quantity gives the rest', () => {
+  assert.deepEqual([...L.abstractCover(NEXT_ROWS)], [[1, [0]], [6, [4, 5]], [9, [8]], [10, [4, 5, 8]], [11, [0, 4, 5, 8]]]);
+  const next = L.nextAbstractRows(NEXT_ROWS, { 0: 20, 4: 0.25, 8: 10.5 }, 520);
+  const of = i => (({ prev, period, toDate, balance, equiv }) => ({ prev, period, toDate, balance, equiv }))(next[i]);
+  assert.deepEqual(of(0), { prev: [420, 27405210, 80.77], period: [20, 1305010, 3.85], toDate: [440, 28710220, 84.62], balance: [80, 5220040], equiv: [420, 440, 80] });
+  assert.deepEqual(of(1), { prev: [null, 27405210, 80.77], period: [null, 1305010, 3.85], toDate: [null, 28710220, 84.62], balance: [null, null], equiv: [null, null, null] });
+  assert.deepEqual(of(4), { prev: [0.6, 1290000.45, 60], period: [0.25, 537500.19, 25], toDate: [0.85, 1827500.64, 85], balance: [0.15, 322500.11], equiv: [312, 442, 78] });
+  assert.deepEqual(of(5), { prev: [1, 350000, 100], period: [null, 0, 0], toDate: [1, 350000, 100], balance: [0, 0], equiv: [520, 520, 0] }); // nothing typed: no work this period
+  assert.deepEqual(of(6), { prev: [null, 1640000.45, null], period: [null, 537500.19, null], toDate: [null, 2177500.64, 87.1], balance: [null, null], equiv: [null, null, null] });
+  assert.deepEqual(of(8), { prev: [36, 666000, 37.5], period: [10.5, 194250, 10.94], toDate: [46.5, 860250, 48.44], balance: [49.5, 915750], equiv: [195, 251.88, 268.12] });
+  assert.deepEqual(of(10).period, [null, 731750.19, 17.11]);
+  assert.deepEqual(of(10).toDate, [null, 3037750.64, 71.04]);
+  assert.deepEqual(of(11), { prev: [null, 29711210.45, 77.77], period: [null, 2036760.19, 5.33], toDate: [null, 31747970.64, 83.1], balance: [null, null], equiv: [null, null, null] });
+  // What is copied from the project's abstract stays as it is: the works, quantities, units, unit costs and amounts.
+  assert.deepEqual(next.map(r => [r.kind, r.no, r.name, r.qty, r.unit, r.unitCost, r.amount]), NEXT_ROWS.map(r => [r.kind, r.no, r.name, r.qty, r.unit, r.unitCost, r.amount]));
+  assert.deepEqual(L.nextAbstractRows(NEXT_ROWS, {})[0].equiv, [null, null, null]); // a sheet without the equivalent-units columns
+  // The one after it continues from these rows.
+  assert.deepEqual(L.nextAbstractRows(next, { 0: 80 }, 520)[0].toDate, [520, 33930260, 100]);
+
+  const source = { asOf: '2026-11-13', rowsJson: JSON.stringify(NEXT_ROWS), equivUnits: 520, updatedAt: 1 };
+  assert.deepEqual(L.nextAbstractFields(source, next, '2026-11-20', 'Engr. Web'),
+    { asOf: '2026-11-20', overallPct: 83.1, rowsJson: JSON.stringify(next), fileName: '', uploadedBy: 'Engr. Web', equivUnits: 520 });
+  assert.equal(L.abstractAudit(L.nextAbstractFields(source, next, '2026-11-20', '')).actionType, 'New abstract');
+
+  assert.deepEqual(L.nextAbstractErrors(NEXT_ROWS, { 0: 20, 4: 0.25 }), []);
+  assert.deepEqual(L.nextAbstractErrors(NEXT_ROWS, { 0: 101, 4: -0.7, 5: NaN, 8: 60 }), [
+    '1 LAND ACQUISITION COST: to date 521 would pass the quantity 520.', '2.1.1 Mobilization/Demobilization: to date would go below zero.',
+    '2.1.2 Permits & Licences: this period must be a number.']);
+  assert.deepEqual(L.nextAbstractErrors(NEXT_ROWS, { 8: 60.5 }), ['2.2.1 Catch basin: to date 96.5 would pass the quantity 96.']);
+  // A line already over its quantity is carried; only more work on it is refused.
+  const over = NEXT_ROWS.map((r, i) => (i === 8 ? { ...r, toDate: [97, 1794500, 101.04] } : r));
+  assert.deepEqual(L.nextAbstractErrors(over, {}), []);
+  assert.deepEqual(L.nextAbstractErrors(over, { 8: -1 }), []);
+  assert.deepEqual(L.nextAbstractErrors(over, { 8: 1 }), ['2.2.1 Catch basin: to date 98 would pass the quantity 96.']);
+  // A line done a third at a time ends at 100.00: its to date % is its to date amount over its amount.
+  const third = [{ ...NEXT_ROWS[8], qty: 3, unitCost: 1000, amount: 3000, toDate: [0, 0, 0] }, { ...NEXT_ROWS[11], amount: 3000, toDate: [null, 0, 0] }];
+  const thrice = [1, 2, 3].reduce(rows => L.nextAbstractRows(rows, { 0: 1 }), third);
+  assert.deepEqual([thrice[0].toDate, thrice[0].balance, thrice[1].toDate], [[3, 3000, 100], [0, 0], [null, 3000, 100]]);
+});
+
+test('the next abstract continues the latest one dated before it', () => {
+  const first = { uuid: 'a', asOf: '2026-11-13', rowsJson: JSON.stringify(NEXT_ROWS), equivUnits: 520, updatedAt: 1 };
+  const second = { uuid: 'b', asOf: '2026-11-20', rowsJson: JSON.stringify(L.nextAbstractRows(NEXT_ROWS, { 0: 20, 8: 10.5 }, 520)), equivUnits: 520, updatedAt: 2 };
+  assert.deepEqual(L.nextAbstractSource([first], '2026-11-20'), { source: first, same: null, error: '' });
+  assert.equal(L.nextAbstractSource([first], '').error, 'Pick the "As of" date.');
+  assert.equal(L.nextAbstractSource([first], '2026-11-13').error, "The date must be after Nov 13, 2026, the first abstract's.");
+  assert.equal(L.nextAbstractSource([first, second], '2026-11-19').error, "The date must not be before the latest abstract's, Nov 20, 2026.");
+  // The latest date again: it is made again from the one before it, starting from what was typed for it.
+  assert.deepEqual(L.nextAbstractSource([first, second], '2026-11-20'), { source: first, same: second, error: '' });
+  assert.deepEqual(L.nextAbstractTyped(NEXT_ROWS, second), { 0: 20, 8: 10.5 });
+  assert.deepEqual(L.nextAbstractTyped(NEXT_ROWS, null), {});
+  assert.deepEqual(L.nextAbstractTyped(NEXT_ROWS.slice(1), second), {}); // other rows: nothing is carried
+  assert.equal(L.nextAbstractSource([first, second], '2026-11-27').source, second);
+  // Subtotals that do not add up from the items cannot be continued.
+  const off = { ...first, rowsJson: JSON.stringify(NEXT_ROWS.map((r, i) => (i === 9 ? { ...r, amount: 1800000 } : r))) };
+  assert.equal(L.nextAbstractSource([off], '2026-11-20').error,
+    '"Subtotal (Drainage Works)" does not add up from its items in the abstract as of Nov 13, 2026, so the next one cannot be made from it. Upload the next abstract instead.');
+  assert.equal(L.nextAbstractProblem({ ...first, rowsJson: JSON.stringify(NEXT_ROWS.slice(0, 10)) }),
+    'There are no pay items with a grand total in the abstract as of Nov 13, 2026, so the next one cannot be made from it. Upload the next abstract instead.');
 });

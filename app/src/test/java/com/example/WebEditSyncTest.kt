@@ -256,6 +256,44 @@ class WebEditSyncTest {
         assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
     }
 
+    /** web/logic.js newAbstractRecord: an abstract uploaded on the website (Actual Accomplishment tab), with JSON's whole numbers. */
+    @Test
+    fun websiteNewAbstract_isAddedToTheProject() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 10_000_000.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2025-01-06", completionDateOriginal = "2025-12-31", completionDateRevised = "2025-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val projectId = db.projectDao().insertProject(project)
+        sql.execSQL("UPDATE sync_outbox SET state = 'SYNCED'")
+        val rows = """[{"kind":"part","no":"2","name":"LAND DEVELOPMENT","qty":null,"unit":"","unitCost":null,"amount":null,""" +
+            """"prev":[null,null,null],"period":[null,null,null],"toDate":[null,null,null],"balance":[null,null]},""" +
+            """{"kind":"item","no":"2.1.1","name":"Mobilization/Demobilization","qty":1,"unit":"l.s.","unitCost":400000,"amount":400000,""" +
+            """"prev":[0,0,0],"period":[0.25,100000,25],"toDate":[0.25,100000,25],"balance":[0.75,300000]},""" +
+            """{"kind":"subtotal","no":"","name":"Subtotal (Land Development)","qty":null,"unit":"","unitCost":null,"amount":2000000,""" +
+            """"prev":[null,null,null],"period":[null,null,null],"toDate":[null,504000,25.21],"balance":[null,null]}]"""
+        val abstract = mapOf(
+            "uuid" to "5d2f8b1a-6c3e-4a7d-9b0f-1e2d3c4b5a69", "type" to "project_abstracts", "projectUuid" to project.projectUuid,
+            "assignedUids" to listOf("web"), "revision" to 1L, "updatedAt" to 1_794_292_093_231L, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to JSONObject().put("asOf", "2025-03-14").put("overallPct", 5).put("rowsJson", rows)
+                .put("fileName", "abstract.xlsx").put("uploadedBy", "Engr. Web").toString()
+        )
+
+        recordSync.applyRemote(listOf(abstract))
+
+        val saved = db.projectDao().getProjectAbstractsForProject(projectId).first().single()
+        assertEquals("2025-03-14", saved.asOf)
+        assertEquals(5.0, saved.overallPct, 0.0)
+        assertEquals("abstract.xlsx", saved.fileName)
+        assertEquals("Engr. Web", saved.uploadedBy)
+        assertEquals(0.0, saved.equivUnits, 0.0) // a record from before the column, or one the website made without it
+        assertEquals("5d2f8b1a-6c3e-4a7d-9b0f-1e2d3c4b5a69", saved.uuid)
+        assertEquals(listOf(0.0, 25.21, 0.0), com.example.util.ProjectAbstracts.lineActuals(saved))
+        assertEquals(listOf(0.25, 100000.0, 25.0), com.example.util.ProjectAbstracts.rows(saved.rowsJson)[1].period)
+        assertEquals("nothing goes back up", 0L, long("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'"))
+    }
+
     /** web/app.js editOrder: an order approved on the website (revision up by one), then deleted there. */
     @Test
     fun websiteOrderApproval_thenDelete_reachThePhone() = runBlocking {

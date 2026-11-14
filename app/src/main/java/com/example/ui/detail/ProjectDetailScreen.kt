@@ -70,6 +70,7 @@ fun ProjectDetailScreen(
     val pendingDocuments by viewModel.pendingDocuments.collectAsState()
     val developerRequests by viewModel.developerRequests.collectAsState()
     val contractorLetters by viewModel.contractorLetters.collectAsState()
+    val projectAbstracts by viewModel.projectAbstracts.collectAsState()
     val weeklyReports by viewModel.weeklyReports.collectAsState()
     val monthlyReports by viewModel.monthlyReports.collectAsState()
     val projectIssues by viewModel.projectIssues.collectAsState()
@@ -211,17 +212,7 @@ fun ProjectDetailScreen(
                 }
             }
 
-            // Four fixed sections; no sideways scrolling.
-            TabRow(selectedTabIndex = section.ordinal, containerColor = MaterialTheme.colorScheme.surface) {
-                ProjectSection.entries.forEach { s ->
-                    Tab(
-                        selected = s == section,
-                        onClick = { viewModel.setSection(s) },
-                        text = { Text(s.label, style = MaterialTheme.typography.labelLarge) },
-                        modifier = Modifier.testTag("detail_tab_${s.ordinal}")
-                    )
-                }
-            }
+            ProjectSectionTabs(section, viewModel::setSection)
 
             Box(modifier = Modifier.weight(1f).nestedScroll(collapseOnScroll)) {
                 AnimatedContent(section, Modifier.fillMaxSize(), transitionSpec = { Motion.fadeThrough() }, label = "section") { section ->
@@ -431,6 +422,33 @@ fun ProjectDetailScreen(
                             }
                         }
                     }
+                    ProjectSection.ACTUAL -> {
+                        val canUpload = currentUser.role.hasPermission(Permission.SUBMIT_REPORT)
+                        com.example.ui.detail.sections.ActualAccomplishmentSection(
+                            project = currentProject,
+                            documents = pendingDocuments,
+                            abstracts = projectAbstracts,
+                            uploadedBy = account.name,
+                            onSave = (viewModel::saveAbstract).takeIf { canUpload },
+                            onDelete = (viewModel::deleteAbstract).takeIf { canUpload },
+                            onPrintAbstract = { abstract ->
+                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                    printForm("Abstract of Physical Accomplishment - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
+                                        viewModel.actualAbstractForm(currentProject, abstract, s)
+                                    }
+                                }
+                            },
+                            onPrintBilling = { abstract, period ->
+                                val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
+                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                    // Not the detailed abstract's name, so the two PDFs do not replace each other.
+                                    printForm("Billing Abstract - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
+                                        viewModel.billingAbstractForm(currentProject, abstract, period, saleable, s)
+                                    }
+                                }
+                            }
+                        )
+                    }
                     ProjectSection.MONEY -> MoneySection(
                         payments = projectPayments,
                         contractCost = contractCost,
@@ -441,12 +459,9 @@ fun ProjectDetailScreen(
                             com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, runCatching { java.time.LocalDate.parse(date) }.getOrNull())[1] /
                                 com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)
                         },
-                        billingCheck = { new, old -> com.example.util.BillingAbstract.aheadErrors(currentProject, pendingDocuments, projectPayments, weeklyReports, new, old) },
-                        onPrintAbstract = { payment ->
-                            val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
-                            printWithSignatories = false to { s: com.example.util.Signatories ->
-                                printForm("Abstract of Physical Accomplishment - ${payment.name}") { viewModel.billingAbstractForm(currentProject, payment, saleable, s) }
-                            }
+                        billingCheck = { new, old ->
+                            com.example.util.BillingAbstract.aheadErrors(currentProject, pendingDocuments, projectPayments, weeklyReports, new, old, projectAbstracts)
+                                .let { errors -> if (errors.isEmpty()) errors else errors + com.example.util.BillingAbstract.aheadHint(projectAbstracts) }
                         },
                         onAddPayment = { viewModel.addProjectPayment(it.copy(projectId = currentProject.id)) },
                         onUpdatePayment = { payment ->

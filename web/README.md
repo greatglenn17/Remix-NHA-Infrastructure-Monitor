@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging, editing and deleting issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, setting a plan's scale, turning or deleting it, picking the revision in use, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, setting a plan's scale, turning or deleting it, picking the revision in use, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather), uploading, replacing and deleting an abstract of the actual work (Actual Accomplishment),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, and **Signatories** on a weekly or monthly report's print page, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -28,17 +28,43 @@ is read only.
 - **What is billed never passes the work done** (`L.billingAheadErrors`, the phone's `BillingAbstract.aheadErrors`): a
   new billing with a housing type, or an edit that raises one, is refused when the billed share of its part
   (Land Acquisition, Land Development, Housing Construction: its billings over the part's contract amount) or of all
-  parts (over the contract cost) would be higher than the actual of the latest weekly report, at 2 decimals; equal is
-  allowed. A part's contract amount is the bar chart's in force, else the Scope of Works' (`L.partAmounts`). Billings
+  parts (over the contract cost) would be higher than the actual, at 2 decimals; equal is allowed. The actual is the
+  latest uploaded abstract's (Actual Accomplishment: its parts folded to the three lines, a line without a part at 0,
+  and its overall) once the project has one, and the message names it ("of the abstract as of Mar 14, 2025", then
+  "Upload the newer abstract first, or lower this billing."); a project without an abstract keeps the latest weekly
+  report's. A part's contract amount is the bar chart's in force, else the Scope of Works' (`L.partAmounts`). Billings
   without a type (an advance payment) are not counted, and a billing already saved can still be corrected.
-- **Print abstract** on a billing with a housing type is its Abstract of Physical Accomplishment in the district's
-  billing format (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`) for
-  `#/p/<id>/print/apa-<billing>`: a landscape A4 sheet headed by the billing's period covered, each line (land
-  acquisition, land development, Milestone 1 at 80% and Milestone 2 at 20% of housing) with its contract quantity, unit
-  cost and amount, what was billed before, in this billing and to date as quantity, amount and share, the balance,
-  subtotals and the grand total. Nothing is uploaded: every figure comes from the billings (`L.billingAbstract`). The
-  quantity is the project's Number of Units, else its saleable lots. Its "actual" is what is billed to date; Prepared,
-  Checked and Approved by are the monthly report's signatories.
+- **The next abstract can be made in the app instead of uploaded**: **New abstract** on the Actual Accomplishment
+  tab (`#/p/<id>/actual/new`), once the project has an abstract. The works, quantities, units, unit costs and amounts
+  are those of the latest abstract dated before the picked "As of" date, and its TO DATE is the new PREVIOUS. The
+  engineer types only each pay item's THIS PERIOD quantity; the amounts, percentages, to date, balance, equivalent
+  units, subtotals and grand total follow the sheet's formulas (`L.nextAbstractRows`, the phone's
+  `ProjectAbstracts.nextRows`), except that TO DATE % is the to date amount over the row's amount (the sheet adds
+  the rounded percentages), so a finished line reads 100.00%. It is filed like an upload, without a file. The latest date picked again is made
+  again from the one before it, starting from what was typed for it. An abstract whose subtotals do not add up from
+  its items cannot be continued: the next one is uploaded.
+- **The billing abstract is printed before the billing, from the Actual Accomplishment tab**, not from a billing: the
+  contractor attaches it to the billing it asks for. **Print billing abstract** on the tab, for anyone who can open
+  it, opens `#/p/<id>/print/apa-<as-of date>`: the abstract shown there in the district's billing format
+  (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`), a landscape A4 sheet with each line (1 land
+  acquisition, 2 land development, 3.1 Milestone 1 at 80% and 3.2 Milestone 2 at 20% of housing) as its contract
+  quantity, unit cost and amount, what was billed before, in this billing and to date as quantity, amount and share,
+  the balance, subtotals and the grand total. It has no equivalent-units columns. Its figures (`L.billingAbstract`,
+  the phone's `BillingAbstract.of`):
+  - **The part amounts** are the uploaded abstract's own, its parts' contract amounts by accomplishment line
+    (`L.abstractLineAmounts`), not the bar chart's or the Scope of Works'. A line without an amount is left out.
+  - **Previous** is the gross of the saved billings of that billing type dated on or before the abstract's "As of"
+    date (a billing without a date is not counted).
+  - **This billing** is typed in the boxes above the sheet and never saved: "Period covered", "Land acquisition
+    (lots)", "Land development (amount)", "Milestone 1 (units)" and "Milestone 2 (units)". A line the abstract has no
+    amount for has no box. Lots and units become an amount as quantity x (line amount / the project's Number of Units,
+    else its saleable lots), at 2 decimals; land development is typed as an amount and starts from the abstract's own
+    THIS PERIOD amount for that part (`L.abstractPeriodAmounts`). A blank, unreadable or negative figure is 0. Only
+    the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
+    leaving the page.
+  - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
+    bar chart's plan on the "As of" date, else the project's stored target; its "actual" is what is billed to date.
+    Prepared, Checked and Approved by are the monthly report's signatories.
 - **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction
   with an "Updated billing" audit entry for each billing saved. "Later" is the order shown (by date); the phone uses the
@@ -185,12 +211,58 @@ is read only.
   and **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
   A new report's Actual % boxes start from the report of the latest week (`L.carriedActuals`), so a week without a new
   abstract keeps the last actual.
-- **Fill from Abstract (Excel)** in that form reads the district's Abstract of Physical Accomplishment of the actual
-  work, the "as of" one (`apa-excel.js`, the port of `util/AbstractExcel.kt`; change both together): the "As of" date
-  and, for each part (item no. 1, 2, 3), the TO DATE "% WT" on the part's own subtotal row, as the sheet prints it.
-  A new report moves to the week holding that date; the three Actual % boxes are filled for review and nothing is
-  saved until Save. The pay items stay in Excel. The billing format is told apart and refused. The overall figure is
-  each line by its weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures).
+- **A week with an uploaded abstract takes its Actual % from it** (`L.abstractInWeek`, `L.abstractLineActuals`; the
+  phone's `ProjectAbstracts.inWeek`): when an abstract's "As of" date is one of the form's 7 days, the three Actual %
+  boxes show its parts (0.00 for a line it has no part for), are not typed, and the form says "Actual % is from the
+  abstract as of Nov 6, 2026 (Actual Accomplishment tab)." It follows the week picked, for a new report and a saved
+  one, and Save stores those figures as the report's. A week without an abstract is typed as before. The report's
+  overall is each line by its weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures).
+  The form no longer reads an Excel file itself: the abstract is uploaded on the Actual Accomplishment tab.
+- **Actual Accomplishment** (the project's third tab, `#/p/<id>/actual[/<as-of date>]`, shown for every project) holds
+  the district's Abstract of Physical Accomplishment of the actual work, the "As of" one. **Upload abstract (Excel)**,
+  for the people who can edit the project, reads the .xlsx in the browser (`apa-excel.js`, the port of
+  `util/AbstractExcel.kt`; change both together): the "As of" date and every row with a description under the
+  ITEM NO. header down to the GRAND TOTAL, each as its kind (part, group, item, subtotal, total), item no.,
+  description, quantity, unit, unit cost, amount, PREVIOUS / THIS PERIOD / TO DATE as quantity, amount and % (0 to
+  100), the balance, and the sheet's last three columns: under the header "EQUIVALENT TO 370 UNITS" (the number
+  varies; it is the read's `equivUnits`, 0 on a sheet without that header), each row's PREVIOUS, TO DATE and BALANCE
+  in equivalent units (`equiv`, at 2 decimals). Amounts are kept at 2 decimals, quantities at 4, an empty cell as
+  null. An item no. Excel stored with a float tail ("2.2000000000000002" for a typed 2.2) is read as the number at 6
+  decimals ("2.2"). A part's figures are those of its own subtotal row, as the sheet prints them
+  (`L.abstractParts`). The billing format, a file without an
+  abstract and an abstract without an "As of" date are refused, each with its own message (`L.abstractProblem`).
+  - **The record** is a `project_abstracts` record (`L.newAbstractRecord`, the phone's `ProjectAbstract` row): `asOf`
+    (yyyy-MM-dd), `overallPct` (the grand total's % to date; without one the parts' by their amounts), `rowsJson`
+    (those rows), `fileName`, `uploadedBy` and `equivUnits` (the N of "EQUIVALENT TO N UNITS"; a record from before
+    the column, or from a sheet without it, counts as 0). The file itself is not kept. Every upload stays under its
+    "As of" date;
+    uploading a date already filed asks first, then replaces that record (`saveEdits`) instead of adding a second.
+    The audit entries are the phone's: "Abstract Upload", "Updated abstract" and "Deleted abstract" (`L.abstractAudit`,
+    `L.deletedAbstractAudit`).
+  - **The tab** opens on the latest abstract; the **As of** menu picks an earlier one. Under the date a small table
+    (`L.abstractStanding`, the phone's `ProjectAbstracts.standing`) gives Target, Actual and +/- for Land
+    Acquisition, Land Development, Housing Construction and Overall. A line's target is the weekly form's: the
+    approved bar chart's plan for that line on the "As of" date ("-" without a chart); the overall target is the
+    chart's plan that day, else the project's stored target. The actuals are the abstract's. +/- is the actual less
+    the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). The file's
+    name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
+    folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at BALANCE: the
+    equivalent-units columns are read and kept on the record but not shown, because the abstract's format has none.
+  - **Two abstracts print from the tab**, for anyone who can open it. **Print abstract** is the abstract of the
+    actual work, the detailed one, made every week and at month end: `#/p/<id>/print/abstract-<as-of date>`
+    (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
+    the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
+    for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns, the
+    header rows repeating on each page, and the Prepared by / Checked by / Approved by signatures (the monthly
+    report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
+    under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
+    "Billing Abstract - As of <date>".
+    **Delete**, for the people who can edit, asks first and marks the record deleted.
+  - **The uploaded abstract is the project's actual accomplishment** (`L.projectActualAfter`, the phone's
+    `ProjectAbstracts.projectActualAfter`): saving or deleting one sets the project's actual, in the same write, to
+    the latest abstract's overall (by "As of" date, then the last saved); with none left, to the latest weekly
+    report's. While a project has an abstract, a weekly report saved here moves only the project's target. A project
+    that never had one works as before.
 - **Edit** on a weekly report opens the same form on the saved report (`L.weeklyStart`, `L.editedWeeklyReport`), with
   the app's "Edited Weekly Report" audit entry. The project's target and actual follow a report added or edited here
   only when no other report is for a later week, so a late entry or a fix to an older week does not set the project
@@ -294,7 +366,7 @@ is read only.
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
 - Screens: the dashboard (project count, total cost, status pills, attention filters, search, project cards with their own
-  Work done and Billed; portfolio averages are deliberately not shown) and four project tabs:
+  Work done and Billed; portfolio averages are deliberately not shown) and five project tabs:
   - **Summary**: profile, key dates with the revised completion from approved orders, contract
     cost, latest weekly report, open issues, status of payment, and the lots status card (the six
     `SdpSummary` bands) for housing projects.
@@ -305,6 +377,7 @@ is read only.
     status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
+  - **Actual Accomplishment**: the uploaded abstracts of the actual work, every pay item as in Excel (see above).
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to
     the contractor, developer requests and related files, each with its scan. The **Audit log**

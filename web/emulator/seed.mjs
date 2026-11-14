@@ -228,6 +228,21 @@ await record(rid(20), 'developer_requests', A, [engineer], { requestType: 'Time 
   dateReceived: '2026-11-02', datePackaged: '', requestFileUrl: requestScan });
 await record(rid(21), 'developer_requests', A, [engineer], { requestType: 'Variation Order', details: '', dateRequested: '2026-07-01',
   dateReceived: '2026-07-03', datePackaged: '2026-07-20', requestFileUrl: '' });
+// Actual Accomplishment: one uploaded abstract (made-up figures) in the week of the latest report. Its overall is the
+// project's actual, and its housing part (33.75%) is ahead of what is billed for housing (4,000,000 of 20,000,000).
+// The sheet's last three columns are each row's share of the project's 400 units: previous, to date and balance.
+const none = [null, null, null];
+const apaRow = (kind, no, name, amount, prev, period, toDate, balance, equiv = none, qty = null, unit = '', unitCost = null) => ({ kind, no, name, qty, unit, unitCost, amount, prev, period, toDate, balance, equiv });
+await record(rid(40), 'project_abstracts', A, [engineer], { asOf: '2026-11-06', overallPct: 41.25, fileName: 'Abstract as of November 6 2026.xlsx', uploadedBy: 'Engr. Sample', equivUnits: 400, rowsJson: JSON.stringify([
+  apaRow('part', '1', 'LAND DEVELOPMENT', null, none, none, none, [null, null]),
+  apaRow('group', '1.1', 'ROADWORKS', null, none, none, none, [null, null]),
+  apaRow('item', '1.1.1', 'Road excavation', 30000000, [4800, 12000000, 40], [750, 1875000, 6.25], [5550, 13875000, 46.25], [6450, 16125000], [160, 185, 215], 12000, 'cu.m.', 2500),
+  apaRow('subtotal', '', 'Subtotal (Land Development)', 30000000, [null, 12000000, 40], [null, 1875000, 6.25], [null, 13875000, 46.25], [null, 16125000], [160, 185, 215]),
+  apaRow('part', '2', 'HOUSING CONSTRUCTION', null, none, none, none, [null, null]),
+  apaRow('item', '2.1', 'Row house units', 20000000, [120, 6000000, 30], [15, 750000, 3.75], [135, 6750000, 33.75], [265, 13250000], [120, 135, 265], 400, 'unit', 50000),
+  apaRow('subtotal', '', 'Subtotal (Housing Construction)', 20000000, [null, 6000000, 30], [null, 750000, 3.75], [null, 6750000, 33.75], [null, 13250000], [120, 135, 265]),
+  apaRow('total', '', 'GRAND TOTAL', 50000000, [null, 18000000, 36], [null, 2625000, 5.25], [null, 20625000, 41.25], [null, 29375000], [144, 165, 235]),
+]) });
 // Subdivision plan: an old version and the one in use; its lots in each progress band, plus lots that are not counted.
 await record(rid(30), 'sdp_plans', A, [engineer], { planName: 'SDP rev 0', pdfFileUrl: '', version: 1, isActive: 0, uploadedDate: '2026-01-10', uploadedBy: 'x', siteName: '' });
 await record(rid(31), 'sdp_plans', A, [engineer], { planName: 'SDP rev 1', pdfFileUrl: planScan, version: 2, isActive: 1, uploadedDate: '2026-03-10', uploadedBy: 'x', siteName: '' });

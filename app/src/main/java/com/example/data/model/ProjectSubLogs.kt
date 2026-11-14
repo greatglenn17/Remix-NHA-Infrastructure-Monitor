@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -182,4 +183,37 @@ data class ContractorLetter(
     // Blank until the contractor receives the letter; NHA's receiving copy (signed or stamped) is an attachment reference.
     val dateReceived: String = "",
     val receivedFileUrl: String = ""
+)
+
+/**
+ * An uploaded Abstract of Physical Accomplishment of the actual work: the project's actual accomplishment as of that
+ * day. One per project and "As of" date; an upload of the same date replaces it (see util/ProjectAbstracts).
+ */
+@Entity(
+    tableName = "project_abstracts",
+    foreignKeys = [
+        ForeignKey(
+            entity = Project::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
+)
+data class ProjectAbstract(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val asOf: String, // yyyy-MM-dd
+    val overallPct: Double,
+    // Every row of the sheet down to the grand total, as ProjectAbstracts.rowsJson writes them.
+    val rowsJson: String,
+    val fileName: String = "",
+    val uploadedBy: String = "",
+    // The N of the sheet's "EQUIVALENT TO N UNITS" columns, 0 without them; a record saved without it reads as 0.
+    @ColumnInfo(defaultValue = "0") val equivUnits: Double = 0.0,
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
 )

@@ -39,9 +39,10 @@ import androidx.security.crypto.MasterKey
         SdpLotInspection::class,
         DeveloperRequest::class,
         ContractorLetter::class,
+        ProjectAbstract::class,
         SyncOutboxEvent::class
     ],
-    version = 40,
+    version = 41,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -418,6 +419,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // The uploaded abstracts (Actual Accomplishment tab), created with their sync columns.
+        private val MIGRATION_40_41 = object : Migration(40, 41) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `project_abstracts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `projectId` INTEGER NOT NULL, " +
+                        "`asOf` TEXT NOT NULL, `overallPct` REAL NOT NULL, `rowsJson` TEXT NOT NULL, `fileName` TEXT NOT NULL, `uploadedBy` TEXT NOT NULL, " +
+                        "`equivUnits` REAL NOT NULL DEFAULT 0, `uuid` TEXT NOT NULL, `revision` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`projectId`) REFERENCES `projects`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_project_abstracts_projectId` ON `project_abstracts` (`projectId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_project_abstracts_uuid` ON `project_abstracts` (`uuid`)")
+            }
+        }
+
         private val MIGRATION_31_32 = object : Migration(31, 32) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN m2BillingStatus TEXT NOT NULL DEFAULT 'NOT BILLED'")
@@ -440,7 +455,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance

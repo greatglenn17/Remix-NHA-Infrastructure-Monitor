@@ -16,7 +16,7 @@ object ProjectDuplicateMerger {
         "work_resumptions", "weekly_reports", "daily_hourly_weather", "monthly_reports",
         "project_inspections", "project_images", "project_issues", "audit_logs",
         "project_payments", "app_notifications", "sdp_plans", "sdp_lots", "sdp_roads",
-        "sdp_lot_progress", "sdp_lot_inspections", "developer_requests", "contractor_letters"
+        "sdp_lot_progress", "sdp_lot_inspections", "developer_requests", "contractor_letters", "project_abstracts"
     )
 
     /** Returns the number of duplicate rows removed. */

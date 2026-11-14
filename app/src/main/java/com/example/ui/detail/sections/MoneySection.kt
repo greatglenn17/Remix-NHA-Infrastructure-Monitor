@@ -10,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.netAmount
 import com.example.data.model.netBillings
 import com.example.data.model.ProjectPayment
@@ -35,9 +34,8 @@ fun MoneySection(
     isHousing: Boolean = false,
     // The contract amount of land development per lot on a billing date; see AddPaymentDialog.
     landPerLot: (date: String) -> Double = { 0.0 },
-    // Why a billing (in place of the old one when editing) cannot be saved; see BillingAbstract.aheadErrors.
+    // Why a billing (in place of the old one when editing) cannot be saved and what to do; see BillingAbstract.aheadErrors and aheadHint.
     billingCheck: (ProjectPayment, ProjectPayment?) -> List<String> = { _, _ -> emptyList() },
-    onPrintAbstract: (ProjectPayment) -> Unit = {},
     onAddPayment: (ProjectPayment) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
     onDeletePayment: (ProjectPayment) -> Unit
@@ -83,8 +81,7 @@ fun MoneySection(
                                 },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                                 canEdit = canManagePayments,
-                                onEdit = { paymentToEdit = payment },
-                                onPrintAbstract = if (payment.billingType in HOUSING_BILLING_TYPES) ({ onPrintAbstract(payment) }) else null
+                                onEdit = { paymentToEdit = payment }
                             )
                         }
                         if (row.size < perRow) Spacer(Modifier.weight(1f))

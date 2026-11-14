@@ -146,8 +146,8 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('hashchange', () => s.user && route());
 
-// #/p/<project>[/progress|/payments|/documents|/print/<weekly report>|/drive]
-const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|payments|documents|print|drive)(?:\/([\w-]+))?)?$/;
+// #/p/<project>[/progress|/actual[/<as-of date>]|/payments|/documents|/print/<weekly report>|/drive]
+const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|drive)(?:\/([\w-]+))?)?$/;
 
 function route() {
   const m = PAGE.exec(location.hash);
@@ -155,7 +155,7 @@ function route() {
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
-    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null });
+    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null, note: '', billing: null, next: null });
     freshScreen();
     return drawProject(s.page);
   }
@@ -854,7 +854,7 @@ function tile(it) {
   </a></li>`;
 }
 
-/* ---------- Project page (ProjectHeader, the four ProjectSection tabs) ---------- */
+/* ---------- Project page (ProjectHeader, the five ProjectSection tabs) ---------- */
 
 function renderProject(projectUuid, section, sub) {
   const page = s.page = { id: projectUuid, project: undefined, records: [], error: null, section, sub, chips: {}, month: null };
@@ -885,8 +885,9 @@ const emptyLine = text => `<p class="none-note">${icon('info', 'sm')}${esc(text)
 const fileLink = (refText, label) => (L.storagePathOf(refText)
   ? `<a class="file" data-file="${esc(refText)}" target="_blank" rel="noopener">${icon(L.isPdf(refText) ? 'picture_as_pdf' : 'attach_file', 'sm')}${esc(label)}</a>`
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
-/** ProjectSection: the project screen's four sections. */
-const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
+/** ProjectSection: the project screen's five sections. */
+const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['actual', 'Actual<span class="tab-long"> Accomplishment</span>', 'assignment'], // the long half shows where the row has room (style.css)
+  ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
 /** SectionChips: the views inside Progress (Lots only for housing) and Documents. */
 const CHIPS = {
   progress: ['Weekly', 'Monthly', 'Photos', 'Weather', 'Issues'],
@@ -921,8 +922,10 @@ function drawProject(page) {
   const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues']
     : page.section === 'documents' && L.canViewAuditLogs(s.claims) ? [...CHIPS.documents, 'Audit log'] : CHIPS[page.section];
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
-  const body = { progress: progressBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
+  const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
+  // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
+  const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
   main.innerHTML = `
     ${backLink}
     <header class="card project-head">
@@ -950,6 +953,8 @@ function drawProject(page) {
   if (planUpload) planUpload.onclick = () => planForm(c);
   bindPlanTools(c);
   if (document.getElementById('issue-results')) bindIssues(c);
+  if (document.getElementById('abstract-note')) bindActual(c);
+  if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
@@ -3042,9 +3047,7 @@ function weeklyForm(c, report = null) {
     <p class="muted small" id="wk-week"></p>
     <h3>Weekly accomplishment</h3>
     <p class="muted small" id="wk-note"></p>
-    <button type="button" class="text-btn wk-add" data-abstract>${icon('upload_file', 'sm')}Fill from Abstract (Excel)</button>
-    <input type="file" accept=".xlsx" data-abstract-file hidden>
-    <p class="muted small" id="wk-abstract" aria-live="polite">${report || !start.lines.length ? '' : 'Actual starts from the latest weekly report. Type over it, or fill it from the Abstract of Physical Accomplishment.'}</p>
+    <p class="muted small" id="wk-abstract" aria-live="polite"></p>
     <div class="wk-rows" id="wk-lines"></div>
     <p class="wk-total" id="wk-total" aria-live="polite"></p>
     ${list('manpower', 'Manpower', 'Add designation')}
@@ -3070,44 +3073,28 @@ function weeklyForm(c, report = null) {
     const t = L.weeklyTotals(values().lines);
     d.querySelector('#wk-total').textContent = `Overall: target ${pct(t.target)}, actual ${pct(t.actual)}, variance ${signedPct(t.actual - t.target)}`;
   };
+  const abstracts = c.of('project_abstracts');
+  let own = null; // the Actual % typed before a week with an abstract took the boxes over: they come back in a week without one
   // The lines follow the week: with a chart their targets are its plan for the week's last day. What was typed stays.
+  // An abstract uploaded for the week (Actual Accomplishment tab) is its actual: the boxes show its parts and are not typed.
   const drawLines = () => {
     if (!form.first.value) return;
-    const label = L.weekLabel(form.first.value), was = box.children.length ? typed() : start.lines;
+    const label = L.weekLabel(form.first.value), was = !box.children.length ? start.lines : typed().map((t, k) => (own ? { ...t, actual: own[k] } : t));
     lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6]);
     const charted = lines[0].targetPct != null;
+    const abstract = L.abstractInWeek(abstracts, label), filed = abstract && L.abstractLineActuals(abstract);
+    own = abstract ? lines.map((_, k) => was[k]?.actual ?? '') : null;
+    d.querySelector('#wk-abstract').textContent = abstract ? L.abstractWeekNote(abstract) : '';
     d.querySelector('#wk-week').textContent = label;
     d.querySelector('#wk-note').textContent = charted ? 'Targets are the approved bar chart\'s plan for the last day of this week.'
       : lines.some(l => l.weightPct > 0) ? 'No bar chart yet: type each target.' : 'This project has no scope of works yet, so the overall figures stay at 0%.';
     box.innerHTML = lines.map((l, k) => `<fieldset class="wk-row" data-line><legend>${esc(l.name)} (${pct(l.weightPct)})</legend>
       <label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(charted ? l.targetPct.toFixed(2) : was[k]?.target ?? '')}"${charted ? ' readonly' : ''}></label>
-      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(was[k]?.actual ?? '')}"></label></fieldset>`).join('');
+      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(filed ? filed[k] : was[k]?.actual ?? '')}"${filed ? ' readonly' : ''}></label></fieldset>`).join('');
     total();
   };
   form.first.onchange = drawLines;
   box.oninput = total;
-  // The abstract of the actual work: its three parts fill the Actual % boxes; a new report moves to the week of its "As of" date.
-  const abstractFile = d.querySelector('[data-abstract-file]'), abstractNote = d.querySelector('#wk-abstract');
-  d.querySelector('[data-abstract]').onclick = () => abstractFile.click();
-  abstractFile.onchange = async () => {
-    const file = abstractFile.files[0];
-    if (!file) return;
-    let found; // undefined: not a workbook; null: no abstract in it
-    try { if (file.size <= 20 * 1024 * 1024) found = await readAbstractWorkbook(await file.arrayBuffer()); } catch { /* the note below says so */ }
-    abstractFile.value = ''; // so the same file, saved again, can be picked again
-    if (!found || found.billing) {
-      abstractNote.textContent = found === undefined ? 'That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx).'
-        : found ? 'That is the billing abstract. Pick the abstract of the actual accomplishment.' : 'No Abstract of Physical Accomplishment was found in that file.';
-      return;
-    }
-    if (!report && found.asOf) form.first.value = L.weekSaturday(found.asOf);
-    drawLines();
-    const actuals = L.abstractActuals(found.parts);
-    box.querySelectorAll('[data-actual]').forEach((el, k) => { if (actuals[k] != null) el.value = actuals[k]; });
-    total();
-    abstractNote.textContent = `Filled from the abstract${found.asOf ? ` as of ${L.displayDate(found.asOf)}` : ''}${found.overallPct != null ? ` (its overall: ${pct(found.overallPct)})` : ''}. Check the figures, then Save.`
-      + (!report && c.weekly.some(r => L.weekDays(r.reportingWeek)[0] === form.first.value) ? ' This week already has a report: to change that one, cancel and use its Edit.' : '');
-  };
   form.onclick = e => {
     const kind = e.target.closest('[data-add-row]')?.dataset.addRow;
     if (kind) {
@@ -3118,6 +3105,8 @@ function weeklyForm(c, report = null) {
     e.target.closest('[data-drop-row]')?.closest('.wk-row').remove();
   };
   drawLines();
+  // An abstract uploaded for a saved report's week changed the boxes on opening: Save stores them though nothing was typed.
+  const refiled = Boolean(report) && typed().some((t, k) => t.actual !== (start.lines[k]?.actual ?? ''));
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
   const close = () => (JSON.stringify(values()) === initial || confirm(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?')) && done();
@@ -3127,15 +3116,15 @@ function weeklyForm(c, report = null) {
     e.preventDefault();
     const f = values(), errors = L.weeklyErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
-    if (report && JSON.stringify(f) === initial) { done(); return; }
+    if (report && !refiled && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
       if (report) {
-        const edit = L.editedWeeklyReport(report, f, c.project, c.weekly);
+        const edit = L.editedWeeklyReport(report, f, c.project, c.weekly, abstracts);
         await saveEdits(c, [[report, edit.changes, edit.audit]], 'weekly report', edit.projectFields);
       } else {
-        const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly);
+        const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly, abstracts);
         await addRecords(c, [[added.build, added.audit]], added.projectFields);
       }
       done();
@@ -3415,8 +3404,8 @@ function billingForm(c, old = null) {
     const f = values(), errors = L.billingErrors(f);
     if (errors.length) { err.textContent = errors.join(' '); return; }
     if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
-    const ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old);
-    if (ahead.length) { err.textContent = `${ahead.join(' ')} Save the newer weekly report first, or lower this billing.`; return; }
+    const abstracts = c.of('project_abstracts'), ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old, abstracts);
+    if (ahead.length) { err.textContent = `${ahead.join(' ')} ${abstracts.length ? 'Upload the newer abstract first' : 'Save the newer weekly report first'}, or lower this billing.`; return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
@@ -3475,9 +3464,170 @@ async function loadMissingPhotos(c) {
   box.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => editPhotos(c, c.weekly.find(x => x.uuid === b.dataset.editPhotos)); });
 }
 
+/* ---------- Actual Accomplishment (ActualSection): the uploaded abstracts of the actual work, every pay item as in Excel ---------- */
+
+/** The project's abstracts newest first, one per "As of" date (the last saved when two devices filed the same date), and the one the page shows. */
+function abstractsOf(c) {
+  const list = c.of('project_abstracts').sort((a, b) => (a.asOf < b.asOf ? 1 : a.asOf > b.asOf ? -1 : b.updatedAt - a.updatedAt))
+    .filter((a, i, all) => all.findIndex(x => x.asOf === a.asOf) === i);
+  return { list, shown: list.find(a => a.asOf === c.page.sub) || list[0] };
+}
+
+/**
+ * `#/p/<id>/actual[/<as-of date>]`: the abstract of that date, the latest without one: its target, actual and
+ * advance/slippage by line (L.abstractStanding), then every pay item (P.abstractItemsHtml). Two sheets print from
+ * it, for anyone who can open the tab: Print abstract, the detailed one of the actual work (drawActualAbstractPrint),
+ * and Print billing abstract, the billing format made from it (drawAbstractPrint).
+ */
+function actualBody(c) {
+  const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
+  const tools = `<div class="toolbar apa-tools">
+      ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
+      ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
+      ${editable && list.length ? `<button class="btn" id="abstract-new">${icon('add_circle', 'sm')}New abstract</button>` : ''}
+      ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
+      ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
+    </div>
+    <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
+  if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
+  if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
+  const figure = v => (v == null ? '-' : pct(v));
+  return `${tools}<div class="stack">
+    ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
+      <div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+        <tbody>${L.abstractStanding(c.project, c.documents, shown).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
+      ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}`)}
+    ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
+}
+
+/** The quantities typed in the New abstract form (text by row index) as numbers; an empty box is no work this period. */
+const typedQuantities = text => Object.fromEntries(Object.entries(text).filter(([, t]) => String(t).trim() !== '')
+  // A plain decimal with commas allowed, as on the phone; anything else is NaN, which L.nextAbstractErrors names.
+  .map(([i, t]) => { const n = String(t).replace(/,/g, '').trim(); return [i, /^-?(\d+(\.\d*)?|\.\d+)$/.test(n) ? Number(n) : NaN]; }));
+
+/**
+ * `#/p/<id>/actual/new`: the next abstract, made here from the one before it (L.nextAbstractSource). The engineer
+ * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts and the
+ * percentages are computed (L.nextAbstractRows). What is typed is kept on the page
+ * (page.next) so a redraw for an arriving record keeps it.
+ */
+function nextAbstractBody(c) {
+  c.page.next ??= { asOf: today(), from: '', text: {} };
+  const { error, html } = nextAbstractSheet(c);
+  return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
+    ${section('New abstract', 'edit', `
+      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.</p>
+      <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(c.page.next.asOf)}"></label>
+        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
+      <div id="next-sheet">${html}</div>`)}`;
+}
+
+/** The form under its date, as { error, html }: why that date cannot be used, or the overall line and the pay items with what is typed (page.next). */
+function nextAbstractSheet(c) {
+  const next = c.page.next, { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
+  const rows = source && !error ? L.abstractRows(source.rowsJson) : [], from = `${source?.uuid}|${same?.uuid}`;
+  // Another abstract to continue, or a date that already has one, starts from what that date has.
+  if (rows.length && next.from !== from) Object.assign(next, { from, text: Object.fromEntries(Object.entries(L.nextAbstractTyped(rows, same)).map(([i, q]) => [i, String(q)])) });
+  const computed = L.nextAbstractRows(rows, typedQuantities(next.text), Number(source?.equivUnits) || 0);
+  const q = v => `<td class="num">${L.quantityText(v)}</td>`;
+  const line = (r, i) => (L.isPayLine(r) ? `<tr><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${q(r.qty)}<td>${esc(r.unit)}</td>${q(computed[i].prev[0])}
+      <td><input inputmode="decimal" data-next="${i}" value="${esc(next.text[i] ?? '')}" aria-label="This period: ${esc(`${r.no} ${r.name}`)}"></td><td class="num" id="next-done-${i}">${L.quantityText(computed[i].toDate[0])}</td></tr>`
+    : r.kind === 'part' || r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="6">${esc(r.name)}</td></tr>` : '');
+  return { error, html: error ? `<p class="error">${esc(error)}</p>` : `<p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
+      <div class="scroll"><table class="grid-table apa-next"><thead><tr><th>ITEM NO.</th><th>ITEM DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>PREVIOUS</th><th>THIS PERIOD</th><th>TO DATE</th></tr></thead>
+        <tbody>${rows.map(line).join('')}</tbody></table></div>` };
+}
+
+/** The New abstract form's controls: a typed quantity redraws only its to date and the overall line; Save files the abstract as an upload does. */
+function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
+  const page = c.page, next = page.next, asOf = document.getElementById('next-as-of'), save = document.getElementById('next-save');
+  const state = () => { const found = L.nextAbstractSource(all, next.asOf); return { ...found, rows: found.source && !found.error ? L.abstractRows(found.source.rowsJson) : [] }; };
+  const made = ({ source, rows }) => L.nextAbstractRows(rows, typedQuantities(next.text), Number(source.equivUnits) || 0);
+  // A browser fires change at each key typed in a date box, so only the sheet under it is redrawn and the box keeps the keyboard's place.
+  asOf.onchange = () => { next.asOf = asOf.value; say(''); const sheet = nextAbstractSheet(c); document.getElementById('next-sheet').innerHTML = sheet.html; save.disabled = Boolean(sheet.error); boxes(); };
+  const boxes = () => main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
+    next.text[box.dataset.next] = box.value;
+    const now = state(), rows = made(now);
+    document.getElementById(`next-done-${box.dataset.next}`).textContent = L.quantityText(rows[box.dataset.next].toDate[0]);
+    document.getElementById('next-overall').textContent = L.nextAbstractNote(now.source, now.same, rows);
+  }; });
+  boxes();
+  save.onclick = async () => {
+    const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, typedQuantities(next.text));
+    if (errors.length) { say(errors.slice(0, 3).join(' ') + (errors.length > 3 ? ` And ${errors.length - 3} more.` : '')); return; }
+    const fields = L.nextAbstractFields(now.source, made(now), next.asOf, s.profile.name || s.user.email), old = now.same;
+    if (old && !confirm(`An abstract as of ${L.displayDate(fields.asOf)} is already filed. Replace it with this one?`)) return;
+    if (!navigator.onLine) { say('You are offline. Connect to the internet, then save again.'); return; }
+    save.disabled = true;
+    const actual = actualAfter([...all.filter(a => a.asOf !== fields.asOf), { ...fields, updatedAt: Infinity }]);
+    try {
+      await (old ? saveEdits(c, [[old, fields, L.abstractAudit(fields, old)]], 'abstract', actual)
+        : addRecords(c, [[ids => L.newAbstractRecord(ids, fields), L.abstractAudit(fields)]], actual));
+      page.next = null;
+      show(fields.asOf, L.abstractSavedNote(fields, Boolean(old)));
+    } catch (x) { failed(x); save.disabled = false; }
+  };
+}
+
+/**
+ * The tab's controls. Upload files the workbook under its "As of" date (a date already filed is replaced, after
+ * asking); Delete removes the one shown. Either way the project's actual becomes the latest abstract's
+ * (L.projectActualAfter) in the same write, with the phone's audit entry.
+ */
+function bindActual(c) {
+  const page = c.page, { list, shown } = abstractsOf(c), all = c.of('project_abstracts');
+  // The tab is redrawn whenever a record arrives, so the line is kept on the page and written to the note of the moment.
+  const say = text => { page.note = text; const note = document.getElementById('abstract-note'); if (note) note.textContent = text; };
+  // The abstract of `asOf` (the latest when null) with `text` under the buttons; the address follows without a second draw.
+  const show = (asOf, text) => {
+    Object.assign(page, { sub: asOf, note: text });
+    history.replaceState(null, '', `#/p/${page.id}/actual${asOf ? `/${asOf}` : ''}`);
+    drawProject(page);
+  };
+  const failed = x => say(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.');
+  const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
+  const pick = document.getElementById('abstract-as-of'), file = document.getElementById('abstract-file'), del = document.getElementById('abstract-delete');
+  if (pick) pick.onchange = () => { location.hash = `#/p/${page.id}/actual/${pick.value}`; };
+  const make = document.getElementById('abstract-new');
+  if (make) make.onclick = () => { page.note = ''; location.hash = `#/p/${page.id}/actual/new`; };
+  if (document.getElementById('next-as-of')) bindNextAbstract(c, { say, show, failed, actualAfter, all });
+  if (file) {
+    document.getElementById('abstract-upload').onclick = () => file.click();
+    file.onchange = async () => {
+      const picked = file.files[0];
+      if (!picked) return;
+      let found; // undefined: not a workbook; null: no abstract in it
+      try { if (picked.size <= L.MAX_FILE_BYTES) found = await readAbstractWorkbook(await picked.arrayBuffer()); } catch { /* abstractProblem says so */ }
+      file.value = ''; // so the same file, saved again, can be picked again
+      const problem = L.abstractProblem(found);
+      if (problem) { say(problem); return; }
+      const fields = L.abstractFields(found, picked.name, s.profile.name || s.user.email), old = list.find(a => a.asOf === fields.asOf);
+      if (old && !confirm(`An abstract as of ${L.displayDate(fields.asOf)} is already uploaded. Replace it with this file?`)) return;
+      if (!navigator.onLine) { say('You are offline. Connect to the internet, then upload again.'); return; }
+      // Infinity: this upload is the last saved of its date.
+      const actual = actualAfter([...all.filter(a => a !== old), { ...fields, updatedAt: Infinity }]);
+      try {
+        await (old ? saveEdits(c, [[old, fields, L.abstractAudit(fields, old)]], 'abstract', actual)
+          : addRecords(c, [[ids => L.newAbstractRecord(ids, fields), L.abstractAudit(fields)]], actual));
+        show(fields.asOf, L.abstractSavedNote(fields, Boolean(old)));
+      } catch (x) { failed(x); }
+    };
+  }
+  if (del) del.onclick = async () => {
+    if (!confirm(`Delete the abstract as of ${L.displayDate(shown.asOf)}? This cannot be undone.`)) return;
+    if (!navigator.onLine) { say('You are offline. Connect to the internet, then delete again.'); return; }
+    del.disabled = true;
+    try {
+      await saveEdits(c, [[shown, null, L.deletedAbstractAudit(shown)]], 'abstract', actualAfter(all.filter(a => a !== shown)));
+      show(null, '');
+    } catch (x) { failed(x); del.disabled = false; }
+  };
+}
+
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
 
-function paymentsBody({ page, project, payments, cost, billed }) {
+function paymentsBody({ project, payments, cost, billed }) {
   const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
@@ -3498,7 +3648,6 @@ function paymentsBody({ page, project, payments, cost, billed }) {
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}
-      ${L.HOUSING_BILLING_TYPES.includes(p.billingType) ? `<a class="text-btn entry-edit" href="#/p/${esc(page.id)}/print/apa-${esc(p.uuid)}">${icon('print', 'sm')}Print abstract</a>` : ''}
       ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`;
   }).join('')}</ul></div>`;
@@ -3689,6 +3838,7 @@ async function drawPrint(c) {
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
   if (c.page.sub === 'profile') return drawProfilePrint(c);
   if (/^apa-/.test(c.page.sub || '')) return drawAbstractPrint(c);
+  if (/^abstract-/.test(c.page.sub || '')) return drawActualAbstractPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -3734,19 +3884,65 @@ function drawProfilePrint({ page, project, documents }) {
   document.getElementById('do-print').onclick = () => window.print();
 }
 
-/** A billing's Abstract of Physical Accomplishment (BlueBookForms.billingAbstract, Print abstract on the billing) for `#/p/<id>/print/apa-<billing>`. */
-function drawAbstractPrint(c) {
-  const { page, project, records, documents, payments } = c;
-  const payment = payments.find(p => p.uuid === page.sub.slice(4));
-  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/payments">${icon('arrow_back', 'sm')}Billings</a>`;
-  if (!payment) { main.innerHTML = `${back}<p class="muted">This billing was deleted or does not exist.</p>`; return; }
-  document.title = `Abstract of Physical Accomplishment - ${payment.name || payment.billingType}`;
+/**
+ * The abstract of the actual work, the detailed one (BlueBookForms.actualAbstract, Print abstract on the Actual
+ * Accomplishment tab) for `#/p/<id>/print/abstract-<as-of date>`: every row of the abstract of that date.
+ */
+function drawActualAbstractPrint(c) {
+  const { page, project, documents } = c, asOf = page.sub.slice('abstract-'.length);
+  const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
+  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`; // the file name "Save as PDF" offers
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
-    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.billingAbstractHtml({
-      project, docs: documents, payments, payment, units: L.abstractUnits(project, L.lotSummary(records).saleable),
-      signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
+    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.actualAbstractHtml({
+      project, docs: documents, abstract, signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
     })}</div></div>`;
+  bindSignatories(c, false);
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.onclick = () => window.print();
+}
+
+/**
+ * The billing abstract the contractor attaches before a billing (BlueBookForms.billingAbstract, Print billing abstract
+ * on the Actual Accomplishment tab) for `#/p/<id>/print/apa-<as-of date>`: the uploaded abstract of that date in the
+ * district's billing format. This billing's figures are typed above the sheet and never saved; they are kept on the
+ * page (page.billing) so a redraw for an arriving record keeps them, and only the sheet redraws as they are typed.
+ */
+function drawAbstractPrint(c) {
+  const { page, project, records, documents, payments } = c, asOf = page.sub.slice(4);
+  const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
+  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  document.title = `Billing Abstract - As of ${L.displayDate(asOf)}`; // not the detailed abstract's name, so the two PDFs do not replace each other
+  const [acquisition, development, housing] = L.abstractLineAmounts(abstract), start = L.abstractPeriodAmounts(abstract)[1];
+  // Land development starts from the abstract's own this-period amount; the rest start empty (0).
+  const typed = page.billing ??= { covered: '', lots: '', development: start > 0 ? start.toFixed(2) : '', m1: '', m2: '' };
+  const box = (name, label, attrs = ' inputmode="decimal" placeholder="0"') => `<label class="field">${label}<input name="${name}" autocomplete="off" value="${esc(typed[name])}"${attrs}></label>`;
+  // The box being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
+  const active = document.activeElement?.closest?.('#apa-typed') ? document.activeElement : null;
+  main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+    <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    ${section('This billing', 'receipt_long', `<div class="apa-typed" id="apa-typed">${box('covered', 'Period covered', '')}
+        ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (amount)') : ''}
+        ${housing > 0 ? box('m1', 'Milestone 1 (units)') + box('m2', 'Milestone 2 (units)') : ''}</div>
+      <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>`, 'no-print')}
+    <div class="bb-scroll"><div class="bb full land" id="sheet"></div></div>`;
+  // A blank or unreadable number is 0 (parseAmount takes no minus sign, so a negative is 0 too).
+  const number = text => L.parseAmount(text) ?? 0;
+  const drawSheet = () => {
+    document.getElementById('sheet').innerHTML = P.billingAbstractHtml({
+      project, docs: documents, payments, abstract, units: L.abstractUnits(project, L.lotSummary(records).saleable),
+      period: { covered: typed.covered, lots: number(typed.lots), development: number(typed.development), m1: number(typed.m1), m2: number(typed.m2) },
+      signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
+    });
+  };
+  drawSheet();
+  const boxes = document.getElementById('apa-typed');
+  boxes.oninput = e => { typed[e.target.name] = e.target.value; drawSheet(); };
+  if (active) { const again = boxes.querySelector(`[name="${active.name}"]`); again?.focus(); again?.setSelectionRange(active.selectionStart, active.selectionEnd); }
   bindSignatories(c, false);
   const btn = document.getElementById('do-print');
   btn.disabled = false;

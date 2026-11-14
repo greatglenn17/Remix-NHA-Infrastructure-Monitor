@@ -11,6 +11,7 @@ import com.example.data.model.ManpowerItem
 import com.example.data.model.MonthlyReport
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectIssue
 import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpSites
@@ -399,16 +400,18 @@ object BlueBookForms {
     }
 
     /**
-     * The Abstract of Physical Accomplishment of [payment] on a landscape sheet, laid out as the district's billing
-     * format: each line's contract quantity, unit cost and amount, what was billed before, in this billing and to date
-     * (quantity, amount, share of the line), and the balance. [units] is the project's lots or housing units; "actual"
-     * here is what is billed to date. web/print.js billingAbstractHtml prints the same page.
+     * The Abstract of Physical Accomplishment the contractor attaches before a billing, on a landscape sheet laid out
+     * as the district's billing format, printed from [uploaded], an abstract of the Actual Accomplishment tab: each
+     * line's contract quantity, unit cost and amount, what was billed before, in this billing ([period], typed) and to
+     * date (quantity, amount, share of the line), and the balance. [units] is the project's lots or housing units;
+     * "actual" here is what is billed to date. It has no equivalent-units columns. web/print.js billingAbstractHtml
+     * prints the same page.
      */
     fun billingAbstract(
-        project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, payment: ProjectPayment,
-        units: Int, signatories: Signatories, banner: String = ""
+        project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, uploaded: ProjectAbstract,
+        period: BillingAbstract.Period, units: Int, signatories: Signatories, banner: String = ""
     ): String {
-        val abstract = BillingAbstract.of(project, documents, payments, payment)
+        val abstract = BillingAbstract.of(project, documents, payments, uploaded, period, units)
         fun money(v: Double) = "%,.2f".format(Locale.US, v)
         // A quantity: 2 decimals at most, none when whole.
         val quantity = java.text.DecimalFormat("#,##0.##", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
@@ -429,31 +432,80 @@ object BlueBookForms {
             "${billed(r, 0.0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>"
         val all = sumOf(abstract.parts.flatMap { it.lines })
         val actual = if (all.amount > 0) (all.previous + all.thisPeriod) / all.amount * 100 else 0.0
-        fun info(label: String, value: String, label2: String = "", value2: String = "") =
-            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
         val rows = abstract.parts.joinToString("") { p ->
             (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='16'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
+            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, actual)}
+            <table class='apa'>
+              ${apaHead()}
+              $rows
+              ${total("GRAND TOTAL", all)}
+            </table>
+            <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
+            """,
+            banner,
+            fullPage = true,
+            landscape = true
+        )
+    }
+
+    /** The district's column layout of an Abstract of Physical Accomplishment: 17 columns under three header rows. */
+    private fun apaHead() = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
+        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>" +
+        "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
+        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
+
+    /**
+     * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract and
+     * its target, actual and advance/slippage, the last as the two at 2 decimals each. web/print.js apaTop.
+     */
+    private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double): String {
+        fun info(label: String, value: String, label2: String = "", value2: String = "") =
+            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
+        return """
             <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
-            <div class='period'>Period covered: ${esc(payment.periodCovered.ifBlank { date(payment.date) })}</div>
+            <div class='period'>${esc(period)}</div>
             <table class='apa-info'>
               ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}
               ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
               ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
               ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
-              ${info("TARGET ACCOMPLISHMENT", pct(abstract.targetPct))}
+              ${info("TARGET ACCOMPLISHMENT", pct(targetPct))}
               ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}
-              ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(abstract.targetPct * 100) / 100.0))}
-            </table>
+              ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(targetPct * 100) / 100.0))}
+            </table>"""
+    }
+
+    /**
+     * The abstract of the actual work, the detailed one ("Print abstract" on the Actual Accomplishment tab), on a
+     * landscape sheet: the same top as the billing format, with the target the tab shows for its "As of" date
+     * ([ProjectAbstracts.standing]'s Overall) and the abstract's own actual, then every row in the abstract's columns,
+     * an empty cell left blank, and the signatures. The header rows repeat on each page. The sheet's "EQUIVALENT TO N
+     * UNITS" columns are not shown: the abstract's format has none. web/print.js actualAbstractHtml prints the same page.
+     */
+    fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = ""): String {
+        val overall = ProjectAbstracts.standing(project, documents, abstract).last()
+        // A quantity: 4 decimals at most, none when whole.
+        val quantity = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
+        fun n(text: String?) = "<td class='n'>${text.orEmpty()}</td>"
+        fun money(v: Double?) = n(v?.let { "%,.2f".format(Locale.US, it) })
+        fun qty(v: Double?) = n(v?.let { quantity.format(it) })
+        fun figures(f: List<Double?>) = qty(f.getOrNull(0)) + money(f.getOrNull(1)) + n(f.getOrNull(2)?.let(::pct))
+        val rows = ProjectAbstracts.rows(abstract.rowsJson).joinToString("") { r ->
+            val name = esc(r.name).let { if (r.kind == "part" || r.kind == "group") "<b>$it</b>" else it }
+            "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
+                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}</tr>"
+        }
+        return page(
+            "Abstract of Physical Accomplishment",
+            """
+            ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
             <table class='apa'>
-              <tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>
-              <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
-              <tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>
-              $rows
-              ${total("GRAND TOTAL", all)}
+              <thead>${apaHead()}</thead>
+              <tbody>$rows</tbody>
             </table>
             <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
             """,

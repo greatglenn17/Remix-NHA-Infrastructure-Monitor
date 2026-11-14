@@ -1,12 +1,15 @@
 package com.example
 
 import com.example.data.model.Project
+import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectPayment
 import com.example.data.model.WeeklyReport
 import com.example.data.model.billedUnits
 import com.example.data.model.unitsText
+import com.example.util.AbstractExcel
 import com.example.util.BillingAbstract
 import com.example.util.BlueBookForms
+import com.example.util.ProjectAbstracts
 import com.example.util.Signatories
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -49,6 +52,19 @@ class BillingAbstractTest {
         billing(3, "Land development", 300_000.0, "2025-03-01", unitPrice = 20_000.0, period = "February 1 - 28, 2025")
     )
 
+    // The rows of web/logic.test.mjs ABSTRACT_ROWS: each part's contract amount, % to date and this-period amount on its own subtotal.
+    private fun row(kind: String, no: String, name: String, amount: Double? = null, pct: Double? = null, period: Double? = null) = AbstractExcel.Row(
+        kind, no, name, null, "", null, amount, listOf(null, null, null), listOf(null, period, null), listOf(null, null, pct), listOf(null, null)
+    )
+    private val rows = listOf(
+        row("part", "1", "LAND ACQUISITION COST"), row("subtotal", "", "Subtotal (Land Acquisition Cost)", 1_000_000.0, 50.0),
+        row("part", "2", "LAND DEVELOPMENT"), row("group", "2.2", "ROADWORKS"), row("item", "2.2.1", "Road Excavation", 1_600_000.0, 25.25),
+        row("subtotal", "", "Subtotal (Roadworks)", 1_600_000.0, 25.25, 80_000.0), row("subtotal", "", "Subtotal (Land Development)", 2_000_000.0, 25.21, 104_000.0),
+        row("part", "3", "HOUSING CONSTRUCTION"), row("subtotal", "", "Subtotal (Housing Construction)", 7_000_000.0, 1.0),
+        row("total", "", "GRAND TOTAL", 10_000_000.0, 10.73)
+    )
+    private val uploaded = ProjectAbstract(projectId = 1, asOf = "2025-03-14", overallPct = 10.73, rowsJson = ProjectAbstracts.rowsJson(rows))
+
     private fun ahead(new: ProjectPayment, old: ProjectPayment? = null, weekly: List<WeeklyReport> = reports) =
         BillingAbstract.aheadErrors(project, emptyList(), payments, weekly, new, old)
 
@@ -79,6 +95,33 @@ class BillingAbstractTest {
         assertEquals(emptyList<String>(), ahead(payments[2].copy(grossAmount = 35_219_729.88), payments[2].copy(grossAmount = 81 * 434_811.48), emptyList()))
     }
 
+    // A project with an uploaded abstract (Actual Accomplishment tab) is checked against the latest one, not the weekly reports.
+    @Test fun withAnUploadedAbstractTheActualIsTheAbstracts() {
+        val abstract = uploaded
+        fun ahead(new: ProjectPayment, abstracts: List<ProjectAbstract> = listOf(abstract), weekly: List<WeeklyReport> = emptyList()) =
+            BillingAbstract.aheadErrors(project, emptyList(), payments, weekly, new, null, abstracts)
+        val form = billing(0, "Land development", 204_200.0, "2025-03-15", unitPrice = 20_000.0)
+        val passes = listOf("Land Development: billed to date 25.22% would pass the actual 25.21% of the abstract as of Mar 14, 2025.")
+        assertEquals(emptyList<String>(), ahead(form))
+        assertEquals(passes, ahead(form.copy(grossAmount = 204_400.0)))
+        assertEquals(
+            listOf("Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025."),
+            ahead(form.copy(billingType = "Land acquisition", units = 1, unitPrice = 100_000.0, grossAmount = 100_000.0), listOf(abstract.copy(overallPct = 7.5)))
+        )
+        // With weekly reports as well, the abstract wins; and of two abstracts, the later one.
+        assertEquals(passes, ahead(form.copy(grossAmount = 204_400.0), weekly = reports))
+        val later = abstract.copy(asOf = "2025-04-11", overallPct = 0.0, rowsJson = "[]")
+        assertEquals(
+            listOf(
+                "Land Development: billed to date 25.21% would pass the actual 0.00% of the abstract as of Apr 11, 2025.",
+                "Overall: billed to date 9.04% would pass the actual 0.00% of the abstract as of Apr 11, 2025."
+            ),
+            ahead(form, listOf(abstract, later), reports)
+        )
+        assertEquals("Upload the newer abstract first, or lower this billing.", BillingAbstract.aheadHint(listOf(abstract)))
+        assertEquals("Save the newer weekly report first, or lower this billing.", BillingAbstract.aheadHint(emptyList()))
+    }
+
     @Test fun latestWeekPartAmountsUnitsAndCarriedActuals() {
         assertEquals("Mar 8, 2025 - Mar 14, 2025", BillingAbstract.latestWeekly(reports)?.reportingWeek)
         assertNull(BillingAbstract.latestWeekly(emptyList()))
@@ -96,43 +139,57 @@ class BillingAbstractTest {
         assertEquals("40", unitsText(40.0))
     }
 
-    @Test fun theAbstractIsMadeFromTheBillings() {
-        val later = billing(4, "Land development", 1.0, "2025-04-01")
-        val abstract = BillingAbstract.of(project, emptyList(), payments + later, payments[2])
-        assertEquals(12.0, abstract.targetPct, 0.0)
+    @Test fun theBillingAbstractIsMadeFromTheUploadedAbstract() {
+        // Previous: the saved billings dated on or before the As-of date (March 14); the one of April 1 is not in it, the one of the day is.
+        val saved = payments + billing(4, "Land development", 1.0, "2025-04-01") + billing(5, "M1 - Housing unit", 56_000.0, " 2025-03-14 ") +
+            billing(6, "Land development", 9.0, "")
+        // Typed for this billing: 5 lots, the abstract's 104,000 of land development, 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
+        val period = BillingAbstract.Period("March 1 - 14, 2025", lots = 5.0, development = ProjectAbstracts.periodAmounts(uploaded)[1], m1 = 2.0, m2 = 1.0)
+        val abstract = BillingAbstract.of(project, emptyList(), saved, uploaded, period, 100)
+        assertEquals(12.0, abstract.targetPct, 0.0) // no bar chart: the project's stored target
         assertEquals(listOf("Land Acquisition Cost" to null, "Land Development" to null, "Housing Construction" to ("3" to "HOUSING CONSTRUCTION")), abstract.parts.map { it.name to it.heading })
         assertEquals(
             listOf(
-                BillingAbstract.Line("1", "LAND ACQUISITION COST", "LOT", "Land acquisition", 1_000_000.0, 400_000.0, 0.0),
-                BillingAbstract.Line("2", "LAND DEVELOPMENT", "LOT", "Land development", 2_000_000.0, 0.0, 300_000.0),
-                BillingAbstract.Line("3.1", "MILESTONE 1 (80%)", "UNIT", "M1 - Housing unit", 5_600_000.0, 0.0, 0.0),
-                BillingAbstract.Line("3.2", "MILESTONE 2 (20%)", "UNIT", "M2 - Housing unit", 1_400_000.0, 0.0, 0.0),
+                BillingAbstract.Line("1", "LAND ACQUISITION COST", "LOT", "Land acquisition", 1_000_000.0, 400_000.0, 50_000.0),
+                BillingAbstract.Line("2", "LAND DEVELOPMENT", "LOT", "Land development", 2_000_000.0, 300_000.0, 104_000.0),
+                BillingAbstract.Line("3.1", "MILESTONE 1 (80%)", "UNIT", "M1 - Housing unit", 5_600_000.0, 56_000.0, 112_000.0),
+                BillingAbstract.Line("3.2", "MILESTONE 2 (20%)", "UNIT", "M2 - Housing unit", 1_400_000.0, 0.0, 14_000.0),
             ),
             abstract.parts.flatMap { it.lines }
         )
-        // Billings of the same date go by uuid, on the site and the phone alike, whatever order they were entered in.
-        val y = billing(7, "Land development", 5.0, "2025-03-01").copy(uuid = "y")
-        val x = billing(8, "Land development", 7.0, "2025-03-01").copy(uuid = "x")
-        assertEquals(7.0, BillingAbstract.of(project, emptyList(), listOf(y, x), y).parts[1].lines[0].previous, 0.0)
-        assertEquals(0.0, BillingAbstract.of(project, emptyList(), listOf(y, x), x).parts[1].lines[0].previous, 0.0)
-        // A project without housing has no housing lines.
-        val land = project.copy(scopeOfWork = """[{"name":"Land Development","amount":500,"weightPct":100}]""")
-        assertEquals(listOf("Land Development"), BillingAbstract.of(land, emptyList(), payments, payments[2]).parts.map { it.name })
+        // A negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
+        assertEquals(
+            listOf(333_333.33, 0.0, 0.0, 0.0),
+            BillingAbstract.of(project, emptyList(), emptyList(), uploaded, BillingAbstract.Period(lots = 1.0, development = -5.0, m1 = -2.0), 3).parts.flatMap { it.lines }.map { it.thisPeriod }
+        )
+        // The target is the bar chart's plan on the As-of date when the project has one.
+        val charted = project.copy(dateStarted = "2025-01-01", barChartJson = """[{"effective":"","items":[{"name":"Roads","amount":60,"bars":[[1,100]]},{"name":"Housing units","amount":40,"bars":[[51,150]]}]}]""")
+        assertEquals(53.0, BillingAbstract.of(charted, emptyList(), emptyList(), uploaded, period, 100).targetPct, 0.0)
+        // An abstract without housing has no housing lines.
+        val land = uploaded.copy(rowsJson = ProjectAbstracts.rowsJson(rows.subList(2, 7)))
+        assertEquals(listOf("Land Development"), BillingAbstract.of(project, emptyList(), payments, land, period, 100).parts.map { it.name })
     }
 
     @Test fun printsEachLineBeforeInThisBillingAndToDate() {
-        val bill = payments[2].copy(grossAmount = 310_000.0)
-        val html = BlueBookForms.billingAbstract(
-            project, emptyList(), payments.dropLast(1) + bill, bill, 100,
-            Signatories("Juan", "Engineer", "", "District Manager", "", "Regional Manager")
+        // The uploaded abstract gives the part amounts; the billing of March 15 is after its As-of date, so it is not in "previous".
+        val abstract = uploaded.copy(equivUnits = 100.0, rowsJson = ProjectAbstracts.rowsJson(rows.map { if (it.kind == "subtotal") it.copy(equiv = listOf(1.0, 2.0, 3.0)) else it }))
+        val saved = payments.dropLast(1) + billing(9, "Land development", 99.0, "2025-03-15")
+        fun sheet(period: BillingAbstract.Period) = BlueBookForms.billingAbstract(
+            project, emptyList(), saved, abstract, period, 100, Signatories("Juan", "Engineer", "", "District Manager", "", "Regional Manager")
         )
-        fun has(vararg cells: String) = assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(html))
-        assertTrue(html.contains("Period covered: February 1 - 28, 2025"))
+        val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 310_000.0))
+        fun has(vararg cells: String, page: String = html) =
+            assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(page))
+        assertTrue(html.contains("<div class='period'>Period covered: February 1 - 28, 2025</div>"))
+        assertTrue(sheet(BillingAbstract.Period(" ")).contains("<div class='period'>As of March 14, 2025</div>")) // no period typed
+        assertTrue(!html.contains("equivalent", ignoreCase = true)) // the billing format has no equivalent-units columns
         // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
         has("1", "LAND ACQUISITION COST", "100", "LOT", "10,000.00", "1,000,000.00", "40", "400,000.00", "40.00%", "0", "0.00", "0.00%", "40", "400,000.00", "40.00%", "60", "600,000.00")
-        // Land development is billed by amount: 310,000 at 20,000 a lot is 15.5 lots.
+        // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
         has("2", "LAND DEVELOPMENT", "100", "LOT", "20,000.00", "2,000,000.00", "0", "0.00", "0.00%", "15.5", "310,000.00", "15.50%", "15.5", "310,000.00", "15.50%", "84.5", "1,690,000.00")
         has("3.1", "MILESTONE 1 (80%)", "100", "UNIT", "56,000.00", "5,600,000.00")
+        // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
+        has("3.2", "MILESTONE 2 (20%)", "100", "UNIT", "14,000.00", "1,400,000.00", "0", "0.00", "0.00%", "2", "28,000.00", "2.00%", page = sheet(BillingAbstract.Period(m2 = 2.0)))
         has("Subtotal (Housing Construction)", "", "", "70,000.00", "7,000,000.00")
         // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
         has("GRAND TOTAL", "", "", "100,000.00", "10,000,000.00", "", "400,000.00", "4.00%", "", "310,000.00", "3.10%", "", "710,000.00", "7.10%", "", "9,290,000.00")

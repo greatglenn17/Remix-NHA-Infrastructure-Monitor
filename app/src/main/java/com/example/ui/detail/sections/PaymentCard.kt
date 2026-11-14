@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,9 +36,7 @@ fun PaymentCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     canEdit: Boolean = true,
-    onEdit: () -> Unit = {},
-    // Prints the billing's Abstract of Physical Accomplishment; null for a billing without a housing type.
-    onPrintAbstract: (() -> Unit)? = null
+    onEdit: () -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
@@ -74,7 +71,7 @@ fun PaymentCard(
                         Icon(Icons.Default.AttachFile, contentDescription = "View scanned DV", tint = scheme.primary)
                     }
                 }
-                if (canEdit || onPrintAbstract != null) PaymentMenu(hasScan, canEdit, onEdit, onAttachScan, onDelete, onPrintAbstract)
+                if (canEdit) PaymentMenu(hasScan, onEdit, onAttachScan, onDelete)
             }
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(
@@ -103,30 +100,25 @@ fun PaymentCard(
 }
 
 @Composable
-private fun PaymentMenu(hasScan: Boolean, canEdit: Boolean, onEdit: () -> Unit, onAttachScan: () -> Unit, onDelete: () -> Unit, onPrintAbstract: (() -> Unit)?) {
+private fun PaymentMenu(hasScan: Boolean, onEdit: () -> Unit, onAttachScan: () -> Unit, onDelete: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Default.MoreVert, contentDescription = "More actions", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (onPrintAbstract != null) DropdownMenuItem(
-                text = { Text("Print abstract") },
-                leadingIcon = { Icon(Icons.Default.Print, contentDescription = null) },
-                onClick = { open = false; onPrintAbstract() }
-            )
-            if (canEdit) DropdownMenuItem(
+            DropdownMenuItem(
                 text = { Text("Edit") },
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                 onClick = { open = false; onEdit() }
             )
-            if (canEdit) DropdownMenuItem(
+            DropdownMenuItem(
                 text = { Text(if (hasScan) "Replace scan" else "Attach scan") },
                 leadingIcon = { Icon(Icons.Default.UploadFile, contentDescription = null) },
                 onClick = { open = false; onAttachScan() }
             )
             val red = LocalNHAColors.current.behind
-            if (canEdit) DropdownMenuItem(
+            DropdownMenuItem(
                 text = { Text("Delete", color = red) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = red) },
                 onClick = { open = false; onDelete() }

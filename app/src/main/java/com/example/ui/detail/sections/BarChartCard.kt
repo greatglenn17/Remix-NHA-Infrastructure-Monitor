@@ -131,7 +131,7 @@ private fun scopeDrafts(project: Project) = scopeItems(project.scopeOfWork).map 
 
 private fun itemDrafts(items: List<BarChart.Item>) = items.map { ItemDraft(it.name, it.amount, it.bars) }
 
-private const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+internal const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 /**
  * Enter the approved bar chart: per Scope of Works item, the bar(s) from month and cell to month and cell,
