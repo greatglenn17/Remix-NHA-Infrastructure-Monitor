@@ -886,7 +886,7 @@ const fileLink = (refText, label) => (L.storagePathOf(refText)
   ? `<a class="file" data-file="${esc(refText)}" target="_blank" rel="noopener">${icon(L.isPdf(refText) ? 'picture_as_pdf' : 'attach_file', 'sm')}${esc(label)}</a>`
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
 /** ProjectSection: the project screen's five sections. */
-const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['actual', 'Actual Accomplishment', 'assignment'],
+const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['actual', 'Actual<span class="tab-long"> Accomplishment</span>', 'assignment'], // the long half shows where the row has room (style.css)
   ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
 /** SectionChips: the views inside Progress (Lots only for housing) and Documents. */
 const CHIPS = {

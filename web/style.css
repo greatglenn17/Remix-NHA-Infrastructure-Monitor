@@ -408,8 +408,12 @@ thead .num { font-family: inherit; }
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
 .tabs a[aria-current="page"] .icon { color: var(--link); }
-/* On a phone the four labels share the row without icons, so Documents never hides off the edge. */
-@media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } .tabs a .icon { display: none; } }
+/* The five labels share the row so Documents never hides off the edge: "Actual" alone and no icons where the row is short, tighter still on a phone. */
+@media (max-width: 900px) { .tabs .tab-long { display: none; } }
+@media (max-width: 720px) { .tabs a .icon { display: none; } }
+@media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } }
+@media (max-width: 420px) { .tabs { gap: 0; } .tabs a { padding: 10px 3px; font-size: 13px; } }
+@media (max-width: 340px) { .tabs a { padding: 10px 1px; font-size: 12px; } }
 /* SectionChips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .chips button { font: 400 13px var(--sans); min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;

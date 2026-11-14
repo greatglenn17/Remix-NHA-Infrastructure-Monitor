@@ -176,6 +176,12 @@ class ProjectDetailScreenshotTest {
         }
     }
 
+    // The five tabs with the phone's font set larger: the labels shrink together to fit; none is cut off.
+    @Config(qualifiers = "w360dp-h800dp", fontScale = 1.3f)
+    @Test fun tabs_360_large_font() = captureRoboImage("src/test/screenshots/detail_tabs_360_large_font.png") {
+        NHATheme(themeMode = AppThemeMode.LIGHT) { Surface { com.example.ui.detail.ProjectSectionTabs(com.example.ui.detail.ProjectSection.ACTUAL) {} } }
+    }
+
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun phone_light() {
         sections("411", AppThemeMode.LIGHT)
