@@ -1,5 +1,5 @@
 // The Blue Book forms as the phone prints them: BlueBookForms.projectProfile, the weekly and monthly Project Engineer's
-// Reports (.weeklyReport, .monthlyReport), a billing's Abstract of Physical Accomplishment (.billingAbstract) and the pieces they use (ContractLogs, weekDocuments, weatherClock, workableDays). Change both
+// Reports (.weeklyReport, .monthlyReport), a billing's Abstract of Physical Accomplishment (.billingAbstract), the pay items of an uploaded abstract for the Actual Accomplishment tab (abstractItemsHtml) and the pieces they use (ContractLogs, weekDocuments, weatherClock, workableDays). Change both
 // together. Pure: no Firebase.
 import * as L from './logic.js';
 
@@ -251,6 +251,34 @@ export function billingAbstractHtml({ project, docs, payments, payment, units, s
       ${total('GRAND TOTAL', all)}
     </table>
     <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
+}
+
+/* ---------- The Actual Accomplishment tab's pay items (an uploaded abstract's rows, every column as in Excel) ---------- */
+
+/**
+ * An uploaded abstract's rows (L.abstractRows) for the site's Actual Accomplishment tab: each part a folding block
+ * headed by its item no., name, amount and % to date, holding its groups, pay items and subtotals in the sheet's
+ * columns, then the grand total. Empty cells stay blank; the workbook's text is escaped.
+ */
+export function abstractItemsHtml(rows) {
+  const cell = (v, show) => `<td class="num">${v == null ? '' : show(v)}</td>`;
+  const quantity = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
+  const figures = t => cell(t?.[0], quantity) + cell(t?.[1], money) + cell(t?.[2], pct);
+  const line = r => (r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="16">${esc(r.name)}</td></tr>`
+    : `<tr class="apa-${esc(r.kind)}"><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${cell(r.qty, quantity)}<td>${esc(r.unit)}</td>${cell(r.unitCost, money)}${cell(r.amount, money)}`
+      + `${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${cell(r.balance?.[0], quantity)}${cell(r.balance?.[1], money)}</tr>`);
+  const table = body => `<div class="scroll"><table class="grid-table apa-items"><thead>
+    <tr><th rowspan="2">ITEM NO.</th><th rowspan="2">ITEM DESCRIPTION</th><th rowspan="2">QTY</th><th rowspan="2">UNIT</th><th rowspan="2">UNIT COST</th><th rowspan="2">AMOUNT</th><th colspan="3">PREVIOUS</th><th colspan="3">THIS PERIOD</th><th colspan="3">TO DATE</th><th colspan="2">BALANCE</th></tr>
+    <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}<th>QTY</th><th>AMOUNT</th></tr></thead><tbody>${body.map(line).join('')}</tbody></table></div>`;
+  // Rows under each part; rows before the first part, if any, get a block without a heading.
+  const parts = L.abstractParts(rows), total = rows.filter(r => r.kind === 'total'), blocks = [];
+  for (const r of rows.filter(x => x.kind !== 'total')) {
+    if (r.kind === 'part') blocks.push({ part: r, sum: parts[blocks.filter(b => b.part).length], rows: [] });
+    else { if (!blocks.length) blocks.push({ rows: [] }); blocks.at(-1).rows.push(r); }
+  }
+  return blocks.map(b => (b.part ? `<details class="card apa-part" open><summary><span class="icon sm" aria-hidden="true">expand_more</span><b>${esc(b.part.no)} ${esc(b.part.name)}</b>
+      <span class="num">${money(b.sum.amount)}</span><span class="num">${pct(b.sum.actualPct)}</span></summary>${b.rows.length ? table(b.rows) : ''}</details>`
+    : `<div class="card apa-part">${table(b.rows)}</div>`)).join('') + (total.length ? `<div class="card apa-part">${table(total)}</div>` : '');
 }
 
 /* ---------- The Project Profile sheet (BlueBookForms.projectProfile) ---------- */

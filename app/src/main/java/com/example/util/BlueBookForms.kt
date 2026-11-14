@@ -11,6 +11,7 @@ import com.example.data.model.ManpowerItem
 import com.example.data.model.MonthlyReport
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectIssue
 import com.example.data.model.ProjectPayment
 import com.example.data.model.SdpSites
@@ -449,13 +450,56 @@ object BlueBookForms {
               ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(abstract.targetPct * 100) / 100.0))}
             </table>
             <table class='apa'>
-              <tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>
-              <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
-              <tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>
+              $APA_HEAD
               $rows
               ${total("GRAND TOTAL", all)}
             </table>
             <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
+            """,
+            banner,
+            fullPage = true,
+            landscape = true
+        )
+    }
+
+    /** The district's column layout of an Abstract of Physical Accomplishment: 17 columns under three header rows. */
+    private val APA_HEAD = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
+        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>" +
+        "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
+        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
+
+    /**
+     * An uploaded abstract of the actual work (Actual Accomplishment tab) on a landscape sheet: every row of the Excel
+     * file with all its columns, an empty cell left blank. The website shows the same table in its tab.
+     */
+    fun actualAbstract(project: Project, abstract: ProjectAbstract, banner: String = ""): String {
+        // A quantity: 4 decimals at most, none when whole.
+        val quantity = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
+        fun n(text: String?) = "<td class='n'>${text.orEmpty()}</td>"
+        fun money(v: Double?) = n(v?.let { "%,.2f".format(Locale.US, it) })
+        fun qty(v: Double?) = n(v?.let { quantity.format(it) })
+        fun figures(f: List<Double?>) = qty(f.getOrNull(0)) + money(f.getOrNull(1)) + n(f.getOrNull(2)?.let(::pct))
+        val rows = ProjectAbstracts.rows(abstract.rowsJson).joinToString("") { r ->
+            val name = esc(r.name).let { if (r.kind == "part" || r.kind == "group") "<b>$it</b>" else it }
+            "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
+                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}</tr>"
+        }
+        fun info(label: String, value: String) = "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td></tr>"
+        return page(
+            "Abstract of Physical Accomplishment",
+            """
+            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
+            <div class='period'>As of ${esc(date(abstract.asOf))}</div>
+            <table class='apa-info'>
+              ${info("PROJECT NAME", project.name)}
+              ${info("LOCATION", project.location)}
+              ${info("CONTRACTOR", project.contractor)}
+              ${info("ACTUAL ACCOMPLISHMENT", pct(abstract.overallPct))}
+            </table>
+            <table class='apa'>
+              $APA_HEAD
+              $rows
+            </table>
             """,
             banner,
             fullPage = true,

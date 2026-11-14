@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { abstractOf, asOfDate } from './apa-excel.js';
 import { NotAnExcelFile } from './chart-excel.js';
+import { abstractParts, abstractRows } from './logic.js';
 
 /** Rows of [ref, value] as a sheet: numbers as they are, text as a formula's worked-out string. */
 const sheet = cells => `<worksheet><sheetData>${cells.map(([r, v]) => (typeof v === 'number' ? `<c r="${r}"><f>X1</f><v>${v}</v></c>` : `<c r="${r}" t="str"><v>${v}</v></c>`)).join('')}</sheetData></worksheet>`;
@@ -26,7 +27,8 @@ const ACTUAL = [...HEAD,
   ['B24', 'Subtotal (Land Acquisition Cost)'], ['H24', 1000000], ['P24', 500000], ['Q24', 0.5],
   ['A26', 2], ['B26', 'LAND DEVELOPMENT'],
   ['A27', 2.1], ['B27', 'GENERAL REQUIREMENTS'],
-  ['A28', '2.1.1'], ['B28', 'Mobilization/Demobilization'], ['H28', 400000], ['P28', 100000], ['Q28', 0.25],
+  ['A28', '2.1.1'], ['B28', 'Mobilization/Demobilization'], ['E28', 1], ['F28', 'l.s.'], ['G28', 400000], ['H28', 400000], ['I28', 0], ['J28', 0], ['K28', 0],
+  ['L28', 0.25], ['M28', 100000], ['N28', 0.25], ['O28', 0.25], ['P28', 100000], ['Q28', 0.25], ['S28', 0.75], ['T28', 300000],
   ['B29', 'Subtotal (General Requrements)'], ['H29', 400000], ['P29', 100000],
   ['A30', 2.2], ['B30', 'ROADWORKS'],
   ['A31', '2.2.1'], ['B31', 'Road Excavation'], ['H31', 1600000], ['P31', 404000], ['Q31', 0.2525],
@@ -43,7 +45,8 @@ const ACTUAL = [...HEAD,
 ];
 
 test('abstract Excel: the as-of date, each part\'s amount and % to date from its own subtotal, and the grand total', () => {
-  assert.deepEqual(abstractOf(workbook(sheet(ACTUAL))), {
+  const { rows, ...found } = abstractOf(workbook(sheet(ACTUAL)));
+  assert.deepEqual(found, {
     asOf: '2025-03-14', overallPct: 10.73, billing: false,
     parts: [
       { name: 'LAND ACQUISITION COST', amount: 1000000, actualPct: 50 },
@@ -51,6 +54,32 @@ test('abstract Excel: the as-of date, each part\'s amount and % to date from its
       { name: 'HOUSING CONSTRUCTION', amount: 7000000, actualPct: 1 }, // no % WT on its subtotal: 70,000 of 7,000,000
     ],
   });
+  assert.equal(abstractParts(rows).length, 3);
+});
+
+test('abstract Excel: every row with a description down to the grand total, as the record keeps them', () => {
+  const { rows } = abstractOf(workbook(sheet(ACTUAL)));
+  assert.deepEqual(rows.map(r => r.kind), ['part', 'subtotal', 'part', 'group', 'item', 'subtotal', 'group', 'item', 'subtotal', 'subtotal', 'part', 'group', 'item', 'subtotal', 'subtotal', 'total']);
+  const row = key => rows.find(r => r.no === key || r.name === key), none = [null, null, null];
+  assert.deepEqual(row('2.1.1'), { kind: 'item', no: '2.1.1', name: 'Mobilization/Demobilization', qty: 1, unit: 'l.s.', unitCost: 400000, amount: 400000,
+    prev: [0, 0, 0], period: [0.25, 100000, 25], toDate: [0.25, 100000, 25], balance: [0.75, 300000] });
+  assert.deepEqual(row('2.2.1'), { kind: 'item', no: '2.2.1', name: 'Road Excavation', qty: null, unit: '', unitCost: null, amount: 1600000,
+    prev: none, period: none, toDate: [null, 404000, 25.25], balance: [null, null] });
+  assert.deepEqual([row('2.1').kind, row('2.1').name, row('2.1').amount], ['group', 'GENERAL REQUIREMENTS', null]);
+  assert.deepEqual([row('Subtotal (Land Development)').amount, row('Subtotal (Land Development)').toDate], [2000000, [null, 504000, 25.21]]);
+  assert.deepEqual(row('Subtotal (Housing Construction)').toDate, [null, 70000, 1]); // no % WT: its amount to date over its amount
+  assert.deepEqual([rows.at(-1).name, rows.at(-1).amount, rows.at(-1).toDate], ['GRAND TOTAL', 10000000, [null, 1074000, 10.73]]);
+  // The rows survive the record's JSON as they are.
+  assert.deepEqual(abstractRows(JSON.stringify(rows)), rows);
+
+  // A sheet without the quantity, unit cost, balance, PREVIOUS and THIS PERIOD columns still reads: those cells are null.
+  const narrow = abstractOf(workbook(sheet([['A1', 'ITEM NO.'], ['B1', 'ITEM DESCRIPTION'], ['C1', 'AMOUNT'], ['D2', 'TO DATE'], ['F3', '% WT'],
+    ['A4', 1], ['B4', 'LAND DEVELOPMENT'], ['B5', 'Subtotal (Land Development)'], ['C5', 500], ['E5', 125], ['B6', 'Signed by']])));
+  assert.deepEqual(narrow.parts, [{ name: 'LAND DEVELOPMENT', amount: 500, actualPct: 25 }]);
+  assert.equal(narrow.overallPct, null);
+  assert.deepEqual(narrow.rows[1], { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', qty: null, unit: '', unitCost: null, amount: 500,
+    prev: none, period: none, toDate: [null, 125, 25], balance: [null, null] });
+  assert.equal(narrow.rows[2].kind, 'item'); // no grand total: the rows run to the end of the sheet
 });
 
 test('abstract Excel: the billing format is told apart, and other sheets are not abstracts', () => {

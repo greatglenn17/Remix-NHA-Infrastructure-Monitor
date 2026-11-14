@@ -6,15 +6,37 @@ import java.time.LocalDate
 
 /**
  * Reads the Abstract of Physical Accomplishment of the actual work (the "as of" one) from its Excel file (.xlsx).
- * Under the "ITEM NO. / ITEM DESCRIPTION / AMOUNT" header, each part (item no. 1, 2, 3) with the contract amount and
- * the TO DATE "% WT" of its subtotal row, the GRAND TOTAL's, and the "As of" date. The pay items stay in Excel.
+ * Under the "ITEM NO. / ITEM DESCRIPTION / AMOUNT" header, every row with a description down to the GRAND TOTAL
+ * (parts, groups, pay items, subtotals) and the "As of" date; the parts (item no. 1, 2, 3, with the contract amount
+ * and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows.
  * web/apa-excel.js is the website's copy; change both together.
  */
 object AbstractExcel {
     data class Part(val name: String, val amount: Double, val actualPct: Double)
 
+    /**
+     * A row of the sheet. [kind] is "part" (item no. 1, 2, 3), "group" (a heading such as 2.1 ROADWORKS), "item",
+     * "subtotal" or "total". [prev], [period] and [toDate] are quantity, amount, %; [balance] quantity, amount.
+     * Null is an empty cell. Kept as the record's rowsJson (see [ProjectAbstracts]).
+     */
+    data class Row(
+        val kind: String, val no: String, val name: String, val qty: Double?, val unit: String, val unitCost: Double?, val amount: Double?,
+        val prev: List<Double?>, val period: List<Double?>, val toDate: List<Double?>, val balance: List<Double?>
+    )
+
     /** [billing] is true for the billing format, which is not the actual work. */
-    data class Abstract(val asOf: LocalDate?, val parts: List<Part>, val overallPct: Double?, val billing: Boolean)
+    data class Abstract(val asOf: LocalDate?, val parts: List<Part>, val overallPct: Double?, val billing: Boolean, val rows: List<Row>)
+
+    /** Each part with the amount and % to date of its own subtotal: the last one before the next part, so it overwrites its groups'. */
+    fun parts(rows: List<Row>): List<Part> {
+        val parts = mutableListOf<Part>()
+        for (row in rows) {
+            if (row.kind == "part") parts += Part(row.name, 0.0, 0.0)
+            else if (row.kind == "subtotal" && parts.isNotEmpty())
+                parts[parts.lastIndex] = parts.last().copy(amount = row.amount ?: 0.0, actualPct = row.toDate.getOrNull(2) ?: 0.0)
+        }
+        return parts
+    }
 
     /**
      * The sheet laid out as an abstract, or null without one; a file that is not a workbook throws
@@ -45,30 +67,46 @@ object AbstractExcel {
         fun inHeader(test: (String) -> Boolean) = all.firstOrNull { it.key.first == header.first && test(it.value) }?.key?.second
         val descCol = inHeader { it.contains("description", ignoreCase = true) } ?: return null
         val amountCol = inHeader { it.equals("AMOUNT", ignoreCase = true) } ?: return null
-        // The first TO DATE under the header is the accomplishment's: QTY, AMOUNT, % WT.
-        val toDate = all.firstOrNull { it.key.first > header.first && it.value.equals("TO DATE", ignoreCase = true) }?.key ?: return null
-        fun at(row: Int, col: Int) = cells[row to col].orEmpty()
+        val (qtyCol, unitCol, unitCostCol, balanceCol) = listOf("QTY", "UNIT", "UNIT COST", "BALANCE").map { name -> inHeader { it.equals(name, ignoreCase = true) } }
+        // The first PREVIOUS, THIS PERIOD and TO DATE under the header are the accomplishment's: QTY, AMOUNT, % WT.
+        fun block(name: String) = all.firstOrNull { it.key.first > header.first && it.value.equals(name, ignoreCase = true) }?.key
+        val toDate = block("TO DATE") ?: return null
+        fun at(row: Int, col: Int?) = col?.let { cells[row to it] }.orEmpty()
         if (!at(toDate.first + 1, toDate.second + 2).startsWith("%")) return null
-        // The sheet's own "% WT" (it adds two rounded figures); without one, the amount to date over the contract amount.
-        fun pct(row: Int): Double? {
-            val total = at(row, amountCol).toDoubleOrNull()
-            val done = at(row, toDate.second + 1).toDoubleOrNull()
-            val v = at(row, toDate.second + 2).toDoubleOrNull() ?: (if (total != null && total > 0 && done != null) done / total else return null)
-            return Math.round(v * 10000) / 100.0
-        }
-        val parts = mutableListOf<Part>()
-        var overall: Double? = null
+        val prev = block("PREVIOUS")
+        val period = block("THIS PERIOD")
+        // A cell's number at [times] decimals' worth: amounts 2, quantities 4, and a % (a fraction on the sheet) as 0 to 100 at 2.
+        fun number(row: Int, col: Int?, times: Double, over: Double = times) = at(row, col).toDoubleOrNull()?.let { Math.round(it * times) / over }
+        fun money(row: Int, col: Int?) = number(row, col, 100.0)
+        fun qty(row: Int, col: Int?) = number(row, col, 10000.0)
+        fun figures(row: Int, block: Pair<Int, Int>?) = block?.second.let { c -> listOf(qty(row, c), money(row, c?.plus(1)), number(row, c?.plus(2), 10000.0, 100.0)) }
+        val rows = mutableListOf<Row>()
         var billing = false
         for (row in all.map { it.key.first }.filter { it > toDate.first + 1 }.distinct()) {
             val name = at(row, descCol)
-            if (name.startsWith("grand total", ignoreCase = true)) { overall = pct(row); break }
+            if (name.isEmpty()) continue
             if (name.startsWith("milestone", ignoreCase = true)) billing = true // the billing format's lines
-            if (at(row, header.second).matches(Regex("\\d+")) && name.isNotEmpty()) parts += Part(name, 0.0, 0.0)
-            // A part's own subtotal is the last one before the next part, so it overwrites its groups'.
-            else if (name.startsWith("subtotal", ignoreCase = true) && parts.isNotEmpty())
-                parts[parts.lastIndex] = parts.last().copy(amount = at(row, amountCol).toDoubleOrNull() ?: 0.0, actualPct = pct(row) ?: 0.0)
+            val no = at(row, header.second)
+            val amount = money(row, amountCol)
+            val kind = when {
+                name.startsWith("grand total", ignoreCase = true) -> "total"
+                name.startsWith("subtotal", ignoreCase = true) -> "subtotal"
+                no.matches(Regex("\\d+")) -> "part"
+                no.isNotEmpty() && amount == null -> "group"
+                else -> "item"
+            }
+            var done = figures(row, toDate)
+            // The sheet's own "% WT" (it adds two rounded figures); a subtotal without one, the amount to date over the contract amount.
+            if ((kind == "subtotal" || kind == "total") && done[2] == null && amount != null && amount > 0)
+                done = done.take(2) + done[1]?.let { Math.round(it / amount * 10000) / 100.0 }
+            rows += Row(
+                kind, no, name, qty(row, qtyCol), at(row, unitCol), money(row, unitCostCol), amount,
+                figures(row, prev), figures(row, period), done, listOf(qty(row, balanceCol), money(row, balanceCol?.plus(1)))
+            )
+            if (kind == "total") break
         }
+        val parts = parts(rows)
         if (parts.isEmpty()) return null
-        return Abstract(all.firstNotNullOfOrNull { asOfDate(it.value) }, parts, overall, billing)
+        return Abstract(all.firstNotNullOfOrNull { asOfDate(it.value) }, parts, rows.lastOrNull { it.kind == "total" }?.toDate?.get(2), billing, rows)
     }
 }

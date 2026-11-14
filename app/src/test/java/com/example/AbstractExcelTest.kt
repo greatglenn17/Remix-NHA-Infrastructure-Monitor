@@ -48,6 +48,8 @@ class AbstractExcelTest {
         "A26" to 2, "B26" to "LAND DEVELOPMENT",
         "A27" to 2.1, "B27" to "GENERAL REQUIREMENTS",
         "A28" to "2.1.1", "B28" to "Mobilization/Demobilization", "H28" to 400000, "P28" to 100000, "Q28" to 0.25,
+        "E28" to 1, "F28" to "l.s.", "G28" to 400000, "I28" to 0, "J28" to 0, "K28" to 0, "L28" to 0.25, "M28" to 100000, "N28" to 0.25, "O28" to 0.25,
+        "S28" to 0.75, "T28" to 300000,
         "B29" to "Subtotal (General Requrements)", "H29" to 400000, "P29" to 100000,
         "A30" to 2.2, "B30" to "ROADWORKS",
         "A31" to "2.2.1", "B31" to "Road Excavation", "H31" to 1600000, "P31" to 404000, "Q31" to 0.2525,
@@ -79,6 +81,41 @@ class AbstractExcelTest {
         // The parts fill the three Actual % boxes; a part the abstract does not have leaves its box alone.
         assertEquals(mapOf("Land Acquisition" to 50.0, "Land Development" to 25.21, "Housing Construction" to 1.0), AbstractExcel.actuals(found.parts))
         assertEquals(mapOf("Land Development" to 25.21), AbstractExcel.actuals(found.parts.subList(1, 2)))
+    }
+
+    // The same expectations as web/apa-excel.test.mjs: what an uploaded abstract keeps as its rowsJson.
+    @Test fun readsEveryRowDownToTheGrandTotal() {
+        val found = read(actual)!!
+        val rows = found.rows
+        assertEquals(
+            listOf("part", "subtotal", "part", "group", "item", "subtotal", "group", "item", "subtotal", "subtotal", "part", "group", "item", "subtotal", "subtotal", "total"),
+            rows.map { it.kind }
+        )
+        assertEquals(
+            AbstractExcel.Row(
+                "item", "2.1.1", "Mobilization/Demobilization", 1.0, "l.s.", 400000.0, 400000.0,
+                prev = listOf(0.0, 0.0, 0.0), period = listOf(0.25, 100000.0, 25.0), toDate = listOf(0.25, 100000.0, 25.0), balance = listOf(0.75, 300000.0)
+            ),
+            rows[4]
+        )
+        assertEquals(
+            AbstractExcel.Row(
+                "item", "2.2.1", "Road Excavation", null, "", null, 1600000.0,
+                prev = listOf(null, null, null), period = listOf(null, null, null), toDate = listOf(null, 404000.0, 25.25), balance = listOf(null, null)
+            ),
+            rows[7]
+        )
+        assertEquals(listOf("1", "", "2", "2.1"), rows.take(4).map { it.no })
+        val landDevelopment = rows.single { it.name == "Subtotal (Land Development)" }
+        assertEquals(2000000.0, landDevelopment.amount!!, 0.0)
+        assertEquals(listOf(null, 504000.0, 25.21), landDevelopment.toDate) // the sheet's own % WT
+        assertEquals(listOf(null, 70000.0, 1.0), rows.single { it.name == "Subtotal (Housing Construction)" }.toDate) // none on the sheet: 70,000 of 7,000,000
+        assertEquals(10000000.0, rows.last().amount!!, 0.0)
+        assertEquals(listOf(null, 1074000.0, 10.73), rows.last().toDate)
+        // The parts and the overall % are what the rows say.
+        assertEquals(found.parts, AbstractExcel.parts(rows))
+        assertEquals(10.73, found.overallPct!!, 0.0)
+        assertNull(read(actual.filterNot { it.first.endsWith("40") })!!.overallPct) // no GRAND TOTAL row
     }
 
     @Test fun tellsTheBillingFormatApartAndRefusesOtherSheets() {

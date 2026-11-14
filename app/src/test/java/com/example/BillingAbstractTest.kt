@@ -1,12 +1,15 @@
 package com.example
 
 import com.example.data.model.Project
+import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectPayment
 import com.example.data.model.WeeklyReport
 import com.example.data.model.billedUnits
 import com.example.data.model.unitsText
+import com.example.util.AbstractExcel
 import com.example.util.BillingAbstract
 import com.example.util.BlueBookForms
+import com.example.util.ProjectAbstracts
 import com.example.util.Signatories
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -77,6 +80,42 @@ class BillingAbstractTest {
         )
         // An old billing saved as lots x price: its gross at 2 decimals parses a hair above the saved one, which is not a raise.
         assertEquals(emptyList<String>(), ahead(payments[2].copy(grossAmount = 35_219_729.88), payments[2].copy(grossAmount = 81 * 434_811.48), emptyList()))
+    }
+
+    // A project with an uploaded abstract (Actual Accomplishment tab) is checked against the latest one, not the weekly reports.
+    @Test fun withAnUploadedAbstractTheActualIsTheAbstracts() {
+        fun row(kind: String, no: String, name: String, amount: Double? = null, pct: Double? = null) = AbstractExcel.Row(
+            kind, no, name, null, "", null, amount, listOf(null, null, null), listOf(null, null, null), listOf(null, null, pct), listOf(null, null)
+        )
+        val rows = ProjectAbstracts.rowsJson(listOf(
+            row("part", "1", "LAND ACQUISITION COST"), row("subtotal", "", "Subtotal (Land Acquisition Cost)", 1_000_000.0, 50.0),
+            row("part", "2", "LAND DEVELOPMENT"), row("subtotal", "", "Subtotal (Land Development)", 2_000_000.0, 25.21),
+            row("part", "3", "HOUSING CONSTRUCTION"), row("subtotal", "", "Subtotal (Housing Construction)", 7_000_000.0, 1.0),
+            row("total", "", "GRAND TOTAL", 10_000_000.0, 10.73)
+        ))
+        val abstract = ProjectAbstract(projectId = 1, asOf = "2025-03-14", overallPct = 10.73, rowsJson = rows)
+        fun ahead(new: ProjectPayment, abstracts: List<ProjectAbstract> = listOf(abstract), weekly: List<WeeklyReport> = emptyList()) =
+            BillingAbstract.aheadErrors(project, emptyList(), payments, weekly, new, null, abstracts)
+        val form = billing(0, "Land development", 204_200.0, "2025-03-15", unitPrice = 20_000.0)
+        val passes = listOf("Land Development: billed to date 25.22% would pass the actual 25.21% of the abstract as of Mar 14, 2025.")
+        assertEquals(emptyList<String>(), ahead(form))
+        assertEquals(passes, ahead(form.copy(grossAmount = 204_400.0)))
+        assertEquals(
+            listOf("Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025."),
+            ahead(form.copy(billingType = "Land acquisition", units = 1, unitPrice = 100_000.0, grossAmount = 100_000.0), listOf(abstract.copy(overallPct = 7.5)))
+        )
+        // With weekly reports as well, the abstract wins; and of two abstracts, the later one.
+        assertEquals(passes, ahead(form.copy(grossAmount = 204_400.0), weekly = reports))
+        val later = abstract.copy(asOf = "2025-04-11", overallPct = 0.0, rowsJson = "[]")
+        assertEquals(
+            listOf(
+                "Land Development: billed to date 25.21% would pass the actual 0.00% of the abstract as of Apr 11, 2025.",
+                "Overall: billed to date 9.04% would pass the actual 0.00% of the abstract as of Apr 11, 2025."
+            ),
+            ahead(form, listOf(abstract, later), reports)
+        )
+        assertEquals("Upload the newer abstract first, or lower this billing.", BillingAbstract.aheadHint(listOf(abstract)))
+        assertEquals("Save the newer weekly report first, or lower this billing.", BillingAbstract.aheadHint(emptyList()))
     }
 
     @Test fun latestWeekPartAmountsUnitsAndCarriedActuals() {

@@ -183,3 +183,34 @@ data class ContractorLetter(
     val dateReceived: String = "",
     val receivedFileUrl: String = ""
 )
+
+/**
+ * An uploaded Abstract of Physical Accomplishment of the actual work: the project's actual accomplishment as of that
+ * day. One per project and "As of" date; an upload of the same date replaces it (see util/ProjectAbstracts).
+ */
+@Entity(
+    tableName = "project_abstracts",
+    foreignKeys = [
+        ForeignKey(
+            entity = Project::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["projectId"]), Index(value = ["uuid"])]
+)
+data class ProjectAbstract(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val asOf: String, // yyyy-MM-dd
+    val overallPct: Double,
+    // Every row of the sheet down to the grand total, as ProjectAbstracts.rowsJson writes them.
+    val rowsJson: String,
+    val fileName: String = "",
+    val uploadedBy: String = "",
+    // Cross-device sync identity and version; see RecordSyncSchema.
+    val uuid: String = UUID.randomUUID().toString(),
+    val revision: Long = 1,
+    val updatedAt: Long = System.currentTimeMillis()
+)

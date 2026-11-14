@@ -13,6 +13,7 @@ import com.example.data.model.SyncOutboxEvent
 import com.example.data.model.TimeExtension
 import com.example.data.remote.RecordSync
 import com.example.data.remote.RecordSync.Unassigned
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -88,6 +89,20 @@ class RecordSyncRemovalTest {
         )
         assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:contractor_letters' AND state = 'PENDING'"))
         assertTrue(reply in recordSync.attachmentRefsOf(id))
+    }
+
+    // An uploaded abstract (Actual Accomplishment tab) syncs like any record; replacing it sends it again under the same uuid.
+    @Test
+    fun projectAbstract_isQueued() = runBlocking {
+        val id = db.projectDao().insertProject(project("P"))
+        markAllSynced()
+        val abstract = com.example.data.model.ProjectAbstract(projectId = id, asOf = "2025-03-14", overallPct = 10.73, rowsJson = "[]")
+        db.projectDao().insertProjectAbstract(abstract)
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:project_abstracts' AND state = 'PENDING'"))
+        markAllSynced()
+        val saved = db.projectDao().getProjectAbstractsForProject(id).first().single()
+        db.projectDao().updateProjectAbstract(saved.copy(overallPct = 11.0))
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:project_abstracts' AND entityUuid = ? AND revision = 2 AND state = 'PENDING'", abstract.uuid))
     }
 
     // A weekly report's photo list is saved by Android's JSONArray, which writes "/" as "\/".

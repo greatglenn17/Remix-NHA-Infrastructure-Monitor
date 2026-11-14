@@ -1310,21 +1310,24 @@ export function partAmounts(project, docs, asOf) {
 /**
  * BillingAbstract.aheadErrors: what is billed never passes the work done. With the form `f` saved (in place of `old`
  * when editing), the billed share of its part's contract amount, and of the contract cost for all parts, against the
- * actual of the latest weekly report, at 2 decimals. Only billings with a housing type count, and only a new or raised
- * one is checked, so a billing already saved can still be corrected.
+ * actual, at 2 decimals: the latest uploaded abstract's (`abstracts`, the project_abstracts records) when the project
+ * has one, else the latest weekly report's. Only billings with a housing type count, and only a new or raised one is
+ * checked, so a billing already saved can still be corrected.
  */
-export function billingAheadErrors(project, docs, payments, weekly, f, old = null) {
+export function billingAheadErrors(project, docs, payments, weekly, f, old = null, abstracts = []) {
   const gross = billingGross(f);
   if (!f.billingType || (old && old.billingType === f.billingType && Math.round(gross * 100) <= Math.round((Number(old.grossAmount) || 0) * 100))) return [];
-  const last = latestWeekly(weekly), actuals = last ? accomplishmentOf(last.accomplishmentItemsJson) : [];
+  const abstract = latestAbstract(abstracts), last = abstract ? null : latestWeekly(weekly);
+  const actuals = abstract ? abstractLineActuals(abstract).map(Number) : last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => a.actualPct) : [];
+  const from = abstract ? ` of the abstract as of ${displayDate(abstract.asOf)}` : last ? ` of ${last.reportingWeek}` : '';
   const billed = [...payments.filter(p => p.billingType && p.uuid !== old?.uuid), { billingType: f.billingType, grossAmount: gross }];
   const sum = list => list.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0), round = v => Math.round(v * 100) / 100;
   const line = accomplishmentLine(f.billingType), k = ACCOMPLISHMENT_LINES.indexOf(line);
   return [
-    [line, sum(billed.filter(p => accomplishmentLine(p.billingType) === line)), partAmounts(project, docs, f.date)[k], actuals[k]?.actualPct ?? 0],
-    ['Overall', sum(billed), currentCost(project, docs), Number(last ? last.actualAccomplishmentPct : project.actualAccomplishment) || 0],
+    [line, sum(billed.filter(p => accomplishmentLine(p.billingType) === line)), partAmounts(project, docs, f.date)[k], actuals[k] ?? 0],
+    ['Overall', sum(billed), currentCost(project, docs), Number(abstract ? abstract.overallPct : last ? last.actualAccomplishmentPct : project.actualAccomplishment) || 0],
   ].flatMap(([name, amount, of, actual]) => (of > 0 && round(amount / of * 100) > round(actual)
-    ? [`${name}: billed to date ${round(amount / of * 100).toFixed(2)}% would pass the actual ${round(actual).toFixed(2)}%${last ? ` of ${last.reportingWeek}` : ''}.`] : []));
+    ? [`${name}: billed to date ${round(amount / of * 100).toFixed(2)}% would pass the actual ${round(actual).toFixed(2)}%${from}.`] : []));
 }
 
 /** BillingAbstract.units: the project's number of units as typed ("370 units"), else its saleable lots, else 1 (a lump sum). */
@@ -1523,6 +1526,75 @@ export const carriedActuals = weekly => { const last = latestWeekly(weekly); ret
 export const abstractActuals = parts => (parts.length ? accomplishmentLines(parts.map(p => ({ itemDescription: p.name, weightPct: p.amount, targetPct: 0, actualPct: p.actualPct })))
   .map(l => (l.weightPct > 0 ? l.actualPct.toFixed(2) : null)) : ACCOMPLISHMENT_LINES.map(() => null));
 
+/* ---------- The uploaded abstracts: project_abstracts records (ProjectAbstract, util/ProjectAbstracts.kt) ---------- */
+
+/** ProjectAbstracts.rows: an abstract's rowsJson as its rows, every pay item as apa-excel.js reads them; [] when it cannot be read. */
+export const abstractRows = rowsJson => jsonArray(rowsJson).filter(r => r && typeof r === 'object');
+
+/** AbstractExcel.parts: each part row as { name, amount, actualPct }, from its own subtotal: the last one before the next part. */
+export function abstractParts(rows) {
+  const parts = [];
+  for (const r of rows) {
+    if (r.kind === 'part') parts.push({ name: r.name, amount: 0, actualPct: 0 });
+    else if (r.kind === 'subtotal' && parts.length) Object.assign(parts.at(-1), { amount: r.amount ?? 0, actualPct: r.toDate?.[2] ?? 0 });
+  }
+  return parts;
+}
+
+/** ProjectAbstracts.latest: the abstract of the latest "As of" date, the last saved when two devices filed the same date; undefined with none. */
+export const latestAbstract = abstracts => abstracts.reduce((best, a) =>
+  (best == null || a.asOf > best.asOf || (a.asOf === best.asOf && (a.updatedAt || 0) > (best.updatedAt || 0)) ? a : best), undefined);
+
+/** ProjectAbstracts.inWeek: the latest abstract dated on one of the report's 7 days; null when the week has none. */
+export function abstractInWeek(abstracts, reportingWeek) {
+  const days = weekDays(reportingWeek);
+  return latestAbstract(abstracts.filter(a => days.includes(a.asOf))) ?? null;
+}
+
+/** An abstract's three Actual % as the weekly form shows them (abstractActuals of its parts); 0.00 for a line it has no part for. */
+export const abstractLineActuals = abstract => abstractActuals(abstractParts(abstractRows(abstract.rowsJson))).map(v => v ?? '0.00');
+
+/**
+ * ProjectAbstracts.fields: a read workbook (apa-excel.js) as the five columns of its record. The overall is the grand
+ * total's; without one the parts' by their amounts, else 0.
+ */
+export function abstractFields(found, fileName, uploadedBy) {
+  const total = found.parts.reduce((t, p) => t + p.amount, 0);
+  const overallPct = found.overallPct ?? (total > 0 ? Math.round(found.parts.reduce((t, p) => t + p.actualPct * p.amount, 0) / total * 100) / 100 : 0);
+  return { asOf: found.asOf, overallPct, rowsJson: JSON.stringify(found.rows), fileName: fileName || '', uploadedBy: uploadedBy || '' };
+}
+
+/** A new project_abstracts record: the ProjectAbstract row, every column (all NOT NULL on the phone). */
+export const newAbstractRecord = (ids, f) => newRecord(ids, 'project_abstracts', { asOf: f.asOf, overallPct: f.overallPct, rowsJson: f.rowsJson, fileName: f.fileName, uploadedBy: f.uploadedBy });
+
+/**
+ * ProjectAbstracts.projectActualAfter: the project's actual once its abstracts are `abstracts`: the latest one's
+ * overall; without any the latest weekly report's actual; without that it stays `current`.
+ */
+export const projectActualAfter = (abstracts, weekly, current) => latestAbstract(abstracts)?.overallPct ?? latestWeekly(weekly)?.actualAccomplishmentPct ?? current;
+
+/**
+ * Why a picked file cannot be filed as the project's abstract, '' when it can. `found` is what readAbstractWorkbook
+ * gave: undefined when the file is not a workbook, null when it holds no abstract.
+ */
+export const abstractProblem = found => (found === undefined ? 'That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx).'
+  : !found ? 'No Abstract of Physical Accomplishment was found in that file.'
+  : found.billing ? 'That is the billing abstract. Pick the abstract of the actual accomplishment.'
+  : !found.asOf ? 'That abstract has no "As of" date, so it cannot be filed. Check the line under its title.' : '');
+
+const overallText = a => `${(Number(a.overallPct) || 0).toFixed(2)}%`;
+const abstractLabel = a => `as of ${displayDate(a.asOf)}: overall ${overallText(a)}`;
+/** The tab's line after an upload is saved. */
+export const abstractSavedNote = (f, replaced) => `${replaced ? 'Replaced' : 'Saved'} the abstract ${abstractLabel(f)}.`;
+/** The weekly form's line when its week has an abstract. */
+export const abstractWeekNote = abstract => `Actual % is from the abstract as of ${displayDate(abstract.asOf)} (Actual Accomplishment tab).`;
+/** ProjectViewModel.saveAbstract's audit entry, word for word; `old` is the abstract of the same date it replaced. */
+export const abstractAudit = (f, old = null) => ({
+  actionType: old ? 'Updated abstract' : 'Abstract Upload', details: `Abstract ${abstractLabel(f)}`, oldValue: old ? overallText(old) : '', newValue: overallText(f),
+});
+/** ProjectViewModel.deleteAbstract's audit entry, word for word. */
+export const deletedAbstractAudit = a => ({ actionType: 'Deleted abstract', details: `Abstract ${abstractLabel(a)}`, oldValue: overallText(a), newValue: '' });
+
 /** FormValidation.percentError's reading: blank is 0, else 0 to 100; NaN for anything else. */
 const percent = text => {
   const t = String(text ?? '').trim(), v = !t ? 0 : /^(\d+(\.\d*)?|\.\d+)$/.test(t) ? Number(t) : NaN;
@@ -1567,17 +1639,19 @@ function weeklyFields(f, project) {
  * WeekRange.isLatest: the project's target and actual follow a saved report only when none of the `weekly` reports is
  * for a later week, so a late entry or a fix to an older week does not set the project back.
  */
-function projectFollows(weekly, uuid, reportingWeek, target, actual) {
+function projectFollows(weekly, uuid, reportingWeek, target, actual, abstracts = []) {
   const at = label => weekStart(label) ?? -Infinity;
-  return weekly.some(r => r.uuid !== uuid && at(r.reportingWeek) > at(reportingWeek)) ? null : { targetAccomplishment: target, actualAccomplishment: actual };
+  if (weekly.some(r => r.uuid !== uuid && at(r.reportingWeek) > at(reportingWeek))) return null;
+  // With an uploaded abstract the project's actual is the abstract's (projectActualAfter): only the target follows the report.
+  return abstracts.length ? { targetAccomplishment: target } : { targetAccomplishment: target, actualAccomplishment: actual };
 }
 
 /**
  * A new weekly report from the form: `build` makes the weekly_reports record as RecordSync uploads one,
- * `projectFields` are the project's target and actual saved with it (projectFollows), `audit` its entry. Photos and
- * weather start empty: the report's Add photos and Edit weather fill them.
+ * `projectFields` are the project's target and actual saved with it (projectFollows; the target alone while the
+ * project has `abstracts`), `audit` its entry. Photos and weather start empty: the report's Add photos and Edit weather fill them.
  */
-export function newWeeklyReport(f, project, user, weekly = []) {
+export function newWeeklyReport(f, project, user, weekly = [], abstracts = []) {
   const data = weeklyFields(f, project), { reportingWeek, targetAccomplishmentPct: target, actualAccomplishmentPct: actual } = data;
   return {
     build: ({ uuid, projectUuid, assignedUids, uid, now }) => ({
@@ -1585,7 +1659,7 @@ export function newWeeklyReport(f, project, user, weekly = []) {
       data: JSON.stringify({ ...data, documentsIssuedReceivedJson: '[]', attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', submittedByStaff: user,
         createdAtTimestamp: now, _weather: [] }),
     }),
-    projectFields: projectFollows(weekly, null, reportingWeek, target, actual),
+    projectFields: projectFollows(weekly, null, reportingWeek, target, actual, abstracts),
     audit: { actionType: 'Report Creation', details: `Submitted Weekly Report for ${reportingWeek}`, newValue: `Week: ${reportingWeek}, Target: ${target}%, Actual: ${actual}%` },
   };
 }
@@ -1609,13 +1683,13 @@ export function weeklyStart(report) {
  * was changed (an older "Week 42: ..." label stays); then weather logged for days outside the new week is dropped.
  * Photos and the rest of the weather are left alone.
  */
-export function editedWeeklyReport(report, f, project, weekly = []) {
+export function editedWeeklyReport(report, f, project, weekly = [], abstracts = []) {
   const fields = weeklyFields(f, project), moved = weekDays(report.reportingWeek)[0] !== f.first;
   const days = weekDays(fields.reportingWeek);
   const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek,
     ...(moved && Array.isArray(report._weather) ? { _weather: report._weather.filter(w => days.includes((w.date || '').trim())) } : {}) };
   return {
-    changes, projectFields: projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct),
+    changes, projectFields: projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct, abstracts),
     audit: { actionType: 'Edited Weekly Report', details: `Modified report for ${changes.reportingWeek}` },
   };
 }

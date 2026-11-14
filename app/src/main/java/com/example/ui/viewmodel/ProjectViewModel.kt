@@ -800,6 +800,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         else combine(projectDao.getContractorLettersForProject(id), repository.getPendingDocuments(id), com.example.util.ContractorLetters::merged)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** The uploaded abstracts of the actual work (Actual Accomplishment tab), newest "As of" date first. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val projectAbstracts: StateFlow<List<ProjectAbstract>> = _selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else projectDao.getProjectAbstractsForProject(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val pendingDocuments: StateFlow<List<PendingDocument>> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getPendingDocuments(id)
@@ -2009,6 +2015,10 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             com.example.util.BillingAbstract.units(project, saleable), signatories, blueBookBanner
         )
 
+    /** An uploaded abstract of the actual work with every column of the Excel file, for the print preview. */
+    fun actualAbstractForm(project: Project, abstract: ProjectAbstract): String =
+        com.example.util.BlueBookForms.actualAbstract(project, abstract, blueBookBanner)
+
     /** Saves the approved bar chart ([json] from BarChart.toJson; blank removes it). */
     fun saveBarChart(projectId: Long, json: String) {
         viewModelScope.launch(missingProjectGuard) {
@@ -2395,7 +2405,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     val latest = isLatestWeek(report)
                     val updated = current.copy(
                         targetAccomplishment = if (latest) targetAccomplishmentPct else current.targetAccomplishment,
-                        actualAccomplishment = if (latest) actualAccomplishmentPct else current.actualAccomplishment,
+                        actualAccomplishment = if (latest && actualFollowsWeekly(projectId)) actualAccomplishmentPct else current.actualAccomplishment,
                         latestUpdatePhotoUrl = photos.firstOrNull() ?: current.latestUpdatePhotoUrl
                     )
                     saveProjectChange(updated)
@@ -2425,7 +2435,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 if (current.id == report.projectId && isLatestWeek(report)) {
                     val updated = current.copy(
                         targetAccomplishment = report.targetAccomplishmentPct,
-                        actualAccomplishment = report.actualAccomplishmentPct
+                        actualAccomplishment = if (actualFollowsWeekly(report.projectId)) report.actualAccomplishmentPct else current.actualAccomplishment
                     )
                     saveProjectChange(updated)
                 }
@@ -2442,12 +2452,11 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
 
                 // Keep the Project Master accomplishment in step with the edited report.
                 val current = projectDao.getProjectByIdOnce(report.projectId)
-                if (current != null && isLatestWeek(report) && (current.targetAccomplishment != report.targetAccomplishmentPct ||
-                        current.actualAccomplishment != report.actualAccomplishmentPct)) {
-                    saveProjectChange(current.copy(
-                        targetAccomplishment = report.targetAccomplishmentPct,
-                        actualAccomplishment = report.actualAccomplishmentPct
-                    ))
+                if (current != null && isLatestWeek(report)) {
+                    val actual = if (actualFollowsWeekly(report.projectId)) report.actualAccomplishmentPct else current.actualAccomplishment
+                    if (current.targetAccomplishment != report.targetAccomplishmentPct || current.actualAccomplishment != actual) {
+                        saveProjectChange(current.copy(targetAccomplishment = report.targetAccomplishmentPct, actualAccomplishment = actual))
+                    }
                 }
                 refreshSitePhoto(report.projectId)
             } catch (error: Exception) {
@@ -2479,6 +2488,54 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     /** WeekRange.isLatest among the project's saved reports. */
     private suspend fun isLatestWeek(report: WeeklyReport) =
         com.example.ui.dialogs.WeekRange.isLatest(report, reportDao.getWeeklyReportsForProject(report.projectId).first())
+
+    /** A project with an uploaded abstract takes its actual from the latest abstract, not from a weekly report; its target still follows the report. */
+    private suspend fun actualFollowsWeekly(projectId: Long) = projectDao.getProjectAbstractsForProject(projectId).first().isEmpty()
+
+    /**
+     * Files an uploaded abstract under its "As of" date, in place of the one already filed under that date, and makes
+     * the latest abstract the project's actual accomplishment.
+     */
+    fun saveAbstract(record: ProjectAbstract) {
+        viewModelScope.launch(missingProjectGuard) {
+            val old = projectDao.getProjectAbstractsForProject(record.projectId).first().firstOrNull { it.asOf == record.asOf }
+            if (old == null) projectDao.insertProjectAbstract(record)
+            else projectDao.updateProjectAbstract(old.copy(overallPct = record.overallPct, rowsJson = record.rowsJson, fileName = record.fileName, uploadedBy = record.uploadedBy))
+            followAbstracts(record.projectId)
+            val overall = com.example.util.ProjectAbstracts.pct(record.overallPct)
+            logAuditAction(
+                projectId = record.projectId,
+                actionType = if (old == null) "Abstract Upload" else "Updated abstract",
+                details = "Abstract as of ${com.example.util.ProjectAbstracts.summary(record)}",
+                // logAuditAction drops an entry whose old and new values are the same, and a replacement must still be logged.
+                oldValue = old?.let { com.example.util.ProjectAbstracts.pct(it.overallPct) }?.takeIf { it != overall }.orEmpty(),
+                newValue = overall
+            )
+        }
+    }
+
+    fun deleteAbstract(record: ProjectAbstract) {
+        viewModelScope.launch(missingProjectGuard) {
+            projectDao.deleteProjectAbstract(record.id)
+            followAbstracts(record.projectId)
+            logAuditAction(
+                projectId = record.projectId,
+                actionType = "Deleted abstract",
+                details = "Abstract as of ${com.example.util.ProjectAbstracts.summary(record)}",
+                oldValue = com.example.util.ProjectAbstracts.pct(record.overallPct),
+                newValue = ""
+            )
+        }
+    }
+
+    /** The project's actual after an abstract was saved or deleted; with none left it goes back to the latest weekly report's. */
+    private suspend fun followAbstracts(projectId: Long) {
+        val current = projectDao.getProjectByIdOnce(projectId) ?: return
+        val actual = com.example.util.ProjectAbstracts.projectActualAfter(
+            projectDao.getProjectAbstractsForProject(projectId).first(), reportDao.getWeeklyReportsForProject(projectId).first(), current.actualAccomplishment
+        )
+        if (actual != current.actualAccomplishment) saveProjectChange(current.copy(actualAccomplishment = actual))
+    }
 
     private suspend fun refreshSitePhoto(projectId: Long) {
         val photo = SitePhotos.latest(reportDao.getWeeklyReportsForProject(projectId).first())

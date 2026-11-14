@@ -416,3 +416,31 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
   assert.match(html, /Approved by:/);
 });
+
+test('actual accomplishment tab: every pay item of an uploaded abstract in the sheet\'s columns, a part to a block, then the grand total', () => {
+  const none = [null, null, null];
+  const rows = [
+    { kind: 'part', no: '2', name: 'LAND DEVELOPMENT', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'group', no: '2.1', name: 'GENERAL <REQUIREMENTS>', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'item', no: '2.1.1', name: 'Mobilization/Demobilization', qty: 1, unit: 'l.s.', unitCost: 400000, amount: 400000, prev: [0, 0, 0], period: [0.25, 100000, 25], toDate: [0.25, 100000, 25], balance: [0.75, 300000] },
+    { kind: 'item', no: '2.2.1', name: 'Road Excavation', qty: 1234.56789, unit: 'cu.m.', unitCost: null, amount: 1600000, prev: none, period: none, toDate: [null, 404000, 25.25], balance: [null, null] },
+    { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', qty: null, unit: '', unitCost: null, amount: 2000000, prev: none, period: none, toDate: [null, 504000, 25.21], balance: [null, null] },
+    { kind: 'part', no: '3', name: 'HOUSING CONSTRUCTION', qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] },
+    { kind: 'total', no: '', name: 'GRAND TOTAL', qty: null, unit: '', unitCost: null, amount: 9000000, prev: none, period: none, toDate: [null, 504000, 5.6], balance: [null, null] },
+  ];
+  const html = P.abstractItemsHtml(rows);
+  const cells = (...list) => list.map(c => `<td class="num">${c}</td>`).join('');
+  // A part heads its block with its own subtotal's amount and % to date; one without a subtotal shows zeros and no table.
+  assert.match(html, /<details class="card apa-part" open><summary>.*<b>2 LAND DEVELOPMENT<\/b>\s*<span class="num">2,000,000.00<\/span><span class="num">25.21%<\/span><\/summary><div class="scroll">/);
+  assert.match(html, /<b>3 HOUSING CONSTRUCTION<\/b>\s*<span class="num">0.00<\/span><span class="num">0.00%<\/span><\/summary><\/details>/);
+  assert.equal(html.match(/<details /g).length, 2);
+  assert.ok(html.includes('<tr class="apa-group"><td>2.1</td><td colspan="16">GENERAL &lt;REQUIREMENTS&gt;</td></tr>'));
+  assert.ok(html.includes(`<tr class="apa-item"><td>2.1.1</td><td>Mobilization/Demobilization</td>${cells('1')}<td>l.s.</td>${cells('400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%', '0.75', '300,000.00')}</tr>`));
+  // Empty cells stay blank; a quantity shows 4 decimals at most.
+  assert.ok(html.includes(`<tr class="apa-item"><td>2.2.1</td><td>Road Excavation</td>${cells('1,234.5679')}<td>cu.m.</td>${cells('', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', '')}</tr>`));
+  assert.ok(html.includes(`<tr class="apa-subtotal"><td></td><td>Subtotal (Land Development)</td>${cells('')}<td></td>${cells('', '2,000,000.00', '', '', '', '', '', '', '', '504,000.00', '25.21%', '', '')}</tr>`));
+  // The grand total comes last, after the parts.
+  assert.ok(html.lastIndexOf('<tr class="apa-total"><td></td><td>GRAND TOTAL</td>') > html.lastIndexOf('</details>'));
+  assert.equal(html.match(/<th colspan="3">TO DATE<\/th>/g).length, 2);
+  assert.equal(P.abstractItemsHtml([]), '');
+});

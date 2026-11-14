@@ -24,6 +24,7 @@ class ThemeGuardTest {
             "ui/dashboard/PortfolioRow.kt",
             "ui/detail/ProjectDetailScreen.kt",
             "ui/detail/ProjectSection.kt",
+            "ui/detail/sections/ActualAccomplishmentSection.kt",
             "ui/detail/sections/BarChartCard.kt",
             "ui/detail/sections/ChipRow.kt",
             "ui/detail/sections/DocumentsSection.kt",

@@ -687,6 +687,9 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   // A report for a later week is already saved: this late entry leaves the project's figures alone.
   assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }]).projectFields, null);
   assert.notEqual(L.newWeeklyReport(f, project, 'x', [{ uuid: 'older', reportingWeek: 'Week 6: February 7 - February 13, 2026' }]).projectFields, null);
+  // The project has an uploaded abstract: its actual is the abstract's, so only the target follows the report.
+  assert.deepEqual(L.newWeeklyReport(f, project, 'x', [], [{ asOf: '2026-01-30' }]).projectFields, { targetAccomplishment: data.targetAccomplishmentPct });
+  assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }], [{ asOf: '2026-01-30' }]).projectFields, null);
   // No dates on the project: day counts are 0, as on the phone.
   assert.deepEqual((({ daysElapsed, remainingDays }) => [daysElapsed, remainingDays])(JSON.parse(L.newWeeklyReport(f, {}, 'x').build({}).data)), [0, 0]);
 });
@@ -737,6 +740,7 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   const others = [report, { uuid: 'r2', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }];
   assert.equal(L.editedWeeklyReport(report, f, project, others).projectFields, null);
   assert.deepEqual(L.editedWeeklyReport(report, f, project, [report]).projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5 });
+  assert.deepEqual(L.editedWeeklyReport(report, f, project, [report], [{ asOf: '2026-01-30' }]).projectFields, { targetAccomplishment: 20 });
   assert.notEqual(L.editedWeeklyReport(report, { ...f, first: '2026-02-28' }, project, others).projectFields, null);
 
   assert.deepEqual(L.deletedWeeklyAudit(report), { actionType: 'Deleted Weekly Report', details: 'Deleted report for Week 7: February 14 - February 20, 2026' });
@@ -1306,6 +1310,69 @@ test('find lots: the closed outlines of a plan page become lots, numbered and na
   assert.deepEqual([drawn, old, started].map(L.foundLot), [false, true, true]);
 });
 
+// A made-up abstract's rows as the record keeps them: three parts at 50, 25.21 and 1, overall 10.73.
+const ABSTRACT_ROWS = [
+  { kind: 'part', no: '1', name: 'LAND ACQUISITION COST', amount: 1000000, toDate: [null, 500000, 50] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Land Acquisition Cost)', amount: 1000000, toDate: [null, 500000, 50] },
+  { kind: 'part', no: '2', name: 'LAND DEVELOPMENT', amount: null, toDate: [null, null, null] },
+  { kind: 'group', no: '2.2', name: 'ROADWORKS', amount: null, toDate: [null, null, null] },
+  { kind: 'item', no: '2.2.1', name: 'Road Excavation', amount: 1600000, toDate: [null, 404000, 25.25] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Roadworks)', amount: 1600000, toDate: [null, 404000, 25.25] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, toDate: [null, 504000, 25.21] },
+  { kind: 'part', no: '3', name: 'HOUSING CONSTRUCTION', amount: null, toDate: [null, null, null] },
+  { kind: 'subtotal', no: '', name: 'Subtotal (Housing Construction)', amount: 7000000, toDate: [null, 70000, 1] },
+  { kind: 'total', no: '', name: 'GRAND TOTAL', amount: 10000000, toDate: [null, 1074000, 10.73] },
+];
+
+test('uploaded abstracts: the record, the latest and a week\'s, the project\'s actual, and the words shown', () => {
+  const parts = [{ name: 'LAND ACQUISITION COST', amount: 1000000, actualPct: 50 }, { name: 'LAND DEVELOPMENT', amount: 2000000, actualPct: 25.21 }, { name: 'HOUSING CONSTRUCTION', amount: 7000000, actualPct: 1 }];
+  assert.deepEqual(L.abstractRows(JSON.stringify(ABSTRACT_ROWS)), ABSTRACT_ROWS);
+  assert.deepEqual([L.abstractRows('not json'), L.abstractRows(''), L.abstractRows('{"a":1}'), L.abstractRows('[null,1]')], [[], [], [], []]);
+  assert.deepEqual(L.abstractParts(ABSTRACT_ROWS), parts);
+  assert.deepEqual(L.abstractParts([{ kind: 'subtotal', amount: 5 }, { kind: 'part', name: 'A' }]), [{ name: 'A', amount: 0, actualPct: 0 }]);
+
+  const found = { asOf: '2025-03-14', parts, overallPct: 10.73, billing: false, rows: ABSTRACT_ROWS };
+  const fields = L.abstractFields(found, 'APA March.xlsx', 'Engr. Web');
+  assert.deepEqual(fields, { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS), fileName: 'APA March.xlsx', uploadedBy: 'Engr. Web' });
+  // No grand total on the sheet: the parts by their amounts; no file name or uploader is '' (the columns are NOT NULL on the phone).
+  assert.deepEqual((({ overallPct, fileName, uploadedBy }) => [overallPct, fileName, uploadedBy])(L.abstractFields({ ...found, overallPct: null }, undefined, null)), [10.74, '', '']);
+  assert.equal(L.abstractFields({ ...found, overallPct: null, parts: [] }, '', '').overallPct, 0);
+  const record = L.newAbstractRecord({ uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'me', now: 5 }, fields);
+  assert.deepEqual(record, { uuid: 'u1', type: 'project_abstracts', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 5, updatedByUid: 'me', isDeleted: false, data: JSON.stringify(fields) });
+  assert.deepEqual(Object.keys(JSON.parse(record.data)), ['asOf', 'overallPct', 'rowsJson', 'fileName', 'uploadedBy']);
+
+  const feb = { uuid: 'feb', asOf: '2025-02-28', overallPct: 8, updatedAt: 9 }, mar = { uuid: 'mar', asOf: '2025-03-14', overallPct: 10.73, updatedAt: 2 };
+  const again = { uuid: 'again', asOf: '2025-03-14', overallPct: 11, updatedAt: 3 };
+  assert.equal(L.latestAbstract([mar, feb]).uuid, 'mar');
+  assert.equal(L.latestAbstract([again, mar, feb]).uuid, 'again'); // two devices filed the same date: the last saved
+  assert.equal(L.latestAbstract([mar, again]).uuid, 'again');
+  assert.equal(L.latestAbstract([]), undefined);
+  assert.equal(L.abstractInWeek([feb, mar], 'Mar 8, 2025 - Mar 14, 2025').uuid, 'mar');
+  assert.equal(L.abstractInWeek([feb, mar, again], 'Week 11: March 8 - March 14, 2025').uuid, 'again');
+  assert.equal(L.abstractInWeek([feb, mar], 'Mar 15, 2025 - Mar 21, 2025'), null);
+  assert.equal(L.abstractInWeek([feb, mar], 'no dates'), null);
+  assert.deepEqual(L.abstractLineActuals(fields), ['50.00', '25.21', '1.00']);
+  assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }), ['0.00', '25.21', '0.00']);
+
+  // The project's actual: the latest abstract's overall, else the latest weekly report's, else as it is.
+  const weekly = [{ reportingWeek: 'Mar 1, 2025 - Mar 7, 2025', actualAccomplishmentPct: 9 }, { reportingWeek: 'Mar 8, 2025 - Mar 14, 2025', actualAccomplishmentPct: 10.5 }];
+  assert.equal(L.projectActualAfter([feb, mar], weekly, 3), 10.73);
+  assert.equal(L.projectActualAfter([], weekly, 3), 10.5);
+  assert.equal(L.projectActualAfter([], [], 3), 3);
+
+  assert.equal(L.abstractProblem(undefined), 'That file could not be read. Pick the abstract saved as an Excel workbook (.xlsx).');
+  assert.equal(L.abstractProblem(null), 'No Abstract of Physical Accomplishment was found in that file.');
+  assert.equal(L.abstractProblem({ ...found, billing: true }), 'That is the billing abstract. Pick the abstract of the actual accomplishment.');
+  assert.equal(L.abstractProblem({ ...found, asOf: null }), 'That abstract has no "As of" date, so it cannot be filed. Check the line under its title.');
+  assert.equal(L.abstractProblem(found), '');
+  assert.equal(L.abstractSavedNote(fields, false), 'Saved the abstract as of Mar 14, 2025: overall 10.73%.');
+  assert.equal(L.abstractSavedNote({ ...fields, overallPct: 11 }, true), 'Replaced the abstract as of Mar 14, 2025: overall 11.00%.');
+  assert.equal(L.abstractWeekNote(mar), 'Actual % is from the abstract as of Mar 14, 2025 (Actual Accomplishment tab).');
+  assert.deepEqual(L.abstractAudit(fields), { actionType: 'Abstract Upload', details: 'Abstract as of Mar 14, 2025: overall 10.73%', oldValue: '', newValue: '10.73%' });
+  assert.deepEqual(L.abstractAudit({ ...fields, overallPct: 11 }, mar), { actionType: 'Updated abstract', details: 'Abstract as of Mar 14, 2025: overall 11.00%', oldValue: '10.73%', newValue: '11.00%' });
+  assert.deepEqual(L.deletedAbstractAudit(mar), { actionType: 'Deleted abstract', details: 'Abstract as of Mar 14, 2025: overall 10.73%', oldValue: '10.73%', newValue: '' });
+});
+
 test('abstracts: what is billed never passes the actual, and the billing abstract is made from the billings', () => {
   const project = { scopeOfWork: JSON.stringify([{ name: 'Land Acquisition', amount: 1000000, weightPct: 10 }, { name: 'Land Development', amount: 2000000, weightPct: 20 },
     { name: 'Construction of Housing Units', amount: 7000000, weightPct: 70 }]), targetAccomplishment: 12, actualAccomplishment: 10.74, numberOfUnits: '100 units' };
@@ -1343,6 +1410,20 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
 
   // An old billing saved as lots x price: its gross at 2 decimals parses a hair above the saved one, which is not a raise.
   assert.deepEqual(ahead({ ...form, grossAmount: '35219729.88' }, { ...payments[2], grossAmount: 81 * 434811.48 }, []), []);
+
+  // With an uploaded abstract the actual is the latest abstract's, whatever the weekly reports say.
+  const uploaded = { asOf: '2025-03-14', overallPct: 10.73, rowsJson: JSON.stringify(ABSTRACT_ROWS) };
+  const byAbstract = (f, a = uploaded, w = []) => L.billingAheadErrors(project, [], payments, w, f, null, [a]);
+  const acquisition = { ...form, billingType: 'Land acquisition', units: '1', unitPrice: '100000' };
+  assert.deepEqual(byAbstract(form), []);
+  assert.deepEqual(byAbstract({ ...form, grossAmount: '204,400' }), ['Land Development: billed to date 25.22% would pass the actual 25.21% of the abstract as of Mar 14, 2025.']);
+  assert.deepEqual(byAbstract(acquisition, { ...uploaded, overallPct: 7.5 }), ['Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025.']);
+  // The weekly reports say 10.74% overall and would let this one through: the abstract wins.
+  assert.deepEqual(ahead(acquisition), []);
+  assert.deepEqual(byAbstract(acquisition, { ...uploaded, overallPct: 7.5 }, weekly), ['Overall: billed to date 8.00% would pass the actual 7.50% of the abstract as of Mar 14, 2025.']);
+  // A line the abstract has no part for has no work done.
+  assert.deepEqual(byAbstract({ ...form, grossAmount: '1' }, { ...uploaded, rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(0, 2)) }),
+    ['Land Development: billed to date 15.00% would pass the actual 0.00% of the abstract as of Mar 14, 2025.']);
 
   assert.equal(L.abstractUnits(project), 100);
   assert.equal(L.abstractUnits({ numberOfUnits: '' }, 42), 42);

@@ -453,6 +453,21 @@ span.file.gone { text-decoration: none; }
 /* Every cell boxed, so the report tables read like the printed form. */
 .grid-table th, .grid-table td { border: 1px solid var(--outline); padding: 8px 10px; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns and scroll sideways. */
+.apa-tools { align-items: end; margin-bottom: 6px; }
+.apa-tools + p { min-height: 16px; margin-bottom: 12px; }
+.apa-part { padding: 0 16px; }
+div.apa-part { padding-top: 16px; }
+.apa-part summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 48px; cursor: pointer; list-style: none; }
+.apa-part summary::-webkit-details-marker { display: none; }
+.apa-part summary b { flex: 1 1 200px; font-weight: 600; }
+.apa-part summary .icon { transition: transform 150ms ease-out; }
+.apa-part[open] summary .icon { transform: rotate(180deg); }
+.apa-part .scroll { margin-bottom: 16px; }
+.apa-items { white-space: nowrap; }
+.apa-items thead th { text-align: center; }
+.apa-items td:nth-child(2) { white-space: normal; min-width: 220px; }
+.apa-group td, .apa-subtotal td, .apa-total td { font-weight: 600; }
 /* Photos: two across on a phone, more on wider screens; each opens full size. */
 /* ul only: the print form's table.photos must keep its table layout. */
 ul.photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 5px)), 1fr)); gap: 10px; }

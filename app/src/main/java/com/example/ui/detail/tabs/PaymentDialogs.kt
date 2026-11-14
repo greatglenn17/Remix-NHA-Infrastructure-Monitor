@@ -55,7 +55,7 @@ fun AddPaymentDialog(
     previous: List<ProjectPayment> = emptyList(),
     // The contract amount of land development per lot on a billing date: where its amount per lot starts without an earlier billing.
     landPerLot: (date: String) -> Double = { 0.0 },
-    // Why this billing cannot be saved (it would pass the actual accomplishment); empty when it can.
+    // Why this billing cannot be saved (it would pass the actual accomplishment) and what to do about it; empty when it can.
     check: (ProjectPayment) -> List<String> = { emptyList() }
 ) {
     var name by remember { mutableStateOf(existing?.name ?: "") }
@@ -251,7 +251,7 @@ fun AddPaymentDialog(
                     )
                     val errors = check(payment)
                     if (errors.isEmpty()) onSubmit(payment)
-                    else ahead = errors.joinToString(" ") + " Save the newer weekly report first, or lower this billing."
+                    else ahead = errors.joinToString(" ")
                 },
                 enabled = amountErr == null && unitsErr == null && priceErr == null,
                 shape = RoundedCornerShape(50.dp)

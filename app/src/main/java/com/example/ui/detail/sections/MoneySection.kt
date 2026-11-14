@@ -35,7 +35,7 @@ fun MoneySection(
     isHousing: Boolean = false,
     // The contract amount of land development per lot on a billing date; see AddPaymentDialog.
     landPerLot: (date: String) -> Double = { 0.0 },
-    // Why a billing (in place of the old one when editing) cannot be saved; see BillingAbstract.aheadErrors.
+    // Why a billing (in place of the old one when editing) cannot be saved and what to do; see BillingAbstract.aheadErrors and aheadHint.
     billingCheck: (ProjectPayment, ProjectPayment?) -> List<String> = { _, _ -> emptyList() },
     onPrintAbstract: (ProjectPayment) -> Unit = {},
     onAddPayment: (ProjectPayment) -> Unit,

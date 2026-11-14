@@ -4,6 +4,7 @@ import com.example.data.model.ACCOMPLISHMENT_LINES
 import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectPayment
 import com.example.data.model.WeeklyReport
 import com.example.data.model.accomplishmentLine
@@ -44,28 +45,35 @@ object BillingAbstract {
 
     /**
      * What is billed never passes the work done. With [new] saved (in place of [old] when editing), the billed share
-     * of its part's contract amount, and of the contract cost for all parts, against the actual of the latest weekly
-     * report, at 2 decimals. Only billings with a housing type count, and only a new or raised one is checked, so a
-     * billing already saved can still be corrected.
+     * of its part's contract amount, and of the contract cost for all parts, against the actual, at 2 decimals: that
+     * of the latest of [abstracts] (the Actual Accomplishment tab), or for a project without one the latest weekly
+     * report's. Only billings with a housing type count, and only a new or raised one is checked, so a billing
+     * already saved can still be corrected.
      */
     fun aheadErrors(
         project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, weekly: List<WeeklyReport>,
-        new: ProjectPayment, old: ProjectPayment? = null
+        new: ProjectPayment, old: ProjectPayment? = null, abstracts: List<ProjectAbstract> = emptyList()
     ): List<String> {
         if (new.billingType.isBlank() || (old != null && old.billingType == new.billingType && round2(new.grossAmount) <= round2(old.grossAmount))) return emptyList()
+        val abstract = ProjectAbstracts.latest(abstracts)
         val last = latestWeekly(weekly)
-        val actuals = last?.let { parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty()
+        val actuals = abstract?.let(ProjectAbstracts::lineActuals)
+            ?: last?.let { parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty().map { it.actualPct }
+        val source = abstract?.let { " of the abstract as of ${ProjectSchedule.displayDate(it.asOf)}" } ?: last?.let { " of ${it.reportingWeek}" }.orEmpty()
         val billed = payments.filter { it.billingType.isNotBlank() && it.uuid != old?.uuid } + new
         val line = accomplishmentLine(new.billingType)
         val k = ACCOMPLISHMENT_LINES.indexOf(line)
         return listOf(
-            Check(line, billed.filter { accomplishmentLine(it.billingType) == line }.sumOf { it.grossAmount }, partAmounts(project, documents, day(new.date))[k], actuals.getOrNull(k)?.actualPct ?: 0.0),
-            Check("Overall", billed.sumOf { it.grossAmount }, ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents), last?.actualAccomplishmentPct ?: project.actualAccomplishment)
+            Check(line, billed.filter { accomplishmentLine(it.billingType) == line }.sumOf { it.grossAmount }, partAmounts(project, documents, day(new.date))[k], actuals.getOrNull(k) ?: 0.0),
+            Check("Overall", billed.sumOf { it.grossAmount }, ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents), abstract?.overallPct ?: last?.actualAccomplishmentPct ?: project.actualAccomplishment)
         ).filter { it.of > 0 && round2(it.billed / it.of * 100) > round2(it.actualPct) }.map {
-            "${it.name}: billed to date ${"%.2f".format(Locale.US, round2(it.billed / it.of * 100))}% would pass the actual " +
-                "${"%.2f".format(Locale.US, round2(it.actualPct))}%${last?.let { r -> " of ${r.reportingWeek}" }.orEmpty()}."
+            "${it.name}: billed to date ${"%.2f".format(Locale.US, round2(it.billed / it.of * 100))}% would pass the actual ${"%.2f".format(Locale.US, round2(it.actualPct))}%$source."
         }
     }
+
+    /** What to do about [aheadErrors], after them in the billing form. */
+    fun aheadHint(abstracts: List<ProjectAbstract>): String =
+        if (abstracts.isEmpty()) "Save the newer weekly report first, or lower this billing." else "Upload the newer abstract first, or lower this billing."
 
     /** [billed] of the contract amount [of], against the actual accomplishment. */
     private class Check(val name: String, val billed: Double, val of: Double, val actualPct: Double)
