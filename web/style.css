@@ -602,7 +602,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* Status of Construction (BlueBookForms.sdpPlan): the plan as big as one page allows, the legend over its bottom-left corner. */
 .bb.land { width: 285mm; }
 .bb table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
-/* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge, above BALANCE. */
+/* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
 .bb table.apa-info td:nth-child(3) { width: 100%; }
 .bb table.apa { font-size: 7.5pt; }
 .bb table.apa th, .bb table.apa td { padding: 1mm 0.8mm; }

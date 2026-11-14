@@ -421,6 +421,7 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   // One blank line between the contract cost and the target.
   assert.match(html, /CONTRACT COST<\/td>.*<\/tr>\s*<tr><td colspan='5'>&nbsp;<\/td><\/tr>\s*<tr><td class='pl'>TARGET ACCOMPLISHMENT/);
   assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
+  assert.ok(html.includes("<th colspan='2' rowspan='2'>BALANCE</th>")); // the billing format keeps its BALANCE columns
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
   assert.match(html, /Approved by:/);
@@ -450,15 +451,16 @@ test('abstract of the actual work: the billing format\'s top with the tab\'s tar
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
   // The header rows are a thead, so they repeat on every page of a long abstract.
-  assert.match(html, /<thead><tr><th rowspan='3'>ITEM NO\.<\/th>.*<th>QTY<\/th><th>AMOUNT<\/th><\/tr><\/thead>/s);
+  assert.match(html, /<thead><tr><th rowspan='3'>ITEM NO\.<\/th>.*<th>QTY<\/th><th>AMOUNT<\/th><th>% WT<\/th><\/tr><\/thead>/s);
+  assert.ok(!html.includes('BALANCE')); // the printed abstract of the actual work has no BALANCE columns
   assert.ok(html.includes("<tr><td class='c'>2</td><td><b>LAND DEVELOPMENT</b></td>"));
   assert.ok(html.includes("<td class='c'>2.1</td><td><b>GENERAL &lt;REQUIREMENTS&gt;</b></td>"));
-  // Every column of the row, ending at BALANCE: the equivalent units it carries are not shown.
-  assert.match(html, row('2.1.1', 'Mobilization/Demobilization', '1', 'l.s.', '400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%', '0.75', '300,000.00'));
+  // Every column of the row, ending at TO DATE: its balance and the equivalent units it carries are not shown.
+  assert.match(html, row('2.1.1', 'Mobilization/Demobilization', '1', 'l.s.', '400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%'));
   assert.ok(!/equivalent/i.test(html));
   // Empty cells stay blank; a quantity shows 4 decimals at most; subtotals and the grand total are bold rows.
-  assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', ''));
-  assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%', '', '').source}`));
+  assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%'));
+  assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%').source}`));
   assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
 });
 

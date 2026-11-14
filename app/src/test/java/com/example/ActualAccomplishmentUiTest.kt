@@ -4,12 +4,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -88,18 +88,22 @@ class ActualAccomplishmentUiTest {
                 ActualAccomplishmentSection(project, emptyList(), listOf(abstract.copy(id = 2, asOf = "2025-02-14", overallPct = 5.0, uuid = "older"), abstract), "Engr. Sample", {}, {}, {}, { _, _ -> })
             }
         }
-        rule.onNodeWithText("10.73%").assertExists() // the latest "As of" date opens first
+        rule.onNodeWithTag("standing_Overall").assert(hasText("10.73%")) // the latest "As of" date opens first
         // Target, actual and advance/slippage by line; without a bar chart only the overall has a target, the project's.
         rule.onNodeWithTag("standing_Land Development").assert(hasText("-")).assert(hasText("25.21%"))
         rule.onNodeWithTag("standing_Overall").assert(hasText("12.00%")).assert(hasText("10.73%")).assert(hasText("-1.27%"))
         rule.onNodeWithText("abstract.xlsx").assertExists()
         rule.onNodeWithText("2  LAND DEVELOPMENT").assertExists()
         rule.onNodeWithText("Amount 2,000,000.00 · To date 25.21%").assertExists()
-        rule.onNodeWithText("2.1.1  Mobilization/Demobilization").assertExists()
-        rule.onNodeWithText("Amount 400,000.00 · To date 100,000.00 (25.00%)").assertExists()
+        // The pay items are a table of the sheet's columns, under their headings; an empty cell is blank.
+        listOf("ITEM DESCRIPTION", "THIS PERIOD", "BALANCE").forEach { rule.onAllNodesWithText(it).onFirst().assertExists() } // each open part has its own headings
+        rule.onNodeWithTag("abstract_row_1").assert(hasText("2.1.1")).assert(hasText("Mobilization/Demobilization")).assert(hasText("l.s."))
+            .assert(hasText("400,000.00")).assert(hasText("0.25")).assert(hasText("100,000.00")).assert(hasText("25.00%")).assert(hasText("0.75")).assert(hasText("300,000.00"))
+        rule.onNodeWithTag("abstract_row_2").assert(hasText("Subtotal (Land Development)")).assert(hasText("2,000,000.00")).assert(hasText("504,000.00")).assert(hasText("25.21%"))
         rule.onNodeWithTag("abstract_part_0").performClick()
-        rule.onNodeWithText("2.1.1  Mobilization/Demobilization").assertDoesNotExist()
-        rule.onNodeWithText("GRAND TOTAL").assertExists()
+        rule.onNodeWithTag("abstract_row_1").assertDoesNotExist()
+        rule.onNodeWithTag("abstract_row_2").assertDoesNotExist()
+        rule.onNodeWithTag("abstract_row_5").assert(hasText("GRAND TOTAL")).assert(hasText("1,074,000.00")) // the grand total stays in sight
         rule.onNodeWithTag("upload_abstract").assertExists()
         rule.onNodeWithTag("delete_abstract").assertExists()
         // An earlier date can be picked.
@@ -249,10 +253,11 @@ class ActualAccomplishmentUiTest {
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun aPartThatIsItsOwnPayItem_showsItsFiguresUnderItsHeading() {
         rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(first), "", null, null, {}, { _, _ -> }) } }
-        rule.onAllNodesWithText("1  LAND ACQUISITION COST").assertCountEquals(2)
-        rule.onAllNodesWithText("Amount 33,930,260.00 · To date 27,405,210.00 (80.77%)").assertCountEquals(2) // its own line and its subtotal
+        rule.onNodeWithText("1  LAND ACQUISITION COST").assertExists()
+        rule.onNodeWithTag("abstract_row_0").assert(hasText("LAND ACQUISITION COST")).assert(hasText("520")).assert(hasText("LOT")).assert(hasText("27,405,210.00")).assert(hasText("80.77%"))
         rule.onNodeWithTag("abstract_part_0").performClick()
-        rule.onAllNodesWithText("1  LAND ACQUISITION COST").assertCountEquals(1)
+        rule.onNodeWithTag("abstract_row_0").assertDoesNotExist()
+        rule.onNodeWithText("1  LAND ACQUISITION COST").assertExists() // its heading stays
         // The sheet ("Print abstract") has every column on the part's own row.
         val row = "<td class='c'>1</td><td><b>LAND ACQUISITION COST</b></td><td class='n'>520</td><td class='c'>LOT</td><td class='n'>65,250.50</td><td class='n'>33,930,260.00</td>"
         assertTrue(BlueBookForms.actualAbstract(project, emptyList(), first, com.example.util.Signatories("", "", "", "", "", "")).contains(row))
