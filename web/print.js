@@ -277,7 +277,8 @@ export function abstractItemsHtml(rows, equivUnits = 0) {
   // Rows under each part; rows before the first part, if any, get a block without a heading.
   const parts = L.abstractParts(rows), total = rows.filter(r => r.kind === 'total'), blocks = [];
   for (const r of rows.filter(x => x.kind !== 'total')) {
-    if (r.kind === 'part') blocks.push({ part: r, sum: parts[blocks.filter(b => b.part).length], rows: [] });
+    // A part that is its own pay item (Land Acquisition) shows its quantity and figures as the first line under it.
+    if (r.kind === 'part') blocks.push({ part: r, sum: parts[blocks.filter(b => b.part).length], rows: L.isPayLine(r) ? [{ ...r, kind: 'item' }] : [] });
     else { if (!blocks.length) blocks.push({ rows: [] }); blocks.at(-1).rows.push(r); }
   }
   return blocks.map(b => (b.part ? `<details class="card apa-part" open><summary><span class="icon sm" aria-hidden="true">expand_more</span><b>${esc(b.part.no)} ${esc(b.part.name)}</b>

@@ -461,3 +461,11 @@ test('actual accomplishment tab: every pay item of an uploaded abstract in the s
   assert.ok(wide.includes(`<tr class="apa-item"><td>2.2.1</td><td>Road Excavation</td>${cells('1,234.5679')}<td>cu.m.</td>${cells('', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', '', '', '', '')}</tr>`));
   assert.ok(P.abstractItemsHtml(rows, 370.5).includes('EQUIVALENT TO 370.5 UNITS'));
 });
+
+test('a part that is its own pay item shows its quantity and figures under its heading', () => {
+  const none = [null, null, null];
+  const html = P.abstractItemsHtml([
+    { kind: 'part', no: '1', name: 'LAND ACQUISITION COST', qty: 520, unit: 'LOT', unitCost: 65250.5, amount: 33930260, prev: none, period: none, toDate: [420, 27405210, 80.77], balance: [100, 6525050], equiv: none },
+    { kind: 'subtotal', no: '', name: 'Subtotal (Land Acquisition Cost)', qty: null, unit: '', unitCost: null, amount: 33930260, prev: none, period: none, toDate: [null, 27405210, 80.77], balance: [null, null], equiv: none }]);
+  assert.match(html, /<tr class="apa-item"><td>1<\/td><td>LAND ACQUISITION COST<\/td><td class="num">520<\/td><td>LOT<\/td>/);
+});

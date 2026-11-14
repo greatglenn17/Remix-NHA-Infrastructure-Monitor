@@ -472,6 +472,9 @@ div.apa-part { padding-top: 16px; }
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
 .apa-standing tbody th { text-align: left; font-weight: 400; }
+.apa-next td:nth-child(2) { min-width: 200px; }
+.apa-next input { width: 110px; text-align: right; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.apa-next input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .apa-typed { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; margin-bottom: 8px; }
 .apa-typed .field { flex: 1 1 170px; }
 .apa-typed .field:first-child { flex-basis: 100%; }

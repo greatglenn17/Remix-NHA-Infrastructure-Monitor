@@ -1628,8 +1628,107 @@ export const abstractSavedNote = (f, replaced) => `${replaced ? 'Replaced' : 'Sa
 export const abstractWeekNote = abstract => `Actual % is from the abstract as of ${displayDate(abstract.asOf)} (Actual Accomplishment tab).`;
 /** ProjectViewModel.saveAbstract's audit entry, word for word; `old` is the abstract of the same date it replaced. */
 export const abstractAudit = (f, old = null) => ({
-  actionType: old ? 'Updated abstract' : 'Abstract Upload', details: `Abstract ${abstractLabel(f)}`, oldValue: old && overallText(old) !== overallText(f) ? overallText(old) : '', newValue: overallText(f), // the phone's log drops an entry whose old and new are equal
+  actionType: old ? 'Updated abstract' : f.fileName ? 'Abstract Upload' : 'New abstract', details: `Abstract ${abstractLabel(f)}`, oldValue: old && overallText(old) !== overallText(f) ? overallText(old) : '', newValue: overallText(f), // the phone's log drops an entry whose old and new are equal
 });
+/* ---------- The next abstract, made in the app from the one before it (ProjectAbstracts.next*, the sheet's own formulas) ---------- */
+
+const round2 = v => Math.round(v * 100) / 100, round4 = v => Math.round(v * 10000) / 10000;
+
+/** ProjectAbstracts.isPayLine: a row the engineer types a quantity for: a pay item, or a part that is its own pay item (Land Acquisition), with a quantity and an amount. */
+export const isPayLine = r => (r.kind === 'item' || r.kind === 'part') && r.qty > 0 && r.amount != null;
+
+/**
+ * ProjectAbstracts.cover: for each subtotal and the grand total (by row index), the indexes of the pay lines it adds
+ * up. A subtotal right after another one is its part's (every line since the part row); any other, the lines since
+ * the subtotal before it or the part row; the grand total, every line.
+ */
+export function abstractCover(rows) {
+  const cover = new Map();
+  let part = 0, group = 0;
+  rows.forEach((r, i) => {
+    if (r.kind === 'part') part = group = i;
+    if (r.kind !== 'subtotal' && r.kind !== 'total') return;
+    const from = r.kind === 'total' ? 0 : rows[i - 1].kind === 'subtotal' ? part : group;
+    cover.set(i, rows.slice(from, i).flatMap((x, k) => (isPayLine(x) ? [from + k] : [])));
+    group = i + 1;
+  });
+  return cover;
+}
+
+/** ProjectAbstracts.nextProblem: why the next abstract cannot be made from `abstract`, '' when it can: its subtotals must add up from its pay items. */
+export function nextAbstractProblem(abstract) {
+  const rows = abstractRows(abstract.rowsJson), cover = abstractCover(rows), from = `the abstract as of ${displayDate(abstract.asOf)}`;
+  const off = [...cover].find(([i, lines]) => Math.abs(lines.reduce((t, k) => t + rows[k].amount, 0) - (rows[i].amount ?? 0)) > 1);
+  return !rows.some(r => r.kind === 'total') || !rows.some(isPayLine) ? `There are no pay items with a grand total in ${from}, so the next one cannot be made from it. Upload the next abstract instead.`
+    : off ? `"${rows[off[0]].name}" does not add up from its items in ${from}, so the next one cannot be made from it. Upload the next abstract instead.` : '';
+}
+
+/**
+ * ProjectAbstracts.nextSource: what an abstract of `asOf` (yyyy-MM-dd) made in the app continues, as { source, same,
+ * error }. `source` is the latest abstract dated before it: its TO DATE is the new PREVIOUS. `same` is the abstract
+ * already filed for that date (saving replaces it), null with none. `error` says why the date cannot be used.
+ */
+export function nextAbstractSource(abstracts, asOf) {
+  const latest = latestAbstract(abstracts), source = latestAbstract(abstracts.filter(a => a.asOf < asOf));
+  const error = !asOf ? 'Pick the "As of" date.' : asOf < latest.asOf ? `The date must not be before the latest abstract's, ${displayDate(latest.asOf)}.`
+    : !source ? `The date must be after ${displayDate(latest.asOf)}, the first abstract's.` : nextAbstractProblem(source);
+  return { source, same: latestAbstract(abstracts.filter(a => a.asOf === asOf)) ?? null, error };
+}
+
+/** ProjectAbstracts.nextTyped: this period's quantities of `same` (the abstract of the date being made again) by row index; {} when its rows are not the source's. */
+export function nextAbstractTyped(sourceRows, same) {
+  const rows = same ? abstractRows(same.rowsJson) : [];
+  if (rows.length !== sourceRows.length || rows.some((r, i) => r.kind !== sourceRows[i].kind || r.no !== sourceRows[i].no || r.name !== sourceRows[i].name)) return {};
+  return Object.fromEntries(rows.flatMap((r, i) => (isPayLine(r) && r.period?.[0] != null ? [[i, r.period[0]]] : [])));
+}
+
+/**
+ * ProjectAbstracts.nextRows: the rows of the next abstract. `rows` are the source's, `typed` this period's quantity
+ * by row index (none typed is no work this period). As on the sheet: PREVIOUS is the source's TO DATE; a pay line's
+ * THIS PERIOD amount is the quantity at its unit cost and its % that amount over the line's amount; TO DATE is
+ * previous plus this period; BALANCE the rest; the equivalent units the quantity's share of `equivUnits`. Subtotals
+ * and the grand total add up their pay lines' THIS PERIOD amounts. Cells the sheet leaves blank stay blank.
+ */
+export function nextAbstractRows(rows, typed, equivUnits = 0) {
+  const out = rows.map(r => ({ ...r }));
+  rows.forEach((r, i) => {
+    if (!isPayLine(r)) return;
+    const q = typed[i] ?? null, n = Number(q) || 0, prev = [0, 1, 2].map(k => Number(r.toDate?.[k]) || 0);
+    const amount = round2(n * (r.unitCost ?? r.amount / r.qty)), share = r.amount ? round2(amount / r.amount * 100) : 0;
+    const toDate = [round4(prev[0] + n), round2(prev[1] + amount), round2(prev[2] + share)], done = round2(toDate[0] / r.qty * equivUnits);
+    Object.assign(out[i], { prev, period: [q, amount, share], toDate, balance: [round4(r.qty - toDate[0]), round2(r.amount - toDate[1])],
+      equiv: equivUnits > 0 ? [round2(prev[0] / r.qty * equivUnits), done, round2(equivUnits - done)] : [null, null, null] });
+  });
+  for (const [i, lines] of abstractCover(rows)) {
+    const r = rows[i], amount = round2(lines.reduce((t, k) => t + out[k].period[1], 0)), share = r.amount ? round2(amount / r.amount * 100) : 0;
+    const before = [Number(r.toDate?.[1]) || 0, Number(r.toDate?.[2]) || 0], done = round2(before[0] + amount);
+    Object.assign(out[i], { prev: [null, before[0], r.prev?.[2] == null ? null : before[1]], period: [null, amount, r.period?.[2] == null ? null : share],
+      toDate: [null, done, round2(before[1] + share)], balance: [null, r.balance?.[1] == null ? null : round2((r.amount ?? 0) - done)], equiv: [null, null, null] });
+  }
+  return out;
+}
+
+/** A quantity as the abstract shows it: up to 4 decimals, with commas. */
+export const quantityText = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
+
+/** ProjectAbstracts.nextErrors: what stops the typed quantities from being saved, one line per pay line; [] when they can. */
+export function nextAbstractErrors(rows, typed) {
+  const next = nextAbstractRows(rows, typed);
+  return rows.flatMap((r, i) => {
+    const label = `${r.no} ${r.name}`.trim(), done = next[i].toDate?.[0];
+    return !isPayLine(r) ? [] : !Number.isFinite(Number(typed[i] ?? 0)) ? [`${label}: this period must be a number.`]
+      : done < 0 ? [`${label}: to date would go below zero.`] : done > r.qty ? [`${label}: to date ${quantityText(done)} would pass the quantity ${quantityText(r.qty)}.`] : [];
+  });
+}
+
+/** ProjectAbstracts.nextFields: the record's columns for the abstract of `asOf` made from `source` with `rows` (nextAbstractRows); it has no file. */
+export const nextAbstractFields = (source, rows, asOf, uploadedBy) => ({
+  asOf, overallPct: rows.find(r => r.kind === 'total')?.toDate[2] ?? 0, rowsJson: JSON.stringify(rows), fileName: '', uploadedBy: uploadedBy || '', equivUnits: Number(source.equivUnits) || 0,
+});
+
+/** The New abstract form's line: the overall its quantities give and what it continues, word for word on the phone. */
+export const nextAbstractNote = (source, same, rows) => `Overall to date ${overallText({ overallPct: rows.find(r => r.kind === 'total')?.toDate[2] })}, from ${overallText(source)} as of ${displayDate(source.asOf)}.${same ? ' Saving replaces the abstract already filed for this date.' : ''}`;
+
 /** ProjectViewModel.deleteAbstract's audit entry, word for word. */
 export const deletedAbstractAudit = a => ({ actionType: 'Deleted abstract', details: `Abstract ${abstractLabel(a)}`, oldValue: overallText(a), newValue: '' });
 

@@ -3480,18 +3480,79 @@ function actualBody(c) {
   const tools = `<div class="toolbar apa-tools">
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
       ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
+      ${editable && list.length ? `<button class="btn" id="abstract-new">${icon('add_circle', 'sm')}New abstract</button>` : ''}
       ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
       ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
+  if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
   if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
   const figure = v => (v == null ? '-' : pct(v));
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
       <div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
         <tbody>${L.abstractStanding(c.project, c.documents, shown).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
-      ${kv('File', shown.fileName)}${kv('Uploaded by', shown.uploadedBy)}`)}
+      ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}`)}
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson), Number(shown.equivUnits) || 0)}</div>`;
+}
+
+/** The quantities typed in the New abstract form (text by row index) as numbers; an empty box is no work this period. */
+const typedQuantities = text => Object.fromEntries(Object.entries(text).filter(([, t]) => String(t).trim() !== '').map(([i, t]) => [i, Number(String(t).replace(/,/g, ''))]));
+
+/**
+ * `#/p/<id>/actual/new`: the next abstract, made here from the one before it (L.nextAbstractSource). The engineer
+ * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts, the
+ * percentages and the equivalent units are computed (L.nextAbstractRows). What is typed is kept on the page
+ * (page.next) so a redraw for an arriving record keeps it.
+ */
+function nextAbstractBody(c) {
+  const next = c.page.next ??= { asOf: today(), from: '', text: {} };
+  const { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
+  const rows = source && !error ? L.abstractRows(source.rowsJson) : [], from = `${source?.uuid}|${same?.uuid}`;
+  // Another abstract to continue, or a date that already has one, starts from what that date has.
+  if (rows.length && next.from !== from) Object.assign(next, { from, text: Object.fromEntries(Object.entries(L.nextAbstractTyped(rows, same)).map(([i, q]) => [i, String(q)])) });
+  const computed = L.nextAbstractRows(rows, typedQuantities(next.text), Number(source?.equivUnits) || 0);
+  const q = v => `<td class="num">${L.quantityText(v)}</td>`;
+  const line = (r, i) => (L.isPayLine(r) ? `<tr><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${q(r.qty)}<td>${esc(r.unit)}</td>${q(computed[i].prev[0])}
+      <td><input inputmode="decimal" data-next="${i}" value="${esc(next.text[i] ?? '')}" aria-label="This period: ${esc(`${r.no} ${r.name}`)}"></td><td class="num" id="next-done-${i}">${L.quantityText(computed[i].toDate[0])}</td></tr>`
+    : r.kind === 'part' || r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="6">${esc(r.name)}</td></tr>` : '');
+  return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
+    ${section('New abstract', 'edit', `
+      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.</p>
+      <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(next.asOf)}"></label>
+        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
+      ${error ? `<p class="error">${esc(error)}</p>` : `<p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
+      <div class="scroll"><table class="grid-table apa-next"><thead><tr><th>ITEM NO.</th><th>ITEM DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>PREVIOUS</th><th>THIS PERIOD</th><th>TO DATE</th></tr></thead>
+        <tbody>${rows.map(line).join('')}</tbody></table></div>`}`)}`;
+}
+
+/** The New abstract form's controls: a typed quantity redraws only its to date and the overall line; Save files the abstract as an upload does. */
+function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
+  const page = c.page, next = page.next, asOf = document.getElementById('next-as-of'), save = document.getElementById('next-save');
+  const state = () => { const found = L.nextAbstractSource(all, next.asOf); return { ...found, rows: found.source && !found.error ? L.abstractRows(found.source.rowsJson) : [] }; };
+  const made = ({ source, rows }) => L.nextAbstractRows(rows, typedQuantities(next.text), Number(source.equivUnits) || 0);
+  asOf.onchange = () => { next.asOf = asOf.value; page.note = ''; drawProject(page); };
+  main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
+    next.text[box.dataset.next] = box.value;
+    const now = state(), rows = made(now);
+    document.getElementById(`next-done-${box.dataset.next}`).textContent = L.quantityText(rows[box.dataset.next].toDate[0]);
+    document.getElementById('next-overall').textContent = L.nextAbstractNote(now.source, now.same, rows);
+  }; });
+  save.onclick = async () => {
+    const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, typedQuantities(next.text));
+    if (errors.length) { say(errors.slice(0, 3).join(' ') + (errors.length > 3 ? ` And ${errors.length - 3} more.` : '')); return; }
+    const fields = L.nextAbstractFields(now.source, made(now), next.asOf, s.profile.name || s.user.email), old = now.same;
+    if (old && !confirm(`An abstract as of ${L.displayDate(fields.asOf)} is already filed. Replace it with this one?`)) return;
+    if (!navigator.onLine) { say('You are offline. Connect to the internet, then save again.'); return; }
+    save.disabled = true;
+    const actual = actualAfter([...all.filter(a => a.asOf !== fields.asOf), { ...fields, updatedAt: Infinity }]);
+    try {
+      await (old ? saveEdits(c, [[old, fields, L.abstractAudit(fields, old)]], 'abstract', actual)
+        : addRecords(c, [[ids => L.newAbstractRecord(ids, fields), L.abstractAudit(fields)]], actual));
+      page.next = null;
+      show(fields.asOf, L.abstractSavedNote(fields, Boolean(old)));
+    } catch (x) { failed(x); save.disabled = false; }
+  };
 }
 
 /**
@@ -3513,6 +3574,9 @@ function bindActual(c) {
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
   const pick = document.getElementById('abstract-as-of'), file = document.getElementById('abstract-file'), del = document.getElementById('abstract-delete');
   if (pick) pick.onchange = () => { location.hash = `#/p/${page.id}/actual/${pick.value}`; };
+  const make = document.getElementById('abstract-new');
+  if (make) make.onclick = () => { page.note = ''; location.hash = `#/p/${page.id}/actual/new`; };
+  if (document.getElementById('next-as-of')) bindNextAbstract(c, { say, show, failed, actualAfter, all });
   if (file) {
     document.getElementById('abstract-upload').onclick = () => file.click();
     file.onchange = async () => {

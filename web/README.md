@@ -34,6 +34,14 @@ is read only.
   "Upload the newer abstract first, or lower this billing."); a project without an abstract keeps the latest weekly
   report's. A part's contract amount is the bar chart's in force, else the Scope of Works' (`L.partAmounts`). Billings
   without a type (an advance payment) are not counted, and a billing already saved can still be corrected.
+- **The next abstract can be made in the app instead of uploaded**: **New abstract** on the Actual Accomplishment
+  tab (`#/p/<id>/actual/new`), once the project has an abstract. The works, quantities, units, unit costs and amounts
+  are those of the latest abstract dated before the picked "As of" date, and its TO DATE is the new PREVIOUS. The
+  engineer types only each pay item's THIS PERIOD quantity; the amounts, percentages, to date, balance, equivalent
+  units, subtotals and grand total follow the sheet's formulas (`L.nextAbstractRows`, the phone's
+  `ProjectAbstracts.nextRows`). It is filed like an upload, without a file. The latest date picked again is made
+  again from the one before it, starting from what was typed for it. An abstract whose subtotals do not add up from
+  its items cannot be continued: the next one is uploaded.
 - **The billing abstract is printed before the billing, from the Actual Accomplishment tab**, not from a billing: the
   contractor attaches it to the billing it asks for. **Print billing abstract** on the tab, for anyone who can open
   it, opens `#/p/<id>/print/apa-<as-of date>`: the abstract shown there in the district's billing format
