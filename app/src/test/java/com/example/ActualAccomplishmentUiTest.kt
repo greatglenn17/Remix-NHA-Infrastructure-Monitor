@@ -174,6 +174,8 @@ class ActualAccomplishmentUiTest {
     // "New abstract" on a small phone: only this period's quantities are typed; the to date and the overall follow, and Save files the record.
     @Config(qualifiers = "w360dp-h640dp")
     @Test fun newAbstract_typedQuantitiesGiveTheToDateAndTheOverall_andSaveFilesIt() {
+        // On a busy machine one scroll step of this form took longer than the 60 s idle limit; with a longer one the test passes in about 80 s.
+        androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         val filed = mutableStateListOf(first)
         openNewAbstract(filed, "2026-11-20") { filed += it }
         rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.").assertExists()
@@ -251,9 +253,19 @@ class ActualAccomplishmentUiTest {
         rule.onAllNodesWithText("Amount 33,930,260.00 · To date 27,405,210.00 (80.77%)").assertCountEquals(2) // its own line and its subtotal
         rule.onNodeWithTag("abstract_part_0").performClick()
         rule.onAllNodesWithText("1  LAND ACQUISITION COST").assertCountEquals(1)
-        // The sheet ("View full table") has every column on the part's own row.
+        // The sheet ("Print abstract") has every column on the part's own row.
         val row = "<td class='c'>1</td><td><b>LAND ACQUISITION COST</b></td><td class='n'>520</td><td class='c'>LOT</td><td class='n'>65,250.50</td><td class='n'>33,930,260.00</td>"
-        assertTrue(BlueBookForms.actualAbstract(project, first).contains(row))    }
+        assertTrue(BlueBookForms.actualAbstract(project, emptyList(), first, com.example.util.Signatories("", "", "", "", "", "")).contains(row))
+    }
+
+    // "Print abstract" hands over the abstract shown, for its detailed sheet; a viewer can print it too.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun printAbstract_handsOverTheAbstractShown() {
+        var printed: ProjectAbstract? = null
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(first), "", null, null, { printed = it }, { _, _ -> }) } }
+        rule.onNodeWithTag("print_abstract").assert(hasText("Print abstract")).performClick()
+        assertEquals(first, printed)
+    }
 
     private fun report(week: String, acquisition: Double, development: Double, housing: Double) = WeeklyReport(
         projectId = 1, reportingWeek = week, daysElapsed = 0, remainingDays = 0, targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0,

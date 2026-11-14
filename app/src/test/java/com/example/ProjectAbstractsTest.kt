@@ -160,11 +160,20 @@ class ProjectAbstractsTest {
         assertNull(ProjectAbstracts.record(7, found.copy(asOf = null), "", "")) // nothing to file it under
     }
 
-    @Test fun theFullTableHasEveryColumnOfTheSheet() {
-        val html = BlueBookForms.actualAbstract(project, abstract("2025-03-14"))
+    // "Print abstract": the detailed sheet of the actual work, as web/sections.test.mjs "abstract of the actual work: ...".
+    @Test fun theAbstractOfTheActualWorkHasTheBillingFormatsTopEveryRowAndTheSignatures() {
+        val signatories = com.example.util.Signatories("Juan", "Engineer", "", "District Manager", "", "Regional Manager")
+        val html = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14"), signatories)
         fun has(vararg cells: String) = assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(html))
-        assertTrue(html.contains("As of March 14, 2025"))
+        assertTrue(html.contains("<div class='period'>As of March 14, 2025</div>"))
+        assertTrue(html.contains("PROJECT NAME</td><td class='pc'>:</td><td>P</td><td class='pl'>CONTRACT DURATION</td><td>: 360 C.D.</td>"))
+        // Without a bar chart the target is the project's stored one; the actual is the abstract's, not what was billed.
+        assertTrue(html.contains("TARGET ACCOMPLISHMENT</td><td class='pc'>:</td><td>12.00%"))
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>10.73%"))
+        assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-1.27%"))
+        // The header rows are a thead, so they repeat on every page of a long abstract.
+        assertTrue(Regex("<thead><tr><th rowspan='3'>ITEM NO\\.</th>.*<th>QTY</th><th>AMOUNT</th></tr></thead>").containsMatchIn(html))
+        assertTrue(Regex("<div class='keep'>\\s*<table class='sig'>[\\s\\S]*Prepared by:[\\s\\S]*Checked by:[\\s\\S]*Approved by:").containsMatchIn(html))
         has("2.1.1", "Mobilization/Demobilization", "1", "l.s.", "400,000.00", "400,000.00", "0", "0.00", "0.00%", "0.25", "100,000.00", "25.00%", "0.25", "100,000.00", "25.00%", "0.75", "300,000.00")
         // A cell the sheet left empty stays blank, and the workbook's text is escaped.
         has("2.2.1", "Fill &amp; &lt;Compaction&gt;", "", "", "", "1,600,000.00", "", "", "", "", "", "", "", "404,000.00", "25.25%", "", "")
@@ -172,7 +181,7 @@ class ProjectAbstractsTest {
         assertTrue(html.contains("<td class='c'>2.1</td><td><b>GENERAL REQUIREMENTS</b></td>"))
         assertTrue(html.contains("size: A4 landscape"))
         // The sheet ends at BALANCE: a record's equivalent-units columns are not shown.
-        val wide = BlueBookForms.actualAbstract(project, abstract("2025-03-14").copy(equivUnits = 1370.0))
+        val wide = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(equivUnits = 1370.0), signatories)
         assertTrue(!wide.contains("EQUIVALENT"))
         assertTrue(wide.contains("<th colspan='2' rowspan='2'>BALANCE</th></tr>"))
         assertTrue(wide.contains(">300,000.00</td></tr>")) // 2.1.1's row ends at its balance, though it carries equivalent units

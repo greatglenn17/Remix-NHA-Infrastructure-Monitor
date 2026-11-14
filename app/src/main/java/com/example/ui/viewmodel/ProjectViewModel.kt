@@ -2019,9 +2019,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         com.example.util.BillingAbstract.units(project, saleable), signatories, blueBookBanner
     )
 
-    /** An uploaded abstract of the actual work with every column of the Excel file, for the print preview. */
-    fun actualAbstractForm(project: Project, abstract: ProjectAbstract): String =
-        com.example.util.BlueBookForms.actualAbstract(project, abstract, blueBookBanner)
+    /** The Abstract of Physical Accomplishment of the actual work, the detailed one: every row of [abstract]. */
+    suspend fun actualAbstractForm(project: Project, abstract: ProjectAbstract, signatories: com.example.util.Signatories): String =
+        com.example.util.BlueBookForms.actualAbstract(project, repository.getPendingDocuments(project.id).first(), abstract, signatories, blueBookBanner)
 
     /** Saves the approved bar chart ([json] from BarChart.toJson; blank removes it). */
     fun saveBarChart(projectId: Long, json: String) {

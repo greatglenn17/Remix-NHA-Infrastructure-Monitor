@@ -432,25 +432,13 @@ object BlueBookForms {
             "${billed(r, 0.0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>"
         val all = sumOf(abstract.parts.flatMap { it.lines })
         val actual = if (all.amount > 0) (all.previous + all.thisPeriod) / all.amount * 100 else 0.0
-        fun info(label: String, value: String, label2: String = "", value2: String = "") =
-            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
         val rows = abstract.parts.joinToString("") { p ->
             (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='16'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
-            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
-            <div class='period'>${esc(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" })}</div>
-            <table class='apa-info'>
-              ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}
-              ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
-              ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
-              ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
-              ${info("TARGET ACCOMPLISHMENT", pct(abstract.targetPct))}
-              ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}
-              ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(abstract.targetPct * 100) / 100.0))}
-            </table>
+            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, actual)}
             <table class='apa'>
               ${apaHead()}
               $rows
@@ -471,11 +459,35 @@ object BlueBookForms {
         "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
 
     /**
-     * An uploaded abstract of the actual work (Actual Accomplishment tab) on a landscape sheet: every row of the Excel
-     * file in the abstract's columns, an empty cell left blank. The sheet's "EQUIVALENT TO N UNITS" columns are not
-     * shown: the abstract's format has none. The website shows the same table in its tab.
+     * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract and
+     * its target, actual and advance/slippage, the last as the two at 2 decimals each. web/print.js apaTop.
      */
-    fun actualAbstract(project: Project, abstract: ProjectAbstract, banner: String = ""): String {
+    private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double): String {
+        fun info(label: String, value: String, label2: String = "", value2: String = "") =
+            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
+        return """
+            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
+            <div class='period'>${esc(period)}</div>
+            <table class='apa-info'>
+              ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}
+              ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
+              ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
+              ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
+              ${info("TARGET ACCOMPLISHMENT", pct(targetPct))}
+              ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}
+              ${info("ADVANCE/SLIPPAGE", pct(Math.round(actual * 100) / 100.0 - Math.round(targetPct * 100) / 100.0))}
+            </table>"""
+    }
+
+    /**
+     * The abstract of the actual work, the detailed one ("Print abstract" on the Actual Accomplishment tab), on a
+     * landscape sheet: the same top as the billing format, with the target the tab shows for its "As of" date
+     * ([ProjectAbstracts.standing]'s Overall) and the abstract's own actual, then every row in the abstract's columns,
+     * an empty cell left blank, and the signatures. The header rows repeat on each page. The sheet's "EQUIVALENT TO N
+     * UNITS" columns are not shown: the abstract's format has none. web/print.js actualAbstractHtml prints the same page.
+     */
+    fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = ""): String {
+        val overall = ProjectAbstracts.standing(project, documents, abstract).last()
         // A quantity: 4 decimals at most, none when whole.
         val quantity = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
         fun n(text: String?) = "<td class='n'>${text.orEmpty()}</td>"
@@ -487,22 +499,15 @@ object BlueBookForms {
             "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
                 "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}</tr>"
         }
-        fun info(label: String, value: String) = "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td></tr>"
         return page(
             "Abstract of Physical Accomplishment",
             """
-            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
-            <div class='period'>As of ${esc(date(abstract.asOf))}</div>
-            <table class='apa-info'>
-              ${info("PROJECT NAME", project.name)}
-              ${info("LOCATION", project.location)}
-              ${info("CONTRACTOR", project.contractor)}
-              ${info("ACTUAL ACCOMPLISHMENT", pct(abstract.overallPct))}
-            </table>
+            ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
             <table class='apa'>
-              ${apaHead()}
-              $rows
+              <thead>${apaHead()}</thead>
+              <tbody>$rows</tbody>
             </table>
+            <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
             """,
             banner,
             fullPage = true,

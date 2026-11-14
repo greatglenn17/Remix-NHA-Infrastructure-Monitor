@@ -248,7 +248,15 @@ is read only.
     name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
     folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at BALANCE: the
     equivalent-units columns are read and kept on the record but not shown, because the abstract's format has none.
-    **Print billing abstract** is described under the billings above.
+  - **Two abstracts print from the tab**, for anyone who can open it. **Print abstract** is the abstract of the
+    actual work, the detailed one, made every week and at month end: `#/p/<id>/print/abstract-<as-of date>`
+    (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
+    the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
+    for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns, the
+    header rows repeating on each page, and the Prepared by / Checked by / Approved by signatures (the monthly
+    report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
+    under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
+    "Billing Abstract - As of <date>".
     **Delete**, for the people who can edit, asks first and marks the record deleted.
   - **The uploaded abstract is the project's actual accomplishment** (`L.projectActualAfter`, the phone's
     `ProjectAbstracts.projectActualAfter`): saving or deleting one sets the project's actual, in the same write, to

@@ -229,7 +229,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
  * Actual Accomplishment: the uploaded Abstracts of Physical Accomplishment of the actual work, each kept under its
  * "As of" date; the latest is the project's actual. Shows the chosen one's target, actual and advance/slippage by
  * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]) and every pay item, the parts
- * folding; "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
+ * folding. Two sheets print from it: "Print abstract" ([onPrintAbstract]) is the detailed one of the actual work;
+ * "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
  * "New abstract" makes the next one here from the latest ([NewAbstractDialog]), its date starting at [today].
  * [onSave] and [onDelete] are null for roles that cannot upload.
  */
@@ -242,7 +243,7 @@ fun ActualAccomplishmentSection(
     uploadedBy: String,
     onSave: ((ProjectAbstract) -> Unit)?,
     onDelete: ((ProjectAbstract) -> Unit)?,
-    onViewTable: (ProjectAbstract) -> Unit,
+    onPrintAbstract: (ProjectAbstract) -> Unit,
     onPrintBilling: (ProjectAbstract, BillingAbstract.Period) -> Unit,
     today: LocalDate = LocalDate.now()
 ) {
@@ -368,7 +369,7 @@ fun ActualAccomplishmentSection(
                 // One made in the app (ProjectAbstracts.nextRecord) has no file.
                 Field("File", shown.fileName.ifBlank { "Made in the app" })
                 Field(if (shown.fileName.isBlank()) "Made by" else "Uploaded by", shown.uploadedBy.ifBlank { "-" })
-                OutlinedButton(onClick = { onViewTable(shown) }, modifier = Modifier.padding(top = 8.dp).testTag("view_abstract_table")) { Text("View full table") }
+                OutlinedButton(onClick = { onPrintAbstract(shown) }, modifier = Modifier.padding(top = 8.dp).testTag("print_abstract")) { Text("Print abstract") }
                 OutlinedButton(onClick = { billing = shown }, modifier = Modifier.testTag("print_billing_abstract")) { Text("Print billing abstract") }
             }
         }

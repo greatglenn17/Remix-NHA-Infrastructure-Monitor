@@ -431,15 +431,18 @@ fun ProjectDetailScreen(
                             uploadedBy = account.name,
                             onSave = (viewModel::saveAbstract).takeIf { canUpload },
                             onDelete = (viewModel::deleteAbstract).takeIf { canUpload },
-                            onViewTable = { abstract ->
-                                printForm("Abstract of Physical Accomplishment - as of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
-                                    viewModel.actualAbstractForm(currentProject, abstract)
+                            onPrintAbstract = { abstract ->
+                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                    printForm("Abstract of Physical Accomplishment - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
+                                        viewModel.actualAbstractForm(currentProject, abstract, s)
+                                    }
                                 }
                             },
                             onPrintBilling = { abstract, period ->
                                 val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
                                 printWithSignatories = false to { s: com.example.util.Signatories ->
-                                    printForm("Abstract of Physical Accomplishment - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
+                                    // Not the detailed abstract's name, so the two PDFs do not replace each other.
+                                    printForm("Billing Abstract - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
                                         viewModel.billingAbstractForm(currentProject, abstract, period, saleable, s)
                                     }
                                 }

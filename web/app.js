@@ -3475,8 +3475,9 @@ function abstractsOf(c) {
 
 /**
  * `#/p/<id>/actual[/<as-of date>]`: the abstract of that date, the latest without one: its target, actual and
- * advance/slippage by line (L.abstractStanding), then every pay item (P.abstractItemsHtml). Print billing abstract,
- * for anyone who can open the tab, is the billing format made from it (drawAbstractPrint).
+ * advance/slippage by line (L.abstractStanding), then every pay item (P.abstractItemsHtml). Two sheets print from
+ * it, for anyone who can open the tab: Print abstract, the detailed one of the actual work (drawActualAbstractPrint),
+ * and Print billing abstract, the billing format made from it (drawAbstractPrint).
  */
 function actualBody(c) {
   const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
@@ -3484,7 +3485,8 @@ function actualBody(c) {
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
       ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
       ${editable && list.length ? `<button class="btn" id="abstract-new">${icon('add_circle', 'sm')}New abstract</button>` : ''}
-      ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
+      ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
       ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
@@ -3836,6 +3838,7 @@ async function drawPrint(c) {
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
   if (c.page.sub === 'profile') return drawProfilePrint(c);
   if (/^apa-/.test(c.page.sub || '')) return drawAbstractPrint(c);
+  if (/^abstract-/.test(c.page.sub || '')) return drawActualAbstractPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -3882,6 +3885,27 @@ function drawProfilePrint({ page, project, documents }) {
 }
 
 /**
+ * The abstract of the actual work, the detailed one (BlueBookForms.actualAbstract, Print abstract on the Actual
+ * Accomplishment tab) for `#/p/<id>/print/abstract-<as-of date>`: every row of the abstract of that date.
+ */
+function drawActualAbstractPrint(c) {
+  const { page, project, documents } = c, asOf = page.sub.slice('abstract-'.length);
+  const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
+  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`; // the file name "Save as PDF" offers
+  main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+    <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
+    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.actualAbstractHtml({
+      project, docs: documents, abstract, signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
+    })}</div></div>`;
+  bindSignatories(c, false);
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.onclick = () => window.print();
+}
+
+/**
  * The billing abstract the contractor attaches before a billing (BlueBookForms.billingAbstract, Print billing abstract
  * on the Actual Accomplishment tab) for `#/p/<id>/print/apa-<as-of date>`: the uploaded abstract of that date in the
  * district's billing format. This billing's figures are typed above the sheet and never saved; they are kept on the
@@ -3892,7 +3916,7 @@ function drawAbstractPrint(c) {
   const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
   if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
-  document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`;
+  document.title = `Billing Abstract - As of ${L.displayDate(asOf)}`; // not the detailed abstract's name, so the two PDFs do not replace each other
   const [acquisition, development, housing] = L.abstractLineAmounts(abstract), start = L.abstractPeriodAmounts(abstract)[1];
   // Land development starts from the abstract's own this-period amount; the rest start empty (0).
   const typed = page.billing ??= { covered: '', lots: '', development: start > 0 ? start.toFixed(2) : '', m1: '', m2: '' };

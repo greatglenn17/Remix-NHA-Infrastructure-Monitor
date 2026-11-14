@@ -424,6 +424,40 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(html, /Approved by:/);
 });
 
+test('abstract of the actual work: the billing format\'s top with the tab\'s target, every row in the abstract\'s columns, then the signatures', () => {
+  const none = [null, null, null], blank = { qty: null, unit: '', unitCost: null, amount: null, prev: none, period: none, toDate: none, balance: [null, null] };
+  const project = { name: 'P & Q', location: 'Pandi', contractor: 'C', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12 };
+  const abstract = { asOf: '2025-03-14', overallPct: 10.73, equivUnits: 100, rowsJson: JSON.stringify([
+    { ...blank, kind: 'part', no: '2', name: 'LAND DEVELOPMENT' },
+    { ...blank, kind: 'group', no: '2.1', name: 'GENERAL <REQUIREMENTS>' },
+    { kind: 'item', no: '2.1.1', name: 'Mobilization/Demobilization', qty: 1, unit: 'l.s.', unitCost: 400000, amount: 400000, prev: [0, 0, 0], period: [0.25, 100000, 25], toDate: [0.25, 100000, 25], balance: [0.75, 300000], equiv: [0, 342.5, 1027.5] },
+    { ...blank, kind: 'item', no: '2.2.1', name: 'Road Excavation', qty: 1234.56789, unit: 'cu.m.', amount: 1600000, toDate: [null, 404000, 25.25] },
+    { ...blank, kind: 'subtotal', no: '', name: 'Subtotal (Land Development)', amount: 2000000, toDate: [null, 504000, 25.21] },
+    { ...blank, kind: 'total', no: '', name: 'GRAND TOTAL', amount: 10000000, toDate: [null, 1074000, 10.73] },
+  ]) };
+  const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
+  const html = P.actualAbstractHtml({ project, docs: [], abstract, signatories, banner: 'b.png' });
+  const row = (...cells) => new RegExp(`${cells.map(c => `>${c.replace(/[.()%/]/g, '\\$&')}</td>`).join('<td[^>]*')}</tr>`);
+  assert.match(html, /^<img class='banner' src='b.png'/);
+  assert.match(html, /<h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT<\/h1>\s*<div class='period'>As of March 14, 2025<\/div>/);
+  assert.match(html, /PROJECT NAME<\/td><td class='pc'>:<\/td><td>P &amp; Q<\/td><td class='pl'>CONTRACT DURATION<\/td><td>: 360 C.D.<\/td>/);
+  // Without a bar chart the target is the project's stored one; the actual is the abstract's, not what was billed.
+  assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
+  assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
+  assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
+  // The header rows are a thead, so they repeat on every page of a long abstract.
+  assert.match(html, /<thead><tr><th rowspan='3'>ITEM NO\.<\/th>.*<th>QTY<\/th><th>AMOUNT<\/th><\/tr><\/thead>/s);
+  assert.ok(html.includes("<tr><td class='c'>2</td><td><b>LAND DEVELOPMENT</b></td>"));
+  assert.ok(html.includes("<td class='c'>2.1</td><td><b>GENERAL &lt;REQUIREMENTS&gt;</b></td>"));
+  // Every column of the row, ending at BALANCE: the equivalent units it carries are not shown.
+  assert.match(html, row('2.1.1', 'Mobilization/Demobilization', '1', 'l.s.', '400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%', '0.75', '300,000.00'));
+  assert.ok(!/equivalent/i.test(html));
+  // Empty cells stay blank; a quantity shows 4 decimals at most; subtotals and the grand total are bold rows.
+  assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', ''));
+  assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%', '', '').source}`));
+  assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
+});
+
 test('actual accomplishment tab: every pay item of an uploaded abstract in the sheet\'s columns, a part to a block, then the grand total', () => {
   const none = [null, null, null];
   const rows = [
