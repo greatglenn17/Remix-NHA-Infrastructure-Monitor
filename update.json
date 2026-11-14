@@ -1,8 +1,8 @@
 {
-  "versionCode": 302,
-  "versionName": "2.8.22",
-  "releaseNotes": "v2.8.22: New Actual tab on every project. Upload the abstract (Excel) or make the next one in the app; the latest abstract is the project's actual; print the abstract or the billing abstract from it.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.22/NHA_Monitor_v2.8.22_Build302.apk",
-  "apkSha256": "4ac060ffc49bf44f3eecac3444186151578af81e382722b9a1e9f8c1a7e054bf",
+  "versionCode": 303,
+  "versionName": "2.8.23",
+  "releaseNotes": "v2.8.23: On both printed abstracts, the contract duration, date started and completion date are at the top right of the header, with a blank line before the target accomplishment.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.23/NHA_Monitor_v2.8.23_Build303.apk",
+  "apkSha256": "51efe28ab0908a6237381a09fb1fd01466860054c16563c4b4ed077677e9cdb8",
   "isMandatory": true
 }
