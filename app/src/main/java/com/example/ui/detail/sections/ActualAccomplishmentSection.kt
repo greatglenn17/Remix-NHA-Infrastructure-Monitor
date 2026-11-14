@@ -78,9 +78,12 @@ private fun StandingRow(name: String, cells: List<String>, header: Boolean = fal
  */
 private val ITEM_WIDTHS: List<Int> = listOf(76, 200, 116, 56, 132, 132) + List(3) { listOf(116, 132, 68) }.flatten() + listOf(116, 132)
 
-/** [ITEM_WIDTHS] at the phone's font size: the figures are set in sp, so the columns grow with them. */
+/**
+ * [ITEM_WIDTHS] at the phone's font size: the figures are set in sp, so the columns grow with them. Each is a whole
+ * number of pixels, so a cell across several columns (a group's name, PREVIOUS) ends where they end.
+ */
 @Composable
-private fun itemWidths(): List<Dp> = LocalDensity.current.fontScale.let { scale -> ITEM_WIDTHS.map { (it * scale).dp } }
+private fun itemWidths(): List<Dp> = with(LocalDensity.current) { ITEM_WIDTHS.map { (it * fontScale).dp.roundToPx().toDp() } }
 
 /**
  * A row of the pay items' table, moving sideways with the rest ([scroll] is the table's). Without the stretch at the
@@ -306,6 +309,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
  * the sheet's columns, as the website's: it scrolls sideways, and each part folds. Two sheets print from it: "Print abstract" ([onPrintAbstract]) is the detailed one of the actual work;
  * "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
  * "New abstract" makes the next one here from the latest ([NewAbstractDialog]), its date starting at [today].
+ * "Monthly" shows the abstract of a month as of a date (starting at [today]), computed from the filed ones and never
+ * saved ([ProjectAbstracts.monthly]): only "Print abstract" is there.
  * [onSave] and [onDelete] are null for roles that cannot upload.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -393,10 +398,16 @@ fun ActualAccomplishmentSection(
         )
     }
 
-    val rows = remember(shown?.rowsJson) { shown?.let { ProjectAbstracts.rows(it.rowsJson) }.orEmpty() }
+    var monthly by rememberSaveable(projectId) { mutableStateOf(false) }
+    var monthlyDate by rememberSaveable(projectId) { mutableStateOf(today.toString()) }
+    val month = remember(abstracts, monthlyDate) { ProjectAbstracts.monthly(abstracts, monthlyDate) }
+    val inMonthly = monthly && shown != null
+    // The abstract drawn: the month's computed one in Monthly (none when its date has no abstract), else the chosen one.
+    val viewed = if (inMonthly) month.abstract else shown
+    val rows = remember(viewed?.rowsJson) { viewed?.let { ProjectAbstracts.rows(it.rowsJson) }.orEmpty() }
     val parts = remember(rows) { AbstractExcel.parts(rows) }
     // The parts folded shut, by their place among the parts.
-    val folded = remember(shown?.uuid) { mutableStateListOf<Int>() }
+    val folded = remember(viewed?.uuid) { mutableStateListOf<Int>() }
 
     // One for the whole table: the headings and every row move sideways together.
     val sideways = rememberScrollState()
@@ -409,13 +420,24 @@ fun ActualAccomplishmentSection(
             item(key = key) { Box(Modifier.padding(top = top)) { content() } }
         }
         if (shown != null) block {
+            ChipRow(listOf("Weekly", "Monthly"), if (monthly) "Monthly" else "Weekly", PaddingValues(0.dp)) { monthly = it == "Monthly"; note = "" }
+        }
+        if (inMonthly) {
+            block { DateField("As of", monthlyDate, { monthlyDate = it }) }
+            block {
+                val to = month.to
+                if (to == null) Text(month.error, style = MaterialTheme.typography.bodySmall, color = scheme.error, modifier = Modifier.testTag("monthly_error"))
+                else Text(ProjectAbstracts.monthlyNote(to, month.from), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.testTag("monthly_note"))
+            }
+        }
+        if (shown != null && !inMonthly) block {
             val labels = dated.map { ProjectSchedule.displayDate(it.asOf) }
             Column {
                 Text("As of", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
                 ChipRow(labels, ProjectSchedule.displayDate(shown.asOf), PaddingValues(0.dp)) { label -> chosen = dated[labels.indexOf(label)].asOf; note = "" }
             }
         }
-        if (onSave != null || (onDelete != null && shown != null)) block {
+        if (!inMonthly && (onSave != null || (onDelete != null && shown != null))) block {
             // The three do not fit one line of a 360dp phone.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onSave != null) OutlinedButton(onClick = { picker.launch(arrayOf(XLSX)) }, modifier = Modifier.testTag("upload_abstract")) {
@@ -436,20 +458,23 @@ fun ActualAccomplishmentSection(
             block {
                 EmptyLine("No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the \"As of\" one), saved as an Excel workbook (.xlsx).")
             }
-            return@LazyColumn
         }
+        if (viewed == null) return@LazyColumn
         block {
             SectionCard("Abstract of Physical Accomplishment", Icons.Default.TableChart) {
-                Field("As of", ProjectSchedule.displayDate(shown.asOf))
+                Field("As of", ProjectSchedule.displayDate(viewed.asOf))
                 StandingRow("", listOf("Target", "Actual", "+/-"), header = true)
-                remember(project, documents, shown) { ProjectAbstracts.standing(project, documents, shown) }.forEach { row ->
+                remember(project, documents, viewed) { ProjectAbstracts.standing(project, documents, viewed) }.forEach { row ->
                     StandingRow(row.name, listOf(row.target?.let(ProjectAbstracts::pct) ?: "-", ProjectAbstracts.pct(row.actual), ProjectAbstracts.diffText(row.diff)))
                 }
-                // One made in the app (ProjectAbstracts.nextRecord) has no file.
-                Field("File", shown.fileName.ifBlank { "Made in the app" })
-                Field(if (shown.fileName.isBlank()) "Made by" else "Uploaded by", shown.uploadedBy.ifBlank { "-" })
-                OutlinedButton(onClick = { onPrintAbstract(shown) }, modifier = Modifier.padding(top = 8.dp).testTag("print_abstract")) { Text("Print abstract") }
-                OutlinedButton(onClick = { billing = shown }, modifier = Modifier.testTag("print_billing_abstract")) { Text("Print billing abstract") }
+                // The month's abstract is not a record: it has no file, no maker and no billing.
+                if (!inMonthly) {
+                    // One made in the app (ProjectAbstracts.nextRecord) has no file.
+                    Field("File", viewed.fileName.ifBlank { "Made in the app" })
+                    Field(if (viewed.fileName.isBlank()) "Made by" else "Uploaded by", viewed.uploadedBy.ifBlank { "-" })
+                }
+                OutlinedButton(onClick = { onPrintAbstract(viewed) }, modifier = Modifier.padding(top = 8.dp).testTag("print_abstract")) { Text("Print abstract") }
+                if (!inMonthly) OutlinedButton(onClick = { billing = viewed }, modifier = Modifier.testTag("print_billing_abstract")) { Text("Print billing abstract") }
             }
         }
         var part = -1

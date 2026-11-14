@@ -1348,10 +1348,12 @@ test('uploaded abstracts: the record, the latest and a week\'s, the project\'s a
   assert.equal(L.latestAbstract([again, mar, feb]).uuid, 'again'); // two devices filed the same date: the last saved
   assert.equal(L.latestAbstract([mar, again]).uuid, 'again');
   assert.equal(L.latestAbstract([]), undefined);
-  assert.equal(L.abstractInWeek([feb, mar], 'Mar 8, 2025 - Mar 14, 2025').uuid, 'mar');
-  assert.equal(L.abstractInWeek([feb, mar, again], 'Week 11: March 8 - March 14, 2025').uuid, 'again');
-  assert.equal(L.abstractInWeek([feb, mar], 'Mar 15, 2025 - Mar 21, 2025'), null);
-  assert.equal(L.abstractInWeek([feb, mar], 'no dates'), null);
+  assert.equal(L.abstractForWeek([feb, mar], 'Mar 8, 2025 - Mar 14, 2025').uuid, 'mar');
+  assert.equal(L.abstractForWeek([feb, mar, again], 'Week 11: March 8 - March 14, 2025').uuid, 'again');
+  assert.equal(L.abstractForWeek([feb, mar], 'Mar 15, 2025 - Mar 21, 2025').uuid, 'mar'); // a week with none of its own takes the latest before it
+  assert.equal(L.abstractForWeek([feb, mar], 'Mar 1, 2025 - Mar 7, 2025').uuid, 'feb'); // never one dated after the week's last day
+  assert.equal(L.abstractForWeek([mar], 'Mar 1, 2025 - Mar 7, 2025'), null);
+  assert.equal(L.abstractForWeek([feb, mar], 'no dates'), null);
   assert.deepEqual(L.abstractLineActuals(fields), ['50.00', '25.21', '1.00']);
   assert.deepEqual(L.abstractLineActuals({ rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }), ['0.00', '25.21', '0.00']);
   // Two parts of one line averaged to 25.215 (stored just under it) read 25.21 on both sides; an overrun part reads 100.
@@ -1399,6 +1401,63 @@ test('uploaded abstracts: target, actual and advance/slippage of the three lines
     { name: 'Overall', target: 12, actual: 10.73, diff: -1.27 },
   ]);
   assert.deepEqual([4.66, -7.58, 0, -0, null].map(L.standingDiffText), ['+4.66%', '-7.58%', '0.00%', '0.00%', '-']);
+});
+
+test('monthly abstract: to date from the latest abstract, previous from the one at the end of the month before', () => {
+  const part = { kind: 'part', no: '1', name: 'LAND DEVELOPMENT', amount: null, toDate: [null, null, null] };
+  const road = { kind: 'item', no: '1.1', name: 'Road Excavation', qty: 1000, unit: 'cu.m.', unitCost: 100, amount: 100000 };
+  const subbase = { kind: 'item', no: '1.2', name: 'Subbase', qty: 500, unit: 'cu.m.', unitCost: 200, amount: 100000 };
+  const curb = { kind: 'item', no: '1.3', name: 'Curb and Gutter', qty: 200, unit: 'l.m.', unitCost: 50, amount: 10000 };
+  const sub = (amount, toDate) => ({ kind: 'subtotal', no: '', name: 'Subtotal', amount, toDate });
+  const total = (amount, toDate) => ({ kind: 'total', no: '', name: 'GRAND TOTAL', amount, toDate });
+  const filed = (uuid, asOf, overallPct, rows) => ({ uuid, asOf, overallPct, equivUnits: 100, rowsJson: JSON.stringify(rows), fileName: `${uuid}.xlsx`, uploadedBy: 'Engr. Web', updatedAt: 1 });
+  const sep = filed('sep', '2026-09-30', 5, [part, { ...road, toDate: [100, 10000, 10] }, total(200000, [null, 10000, 5])]);
+  // October leaves Subbase's cells empty; its two subtotals share a name, so they are matched in order.
+  const oct = filed('oct', '2026-10-30', 20, [part, { ...road, toDate: [400, 40000, 40] }, { ...subbase, toDate: [null, null, null] },
+    sub(200000, [null, 40000, 20]), sub(200000, [null, 40000, 20.5]), total(200000, [null, 40000, 20])]);
+  // November's own PREVIOUS and THIS PERIOD (since an abstract of Nov 6 that is not filed here) are not the month's.
+  const nov = filed('nov', '2026-11-13', 41.72, [part,
+    { ...road, prev: [600, 60000, 60], period: [50.1234, 5012.34, 5.01], toDate: [650.1234, 65012.34, 65.01], balance: [349.8766, 34987.66], equiv: [60, 65.01, 34.99] },
+    { ...subbase, toDate: [100.5, 20100, 20.1] }, { ...curb, toDate: [50, 2500, 25] },
+    sub(210000, [null, 87612.34, 41.72]), sub(210000, [null, 87612.34, 41.72]), total(210000, [null, 87612.34, 41.72])]);
+  const all = [nov, sep, oct];
+
+  const none = error => ({ abstract: null, to: null, from: null, error });
+  assert.deepEqual(L.monthlyAbstract(all, ''), none('Pick the date of the monthly abstract.'));
+  assert.deepEqual(L.monthlyAbstract(all, 'Nov 15, 2026'), none('Pick the date of the monthly abstract.'));
+  assert.deepEqual(L.monthlyAbstract(all, '2026-02-30'), none('Pick the date of the monthly abstract.')); // not on the calendar
+  assert.deepEqual(L.monthlyAbstract(all, '2026-09-29'), none('No abstract is filed on or before Sep 29, 2026.'));
+  assert.deepEqual(L.monthlyAbstract([], '2026-11-15'), none('No abstract is filed on or before Nov 15, 2026.'));
+
+  const made = L.monthlyAbstract(all, '2026-11-15');
+  assert.deepEqual([made.to.uuid, made.from.uuid, made.error], ['nov', 'oct', '']);
+  assert.deepEqual((({ rowsJson, ...rest }) => rest)(made.abstract), { asOf: '2026-11-15', overallPct: 41.72, equivUnits: 100, fileName: '', uploadedBy: '' });
+  assert.deepEqual(L.abstractRows(made.abstract.rowsJson), [
+    { ...part, prev: [null, null, null], period: [null, null, null] },
+    // The row keeps its own to date, balance and equivalent units; previous and this period are the month's.
+    { ...road, prev: [400, 40000, 40], period: [250.1234, 25012.34, 25.01], toDate: [650.1234, 65012.34, 65.01], balance: [349.8766, 34987.66], equiv: [60, 65.01, 34.99] },
+    { ...subbase, toDate: [100.5, 20100, 20.1], prev: [0, 0, 0], period: [100.5, 20100, 20.1] }, // October's cells were empty: previous is 0
+    { ...curb, toDate: [50, 2500, 25], prev: [0, 0, 0], period: [50, 2500, 25] }, // a row new since October
+    { ...sub(210000, [null, 87612.34, 41.72]), prev: [null, 40000, 20], period: [null, 47612.34, 21.72] },
+    { ...sub(210000, [null, 87612.34, 41.72]), prev: [null, 40000, 20.5], period: [null, 47612.34, 21.22] },
+    { ...total(210000, [null, 87612.34, 41.72]), prev: [null, 40000, 20], period: [null, 47612.34, 21.72] },
+  ]);
+  assert.equal(L.monthlyAbstractNote(made.to, made.from), 'To date is the abstract as of Nov 13, 2026. Previous is the abstract as of Oct 30, 2026.');
+
+  // The month before is the one before the picked date's, whatever was filed last: Oct 31 reads October's against September's.
+  assert.deepEqual((({ to, from }) => [to.uuid, from.uuid])(L.monthlyAbstract(all, '2026-10-31')), ['oct', 'sep']);
+  assert.deepEqual((({ to, from }) => [to.uuid, from.uuid])(L.monthlyAbstract(all, '2027-01-05')), ['nov', 'nov']); // January: previous is as of Dec 31
+  // Nothing filed in the picked month yet: both are the same abstract, so this period is zero.
+  const idle = L.monthlyAbstract(all, '2026-10-15');
+  assert.deepEqual([idle.to.uuid, idle.from.uuid], ['sep', 'sep']);
+  assert.deepEqual(L.abstractRows(idle.abstract.rowsJson).map(r => r.period), [[null, null, null], [0, 0, 0], [null, 0, 0]]);
+
+  // No abstract by the end of the month before: previous is zero.
+  const first = L.monthlyAbstract(all, '2026-09-30');
+  assert.deepEqual([first.to.uuid, first.from, first.error], ['sep', null, '']);
+  assert.deepEqual(L.abstractRows(first.abstract.rowsJson).map(r => [r.prev, r.period]),
+    [[[null, null, null], [null, null, null]], [[0, 0, 0], [100, 10000, 10]], [[null, 0, 0], [null, 10000, 5]]]);
+  assert.equal(L.monthlyAbstractNote(first.to, first.from), 'To date is the abstract as of Sep 30, 2026. Previous is zero: no abstract was filed by the end of the month before.');
 });
 
 test('abstracts: what is billed never passes the actual, and the billing abstract is made from the uploaded abstract', () => {

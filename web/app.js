@@ -146,8 +146,8 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('hashchange', () => s.user && route());
 
-// #/p/<project>[/progress|/actual[/<as-of date>]|/payments|/documents|/print/<weekly report>|/drive]
-const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|drive)(?:\/([\w-]+))?)?$/;
+// #/p/<project>[/progress|/actual[/<as-of date>|/monthly[/<date>]]|/payments|/documents|/print/<weekly report>|/drive]
+const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|drive)(?:\/(monthly\/[\d-]*|[\w-]+))?)?$/;
 
 function route() {
   const m = PAGE.exec(location.hash);
@@ -954,6 +954,14 @@ function drawProject(page) {
   bindPlanTools(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   if (document.getElementById('abstract-note')) bindActual(c);
+  main.querySelectorAll('[data-abstracts]').forEach(b => { b.onclick = () => { location.hash = `#/p/${page.id}/actual${b.dataset.abstracts === 'Monthly' ? '/monthly' : ''}`; }; });
+  const monthlyAsOf = document.getElementById('monthly-as-of');
+  // A browser fires change at each key typed in a date box, so only the sheet under it is redrawn; the address follows without a second draw.
+  if (monthlyAsOf) monthlyAsOf.onchange = () => {
+    page.sub = `monthly/${monthlyAsOf.value}`;
+    history.replaceState(null, '', `#/p/${page.id}/actual/${page.sub}`);
+    document.getElementById('monthly-sheet').innerHTML = monthlySheet(c, monthlyAsOf.value);
+  };
   if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
@@ -3076,21 +3084,23 @@ function weeklyForm(c, report = null) {
   const abstracts = c.of('project_abstracts');
   let own = null; // the Actual % typed before a week with an abstract took the boxes over: they come back in a week without one
   // The lines follow the week: with a chart their targets are its plan for the week's last day. What was typed stays.
-  // An abstract uploaded for the week (Actual Accomplishment tab) is its actual: the boxes show its parts and are not typed.
+  // The latest abstract on or before the week's last day (Actual Accomplishment tab) is its actual. A figure that is
+  // automatic has no box: it rides in a hidden input, so the rest of the form reads it as it reads a typed one.
   const drawLines = () => {
     if (!form.first.value) return;
     const label = L.weekLabel(form.first.value), was = !box.children.length ? start.lines : typed().map((t, k) => (own ? { ...t, actual: own[k] } : t));
     lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6]);
     const charted = lines[0].targetPct != null;
-    const abstract = L.abstractInWeek(abstracts, label), filed = abstract && L.abstractLineActuals(abstract);
+    const abstract = L.abstractForWeek(abstracts, label), filed = abstract && L.abstractLineActuals(abstract);
     own = abstract ? lines.map((_, k) => was[k]?.actual ?? '') : null;
     d.querySelector('#wk-abstract').textContent = abstract ? L.abstractWeekNote(abstract) : '';
     d.querySelector('#wk-week').textContent = label;
     d.querySelector('#wk-note').textContent = charted ? 'Targets are the approved bar chart\'s plan for the last day of this week.'
       : lines.some(l => l.weightPct > 0) ? 'No bar chart yet: type each target.' : 'This project has no scope of works yet, so the overall figures stay at 0%.';
-    box.innerHTML = lines.map((l, k) => `<fieldset class="wk-row" data-line><legend>${esc(l.name)} (${pct(l.weightPct)})</legend>
-      <label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(charted ? l.targetPct.toFixed(2) : was[k]?.target ?? '')}"${charted ? ' readonly' : ''}></label>
-      <label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(filed ? filed[k] : was[k]?.actual ?? '')}"${filed ? ' readonly' : ''}></label></fieldset>`).join('');
+    const automatic = (name, value) => `<input type="hidden" data-${name} value="${esc(value)}">`;
+    box.innerHTML = lines.map((l, k) => `<fieldset class="wk-row" data-line${charted && filed ? ' hidden' : ''}><legend>${esc(l.name)} (${pct(l.weightPct)})</legend>
+      ${charted ? automatic('target', l.targetPct.toFixed(2)) : `<label class="field">Target %<input data-target inputmode="decimal" placeholder="0.00" value="${esc(was[k]?.target ?? '')}"></label>`}
+      ${filed ? automatic('actual', filed[k]) : `<label class="field">Actual %<input data-actual inputmode="decimal" placeholder="0.00" value="${esc(was[k]?.actual ?? '')}"></label>`}</fieldset>`).join('');
     total();
   };
   form.first.onchange = drawLines;
@@ -3105,7 +3115,7 @@ function weeklyForm(c, report = null) {
     e.target.closest('[data-drop-row]')?.closest('.wk-row').remove();
   };
   drawLines();
-  // An abstract uploaded for a saved report's week changed the boxes on opening: Save stores them though nothing was typed.
+  // The abstract a saved report's week takes changed its actuals on opening: Save stores them though nothing was typed.
   const refiled = Boolean(report) && typed().some((t, k) => t.actual !== (start.lines[k]?.actual ?? ''));
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
@@ -3473,6 +3483,36 @@ function abstractsOf(c) {
   return { list, shown: list.find(a => a.asOf === c.page.sub) || list[0] };
 }
 
+/** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. */
+const abstractSwitch = monthly => `<div class="chips" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
+
+/** An abstract's Target / Actual / +/- table (L.abstractStanding). */
+function standingTable(c, abstract) {
+  const figure = v => (v == null ? '-' : pct(v));
+  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+    <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/**
+ * `#/p/<id>/actual/monthly[/<date>]`: the abstract of a month as of that date (today without one), computed from the
+ * filed ones and never saved (L.monthlyAbstract). It has no Upload, New abstract, Print billing abstract or Delete.
+ */
+function monthlyAbstractBody(c) {
+  const date = c.page.sub === 'monthly' ? today() : c.page.sub.slice('monthly/'.length);
+  return `${abstractSwitch(true)}
+    <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="monthly-as-of" value="${esc(date)}"></label></div>
+    <div id="monthly-sheet">${monthlySheet(c, date)}</div>`;
+}
+
+/** What is under the Monthly view's date: why that date has no abstract, or the two it was made from, its standing with Print abstract, and every pay item. */
+function monthlySheet(c, date) {
+  const { abstract, to, from, error } = L.monthlyAbstract(c.of('project_abstracts'), date);
+  return error ? `<p class="error">${esc(error)}</p>` : `<p class="muted small">${esc(L.monthlyAbstractNote(to, from))}</p><div class="stack">
+    ${section(`As of ${L.displayDate(date)}`, 'assignment', `${standingTable(c, abstract)}
+      <a class="text-btn" href="#/p/${esc(c.page.id)}/print/monthly-${esc(date)}">${icon('print', 'sm')}Print abstract</a>`)}
+    ${P.abstractItemsHtml(L.abstractRows(abstract.rowsJson))}</div>`;
+}
+
 /**
  * `#/p/<id>/actual[/<as-of date>]`: the abstract of that date, the latest without one: its target, actual and
  * advance/slippage by line (L.abstractStanding), then every pay item (P.abstractItemsHtml). Two sheets print from
@@ -3481,7 +3521,7 @@ function abstractsOf(c) {
  */
 function actualBody(c) {
   const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
-  const tools = `<div class="toolbar apa-tools">
+  const tools = `${list.length ? abstractSwitch(false) : ''}<div class="toolbar apa-tools">
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
       ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
       ${editable && list.length ? `<button class="btn" id="abstract-new">${icon('add_circle', 'sm')}New abstract</button>` : ''}
@@ -3491,12 +3531,11 @@ function actualBody(c) {
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
+  if (/^monthly(\/|$)/.test(c.page.sub || '') && list.length) return monthlyAbstractBody(c);
   if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
-  const figure = v => (v == null ? '-' : pct(v));
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
-      <div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
-        <tbody>${L.abstractStanding(c.project, c.documents, shown).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
+      ${standingTable(c, shown)}
       ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}`)}
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
@@ -3838,7 +3877,7 @@ async function drawPrint(c) {
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
   if (c.page.sub === 'profile') return drawProfilePrint(c);
   if (/^apa-/.test(c.page.sub || '')) return drawAbstractPrint(c);
-  if (/^abstract-/.test(c.page.sub || '')) return drawActualAbstractPrint(c);
+  if (/^(abstract|monthly)-/.test(c.page.sub || '')) return drawActualAbstractPrint(c);
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
@@ -3886,13 +3925,15 @@ function drawProfilePrint({ page, project, documents }) {
 
 /**
  * The abstract of the actual work, the detailed one (BlueBookForms.actualAbstract, Print abstract on the Actual
- * Accomplishment tab) for `#/p/<id>/print/abstract-<as-of date>`: every row of the abstract of that date.
+ * Accomplishment tab) for `#/p/<id>/print/abstract-<as-of date>`: every row of the abstract of that date. The
+ * Monthly view's is `#/p/<id>/print/monthly-<date>`: the same sheet from the month's computed abstract (L.monthlyAbstract).
  */
 function drawActualAbstractPrint(c) {
-  const { page, project, documents } = c, asOf = page.sub.slice('abstract-'.length);
-  const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
-  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
-  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  const { page, project, documents } = c, monthly = page.sub.startsWith('monthly-'), asOf = page.sub.slice(page.sub.indexOf('-') + 1);
+  const made = monthly ? L.monthlyAbstract(c.of('project_abstracts'), asOf) : null;
+  const abstract = made ? made.abstract : abstractsOf(c).list.find(a => a.asOf === asOf);
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${monthly ? 'monthly/' : ''}${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
+  if (!abstract) { main.innerHTML = `${back}<p class="muted">${esc(made?.error || 'This abstract was deleted or does not exist.')}</p>`; return; }
   document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`; // the file name "Save as PDF" offers
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>

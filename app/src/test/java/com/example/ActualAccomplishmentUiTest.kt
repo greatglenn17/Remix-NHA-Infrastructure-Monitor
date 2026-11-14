@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -41,7 +42,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-// The Actual Accomplishment tab, and the weekly report form of a week that has an uploaded abstract.
+// The Actual Accomplishment tab, and the weekly report form's Accomplishment Status with and without an abstract and a bar chart.
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ActualAccomplishmentUiTest {
@@ -126,6 +127,7 @@ class ActualAccomplishmentUiTest {
                 ActualAccomplishmentSection(project, emptyList(), listOf(withPeriod), "", null, null, {}, { a, period -> printed = a to period }) // a viewer can print too
             }
         }
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("print_billing_abstract")) // under the Weekly | Monthly chips it is below the small screen
         rule.onNodeWithTag("print_billing_abstract").performClick()
         rule.onNodeWithText("This billing").assertExists()
         rule.onNodeWithText("Previous is what the billings saved up to Mar 14, 2025 came to. Nothing typed here is saved.").assertExists()
@@ -272,6 +274,64 @@ class ActualAccomplishmentUiTest {
         assertEquals(first, printed)
     }
 
+    // 320dp wide: on a wider screen Robolectric never comes to rest under a dialog of the platform's width that has text
+    // boxes (it measures the dialog at two widths, over and over), with the table in sight or not.
+    @Config(qualifiers = "w320dp-h891dp")
+    @Test fun billingDialog_opensOverThePayItemsTable() {
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(first), "", null, null, {}, { _, _ -> }) } }
+        rule.onNodeWithTag("abstract_row_0").assertIsDisplayed()
+        rule.onNodeWithTag("print_billing_abstract").performClick()
+        rule.onNodeWithText("This billing").assertExists()
+    }
+
+    // At a phone's density each column is rounded to whole pixels on its own; a group's one wide cell must still end where they end.
+    @Config(qualifiers = "w411dp-h891dp-420dpi")
+    @Test fun table_groupRowIsAsWideAsAnItemRow() {
+        val grouped = abstract.copy(rowsJson = abstract.rowsJson.replace("{\"kind\":\"item\"", "{\"kind\":\"group\",\"no\":\"2.1\",\"name\":\"Site Works\",\"qty\":null,\"unit\":\"\",\"unitCost\":null,\"amount\":null,\"prev\":[null,null,null],\"period\":[null,null,null],\"toDate\":[null,null,null],\"balance\":[null,null]}," + "{\"kind\":\"item\""))
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(grouped), "", null, null, {}, { _, _ -> }) } }
+        rule.onNodeWithTag("abstract_row_1").assert(hasText("Site Works"))
+        assertEquals(rule.onNodeWithTag("abstract_row_2").fetchSemanticsNode().size.width, rule.onNodeWithTag("abstract_row_1").fetchSemanticsNode().size.width)
+    }
+
+    // "Monthly": the abstract of the month as of a date, computed from the filed ones; it prints, and nothing else is offered.
+    @Config(qualifiers = "w411dp-h891dp")
+    @Test fun monthly_showsTheMonthsAbstract_andPrintsIt() {
+        val october = first.copy(
+            id = 2, asOf = "2026-10-30", overallPct = 74.36, uuid = "october",
+            rowsJson = ProjectAbstracts.rowsJson(nextRows.mapIndexed { i, r -> if (i == 0) r.copy(toDate = listOf(400.0, 26100200.0, 76.92)) else r })
+        )
+        var printed: ProjectAbstract? = null
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                ActualAccomplishmentSection(project, emptyList(), listOf(first, october), "Engr. Sample", {}, {}, { printed = it }, { _, _ -> }, LocalDate.parse("2026-11-15"))
+            }
+        }
+        rule.onNodeWithTag("monthly_note").assertDoesNotExist() // the tab opens on Weekly
+        rule.onNodeWithTag("section_chip_Monthly").performClick()
+        rule.onNodeWithTag("monthly_note").assert(hasText("To date is the abstract as of Nov 13, 2026. Previous is the abstract as of Oct 30, 2026."))
+        rule.onNodeWithText("Nov 15, 2026").assertExists() // the date starts at today
+        rule.onNodeWithTag("standing_Overall").assert(hasText("77.77%"))
+        // Land Acquisition: previous is October's to date, this period what was done since.
+        rule.onNodeWithTag("abstract_row_0").assert(hasText("400")).assert(hasText("26,100,200.00")).assert(hasText("76.92%"))
+            .assert(hasText("20")).assert(hasText("1,305,010.00")).assert(hasText("3.85%")).assert(hasText("27,405,210.00"))
+        listOf("upload_abstract", "new_abstract", "delete_abstract", "print_billing_abstract").forEach { rule.onNodeWithTag(it).assertDoesNotExist() }
+        rule.onNodeWithText("Uploaded by").assertDoesNotExist()
+        rule.onNodeWithTag("print_abstract").performClick()
+        assertEquals(kept(ProjectAbstracts.monthly(listOf(first, october), "2026-11-15").abstract!!), kept(printed!!))
+        rule.onNodeWithTag("section_chip_Weekly").performClick()
+        rule.onNodeWithTag("upload_abstract").assertExists()
+        rule.onNodeWithTag("monthly_note").assertDoesNotExist()
+    }
+
+    @Test fun monthly_ofADateBeforeTheFirstAbstract_saysSo() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(first), "", null, null, {}, { _, _ -> }, LocalDate.parse("2026-11-12")) }
+        }
+        rule.onNodeWithTag("section_chip_Monthly").performClick()
+        rule.onNodeWithTag("monthly_error").assert(hasText("No abstract is filed on or before Nov 12, 2026."))
+        rule.onNodeWithTag("print_abstract").assertDoesNotExist()
+    }
+
     private fun report(week: String, acquisition: Double, development: Double, housing: Double) = WeeklyReport(
         projectId = 1, reportingWeek = week, daysElapsed = 0, remainingDays = 0, targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0,
         manpowerJson = "[]", equipmentJson = "[]", activitiesJson = "[]", issuesJson = "[]", documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]", submittedByStaff = "",
@@ -318,7 +378,7 @@ class ActualAccomplishmentUiTest {
                     today = LocalDate.of(2025, 3, 12), reports = listOf(report("Mar 1, 2025 - Mar 7, 2025", 50.0, 20.0, 0.5)), abstracts = listOf(abstract))
             }
         }
-        rule.onNodeWithTag("weekly_actual_Land Development").assert(hasText("25.21")) // the abstract's, over the 20.00 carried from the last report
+        rule.onNodeWithTag("weekly_actual_Land Development").assertDoesNotExist() // the abstract's 25.21 stands over the 20.00 carried from the last report
         rule.onNodeWithTag("weekly_target_Land Development").performTextReplacement("30")
         rule.mainClock.advanceTimeBy(1000)
         rule.waitForIdle()
@@ -326,29 +386,63 @@ class ActualAccomplishmentUiTest {
         WeeklyDrafts.clear(context, 1)
     }
 
-    @Test fun weeklyForm_takesTheActualsOfTheAbstractOfItsWeek() {
+    // Without a bar chart the targets are typed; the actuals are the latest abstract's on or before the week's last day, with no field.
+    @Test fun weeklyForm_withAnAbstractAndNoChart_hasOnlyTheTargetFields() {
         rule.setContent {
             NHATheme(themeMode = AppThemeMode.LIGHT) {
-                // Wed Mar 12, 2025 is in the week of Sat Mar 8 to Fri Mar 14.
-                AddWeeklyReportDialog(project = project, projectId = 1, onDismiss = {}, onSubmit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
-                    today = LocalDate.of(2025, 3, 12), abstracts = listOf(abstract))
-            }
-        }
-        rule.onNodeWithText("Actual % is from the abstract as of Mar 14, 2025 (Actual Accomplishment tab).").assertExists()
-        rule.onNodeWithTag("weekly_actual_Land Development").assert(hasText("25.21")).assert(!typed)
-        rule.onNodeWithTag("weekly_actual_Housing Construction").assert(hasText("1.00"))
-        rule.onNodeWithTag("weekly_actual_Land Acquisition").assert(hasText("0.00")) // the abstract has no part for it
-        rule.onNodeWithText("Actual: 5.74%").assertExists() // 25.21 x 20% + 1 x 70%
-    }
-
-    @Test fun weeklyForm_ofAWeekWithoutAnAbstract_isTyped() {
-        rule.setContent {
-            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                // Wed Mar 19, 2025 is in the week of Sat Mar 15 to Fri Mar 21, the week after the abstract's.
                 AddWeeklyReportDialog(project = project, projectId = 1, onDismiss = {}, onSubmit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
                     today = LocalDate.of(2025, 3, 19), abstracts = listOf(abstract))
             }
         }
+        rule.onNodeWithText("Actual % is from the abstract as of Mar 14, 2025 (Actual Accomplishment tab).").assertExists()
+        rule.onNodeWithTag("weekly_actual_Land Development").assertDoesNotExist()
+        rule.onNodeWithText("Actual %").assertDoesNotExist()
+        rule.onNodeWithTag("weekly_target_Land Development").assert(hasText("0.00")).assert(typed)
+        rule.onNodeWithText("Actual: 5.74%").assertExists() // 25.21 x 20% + 1 x 70%
+    }
+
+    // The approved bar chart of ProjectAbstractsTest: roads are Land Development, the housing units Housing Construction.
+    private val charted = project.copy(barChartJson = """[{"effective":"","items":[{"name":"Roads","amount":60,"bars":[[1,100]]},{"name":"Housing units","amount":40,"bars":[[51,150]]}]}]""")
+
+    // With a bar chart the targets have no field; a week before the first abstract has none to take, so its actuals are typed.
+    @Test fun weeklyForm_withAChartAndNoAbstract_hasOnlyTheActualFields() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                // Wed Mar 5, 2025 is in the week of Sat Mar 1 to Fri Mar 7.
+                AddWeeklyReportDialog(project = charted, projectId = 1, onDismiss = {}, onSubmit = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    today = LocalDate.of(2025, 3, 5), abstracts = listOf(abstract))
+            }
+        }
         rule.onNodeWithText("Actual % is from the abstract", substring = true).assertDoesNotExist()
+        rule.onNodeWithTag("weekly_target_Land Development").assertDoesNotExist()
+        rule.onNodeWithText("Target %").assertDoesNotExist()
         rule.onNodeWithTag("weekly_actual_Land Development").assert(hasText("0.00")).assert(typed)
+    }
+
+    // Both automatic: the three lines are left out, the notes and the grand total stay, and Save stores the chart's targets and the abstract's actuals.
+    @Test fun weeklyForm_withAChartAndAnAbstract_hasNoFields_andSavesBoth() {
+        var saved: List<Pair<Double, Double>>? = null
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                AddWeeklyReportDialog(project = charted, projectId = 1, onDismiss = {},
+                    onSubmit = { _, _, _, _, _, _, _, _, _, _, accItemsJson, _ ->
+                        saved = org.json.JSONArray(accItemsJson).let { a -> (0 until a.length()).map { a.getJSONObject(it).run { getDouble("targetPct") to getDouble("actualPct") } } }
+                    },
+                    today = LocalDate.of(2025, 3, 12), abstracts = listOf(abstract))
+            }
+        }
+        rule.onNodeWithText("Target % is from the approved bar chart as of Mar 14, 2025.").assertExists()
+        rule.onNodeWithText("Actual % is from the abstract as of Mar 14, 2025 (Actual Accomplishment tab).").assertExists()
+        listOf("Land Acquisition", "Land Development", "Housing Construction").forEach {
+            rule.onNodeWithTag("weekly_target_$it").assertDoesNotExist()
+            rule.onNodeWithTag("weekly_actual_$it").assertDoesNotExist()
+        }
+        rule.onNodeWithText("Wt:", substring = true).assertDoesNotExist()
+        rule.onNodeWithText("GRAND TOTAL:").assertExists()
+        rule.onNodeWithText("Actual: 15.53%").assertExists() // 25.21 x 60% + 1 x 40%, by the chart's amounts
+        rule.onNodeWithTag("submit_weekly_report_button").performClick()
+        // Mar 14, 2025 is contract day 68: the roads are 68% planned, the housing units 18%.
+        assertEquals(listOf(0.0 to 0.0, 68.0 to 25.21, 18.0 to 1.0), saved)
     }
 }
