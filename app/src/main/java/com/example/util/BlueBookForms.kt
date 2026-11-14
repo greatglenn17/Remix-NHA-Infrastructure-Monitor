@@ -464,26 +464,20 @@ object BlueBookForms {
         )
     }
 
-    /**
-     * The district's column layout of an Abstract of Physical Accomplishment: 17 columns under three header rows; with
-     * [equivalent] (the sheet's "EQUIVALENT TO 370 UNITS", written out) its three columns follow BALANCE.
-     */
-    private fun apaHead(equivalent: String = "") = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
-        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th>${if (equivalent.isEmpty()) "" else "<th colspan='3' rowspan='2'>$equivalent</th>"}</tr>" +
+    /** The district's column layout of an Abstract of Physical Accomplishment: 17 columns under three header rows. */
+    private fun apaHead() = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
+        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>" +
         "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
-        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th>${if (equivalent.isEmpty()) "" else "<th>PREVIOUS</th><th>TO DATE</th><th>BALANCE</th>"}</tr>"
+        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
 
     /**
      * An uploaded abstract of the actual work (Actual Accomplishment tab) on a landscape sheet: every row of the Excel
-     * file with all its columns, an empty cell left blank; the equivalent-units columns when the sheet has them. The
-     * website shows the same table in its tab.
+     * file in the abstract's columns, an empty cell left blank. The sheet's "EQUIVALENT TO N UNITS" columns are not
+     * shown: the abstract's format has none. The website shows the same table in its tab.
      */
     fun actualAbstract(project: Project, abstract: ProjectAbstract, banner: String = ""): String {
-        fun decimals(most: String) = java.text.DecimalFormat("#,##0.$most", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
-        // A quantity: 4 decimals at most, none when whole; equivalent units 2 at most.
-        val quantity = decimals("####")
-        val equivalent = decimals("##")
-        val equiv = abstract.equivUnits > 0
+        // A quantity: 4 decimals at most, none when whole.
+        val quantity = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
         fun n(text: String?) = "<td class='n'>${text.orEmpty()}</td>"
         fun money(v: Double?) = n(v?.let { "%,.2f".format(Locale.US, it) })
         fun qty(v: Double?) = n(v?.let { quantity.format(it) })
@@ -491,8 +485,7 @@ object BlueBookForms {
         val rows = ProjectAbstracts.rows(abstract.rowsJson).joinToString("") { r ->
             val name = esc(r.name).let { if (r.kind == "part" || r.kind == "group") "<b>$it</b>" else it }
             "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
-                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}" +
-                "${if (equiv) (0..2).joinToString("") { i -> n(r.equiv.getOrNull(i)?.let(equivalent::format)) } else ""}</tr>"
+                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}</tr>"
         }
         fun info(label: String, value: String) = "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td></tr>"
         return page(
@@ -507,7 +500,7 @@ object BlueBookForms {
               ${info("ACTUAL ACCOMPLISHMENT", pct(abstract.overallPct))}
             </table>
             <table class='apa'>
-              ${apaHead(if (equiv) "EQUIVALENT TO ${equivalent.format(abstract.equivUnits)} UNITS" else "")}
+              ${apaHead()}
               $rows
             </table>
             """,

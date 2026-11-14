@@ -171,16 +171,11 @@ class ProjectAbstractsTest {
         has("", "GRAND TOTAL", "", "", "", "10,000,000.00", "", "", "", "", "", "", "", "1,074,000.00", "10.73%", "", "")
         assertTrue(html.contains("<td class='c'>2.1</td><td><b>GENERAL REQUIREMENTS</b></td>"))
         assertTrue(html.contains("size: A4 landscape"))
-        assertTrue(!html.contains("EQUIVALENT")) // a record without equivalent units: the table as before
-
-        // With the record's equivalent units: three more columns after BALANCE, 2 decimals at most, blank when empty.
+        // The sheet ends at BALANCE: a record's equivalent-units columns are not shown.
         val wide = BlueBookForms.actualAbstract(project, abstract("2025-03-14").copy(equivUnits = 1370.0))
-        fun wideHas(vararg cells: String) = assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(wide))
-        assertTrue(wide.contains("<th colspan='2' rowspan='2'>BALANCE</th><th colspan='3' rowspan='2'>EQUIVALENT TO 1,370 UNITS</th></tr>"))
-        assertTrue(wide.contains("<th>QTY</th><th>AMOUNT</th><th>PREVIOUS</th><th>TO DATE</th><th>BALANCE</th></tr>"))
-        wideHas("0.75", "300,000.00", "0", "342.5", "1,027.5")
-        wideHas("GRAND TOTAL", "", "", "", "10,000,000.00", "", "", "", "", "", "", "", "1,074,000.00", "10.73%", "", "", "", "", "")
-        assertTrue(BlueBookForms.actualAbstract(project, abstract("2025-03-14").copy(equivUnits = 370.5)).contains("EQUIVALENT TO 370.5 UNITS"))
+        assertTrue(!wide.contains("EQUIVALENT"))
+        assertTrue(wide.contains("<th colspan='2' rowspan='2'>BALANCE</th></tr>"))
+        assertTrue(wide.contains(">300,000.00</td></tr>")) // 2.1.1's row ends at its balance, though it carries equivalent units
     }
 
     // The made-up project of web/logic.test.mjs (NEXT_ROWS), figure for figure: Land Acquisition is a part that is its own pay line.

@@ -119,8 +119,8 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
 
 /**
  * "New abstract": the next abstract, made here from the one before it ([ProjectAbstracts.nextSource]). The engineer
- * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts, the
- * percentages and the equivalent units are computed ([ProjectAbstracts.nextRows]). [onSave] gets the record and
+ * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts and the
+ * percentages are computed ([ProjectAbstracts.nextRows]). [onSave] gets the record and
  * whether it replaces the abstract already filed for its date.
  */
 @Composable
@@ -170,7 +170,7 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                 LazyColumn(Modifier.weight(1f, fill = false).testTag("new_abstract_rows"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         Text(
-                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.",
+                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.",
                             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
                         )
                     }

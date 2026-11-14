@@ -449,17 +449,11 @@ test('actual accomplishment tab: every pay item of an uploaded abstract in the s
   // The grand total comes last, after the parts.
   assert.ok(html.lastIndexOf('<tr class="apa-total"><td></td><td>GRAND TOTAL</td>') > html.lastIndexOf('</details>'));
   assert.equal(html.match(/<th colspan="3">TO DATE<\/th>/g).length, 2);
-  assert.ok(!html.includes('EQUIVALENT')); // a record without equivalent units: the table as before
+  // The table ends at BALANCE: the sheet's equivalent-units columns are not shown, though the rows carry them.
+  assert.ok(rows.some(r => r.equiv?.some(v => v != null)));
+  assert.ok(!html.includes('EQUIVALENT'));
+  assert.ok(html.includes('<th>QTY</th><th>AMOUNT</th></tr></thead>'));
   assert.equal(P.abstractItemsHtml([]), '');
-
-  // With the record's equivalent units: three more columns after BALANCE, 2 decimals at most, blank when empty.
-  const wide = P.abstractItemsHtml(rows, 1370);
-  assert.ok(wide.includes('<th colspan="2">BALANCE</th><th colspan="3">EQUIVALENT TO 1,370 UNITS</th></tr>'));
-  assert.ok(wide.includes('<th>QTY</th><th>AMOUNT</th><th>PREVIOUS</th><th>TO DATE</th><th>BALANCE</th></tr></thead>'));
-  assert.ok(wide.includes('<tr class="apa-group"><td>2.1</td><td colspan="19">GENERAL &lt;REQUIREMENTS&gt;</td></tr>'));
-  assert.ok(wide.includes(`${cells('0.75', '300,000.00', '0', '342.5', '1,027.5')}</tr>`));
-  assert.ok(wide.includes(`<tr class="apa-item"><td>2.2.1</td><td>Road Excavation</td>${cells('1,234.5679')}<td>cu.m.</td>${cells('', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%', '', '', '', '', '')}</tr>`));
-  assert.ok(P.abstractItemsHtml(rows, 370.5).includes('EQUIVALENT TO 370.5 UNITS'));
 });
 
 test('a part that is its own pay item shows its quantity and figures under its heading', () => {

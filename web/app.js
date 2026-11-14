@@ -3496,7 +3496,7 @@ function actualBody(c) {
       <div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
         <tbody>${L.abstractStanding(c.project, c.documents, shown).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
       ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}`)}
-    ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson), Number(shown.equivUnits) || 0)}</div>`;
+    ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
 
 /** The quantities typed in the New abstract form (text by row index) as numbers; an empty box is no work this period. */
@@ -3506,8 +3506,8 @@ const typedQuantities = text => Object.fromEntries(Object.entries(text).filter((
 
 /**
  * `#/p/<id>/actual/new`: the next abstract, made here from the one before it (L.nextAbstractSource). The engineer
- * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts, the
- * percentages and the equivalent units are computed (L.nextAbstractRows). What is typed is kept on the page
+ * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts and the
+ * percentages are computed (L.nextAbstractRows). What is typed is kept on the page
  * (page.next) so a redraw for an arriving record keeps it.
  */
 function nextAbstractBody(c) {
@@ -3515,7 +3515,7 @@ function nextAbstractBody(c) {
   const { error, html } = nextAbstractSheet(c);
   return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
     ${section('New abstract', 'edit', `
-      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.</p>
+      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.</p>
       <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(c.page.next.asOf)}"></label>
         <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
       <div id="next-sheet">${html}</div>`)}`;

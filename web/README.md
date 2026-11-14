@@ -246,9 +246,9 @@ is read only.
     chart's plan that day, else the project's stored target. The actuals are the abstract's. +/- is the actual less
     the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). The file's
     name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
-    folds, groups are headings, subtotals are bold, and the grand total comes last. A record with `equivUnits` above
-    0 has three more columns after BALANCE, under "EQUIVALENT TO 370 UNITS": PREVIOUS, TO DATE and BALANCE, 2
-    decimals at most. **Print billing abstract** is described under the billings above.
+    folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at BALANCE: the
+    equivalent-units columns are read and kept on the record but not shown, because the abstract's format has none.
+    **Print billing abstract** is described under the billings above.
     **Delete**, for the people who can edit, asks first and marks the record deleted.
   - **The uploaded abstract is the project's actual accomplishment** (`L.projectActualAfter`, the phone's
     `ProjectAbstracts.projectActualAfter`): saving or deleting one sets the project's actual, in the same write, to

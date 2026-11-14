@@ -176,7 +176,7 @@ class ActualAccomplishmentUiTest {
     @Test fun newAbstract_typedQuantitiesGiveTheToDateAndTheOverall_andSaveFilesIt() {
         val filed = mutableStateListOf(first)
         openNewAbstract(filed, "2026-11-20") { filed += it }
-        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.").assertExists()
+        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.").assertExists()
         inForm("new_abstract_note").assert(hasText("Overall to date 77.77%, from 77.77% as of Nov 13, 2026."))
         inForm("next_done_0").assert(hasText("To date 420"))
         rule.onNodeWithText("520 LOT · Previous 420").assertExists()
