@@ -90,7 +90,7 @@ fun SummarySection(
     val cards = listOfNotNull<@Composable (Modifier) -> Unit>(
         { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
         construction?.let { c -> { m -> ConstructionCard(c, payments, today, m) } },
-        { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m) },
+        { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m, currentUserRole == UserRole.SUPER_ADMIN) },
         { m -> BarChartCard(project, documents, today, onSaveBarChart?.let { { showBarChart = true } }, m) },
         { m ->
             KeyDatesCard(
@@ -391,9 +391,13 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int) {
     }
 }
 
+/** The website's Copy to Google Drive for this project (web/app.js driveForm). */
+internal fun driveCopyLink(projectUuid: String) = "https://nha-monitor-bulacan-2026.web.app/#/p/$projectUuid/drive"
+
 @Composable
-private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject: () -> Unit, onPrintProfile: () -> Unit, modifier: Modifier) {
+private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject: () -> Unit, onPrintProfile: () -> Unit, modifier: Modifier, superAdmin: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
+    val context = androidx.compose.ui.platform.LocalContext.current
     SectionCard(
         "Project profile",
         Icons.Default.Info,
@@ -433,6 +437,15 @@ private fun ProfileCard(project: Project, canEditProject: Boolean, onEditProject
                     }
                 }
             }
+        }
+        // The website does the copy, so the Google sign-in is set up once, for the site, and the phone needs none.
+        if (superAdmin) TextButton(
+            onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(driveCopyLink(project.projectUuid)))) } },
+            modifier = Modifier.testTag("copy_to_drive_button")
+        ) {
+            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Copy files to Google Drive")
         }
     }
 }

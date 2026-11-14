@@ -10,7 +10,8 @@ import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig, driveClientId } from './firebase-config.js';
+import { DRIVE_SCOPE, driveFiles, copyToDrive } from './drive.js';
 import * as L from './logic.js';
 import * as P from './print.js';
 import { readChartWorkbook } from './chart-excel.js';
@@ -144,8 +145,8 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('hashchange', () => s.user && route());
 
-// #/p/<project>[/progress|/payments|/documents|/print/<weekly report>]
-const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|payments|documents|print)(?:\/([\w-]+))?)?$/;
+// #/p/<project>[/progress|/payments|/documents|/print/<weekly report>|/drive]
+const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|payments|documents|print|drive)(?:\/([\w-]+))?)?$/;
 
 function route() {
   const m = PAGE.exec(location.hash);
@@ -665,6 +666,88 @@ async function assignForm(c) {
   };
 }
 
+let driveWait; // the Google sign-in being waited for
+/**
+ * A Google sign-in window that lets this site add files to the chosen account's Drive; gives the access token (good for
+ * an hour). Call it straight from a click, or the browser blocks the window. Google sends the window back to
+ * drive-auth.html, which passes the answer on; `state` ties it to this request, so no other page can hand in a token.
+ */
+function driveToken() {
+  driveWait?.close();
+  const state = crypto.randomUUID(), channel = driveWait = new BroadcastChannel('nha-drive');
+  const query = new URLSearchParams({ client_id: driveClientId, redirect_uri: `${location.origin}/drive-auth.html`, response_type: 'token', scope: DRIVE_SCOPE, state });
+  if (!window.open(`https://accounts.google.com/o/oauth2/v2/auth?${query}`, 'nha-drive', 'popup,width=520,height=640')) {
+    channel.close();
+    return Promise.reject(new Error('Your browser blocked the Google sign-in window. Allow pop-ups for this site, then try again.'));
+  }
+  return new Promise((resolve, reject) => {
+    channel.onmessage = e => {
+      const answer = new URLSearchParams(e.data);
+      if (answer.get('state') !== state) return;
+      channel.close();
+      if (answer.get('access_token')) resolve(answer.get('access_token'));
+      else reject(new Error(answer.get('error') === 'access_denied' ? 'Google Drive access was not allowed, so nothing was copied.' : 'The Google sign-in did not finish. Try again.'));
+    };
+  });
+}
+
+/**
+ * Copy to Google Drive (Super Admin): the project's photos and PDFs, copied into named folders in the Drive of the
+ * Google account picked in the sign-in window. One way, and a later run adds only what is not there yet (drive.js).
+ */
+function driveForm(c) {
+  const d = document.createElement('dialog');
+  d.className = 'help edit-form';
+  d.innerHTML = `<form novalidate>
+    <h2>Copy to Google Drive</h2>
+    <p class="muted">Copies this project's photos and PDF files to your Google Drive, into the folder <b>NHA Monitor / ${esc(c.project.name)}</b>: the photos of each weekly report in that week's folder, then Billings, Documents, Letters to Contractor, Developer Requests and Subdivision Plan.</p>
+    <p class="muted">Files already copied are skipped, so run it again any time to add the new ones. Nothing is removed from NHA Monitor, and the site can only see the Drive files it made itself.</p>
+    <p role="status"></p>
+    <p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${icon('cloud_upload', 'sm')}Sign in to Google and copy</button></div>
+  </form>`;
+  const form = d.querySelector('form'), err = d.querySelector('.error'), status = d.querySelector('[role=status]'), go = d.querySelector('.actions .btn');
+  let open = true;
+  const done = () => { open = false; driveWait?.close(); d.close(); d.remove(); };
+  d.querySelector('[data-cancel]').onclick = done;
+  d.addEventListener('cancel', e => { e.preventDefault(); done(); });
+  document.body.append(d);
+  d.showModal();
+  if (!driveClientId) { go.hidden = true; err.textContent = 'Google Drive is not set up for this site yet. The steps are in web/README.md, under "Copy to Google Drive".'; return; }
+  form.onsubmit = async e => {
+    e.preventDefault();
+    err.textContent = '';
+    const files = driveFiles(c.page.records);
+    if (!files.length) { err.textContent = 'This project has no uploaded photos or PDF files yet.'; return; }
+    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then copy again.'; return; }
+    try {
+      const wait = driveToken();
+      status.textContent = 'Waiting for the Google sign-in window…';
+      const token = await wait;
+      if (!open) return;
+      go.disabled = true;
+      const result = await copyToDrive({ token, projectId: c.page.id, projectName: c.project.name, files, bytes: planBytes,
+        // Throwing here is how a closed dialog stops the copy before its next file.
+        onProgress: (i, n, name) => { if (!open) throw new Error('stopped'); status.textContent = `Copying ${i} of ${n}: ${name}`; } });
+      if (!open) return;
+      status.innerHTML = `${esc(`${plural(result.copied, 'file')} copied${result.skipped ? `, ${result.skipped} already there` : ''}.`)}
+        <a class="text-btn" href="${esc(result.folderUrl)}" target="_blank" rel="noopener">${icon('folder_open', 'sm')}Open the folder in Google Drive</a>`;
+      if (result.failed.length) err.textContent = `${plural(result.failed.length, 'file')} could not be read from NHA Monitor and ${result.failed.length === 1 ? 'was' : 'were'} left out: ${result.failed.join(', ')}`;
+      go.hidden = true;
+      d.querySelector('[data-cancel]').textContent = 'Close';
+    } catch (x) {
+      if (!open) return;
+      console.error('Copy to Drive', x);
+      status.textContent = '';
+      const again = 'Copy again: it goes on from where it stopped.';
+      err.textContent = !x.status ? (x instanceof TypeError ? `The connection dropped. ${again}` : x.message)
+        : x.status === 401 ? `The Google sign-in ran out (it lasts an hour). ${again}`
+          : `Google Drive refused the copy (error ${x.status}). Check that the Drive has free space. ${again}`;
+      go.disabled = false;
+    }
+  };
+}
+
 function redrawDashboard() {
   const grid = document.getElementById('grid');
   if (!grid || !s.user) return;
@@ -826,6 +909,12 @@ function drawProject(page) {
   const billed = L.billedTotal(payments);
   const c = { page, project, records, of, documents, payments, weekly, cost, billed, now: today() };
   if (page.section === 'print') return drawPrint(c);
+  // #/p/<project>/drive, the link the phone's Copy to Google Drive opens: the summary, with the copy dialog over it.
+  if (page.section === 'drive') {
+    page.section = 'summary';
+    history.replaceState(null, '', `#/p/${page.id}`);
+    if (L.canAssign(s.claims)) driveForm(c);
+  }
 
   const housing = /housing/i.test(project.projectType || '');
   const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues']
@@ -866,6 +955,8 @@ function drawProject(page) {
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
   const projectAssign = document.getElementById('project-assign');
   if (projectAssign) projectAssign.onclick = () => assignForm(c);
+  const projectDrive = document.getElementById('project-drive');
+  if (projectDrive) projectDrive.onclick = () => driveForm(c);
   const weeklyAdd = document.getElementById('weekly-add');
   if (weeklyAdd) weeklyAdd.onclick = () => weeklyForm(c);
   main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
@@ -920,7 +1011,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
       ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
     </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
-      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}`,
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}
+    ${L.canAssign(s.claims) ? `<button class="text-btn foot-btn" id="project-drive">${icon('cloud_upload', 'sm')}Copy files to Google Drive</button>` : ''}`,
     '', `${L.canAssign(s.claims) ? `<button class="text-btn" id="project-assign">${icon('person', 'sm')}Assign</button>` : ''}
       ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
       <a class="text-btn" href="#/p/${esc(page.id)}/print/profile">${icon('print', 'sm')}Print</a>`);
@@ -3694,7 +3786,7 @@ async function drawSdpPrint({ page, project, records }) {
   btn.onclick = () => window.print();
 }
 
-/** The plan PDF's bytes: a plain download first, then the Storage SDK's own request if the browser refuses that one. */
+/** A stored file's bytes (the plan PDF to print, a file to copy to Drive): a plain download first, then the Storage SDK's own request if the browser refuses that one. */
 async function planBytes(refText) {
   const path = L.storagePathOf(refText);
   if (!path) throw new Error('the PDF is not uploaded yet');
