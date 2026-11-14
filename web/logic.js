@@ -1688,6 +1688,8 @@ export function nextAbstractTyped(sourceRows, same) {
  * THIS PERIOD amount is the quantity at its unit cost and its % that amount over the line's amount; TO DATE is
  * previous plus this period; BALANCE the rest; the equivalent units the quantity's share of `equivUnits`. Subtotals
  * and the grand total add up their pay lines' THIS PERIOD amounts. Cells the sheet leaves blank stay blank.
+ * One figure is not the sheet's: TO DATE % is the TO DATE amount over the row's amount, where the sheet adds the
+ * rounded percentages, so a finished line reads 100.00 however many abstracts it took.
  */
 export function nextAbstractRows(rows, typed, equivUnits = 0) {
   const out = rows.map(r => ({ ...r }));
@@ -1695,7 +1697,7 @@ export function nextAbstractRows(rows, typed, equivUnits = 0) {
     if (!isPayLine(r)) return;
     const q = typed[i] ?? null, n = Number(q) || 0, prev = [0, 1, 2].map(k => Number(r.toDate?.[k]) || 0);
     const amount = round2(n * (r.unitCost ?? r.amount / r.qty)), share = r.amount ? round2(amount / r.amount * 100) : 0;
-    const toDate = [round4(prev[0] + n), round2(prev[1] + amount), round2(prev[2] + share)], done = round2(toDate[0] / r.qty * equivUnits);
+    const toDate = [round4(prev[0] + n), round2(prev[1] + amount), r.amount ? round2(round2(prev[1] + amount) / r.amount * 100) : prev[2]], done = round2(toDate[0] / r.qty * equivUnits);
     Object.assign(out[i], { prev, period: [q, amount, share], toDate, balance: [round4(r.qty - toDate[0]), round2(r.amount - toDate[1])],
       equiv: equivUnits > 0 ? [round2(prev[0] / r.qty * equivUnits), done, round2(equivUnits - done)] : [null, null, null] });
   });
@@ -1703,7 +1705,7 @@ export function nextAbstractRows(rows, typed, equivUnits = 0) {
     const r = rows[i], amount = round2(lines.reduce((t, k) => t + out[k].period[1], 0)), share = r.amount ? round2(amount / r.amount * 100) : 0;
     const before = [Number(r.toDate?.[1]) || 0, Number(r.toDate?.[2]) || 0], done = round2(before[0] + amount);
     Object.assign(out[i], { prev: [null, before[0], r.prev?.[2] == null ? null : before[1]], period: [null, amount, r.period?.[2] == null ? null : share],
-      toDate: [null, done, round2(before[1] + share)], balance: [null, r.balance?.[1] == null ? null : round2((r.amount ?? 0) - done)], equiv: [null, null, null] });
+      toDate: [null, done, r.amount ? round2(done / r.amount * 100) : before[1]], balance: [null, r.balance?.[1] == null ? null : round2((r.amount ?? 0) - done)], equiv: [null, null, null] });
   }
   return out;
 }
@@ -1711,13 +1713,13 @@ export function nextAbstractRows(rows, typed, equivUnits = 0) {
 /** A quantity as the abstract shows it: up to 4 decimals, with commas. */
 export const quantityText = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
 
-/** ProjectAbstracts.nextErrors: what stops the typed quantities from being saved, one line per pay line; [] when they can. */
+/** ProjectAbstracts.nextErrors: what stops the typed quantities from being saved, one line per pay line; [] when they can. A line the abstract before it already has over its quantity is carried as it is: only more work on it is refused. */
 export function nextAbstractErrors(rows, typed) {
   const next = nextAbstractRows(rows, typed);
   return rows.flatMap((r, i) => {
     const label = `${r.no} ${r.name}`.trim(), done = next[i].toDate?.[0];
     return !isPayLine(r) ? [] : !Number.isFinite(Number(typed[i] ?? 0)) ? [`${label}: this period must be a number.`]
-      : done < 0 ? [`${label}: to date would go below zero.`] : done > r.qty ? [`${label}: to date ${quantityText(done)} would pass the quantity ${quantityText(r.qty)}.`] : [];
+      : done < 0 ? [`${label}: to date would go below zero.`] : done > r.qty && typed[i] > 0 ? [`${label}: to date ${quantityText(done)} would pass the quantity ${quantityText(r.qty)}.`] : [];
   });
 }
 

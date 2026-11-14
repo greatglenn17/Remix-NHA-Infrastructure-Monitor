@@ -1536,6 +1536,15 @@ test('the next abstract is made from the one before it: previous is its to date,
     '1 LAND ACQUISITION COST: to date 521 would pass the quantity 520.', '2.1.1 Mobilization/Demobilization: to date would go below zero.',
     '2.1.2 Permits & Licences: this period must be a number.']);
   assert.deepEqual(L.nextAbstractErrors(NEXT_ROWS, { 8: 60.5 }), ['2.2.1 Catch basin: to date 96.5 would pass the quantity 96.']);
+  // A line already over its quantity is carried; only more work on it is refused.
+  const over = NEXT_ROWS.map((r, i) => (i === 8 ? { ...r, toDate: [97, 1794500, 101.04] } : r));
+  assert.deepEqual(L.nextAbstractErrors(over, {}), []);
+  assert.deepEqual(L.nextAbstractErrors(over, { 8: -1 }), []);
+  assert.deepEqual(L.nextAbstractErrors(over, { 8: 1 }), ['2.2.1 Catch basin: to date 98 would pass the quantity 96.']);
+  // A line done a third at a time ends at 100.00: its to date % is its to date amount over its amount.
+  const third = [{ ...NEXT_ROWS[8], qty: 3, unitCost: 1000, amount: 3000, toDate: [0, 0, 0] }, { ...NEXT_ROWS[11], amount: 3000, toDate: [null, 0, 0] }];
+  const thrice = [1, 2, 3].reduce(rows => L.nextAbstractRows(rows, { 0: 1 }), third);
+  assert.deepEqual([thrice[0].toDate, thrice[0].balance, thrice[1].toDate], [[3, 3000, 100], [0, 0], [null, 3000, 100]]);
 });
 
 test('the next abstract continues the latest one dated before it', () => {

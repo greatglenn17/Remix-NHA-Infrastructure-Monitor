@@ -155,7 +155,7 @@ function route() {
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
-    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null, note: '', billing: null });
+    Object.assign(s.page, { section: m[2] || 'summary', sub: m[3] || null, note: '', billing: null, next: null });
     freshScreen();
     return drawProject(s.page);
   }
@@ -924,6 +924,8 @@ function drawProject(page) {
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
+  // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
+  const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
   main.innerHTML = `
     ${backLink}
     <header class="card project-head">
@@ -952,6 +954,7 @@ function drawProject(page) {
   bindPlanTools(c);
   if (document.getElementById('issue-results')) bindIssues(c);
   if (document.getElementById('abstract-note')) bindActual(c);
+  if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
@@ -3497,7 +3500,9 @@ function actualBody(c) {
 }
 
 /** The quantities typed in the New abstract form (text by row index) as numbers; an empty box is no work this period. */
-const typedQuantities = text => Object.fromEntries(Object.entries(text).filter(([, t]) => String(t).trim() !== '').map(([i, t]) => [i, Number(String(t).replace(/,/g, ''))]));
+const typedQuantities = text => Object.fromEntries(Object.entries(text).filter(([, t]) => String(t).trim() !== '')
+  // A plain decimal with commas allowed, as on the phone; anything else is NaN, which L.nextAbstractErrors names.
+  .map(([i, t]) => { const n = String(t).replace(/,/g, '').trim(); return [i, /^-?(\d+(\.\d*)?|\.\d+)$/.test(n) ? Number(n) : NaN]; }));
 
 /**
  * `#/p/<id>/actual/new`: the next abstract, made here from the one before it (L.nextAbstractSource). The engineer
@@ -3506,8 +3511,19 @@ const typedQuantities = text => Object.fromEntries(Object.entries(text).filter((
  * (page.next) so a redraw for an arriving record keeps it.
  */
 function nextAbstractBody(c) {
-  const next = c.page.next ??= { asOf: today(), from: '', text: {} };
-  const { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
+  c.page.next ??= { asOf: today(), from: '', text: {} };
+  const { error, html } = nextAbstractSheet(c);
+  return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
+    ${section('New abstract', 'edit', `
+      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.</p>
+      <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(c.page.next.asOf)}"></label>
+        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
+      <div id="next-sheet">${html}</div>`)}`;
+}
+
+/** The form under its date, as { error, html }: why that date cannot be used, or the overall line and the pay items with what is typed (page.next). */
+function nextAbstractSheet(c) {
+  const next = c.page.next, { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
   const rows = source && !error ? L.abstractRows(source.rowsJson) : [], from = `${source?.uuid}|${same?.uuid}`;
   // Another abstract to continue, or a date that already has one, starts from what that date has.
   if (rows.length && next.from !== from) Object.assign(next, { from, text: Object.fromEntries(Object.entries(L.nextAbstractTyped(rows, same)).map(([i, q]) => [i, String(q)])) });
@@ -3516,14 +3532,9 @@ function nextAbstractBody(c) {
   const line = (r, i) => (L.isPayLine(r) ? `<tr><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${q(r.qty)}<td>${esc(r.unit)}</td>${q(computed[i].prev[0])}
       <td><input inputmode="decimal" data-next="${i}" value="${esc(next.text[i] ?? '')}" aria-label="This period: ${esc(`${r.no} ${r.name}`)}"></td><td class="num" id="next-done-${i}">${L.quantityText(computed[i].toDate[0])}</td></tr>`
     : r.kind === 'part' || r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="6">${esc(r.name)}</td></tr>` : '');
-  return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
-    ${section('New abstract', 'edit', `
-      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts, the percentages and the equivalent units are computed.</p>
-      <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(next.asOf)}"></label>
-        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
-      ${error ? `<p class="error">${esc(error)}</p>` : `<p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
+  return { error, html: error ? `<p class="error">${esc(error)}</p>` : `<p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
       <div class="scroll"><table class="grid-table apa-next"><thead><tr><th>ITEM NO.</th><th>ITEM DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>PREVIOUS</th><th>THIS PERIOD</th><th>TO DATE</th></tr></thead>
-        <tbody>${rows.map(line).join('')}</tbody></table></div>`}`)}`;
+        <tbody>${rows.map(line).join('')}</tbody></table></div>` };
 }
 
 /** The New abstract form's controls: a typed quantity redraws only its to date and the overall line; Save files the abstract as an upload does. */
@@ -3531,13 +3542,15 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
   const page = c.page, next = page.next, asOf = document.getElementById('next-as-of'), save = document.getElementById('next-save');
   const state = () => { const found = L.nextAbstractSource(all, next.asOf); return { ...found, rows: found.source && !found.error ? L.abstractRows(found.source.rowsJson) : [] }; };
   const made = ({ source, rows }) => L.nextAbstractRows(rows, typedQuantities(next.text), Number(source.equivUnits) || 0);
-  asOf.onchange = () => { next.asOf = asOf.value; page.note = ''; drawProject(page); };
-  main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
+  // A browser fires change at each key typed in a date box, so only the sheet under it is redrawn and the box keeps the keyboard's place.
+  asOf.onchange = () => { next.asOf = asOf.value; say(''); const sheet = nextAbstractSheet(c); document.getElementById('next-sheet').innerHTML = sheet.html; save.disabled = Boolean(sheet.error); boxes(); };
+  const boxes = () => main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
     next.text[box.dataset.next] = box.value;
     const now = state(), rows = made(now);
     document.getElementById(`next-done-${box.dataset.next}`).textContent = L.quantityText(rows[box.dataset.next].toDate[0]);
     document.getElementById('next-overall').textContent = L.nextAbstractNote(now.source, now.same, rows);
   }; });
+  boxes();
   save.onclick = async () => {
     const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, typedQuantities(next.text));
     if (errors.length) { say(errors.slice(0, 3).join(' ') + (errors.length > 3 ? ` And ${errors.length - 3} more.` : '')); return; }

@@ -39,7 +39,8 @@ is read only.
   are those of the latest abstract dated before the picked "As of" date, and its TO DATE is the new PREVIOUS. The
   engineer types only each pay item's THIS PERIOD quantity; the amounts, percentages, to date, balance, equivalent
   units, subtotals and grand total follow the sheet's formulas (`L.nextAbstractRows`, the phone's
-  `ProjectAbstracts.nextRows`). It is filed like an upload, without a file. The latest date picked again is made
+  `ProjectAbstracts.nextRows`), except that TO DATE % is the to date amount over the row's amount (the sheet adds
+  the rounded percentages), so a finished line reads 100.00%. It is filed like an upload, without a file. The latest date picked again is made
   again from the one before it, starting from what was typed for it. An abstract whose subtotals do not add up from
   its items cannot be continued: the next one is uploaded.
 - **The billing abstract is printed before the billing, from the Actual Accomplishment tab**, not from a billing: the

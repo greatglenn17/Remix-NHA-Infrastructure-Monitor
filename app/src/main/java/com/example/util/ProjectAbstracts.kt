@@ -180,6 +180,8 @@ object ProjectAbstracts {
      * the quantity at its unit cost and its % that amount over the line's amount; TO DATE is previous plus this
      * period; BALANCE the rest; the equivalent units the quantity's share of [equivUnits]. Subtotals and the grand
      * total add up their pay lines' THIS PERIOD amounts. Cells the sheet leaves blank stay blank.
+     * One figure is not the sheet's: TO DATE % is the TO DATE amount over the row's amount, where the sheet adds the
+     * rounded percentages, so a finished line reads 100.00 however many abstracts it took.
      */
     fun nextRows(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>, equivUnits: Double = 0.0): List<AbstractExcel.Row> {
         val out = rows.toMutableList()
@@ -192,7 +194,7 @@ object ProjectAbstracts {
             val prev = List(3) { r.toDate.getOrNull(it) ?: 0.0 }
             val amount = round2(n * (r.unitCost ?: (contract / qty)))
             val share = if (contract != 0.0) round2(amount / contract * 100) else 0.0
-            val toDate = listOf(round4(prev[0] + n), round2(prev[1] + amount), round2(prev[2] + share))
+            val toDate = listOf(round4(prev[0] + n), round2(prev[1] + amount), if (contract != 0.0) round2(round2(prev[1] + amount) / contract * 100) else prev[2])
             val done = round2(toDate[0] / qty * equivUnits)
             out[i] = r.copy(
                 prev = prev, period = listOf(q, amount, share), toDate = toDate, balance = listOf(round4(qty - toDate[0]), round2(contract - toDate[1])),
@@ -208,16 +210,17 @@ object ProjectAbstracts {
             val done = round2(before[0] + amount)
             out[i] = r.copy(
                 prev = listOf(null, before[0], before[1].takeIf { r.prev.getOrNull(2) != null }), period = listOf(null, amount, share.takeIf { r.period.getOrNull(2) != null }),
-                toDate = listOf(null, done, round2(before[1] + share)), balance = listOf(null, r.balance.getOrNull(1)?.let { round2(contract - done) }), equiv = listOf(null, null, null)
+                toDate = listOf(null, done, if (contract != 0.0) round2(done / contract * 100) else before[1]), balance = listOf(null, r.balance.getOrNull(1)?.let { round2(contract - done) }), equiv = listOf(null, null, null)
             )
         }
         return out
     }
 
     /** A quantity as the abstract shows it: up to 4 decimals, with commas. */
-    fun quantityText(v: Double): String = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).format(v)
+    fun quantityText(v: Double): String =
+        java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }.format(v) // a tie rounds up, as the website's does
 
-    /** What stops the typed quantities from being saved, one line per pay line (a NaN is a box that is not a number); empty when they can. */
+    /** What stops the typed quantities from being saved, one line per pay line (a NaN is a box that is not a number); empty when they can. A line the abstract before it already has over its quantity is carried as it is: only more work on it is refused. */
     fun nextErrors(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>): List<String> {
         val next = nextRows(rows, typed)
         return rows.indices.filter { isPayLine(rows[it]) }.mapNotNull { i ->
@@ -227,7 +230,7 @@ object ProjectAbstracts {
             when {
                 typed[i]?.isFinite() == false -> "$label: this period must be a number."
                 done < 0 -> "$label: to date would go below zero."
-                done > qty -> "$label: to date ${quantityText(done)} would pass the quantity ${quantityText(qty)}."
+                done > qty && (typed[i] ?: 0.0) > 0 -> "$label: to date ${quantityText(done)} would pass the quantity ${quantityText(qty)}."
                 else -> null
             }
         }

@@ -235,6 +235,16 @@ class ProjectAbstractsTest {
         )
         assertEquals(listOf("2.2.1 Catch basin: to date 96.5 would pass the quantity 96."), ProjectAbstracts.nextErrors(nextRows, mapOf(8 to 60.5)))
         assertEquals("12,550", ProjectAbstracts.quantityText(12550.0))
+        assertEquals("0.0313", ProjectAbstracts.quantityText(0.03125))
+        // A line already over its quantity is carried; only more work on it is refused.
+        val over = nextRows.mapIndexed { i, r -> if (i == 8) r.copy(toDate = listOf(97.0, 1794500.0, 101.04)) else r }
+        assertEquals(emptyList<String>(), ProjectAbstracts.nextErrors(over, emptyMap()))
+        assertEquals(emptyList<String>(), ProjectAbstracts.nextErrors(over, mapOf(8 to -1.0)))
+        assertEquals(listOf("2.2.1 Catch basin: to date 98 would pass the quantity 96."), ProjectAbstracts.nextErrors(over, mapOf(8 to 1.0)))
+        // A line done a third at a time ends at 100.00: its to date % is its to date amount over its amount.
+        val third = listOf(nextRows[8].copy(qty = 3.0, unitCost = 1000.0, amount = 3000.0, toDate = listOf(0.0, 0.0, 0.0)), nextRows[11].copy(amount = 3000.0, toDate = listOf(null, 0.0, 0.0)))
+        val thrice = (1..3).fold(third) { rows, _ -> ProjectAbstracts.nextRows(rows, mapOf(0 to 1.0)) }
+        assertEquals(listOf(listOf(3.0, 3000.0, 100.0), listOf(0.0, 0.0), listOf(null, 3000.0, 100.0)), listOf(thrice[0].toDate, thrice[0].balance, thrice[1].toDate))
     }
 
     @Test fun next_abstract_continues_the_latest_one_dated_before_it() {
