@@ -157,6 +157,25 @@ class ProjectDetailScreenshotTest {
         captureRoboImage("src/test/screenshots/detail_documents_${width}_$theme.png") { frame(mode) { Documents() } }
     }
 
+    // The Actual Accomplishment tab on a small phone: the five tabs, the target/actual table, the buttons and the pay items.
+    @Config(qualifiers = "w360dp-h800dp")
+    @Test fun actual_tab_360_light() = captureRoboImage("src/test/screenshots/detail_actual_360_light.png") {
+        val none = "[null,null,null]"
+        val abstract = com.example.data.model.ProjectAbstract(
+            id = 1, projectId = project.id, asOf = "2026-10-23", overallPct = 46.25, fileName = "Abstract as of October 23 2026.xlsx", uploadedBy = "Engr. Sample", equivUnits = 400.0,
+            rowsJson = """[{"kind":"part","no":"2","name":"LAND DEVELOPMENT","qty":null,"unit":"","unitCost":null,"amount":null,"prev":$none,"period":$none,"toDate":$none,"balance":[null,null]},
+                {"kind":"item","no":"2.1.1","name":"Road excavation","qty":12000,"unit":"cu.m.","unitCost":2500,"amount":30000000,"prev":[4800,12000000,40],"period":[750,1875000,6.25],"toDate":[5550,13875000,46.25],"balance":[6450,16125000],"equiv":[160,185,215]},
+                {"kind":"subtotal","no":"","name":"Subtotal (Land Development)","qty":null,"unit":"","unitCost":null,"amount":30000000,"prev":[null,12000000,40],"period":[null,1875000,6.25],"toDate":[null,13875000,46.25],"balance":[null,16125000]},
+                {"kind":"total","no":"","name":"GRAND TOTAL","qty":null,"unit":"","unitCost":null,"amount":30000000,"prev":[null,12000000,40],"period":[null,1875000,6.25],"toDate":[null,13875000,46.25],"balance":[null,16125000]}]"""
+        )
+        frame(AppThemeMode.LIGHT, collapsed = true) {
+            Column {
+                com.example.ui.detail.ProjectSectionTabs(com.example.ui.detail.ProjectSection.ACTUAL) {}
+                com.example.ui.detail.sections.ActualAccomplishmentSection(project, docs, listOf(abstract), "Engr. Sample", {}, {}, {}, { _, _ -> })
+            }
+        }
+    }
+
     @Config(qualifiers = "w411dp-h891dp")
     @Test fun phone_light() {
         sections("411", AppThemeMode.LIGHT)
