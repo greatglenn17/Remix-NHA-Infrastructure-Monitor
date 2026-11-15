@@ -1,8 +1,8 @@
 {
-  "versionCode": 305,
-  "versionName": "2.8.25",
-  "releaseNotes": "v2.8.25: The printed billing abstract has no BALANCE columns: it ends at TO DATE, the same as Print abstract.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.25/NHA_Monitor_v2.8.25_Build305.apk",
-  "apkSha256": "42fb5edf065b27dff1b7d25fd9908fe8006f17af5f9e7cf37a75130eae1de987",
+  "versionCode": 306,
+  "versionName": "2.8.26",
+  "releaseNotes": "v2.8.26: A project already in the cloud keeps its own cloud copy even when another project has the same name. A project removed as a duplicate is kept on the phone when it holds work.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.26/NHA_Monitor_v2.8.26_Build306.apk",
+  "apkSha256": "c5419f2d93d85e644f0f3239ae73375062846a483f677db27123c5c9eb9d37b7",
   "isMandatory": true
 }
