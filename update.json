@@ -3,6 +3,6 @@
   "versionName": "2.8.27",
   "releaseNotes": "v2.8.27: Sync no longer stops at a cloud record the phone cannot store; it skips that record and takes the rest. Add file refuses a title that names an order (variation order, time extension, work suspension or resumption).",
   "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.27/NHA_Monitor_v2.8.27_Build307.apk",
-  "apkSha256": "\b8543a8ae34906bffea1a65379d7b24d505de60e1164c48af1e2959e61ed311",
+  "apkSha256": "b8543a8ae34906bffea1a65379d7b24d505de60e1164c48af1e2959e61ed3116",
   "isMandatory": true
 }
