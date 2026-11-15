@@ -1,8 +1,8 @@
 {
-  "versionCode": 308,
-  "versionName": "2.8.28",
-  "releaseNotes": "v2.8.28: The Actual Accomplishment table ends at TO DATE. The BALANCE columns are no longer shown, the same as on the website and the printed abstracts.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.28/NHA_Monitor_v2.8.28_Build308.apk",
-  "apkSha256": "4fe6c95c0648c9604fefcc31ae7323b60bddbe844aec48296608f11aa736e4d1",
+  "versionCode": 309,
+  "versionName": "2.8.29",
+  "releaseNotes": "v2.8.29: Easier to tap. The Edit and Delete buttons on an issue and the Close button on Notifications are larger.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.29/NHA_Monitor_v2.8.29_Build309.apk",
+  "apkSha256": "1f72ee0fdabeca83fb7252dea70e3a02a565161eeb8965ee21032593b32584a0",
   "isMandatory": true
 }
