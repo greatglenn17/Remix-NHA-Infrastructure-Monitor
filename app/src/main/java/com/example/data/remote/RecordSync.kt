@@ -3,9 +3,11 @@ package com.example.data.remote
 import android.content.ContentValues
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
+import android.util.Log
 import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.RecordSyncSchema
+import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -84,14 +86,24 @@ class RecordSync(private val db: AppDatabase) {
         val pending = deferred.values.sortedBy { RecordSyncSchema.TABLES.indexOf(it["type"]) }
         for (doc in pending) {
             val uuid = doc["uuid"] as String
-            if (db.syncOutboxDao().hasPendingFor(uuid)) {
-                // Both phones changed it: the unsent local edit wins, so lift its revision
-                // above the cloud's or the other phones would ignore it.
-                keepLocalAbove(doc)
+            try {
+                if (db.syncOutboxDao().hasPendingFor(uuid)) {
+                    // Both phones changed it: the unsent local edit wins, so lift its revision
+                    // above the cloud's or the other phones would ignore it.
+                    keepLocalAbove(doc)
+                    deferred.remove(uuid)
+                    continue
+                }
+                if (applyOne(doc)) deferred.remove(uuid)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                // A record this phone can't store (unreadable data, a missing required value) is left
+                // out, or it would stop every record after it, now and on each later pass. Its write
+                // was rolled back, so nothing is sent or deleted; the cloud copy comes again when it
+                // changes and when the app next starts.
+                Log.e("RecordSync", "Skipped cloud record $uuid (${doc["type"]}) that could not be applied", e)
                 deferred.remove(uuid)
-                continue
             }
-            if (applyOne(doc)) deferred.remove(uuid)
         }
     }
 
