@@ -452,11 +452,11 @@ object BlueBookForms {
         )
     }
 
-    /** The district's column layout of an Abstract of Physical Accomplishment: 17 columns under three header rows. */
-    private fun apaHead() = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
-        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th><th colspan='2' rowspan='2'>BALANCE</th></tr>" +
+    /** The district's column layout of an Abstract of Physical Accomplishment under three header rows: 17 columns, 15 without the two of BALANCE. */
+    private fun apaHead(balance: Boolean = true) = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
+        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th>${if (balance) "<th colspan='2' rowspan='2'>BALANCE</th>" else ""}</tr>" +
         "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
-        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}<th>QTY</th><th>AMOUNT</th></tr>"
+        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}${if (balance) "<th>QTY</th><th>AMOUNT</th>" else ""}</tr>"
 
     /**
      * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
@@ -484,9 +484,9 @@ object BlueBookForms {
     /**
      * The abstract of the actual work, the detailed one ("Print abstract" on the Actual Accomplishment tab), on a
      * landscape sheet: the same top as the billing format, with the target the tab shows for its "As of" date
-     * ([ProjectAbstracts.standing]'s Overall) and the abstract's own actual, then every row in the abstract's columns,
-     * an empty cell left blank, and the signatures. The header rows repeat on each page. The sheet's "EQUIVALENT TO N
-     * UNITS" columns are not shown: the abstract's format has none. web/print.js actualAbstractHtml prints the same page.
+     * ([ProjectAbstracts.standing]'s Overall) and the abstract's own actual, then every row in the abstract's columns
+     * up to TO DATE, an empty cell left blank, and the signatures. The header rows repeat on each page. Neither BALANCE
+     * nor the sheet's "EQUIVALENT TO N UNITS" columns are shown. web/print.js actualAbstractHtml prints the same page.
      */
     fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = ""): String {
         val overall = ProjectAbstracts.standing(project, documents, abstract).last()
@@ -499,14 +499,14 @@ object BlueBookForms {
         val rows = ProjectAbstracts.rows(abstract.rowsJson).joinToString("") { r ->
             val name = esc(r.name).let { if (r.kind == "part" || r.kind == "group") "<b>$it</b>" else it }
             "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
-                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${qty(r.balance.getOrNull(0))}${money(r.balance.getOrNull(1))}</tr>"
+                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>"
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
             ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
             <table class='apa'>
-              <thead>${apaHead()}</thead>
+              <thead>${apaHead(balance = false)}</thead>
               <tbody>$rows</tbody>
             </table>
             <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
@@ -712,7 +712,7 @@ object BlueBookForms {
         td.pc { width: 3%; }
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
         table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
-        /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge, above BALANCE. */
+        /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
         table.apa-info td:nth-child(3) { width: 100%; }
         table.apa { font-size: 7.5pt; }
         table.apa th, table.apa td { padding: 1mm 0.8mm; }

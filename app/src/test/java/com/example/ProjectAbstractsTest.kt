@@ -174,19 +174,19 @@ class ProjectAbstractsTest {
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>10.73%"))
         assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-1.27%"))
         // The header rows are a thead, so they repeat on every page of a long abstract.
-        assertTrue(Regex("<thead><tr><th rowspan='3'>ITEM NO\\.</th>.*<th>QTY</th><th>AMOUNT</th></tr></thead>").containsMatchIn(html))
+        assertTrue(Regex("<thead><tr><th rowspan='3'>ITEM NO\\.</th>.*<th>QTY</th><th>AMOUNT</th><th>% WT</th></tr></thead>").containsMatchIn(html))
+        assertTrue(!html.contains("BALANCE")) // the printed abstract of the actual work has no BALANCE columns
         assertTrue(Regex("<div class='keep'>\\s*<table class='sig'>[\\s\\S]*Prepared by:[\\s\\S]*Checked by:[\\s\\S]*Approved by:").containsMatchIn(html))
-        has("2.1.1", "Mobilization/Demobilization", "1", "l.s.", "400,000.00", "400,000.00", "0", "0.00", "0.00%", "0.25", "100,000.00", "25.00%", "0.25", "100,000.00", "25.00%", "0.75", "300,000.00")
+        has("2.1.1", "Mobilization/Demobilization", "1", "l.s.", "400,000.00", "400,000.00", "0", "0.00", "0.00%", "0.25", "100,000.00", "25.00%", "0.25", "100,000.00", "25.00%")
         // A cell the sheet left empty stays blank, and the workbook's text is escaped.
-        has("2.2.1", "Fill &amp; &lt;Compaction&gt;", "", "", "", "1,600,000.00", "", "", "", "", "", "", "", "404,000.00", "25.25%", "", "")
-        has("", "GRAND TOTAL", "", "", "", "10,000,000.00", "", "", "", "", "", "", "", "1,074,000.00", "10.73%", "", "")
+        has("2.2.1", "Fill &amp; &lt;Compaction&gt;", "", "", "", "1,600,000.00", "", "", "", "", "", "", "", "404,000.00", "25.25%")
+        has("", "GRAND TOTAL", "", "", "", "10,000,000.00", "", "", "", "", "", "", "", "1,074,000.00", "10.73%")
         assertTrue(html.contains("<td class='c'>2.1</td><td><b>GENERAL REQUIREMENTS</b></td>"))
         assertTrue(html.contains("size: A4 landscape"))
-        // The sheet ends at BALANCE: a record's equivalent-units columns are not shown.
+        // The sheet ends at TO DATE: a record's balance and equivalent-units columns are not shown.
         val wide = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(equivUnits = 1370.0), signatories)
         assertTrue(!wide.contains("EQUIVALENT"))
-        assertTrue(wide.contains("<th colspan='2' rowspan='2'>BALANCE</th></tr>"))
-        assertTrue(wide.contains(">300,000.00</td></tr>")) // 2.1.1's row ends at its balance, though it carries equivalent units
+        assertTrue(wide.contains(">100,000.00</td><td class='n'>25.00%</td></tr>")) // 2.1.1's row ends at its to date, though it carries a balance and equivalent units
     }
 
     // The made-up project of web/logic.test.mjs (NEXT_ROWS), figure for figure: Land Acquisition is a part that is its own pay line.

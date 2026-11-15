@@ -3,7 +3,13 @@ package com.example.ui.detail.sections
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -19,11 +25,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
@@ -44,27 +52,93 @@ import kotlinx.coroutines.withContext
 
 private fun money(value: Double) = "%,.2f".format(Locale.US, value)
 
-/** "Amount 400,000.00 · To date 100,000.00 (25.00%)", leaving out what the sheet left empty. */
-private fun figuresLine(amount: Double?, toDate: Double?, pct: Double?): String = listOfNotNull(
-    amount?.let { "Amount ${money(it)}" },
-    when {
-        toDate != null -> "To date ${money(toDate)}" + pct?.let { " (${ProjectAbstracts.pct(it)})" }.orEmpty()
-        pct != null -> "To date ${ProjectAbstracts.pct(pct)}"
-        else -> null
-    }
-).joinToString(" · ")
-
-/** A row of the summary card's table: the name, then Target, Actual and +/-. */
+/** A row of the summary card's table, ruled as the website's: the name, then Target, Actual and +/-. */
 @Composable
 private fun StandingRow(name: String, cells: List<String>, header: Boolean = false) {
     val scheme = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).semantics(mergeDescendants = true) {}.testTag("standing_$name")) {
-        Text(name, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1.7f))
-        cells.forEach { cell ->
+    val cell = Modifier.fillMaxHeight().border(0.5.dp, scheme.outlineVariant).padding(4.dp)
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(if (header) scheme.surfaceVariant else scheme.surface)
+            .semantics(mergeDescendants = true) {}.testTag("standing_$name")
+    ) {
+        Text(name, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1.7f).then(cell))
+        cells.forEach { text ->
             Text(
-                cell, style = MaterialTheme.typography.bodySmall.figures(cell), fontWeight = if (header) null else FontWeight.SemiBold,
-                color = if (header) scheme.onSurfaceVariant else scheme.onSurface, textAlign = TextAlign.End, modifier = Modifier.weight(1f)
+                text, style = MaterialTheme.typography.bodySmall.figures(text), fontWeight = FontWeight.SemiBold,
+                color = if (header) scheme.onSurfaceVariant else scheme.onSurface, textAlign = TextAlign.End, modifier = Modifier.weight(1f).then(cell)
             )
+        }
+    }
+}
+
+/**
+ * The widths of the pay items' 17 columns, as the website's table has them: item no., description, quantity, unit,
+ * unit cost, amount; quantity, amount and % for previous, this period and to date; the balance's quantity and amount.
+ * At the phone's font size a figure keeps to one line up to 9,999,999,999.99 (a quantity to 1,234,567.8901).
+ */
+private val ITEM_WIDTHS: List<Int> = listOf(76, 200, 116, 56, 132, 132) + List(3) { listOf(116, 132, 68) }.flatten() + listOf(116, 132)
+
+/** [ITEM_WIDTHS] at the phone's font size: the figures are set in sp, so the columns grow with them. */
+@Composable
+private fun itemWidths(): List<Dp> = LocalDensity.current.fontScale.let { scale -> ITEM_WIDTHS.map { (it * scale).dp } }
+
+/**
+ * A row of the pay items' table, moving sideways with the rest ([scroll] is the table's). Without the stretch at the
+ * table's ends: each row would have its own, so only the row under the finger would move out of line.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TableRow(scroll: ScrollState, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) =
+    CompositionLocalProvider(LocalOverscrollConfiguration provides null) {
+        Row(Modifier.horizontalScroll(scroll).height(IntrinsicSize.Min).then(modifier), content = content)
+    }
+
+/** One cell of the pay items' table; [fill] takes the row's height, so the rules of a row line up. */
+@Composable
+private fun ItemCell(text: String, width: Dp, align: TextAlign = TextAlign.End, bold: Boolean = false, fill: Boolean = true) {
+    val scheme = MaterialTheme.colorScheme
+    Text(
+        text, style = MaterialTheme.typography.bodySmall.figures(text), fontWeight = if (bold) FontWeight.SemiBold else null, color = scheme.onSurface, textAlign = align,
+        modifier = Modifier.width(width).then(if (fill) Modifier.fillMaxHeight() else Modifier).border(0.5.dp, scheme.outlineVariant).padding(horizontal = 6.dp, vertical = 4.dp)
+    )
+}
+
+/** The table's column headings, in two rows as the website's table has them. */
+@Composable
+private fun ItemsHeader(scroll: ScrollState) {
+    val w = itemWidths()
+    TableRow(scroll, Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+        listOf("ITEM NO.", "ITEM DESCRIPTION", "QTY", "UNIT", "UNIT COST", "AMOUNT").forEachIndexed { k, label -> ItemCell(label, w[k], TextAlign.Center, bold = true) }
+        // Each with the place of its first column.
+        listOf("PREVIOUS" to 6, "THIS PERIOD" to 9, "TO DATE" to 12, "BALANCE" to 15).forEach { (label, first) ->
+            val under = if (label == "BALANCE") listOf("QTY", "AMOUNT") else listOf("QTY", "AMOUNT", "% WT")
+            Column {
+                ItemCell(label, under.indices.fold(0.dp) { sum, k -> sum + w[first + k] }, TextAlign.Center, bold = true, fill = false)
+                Row { under.forEachIndexed { k, sub -> ItemCell(sub, w[first + k], TextAlign.Center, bold = true, fill = false) } }
+            }
+        }
+    }
+}
+
+/**
+ * Row [index] of the abstract in the table, every column as in the sheet and an empty cell left blank; a group is its
+ * number, then its name across the rest. Groups, subtotals and the grand total are bold.
+ */
+@Composable
+private fun ItemRow(row: AbstractExcel.Row, index: Int, scroll: ScrollState) {
+    val w = itemWidths()
+    val bold = row.kind == "group" || row.kind == "subtotal" || row.kind == "total"
+    fun qty(v: Double?) = v?.let(ProjectAbstracts::quantityText).orEmpty()
+    fun amount(v: Double?) = v?.let(::money).orEmpty()
+    TableRow(scroll, Modifier.background(MaterialTheme.colorScheme.surface).semantics(mergeDescendants = true) {}.testTag("abstract_row_$index")) {
+        ItemCell(row.no, w[0], TextAlign.Start, bold)
+        if (row.kind == "group") ItemCell(row.name, w.drop(1).fold(0.dp) { sum, x -> sum + x }, TextAlign.Start, bold)
+        else {
+            ItemCell(row.name, w[1], TextAlign.Start, bold)
+            val figures = listOf(qty(row.qty), row.unit, amount(row.unitCost), amount(row.amount)) +
+                listOf(row.prev, row.period, row.toDate).flatMap { f -> listOf(qty(f.getOrNull(0)), amount(f.getOrNull(1)), f.getOrNull(2)?.let(ProjectAbstracts::pct).orEmpty()) } +
+                listOf(qty(row.balance.getOrNull(0)), amount(row.balance.getOrNull(1)))
+            figures.forEachIndexed { k, text -> ItemCell(text, w[k + 2], if (k == 1) TextAlign.Center else TextAlign.End, bold) }
         }
     }
 }
@@ -228,8 +302,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
 /**
  * Actual Accomplishment: the uploaded Abstracts of Physical Accomplishment of the actual work, each kept under its
  * "As of" date; the latest is the project's actual. Shows the chosen one's target, actual and advance/slippage by
- * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]) and every pay item, the parts
- * folding. Two sheets print from it: "Print abstract" ([onPrintAbstract]) is the detailed one of the actual work;
+ * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]), then every pay item in a table of
+ * the sheet's columns, as the website's: it scrolls sideways, and each part folds. Two sheets print from it: "Print abstract" ([onPrintAbstract]) is the detailed one of the actual work;
  * "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
  * "New abstract" makes the next one here from the latest ([NewAbstractDialog]), its date starting at [today].
  * [onSave] and [onDelete] are null for roles that cannot upload.
@@ -324,19 +398,24 @@ fun ActualAccomplishmentSection(
     // The parts folded shut, by their place among the parts.
     val folded = remember(shown?.uuid) { mutableStateListOf<Int>() }
 
-    LazyColumn(
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().testTag("actual_accomplishment")
-    ) {
-        if (shown != null) item {
+    // One for the whole table: the headings and every row move sideways together.
+    val sideways = rememberScrollState()
+    LazyColumn(contentPadding = PaddingValues(16.dp), modifier = Modifier.fillMaxSize().testTag("actual_accomplishment")) {
+        // The blocks stand 8dp apart; the rows of the table touch.
+        var gap = 0.dp
+        fun block(key: Any? = null, content: @Composable () -> Unit) {
+            val top = gap
+            gap = 8.dp
+            item(key = key) { Box(Modifier.padding(top = top)) { content() } }
+        }
+        if (shown != null) block {
             val labels = dated.map { ProjectSchedule.displayDate(it.asOf) }
             Column {
                 Text("As of", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
                 ChipRow(labels, ProjectSchedule.displayDate(shown.asOf), PaddingValues(0.dp)) { label -> chosen = dated[labels.indexOf(label)].asOf; note = "" }
             }
         }
-        if (onSave != null || (onDelete != null && shown != null)) item {
+        if (onSave != null || (onDelete != null && shown != null)) block {
             // The three do not fit one line of a 360dp phone.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onSave != null) OutlinedButton(onClick = { picker.launch(arrayOf(XLSX)) }, modifier = Modifier.testTag("upload_abstract")) {
@@ -350,16 +429,16 @@ fun ActualAccomplishmentSection(
                 ) { Text("Delete") }
             }
         }
-        if (note.isNotBlank()) item {
+        if (note.isNotBlank()) block {
             Text(note, style = MaterialTheme.typography.bodySmall, color = if (noteIsError) scheme.error else scheme.onSurfaceVariant, modifier = Modifier.testTag("abstract_note"))
         }
         if (shown == null) {
-            item {
+            block {
                 EmptyLine("No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the \"As of\" one), saved as an Excel workbook (.xlsx).")
             }
             return@LazyColumn
         }
-        item {
+        block {
             SectionCard("Abstract of Physical Accomplishment", Icons.Default.TableChart) {
                 Field("As of", ProjectSchedule.displayDate(shown.asOf))
                 StandingRow("", listOf("Target", "Actual", "+/-"), header = true)
@@ -374,10 +453,12 @@ fun ActualAccomplishmentSection(
             }
         }
         var part = -1
+        var headed = false // whether the column headings stand above the next row: a part's heading breaks the table
         rows.forEachIndexed { i, row ->
             if (row.kind == "part") part++
             val index = part
-            if (row.kind == "part") item(key = "part$i") {
+            if (row.kind == "part") headed = false
+            if (row.kind == "part") block("part$i") {
                 val open = index !in folded
                 Surface(
                     color = scheme.surfaceVariant, shape = MaterialTheme.shapes.small,
@@ -386,33 +467,26 @@ fun ActualAccomplishmentSection(
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("${row.no}  ${row.name}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
-                            val line = figuresLine(parts[index].amount, null, parts[index].actualPct)
+                            val line = "Amount ${money(parts[index].amount)} · To date ${ProjectAbstracts.pct(parts[index].actualPct)}"
                             Text(line, style = MaterialTheme.typography.bodySmall.figures(line), color = scheme.onSurfaceVariant)
                         }
                         Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = if (open) "Hide its items" else "Show its items", tint = scheme.onSurfaceVariant)
                     }
                 }
             }
-            when {
-                // A part that is its own pay item (Land Acquisition) shows its figures as the first line under its heading.
-                row.kind == "part" && !ProjectAbstracts.isPayLine(row) -> Unit
+            val inTable = when (row.kind) {
+                // A part that is its own pay item (Land Acquisition) has its figures on the first row under its heading.
+                "part" -> ProjectAbstracts.isPayLine(row) && index !in folded
                 // The grand total stays in sight whatever is folded.
-                row.kind != "total" && index in folded -> Unit
-                row.kind == "group" -> item(key = i) {
-                    Text(
-                        "${row.no}  ${row.name}".trim(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
-                        color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)
-                    )
+                "total" -> true
+                else -> index !in folded
+            }
+            if (inTable) {
+                if (!headed) {
+                    headed = true
+                    item(key = "columns$i") { ItemsHeader(sideways) }
                 }
-                else -> item(key = i) {
-                    val bold = if (row.kind == "item" || row.kind == "part") null else FontWeight.SemiBold
-                    Column(Modifier.fillMaxWidth()) {
-                        Text("${row.no}  ${row.name}".trim(), style = MaterialTheme.typography.bodyMedium, fontWeight = bold, color = scheme.onSurface)
-                        val line = figuresLine(row.amount, row.toDate.getOrNull(1), row.toDate.getOrNull(2))
-                        if (line.isNotEmpty()) Text(line, style = MaterialTheme.typography.bodySmall.figures(line), fontWeight = bold, color = scheme.onSurfaceVariant)
-                        if (bold != null) HorizontalDivider(color = scheme.outlineVariant, modifier = Modifier.padding(top = 6.dp))
-                    }
-                }
+                item(key = i) { ItemRow(row, i, sideways) }
             }
         }
     }

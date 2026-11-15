@@ -252,8 +252,9 @@ is read only.
     actual work, the detailed one, made every week and at month end: `#/p/<id>/print/abstract-<as-of date>`
     (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
     the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
-    for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns, the
-    header rows repeating on each page, and the Prepared by / Checked by / Approved by signatures (the monthly
+    for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns up to TO
+    DATE (the printed sheet has no BALANCE columns; the tab's table keeps them), the header rows repeating on each
+    page, and the Prepared by / Checked by / Approved by signatures (the monthly
     report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
     under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
     "Billing Abstract - As of <date>".
