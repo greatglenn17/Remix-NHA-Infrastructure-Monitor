@@ -1868,7 +1868,7 @@ export const deletedWeeklyAudit = report => ({ actionType: 'Deleted Weekly Repor
 /** Permission.DELETE_REPORT: the Super Admin and Engineer Admins; a Field Engineer can add and edit reports, not delete them. */
 export const canDeleteReport = claims => ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
 
-/** Permission.DELETE_ISSUE: the same roles. A form rule only, like canDeleteReport. */
+/** Permission.DELETE_ISSUE: the same roles. firestore.rules refuses anyone else's delete of a report or an issue. */
 export const canDeleteIssue = canDeleteReport;
 
 /** ProjectViewModel.deleteProjectIssue's audit entry; the phone's "Issue ID" is its own row number, here it is the record's id. */
@@ -1915,7 +1915,7 @@ export function weatherChanges(report, days, changed) {
 
 /* ---------- New project and Edit project (CreateProjectDialog, EditProjectDialog, ProjectViewModel) ---------- */
 
-/** Permission.CREATE_PROJECT: the Super Admin and Engineer Admins. A form rule only: firestore.rules lets any writer create one. */
+/** Permission.CREATE_PROJECT: the Super Admin and Engineer Admins, as firestore.rules allows. */
 export const canCreateProject = claims => isWriter(claims) && ['SUPER_ADMIN', 'ENGINEER_ADMIN'].includes(claims.role);
 
 /** CreateProjectDialog's choices; the type also takes any other text ("Custom..."). */

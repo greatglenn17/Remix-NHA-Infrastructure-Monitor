@@ -303,8 +303,8 @@ is read only.
   because the rules read the saved project before they let a record in; if it fails the project stands without it.
   A project with the same name and location (ignoring case and spacing) among those the account can see is refused,
   as on the phone. A blank duration is 365 days here for both the saved duration and the completion date (the phone
-  saves 365 days but shows the start date as the completion date). The role rule is in the form only:
-  firestore.rules lets any approved writer create a project. Assigning other people stays on the phone.
+  saves 365 days but shows the start date as the completion date). firestore.rules has the same
+  role rule and wants the creator named as `createdByUid`. Assigning other people stays on the phone.
 - **Edit** on the Project profile card (Summary), for the people who can edit the project (the app's EDIT_PROJECT
   roles), opens the same form on the saved project (`L.projectStart`), with the Project Profile's projected
   beneficiaries, board resolution, notice of award and notice to proceed, and without the assigned staff. Save
@@ -330,7 +330,7 @@ is read only.
   in the cloud, and every phone and this website drop the project. No audit entry is written: the phone's names no
   project, so it never reaches the cloud either; the document keeps who deleted it and when.
 - **Delete issue** in the Edit issue form (Progress → Issues), for the Super Admin and Engineer Admins, the app's
-  DELETE_ISSUE roles (`L.canDeleteIssue`; a form rule only, like Delete report). It asks first, marks the record
+  DELETE_ISSUE roles (`L.canDeleteIssue`; firestore.rules refuses anyone else's delete of an issue or a report). It asks first, marks the record
   deleted, as the phones sync a delete, and writes the app's "Issue Deletion" audit entry (`L.deletedIssueAudit`).
 - **Assign** on the Project profile card, for the Super Admin only (`L.canAssign`, as in the app and the rules), is
   the app's assignment checklist on its own (`assignForm`): every account by name, with its role, ticked when the

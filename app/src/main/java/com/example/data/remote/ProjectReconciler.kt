@@ -5,9 +5,14 @@ package com.example.data.remote
  *
  * The same real project can carry different projectUuids on different phones (the
  * v21 migration and older Drive restores generated random ones), so matching by uuid
- * alone inserts a second copy. Projects are matched by uuid first, then by
- * normalized name + location, and every phone settles on the same canonical cloud
- * document: the oldest one for that name + location.
+ * alone inserts a second copy. Projects are matched by uuid first. Only a local project
+ * with no cloud document of its own is then matched by normalized name + location, to the
+ * oldest cloud document of that name.
+ *
+ * A project whose own document is live never moves to another one. Whoever may create a
+ * project can upload one with any name, location and createdAt, so a name match must not
+ * re-home a project: its files and records would be uploaded again under the other document,
+ * for that document's assigned accounts to read.
  */
 object ProjectReconciler {
 
@@ -37,46 +42,50 @@ object ProjectReconciler {
         val adopt = mutableMapOf<Long, String>()
         val upload = mutableSetOf<String>()
         val delete = mutableSetOf<Long>()
-        val claimed = mutableSetOf<String>()
+        /** Names (name + location) of the cloud documents a local row has: no second row is made for one. */
+        val held = mutableSetOf<String>()
         val pending = mutableListOf<LocalRef>()
 
-        // Pass 1: exact uuid matches on canonical docs claim them first, so a later
-        // adoption can never hand the same uuid to two local rows.
+        // Pass 1: a row whose own document is live keeps it, whatever else carries its name. These
+        // go first, so a later adoption can never hand a second row a project this phone already has.
         for (row in local) {
             val doc = liveByUuid[row.uuid]
             when {
                 row.uuid in deletedUuids -> delete += row.id
-                doc != null && canonicalByKey[doc.key]?.uuid == row.uuid -> claimed += row.uuid
+                doc != null -> held += doc.key
                 else -> pending += row
             }
         }
 
-        // Pass 2: match the rest by the cloud doc they belong to, or by name + location.
+        // Pass 2: a row with no cloud document of its own is matched by name + location.
         for (row in pending) {
-            val viaUuid = liveByUuid[row.uuid]?.let { canonicalByKey[it.key] }
-            val canonical = viaUuid ?: canonicalByKey[row.key]
+            val canonical = canonicalByKey[row.key]
             when {
                 canonical == null -> upload += row.uuid
-                canonical.uuid in claimed -> Unit // another local row owns it; merged by localDuplicates
+                row.key in held -> Unit // another local row has that project; merged by localDuplicates
                 else -> {
                     adopt[row.id] = canonical.uuid
-                    claimed += canonical.uuid
+                    held += row.key
                 }
             }
         }
 
-        val insert = canonicalByKey.values.map { it.uuid }.filterNot { it in claimed }.toSet()
+        val insert = canonicalByKey.filterKeys { it !in held }.values.map { it.uuid }.toSet()
         return Plan(adopt, insert, upload, delete)
     }
 
-    /** Local rows describing the same project: duplicate id -> id of the row to keep (the oldest). */
-    fun localDuplicates(local: List<LocalRef>): Map<Long, Long> =
+    /**
+     * Local rows describing the same project: duplicate id -> id of the row to keep. Only a row with no live cloud
+     * document of its own ([liveUuids]) is merged away, into the oldest row that has one, else into the oldest row.
+     * Two projects that are both in the cloud stay apart even under one name: anyone assigned to a project can rename it.
+     */
+    fun localDuplicates(local: List<LocalRef>, liveUuids: Set<String>): Map<Long, Long> =
         local.groupBy { it.key }
             .values
             .filter { it.size > 1 }
             .flatMap { group ->
-                val keep = group.minOf { it.id }
-                group.filter { it.id != keep }.map { it.id to keep }
+                val keep = group.filter { it.uuid in liveUuids }.ifEmpty { group }.minOf { it.id }
+                group.filter { it.id != keep && it.uuid !in liveUuids }.map { it.id to keep }
             }
             .toMap()
 

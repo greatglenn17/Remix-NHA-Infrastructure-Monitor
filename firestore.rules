@@ -32,6 +32,13 @@ service cloud.firestore {
                            || request.auth.token.get('allProjects', false) == true));
     }
 
+    // An Engineer Admin. With the Super Admin, the only role that creates or deletes a project, deletes a report or
+    // an issue, and adds or deletes a subdivision plan (UserRole.kt: CREATE_PROJECT, DELETE_PROJECT, DELETE_REPORT,
+    // DELETE_ISSUE, MANAGE_SDP_PLANS). The app and the website hide those from a Field Engineer; the rules refuse them.
+    function isEngineerAdmin() {
+      return signedIn() && request.auth.token.get('role', '') == 'ENGINEER_ADMIN';
+    }
+
     function assigned(uids) {
       return signedIn() && request.auth.uid in uids;
     }
@@ -56,20 +63,47 @@ service cloud.firestore {
         && request.resource.data.assignedUids == project.assignedUids;
     }
 
+    // What a writer other than the Super Admin may put in a record: its own uid as the editor, no deleted audit entry,
+    // and, unless an Engineer Admin, no deleted report, issue or plan. A record is deleted by marking it isDeleted.
+    function recordByRole() {
+      let type = request.resource.data.get('type', '');
+      let deleted = request.resource.data.get('isDeleted', false) == true;
+      return request.resource.data.get('updatedByUid', '') == request.auth.uid
+        && !(deleted && type == 'audit_logs')
+        && (isEngineerAdmin() || !(deleted && type in ['weekly_reports', 'monthly_reports', 'project_issues', 'sdp_plans']));
+    }
+
+    // The record stays what it is and where it is (moving one out of its project would delete it there), and an
+    // audit entry keeps its content: the same upload sent twice still passes.
+    function recordKept() {
+      return request.resource.data.get('type', '') == resource.data.get('type', '')
+        && request.resource.data.projectUuid == resource.data.projectUuid
+        && (resource.data.get('type', '') != 'audit_logs'
+            || request.resource.data.get('data', '') == resource.data.get('data', ''));
+    }
+
     match /projects/{projectId} {
       allow read: if seesAll() || assigned(resource.data.assignedUids);
-      // The creator is assigned automatically and cannot add anyone else.
+      // An Engineer Admin creates one in their own name, is assigned automatically and cannot add anyone else.
       allow create: if isSuperAdmin()
         || (isWriter()
+            && isEngineerAdmin()
+            && request.resource.data.name is string && request.resource.data.name.size() > 0
+            && request.resource.data.createdByUid == request.auth.uid
             && request.resource.data.assignedUids.size() == 1
             && request.auth.uid in request.resource.data.assignedUids);
-      // The approved bar chart (the target % follows it) is the Super Admin's or an assigned Engineer Admin's to change.
+      // The approved bar chart (the target % follows it) and deleting the project are the Super Admin's or an assigned
+      // Engineer Admin's. A project is deleted by its isDeleted mark; the phones and the website also drop one with no
+      // name. Bringing a deleted project back would be creating one.
       allow update: if isSuperAdmin()
         || (isWriter()
             && assigned(resource.data.assignedUids)
             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedUids'])
-            && (request.auth.token.get('role', '') == 'ENGINEER_ADMIN'
-                || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['barChartJson'])));
+            && (isEngineerAdmin()
+                || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['barChartJson'])
+                    && request.resource.data.get('isDeleted', false) != true
+                    && resource.data.get('isDeleted', false) != true
+                    && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() > 0)));
       // Deletion is the isDeleted tombstone, never a physical delete.
       allow delete: if false;
 
@@ -110,9 +144,13 @@ service cloud.firestore {
     // only marked isDeleted, so other phones learn about the deletion.
     match /records/{recordId} {
       allow read: if seesAll() || assigned(resource.data.assignedUids);
-      allow create: if recordShape(recordId) && (isSuperAdmin() || recordInAssignedProject());
+      allow create: if recordShape(recordId)
+        && (isSuperAdmin()
+            || (recordInAssignedProject() && recordByRole()
+                && (isEngineerAdmin() || request.resource.data.get('type', '') != 'sdp_plans')));
       allow update: if recordShape(recordId)
-        && (isSuperAdmin() || (assigned(resource.data.assignedUids) && recordInAssignedProject()));
+        && (isSuperAdmin()
+            || (assigned(resource.data.assignedUids) && recordInAssignedProject() && recordByRole() && recordKept()));
       allow delete: if false;
     }
 
