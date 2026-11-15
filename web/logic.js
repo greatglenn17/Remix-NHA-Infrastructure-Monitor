@@ -1766,6 +1766,47 @@ export const monthlyAbstractNote = (to, from) => `To date is the abstract as of 
 /** ProjectViewModel.deleteAbstract's audit entry, word for word. */
 export const deletedAbstractAudit = a => ({ actionType: 'Deleted abstract', details: `Abstract ${abstractLabel(a)}`, oldValue: overallText(a), newValue: '' });
 
+/* ---------- Undo of a saved abstract, and the New abstract form kept as a draft (both kept in the browser, per project) ---------- */
+
+/** Text kept in the browser as the object it holds; null when it is none. */
+const keptObject = text => { try { const v = JSON.parse(text); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch { return null; } };
+
+/**
+ * What the tab keeps after an abstract is saved (`fields`), so the save can be taken back: its date, its rows (Undo
+ * is only for the abstract as that save left it) and `before`, the six columns of the abstract of that date it
+ * replaced (`old`), null when the date had none.
+ */
+export const abstractUndo = (fields, old) => ({ asOf: fields.asOf, rowsJson: fields.rowsJson,
+  before: old ? { asOf: old.asOf, overallPct: old.overallPct, rowsJson: old.rowsJson, fileName: old.fileName, uploadedBy: old.uploadedBy, equivUnits: old.equivUnits } : null });
+
+/**
+ * Taking the last save back, from the kept text of abstractUndo, as { rec, changes, audit } for saveEdits: the
+ * abstract of that date gets the replaced one's columns back, or is deleted (null changes) when the date had none.
+ * null when there is nothing to undo: nothing kept, or the abstract was deleted or saved again since.
+ */
+export function abstractUndoEdit(kept, abstracts) {
+  const undo = keptObject(kept), rec = undo && latestAbstract(abstracts.filter(a => a.asOf === undo.asOf));
+  if (!rec || rec.rowsJson !== undo.rowsJson) return null;
+  return undo.before ? { rec, changes: undo.before, audit: abstractAudit(undo.before, rec) } : { rec, changes: null, audit: deletedAbstractAudit(rec) };
+}
+
+/** What Undo asks before it takes the save back (abstractUndoEdit's edit). */
+export const abstractUndoAsk = ({ rec, changes }) => `Undo the last save? The abstract as of ${displayDate(rec.asOf)} ${changes ? `goes back to the one before it (overall ${overallText(changes)})` : 'will be removed'}.`;
+/** The tab's line once the save is taken back. */
+export const abstractUndoneNote = ({ rec, changes }) => `Undid the last save. The abstract ${changes ? `${abstractLabel(changes)} is back` : `as of ${displayDate(rec.asOf)} was removed`}.`;
+
+/**
+ * The New abstract form (page.next) as the draft the browser keeps: its date, what it continues and what is typed.
+ * null, so nothing is kept, until a quantity is typed here (`kept`) and while every box is empty.
+ */
+export const nextAbstractDraft = next => (next.kept && Object.values(next.text).some(t => String(t).trim() !== '') ? { asOf: next.asOf, from: next.from, text: next.text } : null);
+
+/** A kept draft's text as the form to continue (page.next); null when it is not one. */
+export function keptNextAbstract(kept) {
+  const d = keptObject(kept);
+  return d && typeof d.asOf === 'string' && keptObject(JSON.stringify(d.text ?? null)) ? { asOf: d.asOf, from: String(d.from ?? ''), text: d.text, kept: true } : null;
+}
+
 /** FormValidation.percentError's reading: blank is 0, else 0 to 100; NaN for anything else. */
 const percent = text => {
   const t = String(text ?? '').trim(), v = !t ? 0 : /^(\d+(\.\d*)?|\.\d+)$/.test(t) ? Number(t) : NaN;

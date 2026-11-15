@@ -300,19 +300,20 @@ export function actualAbstractHtml({ project, docs, abstract, signatories, banne
 /**
  * An uploaded abstract's rows (L.abstractRows) for the site's Actual Accomplishment tab: each part a folding block
  * headed by its item no., name, amount and % to date, holding its groups, pay items and subtotals in the sheet's
- * columns, then the grand total. The sheet's "EQUIVALENT TO <N> UNITS" columns are not shown: the abstract's format
- * has none. Empty cells stay blank; the workbook's text is escaped.
+ * columns up to TO DATE, then the grand total. The sheet's BALANCE and "EQUIVALENT TO <N> UNITS" columns are not
+ * shown, as on the printed abstracts, so the table fits the page's width. Empty cells stay blank; the workbook's text
+ * is escaped.
  */
 export function abstractItemsHtml(rows) {
   const cell = (v, show) => `<td class="num">${v == null ? '' : show(v)}</td>`;
   const quantity = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
   const figures = t => cell(t?.[0], quantity) + cell(t?.[1], money) + cell(t?.[2], pct);
-  const line = r => (r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="16">${esc(r.name)}</td></tr>`
+  const line = r => (r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="14">${esc(r.name)}</td></tr>`
     : `<tr class="apa-${esc(r.kind)}"><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${cell(r.qty, quantity)}<td>${esc(r.unit)}</td>${cell(r.unitCost, money)}${cell(r.amount, money)}`
-      + `${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}${cell(r.balance?.[0], quantity)}${cell(r.balance?.[1], money)}</tr>`);
+      + `${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>`);
   const table = body => `<div class="scroll"><table class="grid-table apa-items"><thead>
-    <tr><th rowspan="2">ITEM NO.</th><th rowspan="2">ITEM DESCRIPTION</th><th rowspan="2">QTY</th><th rowspan="2">UNIT</th><th rowspan="2">UNIT COST</th><th rowspan="2">AMOUNT</th><th colspan="3">PREVIOUS</th><th colspan="3">THIS PERIOD</th><th colspan="3">TO DATE</th><th colspan="2">BALANCE</th></tr>
-    <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}<th>QTY</th><th>AMOUNT</th></tr></thead><tbody>${body.map(line).join('')}</tbody></table></div>`;
+    <tr><th rowspan="2">ITEM NO.</th><th rowspan="2">ITEM DESCRIPTION</th><th rowspan="2">QTY</th><th rowspan="2">UNIT</th><th rowspan="2">UNIT COST</th><th rowspan="2">AMOUNT</th><th colspan="3">PREVIOUS</th><th colspan="3">THIS PERIOD</th><th colspan="3">TO DATE</th></tr>
+    <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}</tr></thead><tbody>${body.map(line).join('')}</tbody></table></div>`;
   // Rows under each part; rows before the first part, if any, get a block without a heading.
   const parts = L.abstractParts(rows), total = rows.filter(r => r.kind === 'total'), blocks = [];
   for (const r of rows.filter(x => x.kind !== 'total')) {

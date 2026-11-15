@@ -3485,6 +3485,15 @@ function abstractsOf(c) {
   return { list, shown: list.find(a => a.asOf === c.page.sub) || list[0] };
 }
 
+/**
+ * What this browser keeps for the open project and account, as text: "abstract-draft", the New abstract form left
+ * unfinished (L.nextAbstractDraft), and "abstract-undo", what the last saved abstract replaced (L.abstractUndo).
+ * null with none, and where the browser keeps nothing (a private window): then there is no draft and no Undo.
+ */
+const keptName = (c, what) => `nha.${what}.${s.user.uid}.${c.page.id}`;
+const kept = (c, what) => { try { return localStorage.getItem(keptName(c, what)); } catch { return null; } };
+const keep = (c, what, value) => { try { if (value == null) localStorage.removeItem(keptName(c, what)); else localStorage.setItem(keptName(c, what), JSON.stringify(value)); } catch { /* nothing is kept */ } };
+
 /** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. */
 const abstractSwitch = monthly => `<div class="chips" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
 
@@ -3526,9 +3535,10 @@ function actualBody(c) {
   const tools = `${list.length ? abstractSwitch(false) : ''}<div class="toolbar apa-tools">
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
       ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
-      ${editable && list.length ? `<button class="btn" id="abstract-new">${icon('add_circle', 'sm')}New abstract</button>` : ''}
+      ${editable && list.length ? `<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button>` : ''}
       ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
+      ${editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : ''}
       ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
@@ -3551,16 +3561,19 @@ const typedQuantities = text => Object.fromEntries(Object.entries(text).filter((
  * `#/p/<id>/actual/new`: the next abstract, made here from the one before it (L.nextAbstractSource). The engineer
  * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts and the
  * percentages are computed (L.nextAbstractRows). What is typed is kept on the page
- * (page.next) so a redraw for an arriving record keeps it.
+ * (page.next) so a redraw for an arriving record keeps it, and in this browser as a draft (L.nextAbstractDraft) until
+ * it is saved or discarded: Close leaves the form, and New abstract, then named Continue abstract, opens it as it was left.
  */
 function nextAbstractBody(c) {
-  c.page.next ??= { asOf: today(), from: '', text: {} };
+  c.page.next ??= L.keptNextAbstract(kept(c, 'abstract-draft')) ?? { asOf: today(), from: '', text: {} };
   const { error, html } = nextAbstractSheet(c);
   return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
     ${section('New abstract', 'edit', `
-      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.</p>
+      <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.
+        What you type is kept in this browser until you save or discard it, so you can close this and continue later.</p>
       <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(c.page.next.asOf)}"></label>
-        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Cancel</a></div>
+        <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Close</a>
+        <button class="text-btn danger" id="next-discard">${icon('delete', 'sm')}Discard</button></div>
       <div id="next-sheet">${html}</div>`)}`;
 }
 
@@ -3569,7 +3582,7 @@ function nextAbstractSheet(c) {
   const next = c.page.next, { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
   const rows = source && !error ? L.abstractRows(source.rowsJson) : [], from = `${source?.uuid}|${same?.uuid}`;
   // Another abstract to continue, or a date that already has one, starts from what that date has.
-  if (rows.length && next.from !== from) Object.assign(next, { from, text: Object.fromEntries(Object.entries(L.nextAbstractTyped(rows, same)).map(([i, q]) => [i, String(q)])) });
+  if (rows.length && next.from !== from) Object.assign(next, { from, kept: false, text: Object.fromEntries(Object.entries(L.nextAbstractTyped(rows, same)).map(([i, q]) => [i, String(q)])) });
   const computed = L.nextAbstractRows(rows, typedQuantities(next.text), Number(source?.equivUnits) || 0);
   const q = v => `<td class="num">${L.quantityText(v)}</td>`;
   const line = (r, i) => (L.isPayLine(r) ? `<tr><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${q(r.qty)}<td>${esc(r.unit)}</td>${q(computed[i].prev[0])}
@@ -3586,9 +3599,17 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
   const state = () => { const found = L.nextAbstractSource(all, next.asOf); return { ...found, rows: found.source && !found.error ? L.abstractRows(found.source.rowsJson) : [] }; };
   const made = ({ source, rows }) => L.nextAbstractRows(rows, typedQuantities(next.text), Number(source.equivUnits) || 0);
   // A browser fires change at each key typed in a date box, so only the sheet under it is redrawn and the box keeps the keyboard's place.
-  asOf.onchange = () => { next.asOf = asOf.value; say(''); const sheet = nextAbstractSheet(c); document.getElementById('next-sheet').innerHTML = sheet.html; save.disabled = Boolean(sheet.error); boxes(); };
+  // The draft follows the form: kept from the first quantity typed here, dropped when the boxes are empty again.
+  const draft = () => keep(c, 'abstract-draft', L.nextAbstractDraft(next));
+  draft();
+  asOf.onchange = () => { next.asOf = asOf.value; say(''); const sheet = nextAbstractSheet(c); document.getElementById('next-sheet').innerHTML = sheet.html; save.disabled = Boolean(sheet.error); draft(); boxes(); };
+  document.getElementById('next-discard').onclick = () => {
+    if (L.nextAbstractDraft(next) && !confirm('Discard what you typed for this abstract?')) return;
+    next.kept = false; draft();
+    location.hash = `#/p/${page.id}/actual`;
+  };
   const boxes = () => main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
-    next.text[box.dataset.next] = box.value;
+    next.text[box.dataset.next] = box.value; next.kept = true; draft();
     const now = state(), rows = made(now);
     document.getElementById(`next-done-${box.dataset.next}`).textContent = L.quantityText(rows[box.dataset.next].toDate[0]);
     document.getElementById('next-overall').textContent = L.nextAbstractNote(now.source, now.same, rows);
@@ -3606,6 +3627,7 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
       await (old ? saveEdits(c, [[old, fields, L.abstractAudit(fields, old)]], 'abstract', actual)
         : addRecords(c, [[ids => L.newAbstractRecord(ids, fields), L.abstractAudit(fields)]], actual));
       page.next = null;
+      keep(c, 'abstract-draft', null); keep(c, 'abstract-undo', L.abstractUndo(fields, old));
       show(fields.asOf, L.abstractSavedNote(fields, Boolean(old)));
     } catch (x) { failed(x); save.disabled = false; }
   };
@@ -3614,7 +3636,9 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
 /**
  * The tab's controls. Upload files the workbook under its "As of" date (a date already filed is replaced, after
  * asking); Delete removes the one shown. Either way the project's actual becomes the latest abstract's
- * (L.projectActualAfter) in the same write, with the phone's audit entry.
+ * (L.projectActualAfter) in the same write, with the phone's audit entry. Undo last save takes back the last abstract
+ * saved from this browser (an upload or New abstract): the one it replaced comes back, or it is removed when its
+ * date had none (L.abstractUndoEdit), after asking.
  */
 function bindActual(c) {
   const page = c.page, { list, shown } = abstractsOf(c), all = c.of('project_abstracts');
@@ -3651,10 +3675,24 @@ function bindActual(c) {
       try {
         await (old ? saveEdits(c, [[old, fields, L.abstractAudit(fields, old)]], 'abstract', actual)
           : addRecords(c, [[ids => L.newAbstractRecord(ids, fields), L.abstractAudit(fields)]], actual));
+        keep(c, 'abstract-undo', L.abstractUndo(fields, old));
         show(fields.asOf, L.abstractSavedNote(fields, Boolean(old)));
       } catch (x) { failed(x); }
     };
   }
+  const undo = document.getElementById('abstract-undo');
+  if (undo) undo.onclick = async () => {
+    const edit = L.abstractUndoEdit(kept(c, 'abstract-undo'), all);
+    if (!edit || !confirm(L.abstractUndoAsk(edit))) return;
+    if (!navigator.onLine) { say('You are offline. Connect to the internet, then undo again.'); return; }
+    undo.disabled = true;
+    const rest = all.filter(a => a !== edit.rec);
+    try {
+      await saveEdits(c, [[edit.rec, edit.changes, edit.audit]], 'abstract', actualAfter(edit.changes ? [...rest, { ...edit.changes, updatedAt: Infinity }] : rest));
+      keep(c, 'abstract-undo', null);
+      show(edit.changes ? edit.rec.asOf : null, L.abstractUndoneNote(edit));
+    } catch (x) { failed(x); undo.disabled = false; }
+  };
   if (del) del.onclick = async () => {
     if (!confirm(`Delete the abstract as of ${L.displayDate(shown.asOf)}? This cannot be undone.`)) return;
     if (!navigator.onLine) { say('You are offline. Connect to the internet, then delete again.'); return; }

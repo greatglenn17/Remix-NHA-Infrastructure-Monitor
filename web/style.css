@@ -457,10 +457,18 @@ span.file.gone { text-decoration: none; }
 /* Every cell boxed, so the report tables read like the printed form. */
 .grid-table th, .grid-table td { border: 1px solid var(--outline); padding: 8px 10px; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns and scroll sideways. */
+/* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns up to TO DATE. */
 .apa-tools { align-items: end; margin-bottom: 6px; }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
-.apa-part { padding: 0 16px; min-width: 0; } /* min-width: the wide table scrolls inside its card instead of widening the page */
+.apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
+/* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (about
+   11px at 1366) and the headings wrap. A narrower card (a tablet, a phone) keeps the 13px type and scrolls sideways. */
+@container (min-width: 1080px) {
+  .apa-items { font-size: min(13px, 0.9cqw); }
+  .apa-items th, .apa-items td { padding: 0.55em 0.3em; }
+  .apa-items thead th { font-size: 0.92em; letter-spacing: 0; white-space: normal; }
+  .apa-items td:nth-child(2) { min-width: 9em; }
+}
 div.apa-part { padding-top: 16px; }
 .apa-part summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 48px; cursor: pointer; list-style: none; }
 .apa-part summary::-webkit-details-marker { display: none; }

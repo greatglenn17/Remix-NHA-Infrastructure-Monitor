@@ -1631,3 +1631,35 @@ test('the next abstract continues the latest one dated before it', () => {
   assert.equal(L.nextAbstractProblem({ ...first, rowsJson: JSON.stringify(NEXT_ROWS.slice(0, 10)) }),
     'There are no pay items with a grand total in the abstract as of Nov 13, 2026, so the next one cannot be made from it. Upload the next abstract instead.');
 });
+
+test('undo of a saved abstract: back to the one it replaced, or removed when the date had none; not once it was saved again', () => {
+  const fields = asOf => ({ asOf, overallPct: 12.5, rowsJson: '[{"kind":"total"}]', fileName: 'new.xlsx', uploadedBy: 'Engr. Web', equivUnits: 370 });
+  const old = { uuid: 'old', type: 'project_abstracts', revision: 2, updatedAt: 5, asOf: '2026-11-13', overallPct: 10.73, rowsJson: '[]', fileName: 'old.xlsx', uploadedBy: 'Engr. Phone', equivUnits: 370 };
+  const before = { asOf: '2026-11-13', overallPct: 10.73, rowsJson: '[]', fileName: 'old.xlsx', uploadedBy: 'Engr. Phone', equivUnits: 370 };
+  // A save that replaced the abstract of its date keeps that one's six columns.
+  const replaced = L.abstractUndo(fields('2026-11-13'), old);
+  assert.deepEqual(replaced, { asOf: '2026-11-13', rowsJson: '[{"kind":"total"}]', before });
+  const now = { ...old, ...fields('2026-11-13'), revision: 3, updatedAt: 9 }, kept = JSON.stringify(replaced);
+  assert.deepEqual(L.abstractUndoEdit(kept, [now]), { rec: now, changes: before,
+    audit: { actionType: 'Updated abstract', details: 'Abstract as of Nov 13, 2026: overall 10.73%', oldValue: '12.50%', newValue: '10.73%' } });
+  assert.equal(L.abstractUndoAsk(L.abstractUndoEdit(kept, [now])), 'Undo the last save? The abstract as of Nov 13, 2026 goes back to the one before it (overall 10.73%).');
+  assert.equal(L.abstractUndoneNote(L.abstractUndoEdit(kept, [now])), 'Undid the last save. The abstract as of Nov 13, 2026: overall 10.73% is back.');
+  // A save of a new date is taken back by removing it.
+  const added = JSON.stringify(L.abstractUndo(fields('2026-11-20'), null)), made = { ...fields('2026-11-20'), uuid: 'made', revision: 1, updatedAt: 9 };
+  assert.deepEqual(L.abstractUndoEdit(added, [old, made]), { rec: made, changes: null,
+    audit: { actionType: 'Deleted abstract', details: 'Abstract as of Nov 20, 2026: overall 12.50%', oldValue: '12.50%', newValue: '' } });
+  assert.equal(L.abstractUndoAsk(L.abstractUndoEdit(added, [made])), 'Undo the last save? The abstract as of Nov 20, 2026 will be removed.');
+  assert.equal(L.abstractUndoneNote(L.abstractUndoEdit(added, [made])), 'Undid the last save. The abstract as of Nov 20, 2026 was removed.');
+  // Nothing to undo: nothing kept, text that is not one, the abstract deleted, or saved again since (other rows).
+  for (const [text, abstracts] of [[null, [made]], ['{', [made]], ['[]', [made]], [added, [old]], [added, [{ ...made, rowsJson: '[]' }]]]) assert.equal(L.abstractUndoEdit(text, abstracts), null);
+});
+
+test('an unfinished New abstract is kept as a draft: its date and what was typed, only while something is typed', () => {
+  const next = { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, kept: true };
+  assert.deepEqual(L.nextAbstractDraft(next), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' } });
+  assert.equal(L.nextAbstractDraft({ ...next, text: { 8: ' ' } }), null); // nothing typed: nothing to keep
+  assert.equal(L.nextAbstractDraft({ ...next, kept: false }), null); // quantities the date already had, not typed here
+  // Read back from the browser: the form as it was left; anything else is no draft.
+  assert.deepEqual(L.keptNextAbstract(JSON.stringify(L.nextAbstractDraft(next))), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, kept: true });
+  for (const text of [null, '', '{', '[]', '{"asOf":5,"text":{}}', '{"asOf":"2026-11-20","text":[1]}', '{"asOf":"2026-11-20"}']) assert.equal(L.keptNextAbstract(text), null);
+});
