@@ -28,10 +28,16 @@ test("data the app and the website never write is malformed, whatever a phone wo
     JSON.stringify({ documentName: { x: "Time Extension No. 9 - 300 Days" }, status: "Approved" }),
     JSON.stringify({ documentName: VO, status: ["Approved"] }),
     JSON.stringify({ documentName: VO, status: "Approved", remarks: { toString: 0 } }),
-    JSON.stringify({ status: "Approved" })]) {
+    JSON.stringify({ status: "Approved" }),
+    // A phone keeps the status or remarks it has when the data leaves one out: an approved order stays approved there.
+    JSON.stringify({ documentName: VO, remarks: "" }), JSON.stringify({ documentName: VO, status: "Pending" }),
+    JSON.stringify({ documentName: VO, status: null, remarks: "" })]) {
     assert.deepStrictEqual(live(data), { malformed: true, order: null }, String(data));
   }
   assert.deepStrictEqual(live(JSON.stringify({ documentName: "As-built plan" })), { order: null });
+  // As a phone writes it: its own key order, the slash escaped.
+  assert.deepStrictEqual(live('{"fileUrl":"attachments\\/x.pdf","isCoreChecklist":1,"remarks":"","status":"Approved","documentName":"' + VO + '"}').order,
+    { name: VO, status: "Approved", remarks: "" });
   assert.ok(concernsOrders(null, { type: "pending_documents", data: "not json" }));
   assert.ok(concernsOrders(doc(VO), doc("As-built plan")));
   assert.ok(!concernsOrders(doc("As-built plan", "Approved"), doc("As-built plan", "Approved", { isDeleted: true })));
@@ -59,7 +65,7 @@ test("an order an approver approved stays as approved: any other state is put ba
     doc(VO, "Approved", { data: JSON.stringify({ documentName: VO, status: ["Approved"] }) }), doc(VO, "Approved", { data: "not json" })]) {
     assert.deepStrictEqual(fe(now, approved), back);
   }
-  // The same order with a file attached, or re-sent as it is.
+  // The same order re-sent as it is, or with something that is not the order's changed.
   assert.strictEqual(fe(doc(VO, "Approved"), approved), null);
   assert.strictEqual(fe(doc(VO, "Approved", { data: json(VO, "Approved", { fileUrl: "attachments/x.pdf" }) }), approved), null);
 });

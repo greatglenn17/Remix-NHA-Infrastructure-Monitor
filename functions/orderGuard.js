@@ -27,8 +27,9 @@ const fold = (text) => [...text].map((c) => c.toUpperCase().toLowerCase()[0] ?? 
 /**
  * How a record reads: { order } with the order it holds ({ name, status, remarks }) or null (deleted, another type, a
  * name that is no order's), or { malformed: true } for a live pending_documents record whose data is not what the app
- * and the website write (strict JSON of an object, the name as text, the status and remarks as text or absent). The phones read such data
- * more loosely than this server can, so what it would be to them is not known here.
+ * and the website write: strict JSON of an object with the name as text and, for an order, the status and remarks as
+ * text. What such data would be to a phone is not known here: it reads JSON more loosely, and it keeps the name,
+ * status or remarks it already has when the data leaves one out (RecordSync.applyOne).
  */
 function read(record) {
   if (!record || record.type !== "pending_documents" || record.isDeleted === true) return { order: null };
@@ -38,11 +39,10 @@ function read(record) {
   } catch {
     return { malformed: true, order: null };
   }
-  const text = (value) => value == null || typeof value === "string";
-  if (data === null || typeof data !== "object" || Array.isArray(data)
-    || typeof data.documentName !== "string" || !text(data.status) || !text(data.remarks)) return { malformed: true, order: null };
+  if (data === null || typeof data !== "object" || Array.isArray(data) || typeof data.documentName !== "string") return { malformed: true, order: null };
   if (!ORDER_NAMES.some((order) => fold(data.documentName).includes(order))) return { order: null };
-  return { order: { name: data.documentName, status: data.status ?? "", remarks: data.remarks ?? "" } };
+  if (typeof data.status !== "string" || typeof data.remarks !== "string") return { malformed: true, order: null };
+  return { order: { name: data.documentName, status: data.status, remarks: data.remarks } };
 }
 
 const isApproved = (order) => !!order && fold(order.status) === "approved";
@@ -61,8 +61,7 @@ const concernsOrders = (before, after) => [before, after].some((record) => read(
  *   its status and its remarks (the dates). Anything else, a delete included, is put back.
  * - not approved: a record that reads as an approved order goes back to Pending, and one with malformed data is
  *   marked deleted.
- * An approver's own write is theirs to make; so are a file attached to an order and everything about a document that
- * is no order.
+ * An approver's own write is theirs to make; so is everything about a document that is no order.
  */
 function orderFix({ now, role, approvedData }) {
   if (!now || now.type !== "pending_documents" || APPROVERS.includes(role)) return null;

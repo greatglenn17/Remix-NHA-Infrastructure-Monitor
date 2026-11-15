@@ -83,6 +83,8 @@ test("an approved order a Field Engineer deletes, changes, renames or sends back
     () => write(record("fe", "Submitted")),
     () => write(record("fe", "Approved", { data: json(["Approved"]) })),
     () => write(record("fe", "Approved", { data: approved + "}" })),
+    // No status: a phone that has the order as approved keeps it so, under the new amount.
+    () => write(record("fe", "", { data: JSON.stringify({ documentName: VO.replace("1,000,000", "9,000,000"), remarks: "" }) })),
   ];
   for (const change of changes) {
     const event = await change();
@@ -105,7 +107,8 @@ test("an approved order an Engineer Admin deleted comes back from a Field Engine
 
 test("data that is not what the app writes is marked deleted when a Field Engineer sends it", async () => {
   for (const data of [json("Approved") + "}", "{'documentName':'Time Extension No. 9 - 300 Days','status':'Approved'}",
-    JSON.stringify({ documentName: { x: "Time Extension No. 9 - 300 Days" }, status: "Approved" }), json("Approved", { remarks: { toString: 0 } })]) {
+    JSON.stringify({ documentName: { x: "Time Extension No. 9 - 300 Days" }, status: "Approved" }), json("Approved", { remarks: { toString: 0 } }),
+    JSON.stringify({ documentName: VO, remarks: "" })]) {
     await ref().delete();
     await guard(await write(record("fe", "", { data })));
     const now = await stored();
@@ -141,6 +144,22 @@ test("runs that come late or out of order end the same way", async () => {
   for (const event of [signed, takenBack, approval]) await guard(event);
   assert.deepStrictEqual(await state(), ["Signed", "fe", false]);
   assert.strictEqual(await onRecord(), null);
+  // The same three, all written before the first run, the runs in order.
+  await ref().delete();
+  await db().doc("orderGuard/vo").delete();
+  const late = [await write(record("ea", "Approved")), await write(record("ea", "Submitted", { revision: 2 })), await write(record("fe", "Signed", { revision: 3 }))];
+  for (const event of late) await guard(event);
+  assert.deepStrictEqual([await state(), (await stored()).revision], [["Signed", "fe", false], 3]);
+  assert.strictEqual(await onRecord(), null);
+
+  // An Engineer Admin approves and a Field Engineer changes the order before that run: put back in either order of the runs.
+  for (const order of [[0, 1], [1, 0]]) {
+    await ref().delete();
+    await db().doc("orderGuard/vo").delete();
+    const events = [await write(record("ea", "Approved")), await write(record("fe", "Signed", { revision: 2 }))];
+    for (const i of order) await guard(events[i]);
+    assert.deepStrictEqual(await state(), ["Approved", ORDER_GUARD_UID, false]);
+  }
 
   // The guard put an order back to Pending before the run for the approval that came first: it corrects itself.
   await ref().delete();
@@ -154,16 +173,6 @@ test("runs that come late or out of order end the same way", async () => {
   await guard(resent);
   const now = await stored();
   assert.deepStrictEqual([now.data, now.updatedByUid, now.isDeleted], [json("Approved"), ORDER_GUARD_UID, false]);
-});
-
-test("a file attached to an approved order stays with it", async () => {
-  await guard(await write(record("ea", "Approved")));
-  const withFile = json("Approved", { fileUrl: "attachments/x.pdf" });
-  await guard(await write(record("fe", "Approved", { revision: 2, data: withFile })));
-  assert.deepStrictEqual(await state(), ["Approved", "fe", false]);
-  await guard(await write(record("fe", "Pending", { revision: 3 })));
-  const now = await stored();
-  assert.deepStrictEqual([now.data, now.updatedByUid], [withFile, ORDER_GUARD_UID]);
 });
 
 test("an order approved before there was a guard is kept as it stood, whoever wrote it last", async () => {
@@ -188,7 +197,7 @@ test("an order approved before there was a guard is kept as it stood, whoever wr
 
 test("what a Field Engineer may do is left alone", async () => {
   await guard(await write(record("fe", "Pending")));
-  await guard(await write(record("fe", "Notarized", { revision: 2 })));
+  await guard(await write(record("fe", "Notarized", { revision: 2, data: json("Notarized", { remarks: "Signed by the contractor" }) })));
   assert.deepStrictEqual(await state(), ["Notarized", "fe", false]);
   await guard(await tombstone("fe", 3));
   assert.deepStrictEqual(await state(), ["Notarized", "fe", true]);
@@ -198,6 +207,11 @@ test("what a Field Engineer may do is left alone", async () => {
   await guard(await write(record("fe", "", { data: JSON.stringify({ documentName: "As-built plan", status: "Approved", remarks: "" }) })));
   await guard(await tombstone("fe", 2));
   assert.deepStrictEqual(await state(), ["Approved", "fe", true]);
+
+  // But a file titled with an order's words is an order to every phone and to the website, so it is one here.
+  await ref().delete();
+  await guard(await write(record("fe", "", { data: JSON.stringify({ documentName: "Request Letter for Time Extension", status: "Approved", remarks: "" }) })));
+  assert.deepStrictEqual(await state(), ["Pending", ORDER_GUARD_UID, false]);
 
   // The server copying the assigned accounts onto an order a Field Engineer wrote as approved before the guard's run.
   await ref().delete();

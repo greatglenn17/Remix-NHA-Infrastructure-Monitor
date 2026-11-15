@@ -530,13 +530,18 @@ async function orderGuardStart(db) {
   if (!snap.get("recorded")) {
     const records = await db.collection("records").where("type", "==", "pending_documents").get();
     const writer = db.bulkWriter();
+    let failed = false;
     for (const doc of records.docs) {
       const approvedData = approvedDataOf(doc.data());
-      // create: a record the guard has ruled on meanwhile keeps that ruling.
-      if (approvedData && doc.updateTime < since) writer.create(db.doc(`orderGuard/${doc.id}`), { approvedData, at: doc.updateTime }).catch(() => {});
+      if (!approvedData || doc.updateTime >= since) continue;
+      // create: a record the guard has ruled on meanwhile keeps that ruling (6: it exists already).
+      writer.create(db.doc(`orderGuard/${doc.id}`), { approvedData, at: doc.updateTime }).catch((error) => {
+        if (error.code !== 6) failed = true;
+      });
     }
     await writer.close();
-    await start.update({ recorded: true });
+    // Left unset when an order could not be recorded, so the next run goes through them again.
+    if (!failed) await start.update({ recorded: true });
   }
   return since;
 }
@@ -550,7 +555,8 @@ async function orderGuardStart(db) {
  * Runs can come late and out of order, so nothing is concluded from the order of the runs: each write shows the
  * record before and after it, each with the server's time and its writer (updatedByUid, which the rules hold to the
  * signed-in account), and the latest state an approver wrote is the one on record. The record as it is now, the
- * guard's own writes included, is then held to that.
+ * guard's own writes included, is then held to that. Every state an approver wrote reaches two runs, its own
+ * write's and the next write's: the first to come records it, and the other, or any later run, puts the record back.
  */
 exports.guardOrderRecord = functions.region(REGION).firestore
   .document("records/{recordId}")
@@ -586,21 +592,19 @@ exports.guardOrderRecord = functions.region(REGION).firestore
           if (at && snap.updateTime <= at) continue;
           [approvedData, at, changed] = [approvedDataOf(snap.data()), snap.updateTime, true];
         }
-        const writer = now.updatedByUid || "";
-        const writerRole = await role(writer);
-        const fix = orderFix({ now, role: writerRole, approvedData });
-        // The approved order with a file attached since: kept with it, or putting the order back later would drop the file.
-        if (!fix && approvedData != null && now.data !== approvedData && now.isDeleted !== true && !APPROVERS.includes(writerRole)) {
-          [approvedData, changed] = [now.data, true];
-        }
         if (changed) tx.set(mark, { approvedData, at });
+        // On record only since this run, and the record has been written again since this write: an approver may
+        // have written in between (approved, then took it back), which the runs for those writes will show.
+        if (changed && record.updateTime > change.after.updateTime) return null;
+        const writer = now.updatedByUid || "";
+        const fix = orderFix({ now, role: await role(writer), approvedData });
         if (!fix) return null;
         // One revision up and a new edit time, so every phone takes the record back (RemoteVersion.isNewer).
         tx.update(ref, { ...fix.patch, revision: (Number(now.revision) || 1) + 1, updatedAt: Date.now(), updatedByUid: ORDER_GUARD_UID });
-        return { name: fix.name, uid: writer, projectUuid: now.projectUuid || "" };
+        return { name: fix.name, deleted: fix.patch.isDeleted === true, uid: writer, projectUuid: now.projectUuid || "" };
       });
       if (!undone) return null;
-      console.log(`Record ${id}: an order change by ${undone.uid || "an unknown account"} was put back`);
+      console.log(`Record ${id}: an order change by ${undone.uid || "an unknown account"} was ${undone.deleted ? "removed" : "put back"}`);
       // Its own earlier write, corrected once a late run showed what an approver had done: nobody to tell.
       if (undone.uid === ORDER_GUARD_UID) return null;
 
@@ -616,8 +620,10 @@ exports.guardOrderRecord = functions.region(REGION).firestore
         data: {
           // The phones list an AUDIT_ALERT in the bell.
           type: "AUDIT_ALERT",
-          title: "Order put back",
-          message: `${who} saved a change to "${undone.name}" that only an Engineer Admin can make (approving an order, or changing an approved one), so it was put back.`,
+          title: undone.deleted ? "Document removed" : "Order put back",
+          message: undone.deleted
+            ? `${who} saved a document in a form the app does not write, so it was removed.`
+            : `${who} saved a change to "${undone.name}" that only an Engineer Admin can make (approving an order, or changing an approved one), so it was put back.`,
           projectName: String(project?.get("name") || ""),
           actorName: String(who),
           actorRole: String(actor?.get("role") || ""),
