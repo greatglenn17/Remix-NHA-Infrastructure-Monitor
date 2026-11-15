@@ -43,6 +43,15 @@ is read only.
   the rounded percentages), so a finished line reads 100.00%. It is filed like an upload, without a file. The latest date picked again is made
   again from the one before it, starting from what was typed for it. An abstract whose subtotals do not add up from
   its items cannot be continued: the next one is uploaded.
+- **An unfinished New abstract is kept, and the last save can be undone** (website only; both are kept in the
+  browser's own storage, per account and project, so they are not on another computer or on the phone). What is
+  typed in the New abstract form is a draft from the first quantity typed (`L.nextAbstractDraft`): **Close** leaves
+  the form, the tab's button then reads **Continue abstract** and opens it as it was left, even after the browser
+  was closed; saving or **Discard** drops it. After an upload or a New abstract is saved, **Undo last save** on the
+  tab takes it back after asking (`L.abstractUndoEdit`): the abstract it replaced comes back, or the new one is
+  removed when its date had none, with the audit entry of an update or a delete, and the project's actual follows.
+  Undo is offered only while the abstract is still as that save left it. An abstract of another date is never
+  replaced by a save: every date stays in the tab's **As of** list.
 - **The billing abstract is printed before the billing, from the Actual Accomplishment tab**, not from a billing: the
   contractor attaches it to the billing it asks for. **Print billing abstract** on the tab, for anyone who can open
   it, opens `#/p/<id>/print/apa-<as-of date>`: the abstract shown there in the district's billing format
@@ -252,8 +261,11 @@ is read only.
     chart's plan that day, else the project's stored target. The actuals are the abstract's. +/- is the actual less
     the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). The file's
     name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
-    folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at BALANCE: the
-    equivalent-units columns are read and kept on the record but not shown, because the abstract's format has none.
+    folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at TO DATE, as the
+    printed abstracts do: the BALANCE and equivalent-units columns are read and kept on the record but not shown
+    (the phone's table still has BALANCE). On a laptop or wider (a window of about 1,180px or more) the 15 columns
+    fit the page with nothing to scroll: the type follows the card's width (about 11px at 1366) and the headings
+    wrap. On a narrower window (a tablet, a phone) the table keeps its 13px type and scrolls sideways inside its card.
   - **Weekly | Monthly**, a switch at the top of the tab once the project has an abstract. Weekly is the tab as
     described here. **Monthly** (`#/p/<id>/actual/monthly[/<date>]`) is the abstract of a month, computed from the
     filed ones and never saved (`L.monthlyAbstract`, the phone's `ProjectAbstracts.monthly`). Its **As of** date box
@@ -275,7 +287,7 @@ is read only.
     (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
     the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
     for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns up to TO
-    DATE (neither printed abstract has BALANCE columns; the tab's table keeps them), the header rows repeating on each
+    DATE (neither printed abstract has BALANCE columns, nor has the tab's table), the header rows repeating on each
     page, and the Prepared by / Checked by / Approved by signatures (the monthly
     report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
     under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
