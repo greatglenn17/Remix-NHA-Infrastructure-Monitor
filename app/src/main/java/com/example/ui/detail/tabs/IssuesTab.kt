@@ -380,12 +380,12 @@ fun IssueCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (currentUserRole.hasPermission(Permission.EDIT_ISSUE)) {
-                        IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = onEditClick) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit Issue", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         }
                     }
                     if (currentUserRole.hasPermission(Permission.DELETE_ISSUE)) {
-                        IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete Issue", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         }
                     }

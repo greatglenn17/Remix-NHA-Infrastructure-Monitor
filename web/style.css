@@ -833,3 +833,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-h:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
 .wx-row legend { flex-wrap: wrap; }
 .wx-row legend select { font: 400 12px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 32px; }
+
+/* Touch screens: controls are at least 44px tall for a finger, and fields are 16px so iPhone Safari does not zoom in on focus. */
+@media (pointer: coarse) {
+  .btn, .btn.lc-more, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select { min-height: 44px; }
+  input, select, textarea { font-size: 16px !important; }
+}

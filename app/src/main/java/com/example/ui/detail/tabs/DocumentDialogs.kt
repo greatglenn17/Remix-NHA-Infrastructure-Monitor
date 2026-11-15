@@ -87,7 +87,7 @@ fun AddRelatedDocumentDialog(
                         label = { Text("Select Document Type") },
                         trailingIcon = {
                             IconButton(onClick = { showPresetDropdown = true }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose document type", tint = MaterialTheme.colorScheme.primary)
                             }
                         },
                         
@@ -150,7 +150,7 @@ fun AddRelatedDocumentDialog(
                         label = { Text("Document Status") },
                         trailingIcon = {
                             IconButton(onClick = { showStatusDropdown = true }) {
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose document status", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         

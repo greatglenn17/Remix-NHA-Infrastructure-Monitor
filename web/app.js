@@ -4280,6 +4280,7 @@ function loadPhotos(root) {
 /** Fills in each attached-file link and thumbnail; one Storage cannot give says so. */
 function loadFiles(root) {
   root.querySelectorAll('[data-file]').forEach(async a => {
+    if (a.dataset.alt) a.setAttribute('aria-label', a.dataset.alt); // a thumbnail is only an icon until its photo loads
     const url = await photoUrl(a.dataset.file);
     if (!a.isConnected) return;
     if (!url) {
