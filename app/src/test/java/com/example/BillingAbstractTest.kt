@@ -184,17 +184,19 @@ class BillingAbstractTest {
         assertTrue(sheet(BillingAbstract.Period(" ")).contains("<div class='period'>As of March 14, 2025</div>")) // no period typed
         assertTrue(!html.contains("equivalent", ignoreCase = true)) // the billing format has no equivalent-units columns
         // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
-        has("1", "LAND ACQUISITION COST", "100", "LOT", "10,000.00", "1,000,000.00", "40", "400,000.00", "40.00%", "0", "0.00", "0.00%", "40", "400,000.00", "40.00%", "60", "600,000.00")
+        has("1", "LAND ACQUISITION COST", "100", "LOT", "10,000.00", "1,000,000.00", "40", "400,000.00", "40.00%", "0", "0.00", "0.00%", "40", "400,000.00", "40.00%")
         // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
-        has("2", "LAND DEVELOPMENT", "100", "LOT", "20,000.00", "2,000,000.00", "0", "0.00", "0.00%", "15.5", "310,000.00", "15.50%", "15.5", "310,000.00", "15.50%", "84.5", "1,690,000.00")
+        has("2", "LAND DEVELOPMENT", "100", "LOT", "20,000.00", "2,000,000.00", "0", "0.00", "0.00%", "15.5", "310,000.00", "15.50%", "15.5", "310,000.00", "15.50%")
         has("3.1", "MILESTONE 1 (80%)", "100", "UNIT", "56,000.00", "5,600,000.00")
         // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
         has("3.2", "MILESTONE 2 (20%)", "100", "UNIT", "14,000.00", "1,400,000.00", "0", "0.00", "0.00%", "2", "28,000.00", "2.00%", page = sheet(BillingAbstract.Period(m2 = 2.0)))
         has("Subtotal (Housing Construction)", "", "", "70,000.00", "7,000,000.00")
         // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
-        has("GRAND TOTAL", "", "", "100,000.00", "10,000,000.00", "", "400,000.00", "4.00%", "", "310,000.00", "3.10%", "", "710,000.00", "7.10%", "", "9,290,000.00")
+        has("GRAND TOTAL", "", "", "100,000.00", "10,000,000.00", "", "400,000.00", "4.00%", "", "310,000.00", "3.10%", "", "710,000.00", "7.10%")
         assertTrue(html.contains("TARGET ACCOMPLISHMENT</td><td class='pc'>:</td><td>12.00%"))
-        assertTrue(html.contains("<th colspan='2' rowspan='2'>BALANCE</th>")) // the billing format keeps its BALANCE columns
+        assertTrue(!html.contains("BALANCE")) // the printed billing abstract has no BALANCE columns either
+        assertTrue(html.contains(">400,000.00</td><td class='n'>40.00%</td></tr>")) // a line ends at its to date
+        assertTrue(html.contains(">710,000.00</td><td class='n'>7.10%</td></tr>")) // and so does the grand total
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>7.10%"))
         assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-4.90%"))
         assertTrue(html.contains("Approved by:"))

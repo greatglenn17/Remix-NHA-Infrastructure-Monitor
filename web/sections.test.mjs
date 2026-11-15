@@ -409,19 +409,21 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(sheet({ covered: ' ', lots: 0, development: 0, m1: 0, m2: 0 }), /<div class='period'>As of March 14, 2025<\/div>/); // no period typed
   assert.ok(!/equivalent/i.test(html)); // the billing format has no equivalent-units columns
   // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
-  assert.match(html, row('1', 'LAND ACQUISITION COST', '100', 'LOT', '10,000.00', '1,000,000.00', '40', '400,000.00', '40.00%', '0', '0.00', '0.00%', '40', '400,000.00', '40.00%', '60', '600,000.00'));
+  assert.match(html, row('1', 'LAND ACQUISITION COST', '100', 'LOT', '10,000.00', '1,000,000.00', '40', '400,000.00', '40.00%', '0', '0.00', '0.00%', '40', '400,000.00', '40.00%'));
   // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
-  assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%', '84.5', '1,690,000.00'));
+  assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%'));
   assert.match(html, row('3.1', 'MILESTONE 1 (80%)', '100', 'UNIT', '56,000.00', '5,600,000.00'));
   // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
   assert.match(sheet({ covered: '', lots: 0, development: 0, m1: 0, m2: 2 }), row('3.2', 'MILESTONE 2 (20%)', '100', 'UNIT', '14,000.00', '1,400,000.00', '0', '0.00', '0.00%', '2', '28,000.00', '2.00%'));
   assert.match(html, row('Subtotal (Housing Construction)', '', '', '70,000.00', '7,000,000.00'));
   // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.
-  assert.match(html, row('GRAND TOTAL', '', '', '100,000.00', '10,000,000.00', '', '400,000.00', '4.00%', '', '310,000.00', '3.10%', '', '710,000.00', '7.10%', '', '9,290,000.00'));
+  assert.match(html, row('GRAND TOTAL', '', '', '100,000.00', '10,000,000.00', '', '400,000.00', '4.00%', '', '310,000.00', '3.10%', '', '710,000.00', '7.10%'));
   // One blank line between the contract cost and the target.
   assert.match(html, /CONTRACT COST<\/td>.*<\/tr>\s*<tr><td colspan='5'>&nbsp;<\/td><\/tr>\s*<tr><td class='pl'>TARGET ACCOMPLISHMENT/);
   assert.match(html, /TARGET ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>12.00%/);
-  assert.ok(html.includes("<th colspan='2' rowspan='2'>BALANCE</th>")); // the billing format keeps its BALANCE columns
+  assert.ok(!html.includes('BALANCE')); // the printed billing abstract has no BALANCE columns either
+  assert.ok(html.includes(">400,000.00</td><td class='n'>40.00%</td></tr>")); // a line ends at its to date
+  assert.ok(html.includes(">710,000.00</td><td class='n'>7.10%</td></tr>")); // and so does the grand total
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
   assert.match(html, /Approved by:/);

@@ -49,7 +49,7 @@ is read only.
   (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`), a landscape A4 sheet with each line (1 land
   acquisition, 2 land development, 3.1 Milestone 1 at 80% and 3.2 Milestone 2 at 20% of housing) as its contract
   quantity, unit cost and amount, what was billed before, in this billing and to date as quantity, amount and share,
-  the balance, subtotals and the grand total. It has no equivalent-units columns. Its figures (`L.billingAbstract`,
+  subtotals and the grand total. It has neither BALANCE nor equivalent-units columns. Its figures (`L.billingAbstract`,
   the phone's `BillingAbstract.of`):
   - **The part amounts** are the uploaded abstract's own, its parts' contract amounts by accomplishment line
     (`L.abstractLineAmounts`), not the bar chart's or the Scope of Works'. A line without an amount is left out.
@@ -275,7 +275,7 @@ is read only.
     (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
     the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
     for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns up to TO
-    DATE (the printed sheet has no BALANCE columns; the tab's table keeps them), the header rows repeating on each
+    DATE (neither printed abstract has BALANCE columns; the tab's table keeps them), the header rows repeating on each
     page, and the Prepared by / Checked by / Approved by signatures (the monthly
     report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
     under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
