@@ -265,7 +265,7 @@ Flat, with tonal layering. Depth comes from dark translucent panels over the dot
 ## Components
 
 ### Buttons
-- **Shape:** gently rounded (6px), at least 40px tall.
+- **Shape:** gently rounded (6px), at least 40px tall. On touch screens (`pointer: coarse`) buttons, text buttons, chips, pills and file links are at least 44px tall, and field text is 16px so iPhone Safari does not zoom in on focus.
 - **Primary:** Action Blue fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
 - **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px primary outline with a 2px offset. Disabled is 0.6 opacity.
 - **Text button:** blue 600 14px, 8px padding, Blue Haze background on hover. Used for Sign out, Back, Forgot password, and "What these mean" (always labelled; it opens the help that explains every status word and its threshold). An icon leads the label.
