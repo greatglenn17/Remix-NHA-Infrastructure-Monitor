@@ -1,7 +1,7 @@
 const functions = require("firebase-functions/v1");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
@@ -12,6 +12,7 @@ const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
 const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
+const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, concernsOrders, orderFix } = require("./orderGuard");
 // A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
 // new duplicate empty.
 const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
@@ -498,5 +499,135 @@ exports.stampProjectCreationTimes = functions.region(REGION).pubsub
   .onRun(async () => {
     const snap = await getFirestore().collection("projects").get();
     console.log(`Stamped ${await stampCreationTimes(snap.docs)} of ${snap.size} projects with their creation time`);
+    return null;
+  });
+
+/** The role in an account's sign-in token, which is what firestore.rules go by; "" for an account that is gone. */
+async function roleOf(uid) {
+  if (!uid) return "";
+  try {
+    return (await getAuth().getUser(uid)).customClaims?.role || "";
+  } catch (error) {
+    if (error.code === "auth/user-not-found") return "";
+    throw error;
+  }
+}
+
+/**
+ * The time before which a record is taken as it stood: nobody's order writes were checked then. It is set when the
+ * guard first runs, and that run puts every order approved by then on record (orderGuard/{recordId}), so that one a
+ * Field Engineer wrote last, on an older app or after a role change, is not taken for theirs.
+ */
+async function orderGuardStart(db) {
+  const start = db.doc("orderGuardStart/start");
+  let snap = await start.get();
+  if (!snap.exists) {
+    // Fails when another run was first; that run's time is the one read back.
+    await start.create({ at: FieldValue.serverTimestamp() }).catch(() => {});
+    snap = await start.get();
+  }
+  const since = Timestamp.fromMillis(snap.get("at").toMillis() - LEGACY_MARGIN_MS);
+  if (!snap.get("recorded")) {
+    const records = await db.collection("records").where("type", "==", "pending_documents").get();
+    const writer = db.bulkWriter();
+    for (const doc of records.docs) {
+      const approvedData = approvedDataOf(doc.data());
+      // create: a record the guard has ruled on meanwhile keeps that ruling.
+      if (approvedData && doc.updateTime < since) writer.create(db.doc(`orderGuard/${doc.id}`), { approvedData, at: doc.updateTime }).catch(() => {});
+    }
+    await writer.close();
+    await start.update({ recorded: true });
+  }
+  return since;
+}
+
+/**
+ * Triggered whenever a record is written. Only an Engineer Admin or the Super Admin approves an order or changes an
+ * approved one (orderGuard.js), and the rules cannot see an order's status. So this keeps, in orderGuard/{recordId}
+ * where no client can write, the order as an approver last approved it, and puts the record back when anyone else's
+ * write makes it differ; the Super Admins and the writer are told.
+ *
+ * Runs can come late and out of order, so nothing is concluded from the order of the runs: each write shows the
+ * record before and after it, each with the server's time and its writer (updatedByUid, which the rules hold to the
+ * signed-in account), and the latest state an approver wrote is the one on record. The record as it is now, the
+ * guard's own writes included, is then held to that.
+ */
+exports.guardOrderRecord = functions.region(REGION).firestore
+  .document("records/{recordId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const id = context.params.recordId;
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.data();
+    try {
+      // Most writes are not about an order, or leave it as it was (the server copying a project's assigned accounts
+      // onto its records): nothing is read for those.
+      if (after.type !== "pending_documents" || !concernsOrders(before, after)) return null;
+      if (before && before.data === after.data && before.isDeleted === after.isDeleted && before.updatedByUid === after.updatedByUid) return null;
+      const db = getFirestore();
+      const since = await orderGuardStart(db);
+      const roles = new Map();
+      const role = (uid) => roles.get(uid) ?? roles.set(uid, roleOf(uid)).get(uid);
+      const seen = [];
+      for (const snap of [change.before, change.after]) {
+        if (snap.exists && (snap.updateTime < since || APPROVERS.includes(await role(snap.get("updatedByUid"))))) seen.push(snap);
+      }
+
+      const ref = change.after.ref;
+      const mark = db.doc(`orderGuard/${id}`);
+      const undone = await db.runTransaction(async (tx) => {
+        const [record, marked] = await tx.getAll(ref, mark);
+        const now = record.data();
+        if (!now) return null;
+        let approvedData = marked.get("approvedData") ?? null;
+        let at = marked.get("at");
+        let changed = false;
+        for (const snap of seen) {
+          if (at && snap.updateTime <= at) continue;
+          [approvedData, at, changed] = [approvedDataOf(snap.data()), snap.updateTime, true];
+        }
+        const writer = now.updatedByUid || "";
+        const writerRole = await role(writer);
+        const fix = orderFix({ now, role: writerRole, approvedData });
+        // The approved order with a file attached since: kept with it, or putting the order back later would drop the file.
+        if (!fix && approvedData != null && now.data !== approvedData && now.isDeleted !== true && !APPROVERS.includes(writerRole)) {
+          [approvedData, changed] = [now.data, true];
+        }
+        if (changed) tx.set(mark, { approvedData, at });
+        if (!fix) return null;
+        // One revision up and a new edit time, so every phone takes the record back (RemoteVersion.isNewer).
+        tx.update(ref, { ...fix.patch, revision: (Number(now.revision) || 1) + 1, updatedAt: Date.now(), updatedByUid: ORDER_GUARD_UID });
+        return { name: fix.name, uid: writer, projectUuid: now.projectUuid || "" };
+      });
+      if (!undone) return null;
+      console.log(`Record ${id}: an order change by ${undone.uid || "an unknown account"} was put back`);
+      // Its own earlier write, corrected once a late run showed what an approver had done: nobody to tell.
+      if (undone.uid === ORDER_GUARD_UID) return null;
+
+      const [actor, project] = await Promise.all([
+        undone.uid ? db.collection("users").doc(undone.uid).get() : null,
+        undone.projectUuid ? db.collection("projects").doc(undone.projectUuid).get() : null,
+      ]);
+      const who = actor?.get("displayName") || actor?.get("email") || "Someone";
+      const tokens = [...new Set([...(await superAdminTokens()), ...(await tokensOf(undone.uid))])];
+      if (tokens.length === 0) return null;
+      await getMessaging().sendEachForMulticast({
+        tokens,
+        data: {
+          // The phones list an AUDIT_ALERT in the bell.
+          type: "AUDIT_ALERT",
+          title: "Order put back",
+          message: `${who} saved a change to "${undone.name}" that only an Engineer Admin can make (approving an order, or changing an approved one), so it was put back.`,
+          projectName: String(project?.get("name") || ""),
+          actorName: String(who),
+          actorRole: String(actor?.get("role") || ""),
+          actionType: "Order Guard",
+          eventId: `order_${id}_${Date.now()}`,
+        },
+        android: { priority: "high" },
+      });
+    } catch (error) {
+      console.error(`Order guard error for record ${id}:`, error);
+    }
     return null;
   });
