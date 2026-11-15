@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, Timestamp } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { guardOrderRecord } = require("./index");
 const { ORDER_GUARD_UID, LEGACY_MARGIN_MS } = require("./orderGuard");
 
@@ -54,13 +54,44 @@ test("a Field Engineer's approval goes back to Pending; an Engineer Admin's and 
     [JSON.parse(json("Pending", { fileUrl: "attachments/x.pdf" })), 3, ORDER_GUARD_UID, false]);
   assert.strictEqual(await onRecord(), null);
 
+  let revision = 3;
   for (const uid of ["ea", "sa"]) {
-    await guard(await write(record(uid, "Approved", { revision: 4 })));
+    await guard(await write(record(uid, "Approved", { revision: ++revision })));
     now = await stored();
-    assert.deepStrictEqual([statusOf(now), now.revision, now.updatedByUid], ["Approved", 4, uid]);
+    assert.deepStrictEqual([statusOf(now), now.revision, now.updatedByUid], ["Approved", revision, uid]);
     assert.strictEqual(await onRecord(), now.data);
-    await guard(await write(record("ea", "Submitted", { revision: 5 })));
+    await guard(await write(record("ea", "Submitted", { revision: ++revision })));
     assert.strictEqual(await onRecord(), null);
+  }
+});
+
+test("the phones take what the guard leaves: its revision is above any the writer chose", async () => {
+  // An approval at a revision no number here holds exactly (2^53 + 1).
+  await ref().set(record("fe", "Pending", { revision: Number.MAX_SAFE_INTEGER }));
+  const before = await ref().get();
+  await ref().set(record("fe", "Approved", { revision: Number.MAX_SAFE_INTEGER }));
+  await ref().update({ revision: FieldValue.increment(2) });
+  await guard({ before, after: await ref().get(), id: "vo" });
+  let now = await stored();
+  assert.deepStrictEqual([statusOf(now), now.updatedByUid], ["Pending", ORDER_GUARD_UID]);
+  assert.ok(now.revision > Number.MAX_SAFE_INTEGER + 3, String(now.revision));
+
+  // An approval, then Pending at a lower revision before the run: the phones that took the approval would keep it.
+  for (const order of [[0, 1], [1, 0]]) {
+    await ref().delete();
+    const events = [await write(record("fe", "Approved", { revision: 10 })), await write(record("fe", "Pending", { revision: 9 }))];
+    for (const i of order) await guard(events[i]);
+    now = await stored();
+    assert.deepStrictEqual([statusOf(now), now.revision, now.updatedByUid], ["Pending", 11, "fe"]);
+  }
+
+  // An approved order sent again as it is, far below its revision: an approver's later change would never reach the phones.
+  await ref().delete();
+  await guard(await write(record("ea", "Approved", { revision: 5 })));
+  for (const [again, above] of [[-1000, 6], [-2000, 7]]) {
+    await guard(await write(record("fe", "Approved", { revision: again })));
+    now = await stored();
+    assert.deepStrictEqual([statusOf(now), now.revision, now.updatedByUid], ["Approved", above, "fe"]);
   }
 });
 
@@ -95,6 +126,19 @@ test("an approved order a Field Engineer deletes, changes, renames or sends back
     await guard({ before: event.after, after: await ref().get(), id: "vo" });
     assert.deepStrictEqual(await stored(), now);
   }
+});
+
+test("an Engineer Admin's rename of what a Field Engineer had renamed takes the approval back", async () => {
+  await guard(await write(record("ea", "Approved")));
+  const letter = (uid, revision) => record(uid, "", { revision, data: JSON.stringify({ documentName: "Scanned letter", status: "Approved", remarks: "" }) });
+  // Neither state of the Engineer Admin's write reads as an order; its run comes before the Field Engineer's.
+  const events = [await write(letter("fe", 2)), await write(letter("ea", 3))];
+  await guard(events[1]);
+  await guard(events[0]);
+  assert.strictEqual(await onRecord(), null);
+  await guard(await write(letter("fe", 4)));
+  const now = await stored();
+  assert.deepStrictEqual([JSON.parse(now.data).documentName, now.updatedByUid, now.revision], ["Scanned letter", "fe", 4]);
 });
 
 test("an approved order an Engineer Admin deleted comes back from a Field Engineer as Pending only", async () => {
@@ -144,12 +188,13 @@ test("runs that come late or out of order end the same way", async () => {
   for (const event of [signed, takenBack, approval]) await guard(event);
   assert.deepStrictEqual(await state(), ["Signed", "fe", false]);
   assert.strictEqual(await onRecord(), null);
-  // The same three, all written before the first run, the runs in order.
+  // The same three, all written before the first run, the runs in order: the first run knows only the approval.
+  // A known limit: the Field Engineer's Signed is lost. The order is not left approved.
   await ref().delete();
   await db().doc("orderGuard/vo").delete();
   const late = [await write(record("ea", "Approved")), await write(record("ea", "Submitted", { revision: 2 })), await write(record("fe", "Signed", { revision: 3 }))];
   for (const event of late) await guard(event);
-  assert.deepStrictEqual([await state(), (await stored()).revision], [["Signed", "fe", false], 3]);
+  assert.deepStrictEqual(await state(), ["Pending", ORDER_GUARD_UID, false]);
   assert.strictEqual(await onRecord(), null);
 
   // An Engineer Admin approves and a Field Engineer changes the order before that run: put back in either order of the runs.

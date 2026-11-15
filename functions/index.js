@@ -555,8 +555,11 @@ async function orderGuardStart(db) {
  * Runs can come late and out of order, so nothing is concluded from the order of the runs: each write shows the
  * record before and after it, each with the server's time and its writer (updatedByUid, which the rules hold to the
  * signed-in account), and the latest state an approver wrote is the one on record. The record as it is now, the
- * guard's own writes included, is then held to that. Every state an approver wrote reaches two runs, its own
- * write's and the next write's: the first to come records it, and the other, or any later run, puts the record back.
+ * guard's own writes included, is then held to that.
+ *
+ * A phone takes a record only at a higher revision than the one it holds, and the revision is the writer's to choose.
+ * So the guard's write goes above every revision the write shows, and a record left below one of them (an approval
+ * sent at revision 10, then Pending at 9, would leave the phones with the approval) is given a higher one as it is.
  */
 exports.guardOrderRecord = functions.region(REGION).firestore
   .document("records/{recordId}")
@@ -566,11 +569,17 @@ exports.guardOrderRecord = functions.region(REGION).firestore
     const before = change.before.exists ? change.before.data() : null;
     const after = change.after.data();
     try {
-      // Most writes are not about an order, or leave it as it was (the server copying a project's assigned accounts
-      // onto its records): nothing is read for those.
-      if (after.type !== "pending_documents" || !concernsOrders(before, after)) return null;
-      if (before && before.data === after.data && before.isDeleted === after.isDeleted && before.updatedByUid === after.updatedByUid) return null;
+      // Most writes are of another type, or leave the record as it was (the server copying a project's assigned
+      // accounts onto its records): nothing is read for those.
+      if (after.type !== "pending_documents") return null;
+      if (before && before.data === after.data && before.isDeleted === after.isDeleted && before.updatedByUid === after.updatedByUid
+        && !(after.revision < before.revision)) return null;
       const db = getFirestore();
+      const ref = change.after.ref;
+      const mark = db.doc(`orderGuard/${id}`);
+      // No order before or after it, and none ever put on record for it: one read. With one on record, an approver
+      // who deletes or renames what a Field Engineer already deleted or renamed still takes the approval back.
+      if (!concernsOrders(before, after) && !(await mark.get()).exists) return null;
       const since = await orderGuardStart(db);
       const roles = new Map();
       const role = (uid) => roles.get(uid) ?? roles.set(uid, roleOf(uid)).get(uid);
@@ -579,8 +588,6 @@ exports.guardOrderRecord = functions.region(REGION).firestore
         if (snap.exists && (snap.updateTime < since || APPROVERS.includes(await role(snap.get("updatedByUid"))))) seen.push(snap);
       }
 
-      const ref = change.after.ref;
-      const mark = db.doc(`orderGuard/${id}`);
       const undone = await db.runTransaction(async (tx) => {
         const [record, marked] = await tx.getAll(ref, mark);
         const now = record.data();
@@ -593,14 +600,23 @@ exports.guardOrderRecord = functions.region(REGION).firestore
           [approvedData, at, changed] = [approvedDataOf(snap.data()), snap.updateTime, true];
         }
         if (changed) tx.set(mark, { approvedData, at });
-        // On record only since this run, and the record has been written again since this write: an approver may
-        // have written in between (approved, then took it back), which the runs for those writes will show.
-        if (changed && record.updateTime > change.after.updateTime) return null;
         const writer = now.updatedByUid || "";
         const fix = orderFix({ now, role: await role(writer), approvedData });
-        if (!fix) return null;
-        // One revision up and a new edit time, so every phone takes the record back (RemoteVersion.isNewer).
-        tx.update(ref, { ...fix.patch, revision: (Number(now.revision) || 1) + 1, updatedAt: Date.now(), updatedByUid: ORDER_GUARD_UID });
+        // The revisions of the states this write shows that are not the record as it is: a phone may hold either.
+        const held = [change.before, change.after].filter((snap) => snap.exists && !snap.updateTime.isEqual(record.updateTime))
+          .map((snap) => Number(snap.get("revision")) || 0);
+        const mine = Number(now.revision) || 0;
+        if (!fix && !held.some((revision) => revision >= mine)) return null;
+        // Above them all and with a new edit time, so every phone takes the record (RemoteVersion.isNewer). Added by
+        // the server, which counts whole numbers exactly. shortcut: 4096 covers what a number here loses of a
+        // revision above 2^53 (no app writes one), drop it if the rules ever bound the revision.
+        const up = Math.max(0, ...held.map((revision) => revision - mine)) + 1 + ([mine, ...held].every(Number.isSafeInteger) ? 0 : 4096);
+        const stamp = { revision: FieldValue.increment(up), updatedAt: Date.now() };
+        if (!fix) {
+          tx.update(ref, stamp);
+          return null;
+        }
+        tx.update(ref, { ...fix.patch, ...stamp, updatedByUid: ORDER_GUARD_UID });
         return { name: fix.name, deleted: fix.patch.isDeleted === true, uid: writer, projectUuid: now.projectUuid || "" };
       });
       if (!undone) return null;

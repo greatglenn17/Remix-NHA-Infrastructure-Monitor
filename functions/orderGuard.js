@@ -35,6 +35,8 @@ function read(record) {
   if (!record || record.type !== "pending_documents" || record.isDeleted === true) return { order: null };
   let data;
   try {
+    // Text only: JSON.parse would read an array holding one string, or bytes, as that string; a phone reads neither.
+    if (typeof record.data !== "string") throw new TypeError("data is not text");
     data = JSON.parse(record.data);
   } catch {
     return { malformed: true, order: null };

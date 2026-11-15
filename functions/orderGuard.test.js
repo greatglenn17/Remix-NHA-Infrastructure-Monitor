@@ -24,7 +24,7 @@ test("an order is a live pending document whose name says so, the way the phones
 
 test("data the app and the website never write is malformed, whatever a phone would make of it", () => {
   const live = (data) => read({ type: "pending_documents", data });
-  for (const data of [undefined, 5, "not json", json(VO, "Approved") + "}", "{'documentName':'" + VO + "','status':'Approved'}", "null", "[]",
+  for (const data of [undefined, 5, [json(VO, "Pending")], Buffer.from(json(VO, "Pending")), "not json", json(VO, "Approved") + "}", "{'documentName':'" + VO + "','status':'Approved'}", "null", "[]",
     JSON.stringify({ documentName: { x: "Time Extension No. 9 - 300 Days" }, status: "Approved" }),
     JSON.stringify({ documentName: VO, status: ["Approved"] }),
     JSON.stringify({ documentName: VO, status: "Approved", remarks: { toString: 0 } }),
