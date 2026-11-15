@@ -1,7 +1,7 @@
 const functions = require("firebase-functions/v1");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
@@ -12,6 +12,7 @@ const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
 const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
+const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, orderFix } = require("./orderGuard");
 // A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
 // new duplicate empty.
 const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
@@ -498,5 +499,156 @@ exports.stampProjectCreationTimes = functions.region(REGION).pubsub
   .onRun(async () => {
     const snap = await getFirestore().collection("projects").get();
     console.log(`Stamped ${await stampCreationTimes(snap.docs)} of ${snap.size} projects with their creation time`);
+    return null;
+  });
+
+/** The role in an account's sign-in token, which is what firestore.rules go by; "" for an account that is gone. */
+async function roleOf(uid) {
+  if (!uid) return "";
+  try {
+    return (await getAuth().getUser(uid)).customClaims?.role || "";
+  } catch (error) {
+    if (error.code === "auth/user-not-found") return "";
+    throw error;
+  }
+}
+
+/**
+ * The time before which a record is taken as it stood: nobody's order writes were checked then. It is set when the
+ * guard first runs, and that run puts every order approved by then on record (orderGuard/{recordId}), so that one a
+ * Field Engineer wrote last, on an older app or after a role change, is not taken for theirs.
+ */
+async function orderGuardStart(db) {
+  const start = db.doc("orderGuardStart/start");
+  let snap = await start.get();
+  if (!snap.exists) {
+    // Fails when another run was first; that run's time is the one read back.
+    await start.create({ at: FieldValue.serverTimestamp() }).catch(() => {});
+    snap = await start.get();
+  }
+  const since = Timestamp.fromMillis(snap.get("at").toMillis() - LEGACY_MARGIN_MS);
+  if (!snap.get("recorded")) {
+    const records = await db.collection("records").where("type", "==", "pending_documents").get();
+    const writer = db.bulkWriter();
+    let failed = false;
+    for (const doc of records.docs) {
+      const approvedData = approvedDataOf(doc.data());
+      if (!approvedData || doc.updateTime >= since) continue;
+      // create: a record the guard has ruled on meanwhile keeps that ruling (6: it exists already).
+      writer.create(db.doc(`orderGuard/${doc.id}`), { approvedData, at: doc.updateTime }).catch((error) => {
+        if (error.code !== 6) failed = true;
+      });
+    }
+    await writer.close();
+    // Left unset when an order could not be recorded, so the next run goes through them again.
+    if (!failed) await start.update({ recorded: true });
+  }
+  return since;
+}
+
+/**
+ * Triggered whenever a record is written. Only an Engineer Admin or the Super Admin approves an order or changes an
+ * approved one (orderGuard.js), and the rules cannot see an order's status. So this keeps, in orderGuard/{recordId}
+ * where no client can write, the order as an approver last approved it, and puts the record back when anyone else's
+ * write makes it differ; the Super Admins and the writer are told.
+ *
+ * Runs can come late and out of order, so nothing is concluded from the order of the runs: each write shows the
+ * record before and after it, each with the server's time and its writer (updatedByUid, which the rules hold to the
+ * signed-in account), and the latest state an approver wrote is the one on record. The record as it is now, the
+ * guard's own writes included, is then held to that.
+ *
+ * A phone takes a record only at a higher revision than the one it holds, and the revision is the writer's to choose.
+ * So the guard's write goes above every revision the write shows, and a record left below one of them (an approval
+ * sent at revision 10, then Pending at 9, would leave the phones with the approval) is given a higher one as it is.
+ */
+exports.guardOrderRecord = functions.region(REGION).firestore
+  .document("records/{recordId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const id = context.params.recordId;
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.data();
+    try {
+      // Most writes are of another type, or leave the record as it was (the server copying a project's assigned
+      // accounts onto its records): nothing is read for those. Every other write of a document is followed, order
+      // or not: an approver's write of one that is no order, on a record that was one, takes the approval back, and
+      // the run that would say it was an order may come later.
+      if (after.type !== "pending_documents") return null;
+      if (before && before.data === after.data && before.isDeleted === after.isDeleted && before.updatedByUid === after.updatedByUid
+        && !(after.revision < before.revision)) return null;
+      const db = getFirestore();
+      const ref = change.after.ref;
+      const mark = db.doc(`orderGuard/${id}`);
+      const since = await orderGuardStart(db);
+      const roles = new Map();
+      const role = (uid) => roles.get(uid) ?? roles.set(uid, roleOf(uid)).get(uid);
+      const seen = [];
+      for (const snap of [change.before, change.after]) {
+        if (snap.exists && (snap.updateTime < since || APPROVERS.includes(await role(snap.get("updatedByUid"))))) seen.push(snap);
+      }
+
+      const undone = await db.runTransaction(async (tx) => {
+        const [record, marked] = await tx.getAll(ref, mark);
+        const now = record.data();
+        if (!now) return null;
+        let approvedData = marked.get("approvedData") ?? null;
+        let at = marked.get("at");
+        let changed = false;
+        for (const snap of seen) {
+          if (at && snap.updateTime <= at) continue;
+          [approvedData, at, changed] = [approvedDataOf(snap.data()), snap.updateTime, true];
+        }
+        if (changed) tx.set(mark, { approvedData, at });
+        const writer = now.updatedByUid || "";
+        const fix = orderFix({ now, role: await role(writer), approvedData });
+        // The revisions of the states this write shows that are not the record as it is: a phone may hold either.
+        const held = [change.before, change.after].filter((snap) => snap.exists && !snap.updateTime.isEqual(record.updateTime))
+          .map((snap) => Number(snap.get("revision")) || 0);
+        const mine = Number(now.revision) || 0;
+        if (!fix && !held.some((revision) => revision >= mine)) return null;
+        // Above them all and with a new edit time, so every phone takes the record (RemoteVersion.isNewer). Added by
+        // the server, which counts whole numbers exactly. shortcut: 4096 covers what a number here loses of a
+        // revision above 2^53 (no app writes one), drop it if the rules ever bound the revision.
+        const up = Math.max(0, ...held.map((revision) => revision - mine)) + 1 + ([mine, ...held].every(Number.isSafeInteger) ? 0 : 4096);
+        const stamp = { revision: FieldValue.increment(up), updatedAt: Date.now() };
+        if (!fix) {
+          tx.update(ref, stamp);
+          return null;
+        }
+        tx.update(ref, { ...fix.patch, ...stamp, updatedByUid: ORDER_GUARD_UID });
+        return { name: fix.name, deleted: fix.patch.isDeleted === true, uid: writer, projectUuid: now.projectUuid || "" };
+      });
+      if (!undone) return null;
+      console.log(`Record ${id}: an order change by ${undone.uid || "an unknown account"} was ${undone.deleted ? "removed" : "put back"}`);
+      // Its own earlier write, corrected once a late run showed what an approver had done: nobody to tell.
+      if (undone.uid === ORDER_GUARD_UID) return null;
+
+      const [actor, project] = await Promise.all([
+        undone.uid ? db.collection("users").doc(undone.uid).get() : null,
+        undone.projectUuid ? db.collection("projects").doc(undone.projectUuid).get() : null,
+      ]);
+      const who = actor?.get("displayName") || actor?.get("email") || "Someone";
+      const tokens = [...new Set([...(await superAdminTokens()), ...(await tokensOf(undone.uid))])];
+      if (tokens.length === 0) return null;
+      await getMessaging().sendEachForMulticast({
+        tokens,
+        data: {
+          // The phones list an AUDIT_ALERT in the bell.
+          type: "AUDIT_ALERT",
+          title: undone.deleted ? "Document removed" : "Order put back",
+          message: undone.deleted
+            ? `${who} saved a document in a form the app does not write, so it was removed.`
+            : `${who} saved a change to "${undone.name}" that only an Engineer Admin can make (approving an order, or changing an approved one), so it was put back.`,
+          projectName: String(project?.get("name") || ""),
+          actorName: String(who),
+          actorRole: String(actor?.get("role") || ""),
+          actionType: "Order Guard",
+          eventId: `order_${id}_${Date.now()}`,
+        },
+        android: { priority: "high" },
+      });
+    } catch (error) {
+      console.error(`Order guard error for record ${id}:`, error);
+    }
     return null;
   });
