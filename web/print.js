@@ -217,8 +217,8 @@ const qty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigit
  * The abstract the contractor attaches before a billing, on a landscape sheet laid out as the district's billing
  * format, printed from the uploaded `abstract` (Actual Accomplishment tab): each line's contract quantity, unit cost
  * and amount, what was billed before, in this billing (`period`, the typed figures of L.billingAbstract) and to date
- * (quantity, amount, share of the line), and the balance. `units` is the project's lots or housing units; "actual"
- * here is what is billed to date. It has no equivalent-units columns.
+ * (quantity, amount, share of the line). `units` is the project's lots or housing units; "actual" here is what is
+ * billed to date. It has neither BALANCE nor equivalent-units columns.
  */
 export function billingAbstractHtml({ project, docs, payments, abstract, period, units, signatories, banner }) {
   const { parts, targetPct } = L.billingAbstract(project, docs, payments, abstract, period, units), covered = String(period.covered ?? '').trim();
@@ -227,27 +227,27 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
   const billed = (r, unitCost) => [r.previous, r.thisPeriod, r.previous + r.thisPeriod].map(x =>
     `<td class='n'>${unitCost > 0 ? qty(x / unitCost) : ''}</td><td class='n'>${money(x)}</td><td class='n'>${r.amount > 0 ? pct(x / r.amount * 100) : ''}</td>`).join('');
   const line = l => {
-    const unitCost = l.amount / units, left = l.amount - l.previous - l.thisPeriod;
-    return `<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units)}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>${billed(l, unitCost)}<td class='n'>${unitCost > 0 ? qty(left / unitCost) : ''}</td><td class='n'>${money(left)}</td></tr>`;
+    const unitCost = l.amount / units;
+    return `<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units)}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>${billed(l, unitCost)}</tr>`;
   };
-  const total = (label, r) => `<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>${billed(r, 0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>`;
+  const total = (label, r) => `<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>${billed(r, 0)}</tr>`;
   const all = sumOf(parts.flatMap(p => p.lines)), actual = all.amount > 0 ? (all.previous + all.thisPeriod) / all.amount * 100 : 0;
   return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, actual)}
     <table class='apa'>
-      ${apaHead()}
-      ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='16'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
+      ${APA_HEAD}
+      ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
       ${total('GRAND TOTAL', all)}
     </table>
     <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
 }
 
 /**
- * The district's column layout of an Abstract of Physical Accomplishment under three header rows (BlueBookForms.apaHead):
- * 17 columns, 15 without the two of BALANCE.
+ * The district's column layout of an Abstract of Physical Accomplishment under three header rows (BlueBookForms.APA_HEAD):
+ * 15 columns, up to TO DATE. Neither printed abstract has the sheet's BALANCE columns.
  */
-const apaHead = (balance = true) => `<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th>${balance ? "<th colspan='2' rowspan='2'>BALANCE</th>" : ''}</tr>
+const APA_HEAD = `<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th></tr>
       <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
-      <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}${balance ? '<th>QTY</th><th>AMOUNT</th>' : ''}</tr>`;
+      <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}</tr>`;
 
 /**
  * The top of both abstracts (BlueBookForms.apaTop): the banner, the title, the `period` line, then the project, its
@@ -289,7 +289,7 @@ export function actualAbstractHtml({ project, docs, abstract, signatories, banne
     + `${n(r.unitCost, money)}${n(r.amount, money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>`;
   return `${apaTop(banner, `As of ${longDate(abstract.asOf)}`, project, docs, overall.target, overall.actual)}
     <table class='apa'>
-      <thead>${apaHead(false)}</thead>
+      <thead>${APA_HEAD}</thead>
       <tbody>${L.abstractRows(abstract.rowsJson).map(row).join('')}</tbody>
     </table>
     <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;

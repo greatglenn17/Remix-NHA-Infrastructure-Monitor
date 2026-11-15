@@ -403,8 +403,8 @@ object BlueBookForms {
      * The Abstract of Physical Accomplishment the contractor attaches before a billing, on a landscape sheet laid out
      * as the district's billing format, printed from [uploaded], an abstract of the Actual Accomplishment tab: each
      * line's contract quantity, unit cost and amount, what was billed before, in this billing ([period], typed) and to
-     * date (quantity, amount, share of the line), and the balance. [units] is the project's lots or housing units;
-     * "actual" here is what is billed to date. It has no equivalent-units columns. web/print.js billingAbstractHtml
+     * date (quantity, amount, share of the line). [units] is the project's lots or housing units; "actual" here is
+     * what is billed to date. It has neither BALANCE nor equivalent-units columns. web/print.js billingAbstractHtml
      * prints the same page.
      */
     fun billingAbstract(
@@ -424,23 +424,22 @@ object BlueBookForms {
         }
         fun line(l: BillingAbstract.Line): String {
             val unitCost = l.amount / units
-            val left = l.amount - l.previous - l.thisPeriod
             return "<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units.toDouble())}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>" +
-                "${billed(Row(l.amount, l.previous, l.thisPeriod), unitCost)}<td class='n'>${if (unitCost > 0) qty(left / unitCost) else ""}</td><td class='n'>${money(left)}</td></tr>"
+                "${billed(Row(l.amount, l.previous, l.thisPeriod), unitCost)}</tr>"
         }
         fun total(label: String, r: Row) = "<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>" +
-            "${billed(r, 0.0)}<td></td><td class='n'>${money(r.amount - r.previous - r.thisPeriod)}</td></tr>"
+            "${billed(r, 0.0)}</tr>"
         val all = sumOf(abstract.parts.flatMap { it.lines })
         val actual = if (all.amount > 0) (all.previous + all.thisPeriod) / all.amount * 100 else 0.0
         val rows = abstract.parts.joinToString("") { p ->
-            (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='16'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
+            (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='14'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
             ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, actual)}
             <table class='apa'>
-              ${apaHead()}
+              $APA_HEAD
               $rows
               ${total("GRAND TOTAL", all)}
             </table>
@@ -452,11 +451,11 @@ object BlueBookForms {
         )
     }
 
-    /** The district's column layout of an Abstract of Physical Accomplishment under three header rows: 17 columns, 15 without the two of BALANCE. */
-    private fun apaHead(balance: Boolean = true) = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
-        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th>${if (balance) "<th colspan='2' rowspan='2'>BALANCE</th>" else ""}</tr>" +
+    /** The district's column layout of an Abstract of Physical Accomplishment under three header rows: 15 columns, up to TO DATE. Neither printed abstract has the sheet's BALANCE columns. */
+    private const val APA_HEAD = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
+        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th></tr>" +
         "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
-        "<tr>${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}${if (balance) "<th>QTY</th><th>AMOUNT</th>" else ""}</tr>"
+        "<tr><th>QTY</th><th>AMOUNT</th><th>% WT</th><th>QTY</th><th>AMOUNT</th><th>% WT</th><th>QTY</th><th>AMOUNT</th><th>% WT</th></tr>"
 
     /**
      * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
@@ -506,7 +505,7 @@ object BlueBookForms {
             """
             ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
             <table class='apa'>
-              <thead>${apaHead(balance = false)}</thead>
+              <thead>$APA_HEAD</thead>
               <tbody>$rows</tbody>
             </table>
             <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
