@@ -86,7 +86,7 @@ fun AddWeeklyReportDialog(
     documents: List<com.example.data.model.PendingDocument> = emptyList(),
     // The project's saved reports: a new one starts from the latest week's actual.
     reports: List<com.example.data.model.WeeklyReport> = emptyList(),
-    // The project's uploaded abstracts: a week that has one takes its Actual % from it.
+    // The project's uploaded abstracts: a week takes its Actual % from the latest one on or before its last day.
     abstracts: List<com.example.data.model.ProjectAbstract> = emptyList()
 ) {
     // Only new reports keep a draft; editing a saved report works as before.
@@ -225,8 +225,8 @@ private fun WeeklyReportForm(
             ?.let { t -> com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 }) }
     }
     fun targetText(name: String) = chartTargets?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.first ?: "0.00"
-    // A week with an uploaded abstract (Actual Accomplishment tab) takes the three actuals from it, not typed; a line it has no part for is 0.
-    val weekAbstract = remember(reportingWeek, abstracts) { com.example.util.ProjectAbstracts.inWeek(abstracts, reportingWeek) }
+    // The latest abstract on or before the week's last day (Actual Accomplishment tab) gives the three actuals, not typed; a line it has no part for is 0.
+    val weekAbstract = remember(reportingWeek, abstracts) { com.example.util.ProjectAbstracts.forWeek(abstracts, reportingWeek) }
     val abstractActuals = remember(weekAbstract) {
         weekAbstract?.let { com.example.data.model.ACCOMPLISHMENT_LINES.zip(com.example.util.ProjectAbstracts.lineActuals(it)).toMap() }
     }
@@ -496,16 +496,20 @@ private fun WeeklyReportForm(
                     modifier = Modifier.testTag("abstract_note")
                 )
 
+                // A figure that is automatic has no field (the chart's target, the abstract's actual); with both, the lines are left out and the grand total shows what is saved.
+                val typesTarget = chartTargets == null
+                val typesActual = abstractActuals == null
+
                 // Header
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (typesTarget || typesActual) Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Item", modifier = Modifier.weight(2f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                    Text("Target %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-                    Text("Actual %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    if (typesTarget) Text("Target %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
+                    if (typesActual) Text("Actual %", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                     Text("Var", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.End))
                 }
 
                 // Scope Items Rows
-                scopeItems.forEach { item ->
+                if (typesTarget || typesActual) scopeItems.forEach { item ->
                     val vals = accomplishmentMap[item.name] ?: Pair("0.00", "0.00")
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -516,21 +520,19 @@ private fun WeeklyReportForm(
                             Text(item.name, style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Text("Wt: ${"%.2f".format(item.weightPct)}%", style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
                         }
-                        OutlinedTextField(
+                        if (typesTarget) OutlinedTextField(
                             value = targetText(item.name),
                             onValueChange = { accomplishmentMap[item.name] = Pair(it, vals.second) },
                             modifier = Modifier.weight(1f).testTag("weekly_target_${item.name}"),
-                            readOnly = chartTargets != null,
                             isError = FormValidation.percentError(targetText(item.name)) != null,
                             supportingText = FormValidation.percentError(targetText(item.name))?.let { { Text(it) } },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
-                        OutlinedTextField(
+                        if (typesActual) OutlinedTextField(
                             value = actualText(item.name),
                             onValueChange = { accomplishmentMap[item.name] = Pair(vals.first, it) },
                             modifier = Modifier.weight(1f).testTag("weekly_actual_${item.name}"),
-                            readOnly = abstractActuals != null,
                             isError = FormValidation.percentError(actualText(item.name)) != null,
                             supportingText = FormValidation.percentError(actualText(item.name))?.let { { Text(it) } },
                             singleLine = true,

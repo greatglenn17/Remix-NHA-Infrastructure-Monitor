@@ -81,16 +81,16 @@ class ProjectAbstractsTest {
         assertNull(ProjectAbstracts.latest(emptyList()))
     }
 
-    @Test fun aWeeklyReportTakesTheAbstractDatedInItsWeek() {
+    @Test fun aWeeklyReportTakesTheLatestAbstractOnOrBeforeItsLastDay() {
         val friday = abstract("2025-03-14")
         val monday = abstract("2025-03-10", 9.0)
-        assertEquals(friday, ProjectAbstracts.inWeek(listOf(monday, friday), "Mar 8, 2025 - Mar 14, 2025"))
-        assertEquals(monday, ProjectAbstracts.inWeek(listOf(monday), "Week 11: March 8 - March 14, 2025")) // an older label
-        assertNull(ProjectAbstracts.inWeek(listOf(monday, friday), "Mar 15, 2025 - Mar 21, 2025"))
-        assertNull(ProjectAbstracts.inWeek(listOf(monday, friday), "Mar 1, 2025 - Mar 7, 2025"))
-        assertNull(ProjectAbstracts.inWeek(listOf(friday), "some week"))
-        // The date is compared as it is saved, as the website does.
-        assertNull(ProjectAbstracts.inWeek(listOf(friday.copy(asOf = " 2025-03-14 ")), "Mar 8, 2025 - Mar 14, 2025"))
+        val february = abstract("2025-02-28", 8.0)
+        assertEquals(friday, ProjectAbstracts.forWeek(listOf(monday, friday), "Mar 8, 2025 - Mar 14, 2025"))
+        assertEquals(monday, ProjectAbstracts.forWeek(listOf(monday), "Week 11: March 8 - March 14, 2025")) // an older label
+        assertEquals(friday, ProjectAbstracts.forWeek(listOf(february, friday), "Mar 15, 2025 - Mar 21, 2025")) // a week with none of its own takes the latest before it
+        assertEquals(february, ProjectAbstracts.forWeek(listOf(february, friday), "Mar 1, 2025 - Mar 7, 2025")) // never one dated after the week's last day
+        assertNull(ProjectAbstracts.forWeek(listOf(friday), "Mar 1, 2025 - Mar 7, 2025"))
+        assertNull(ProjectAbstracts.forWeek(listOf(friday), "some week"))
         // Its parts fill the three lines; a line it has no part for is 0.
         assertEquals(listOf(50.0, 25.21, 1.0), ProjectAbstracts.lineActuals(friday))
         assertEquals(listOf(0.0, 25.21, 0.0), ProjectAbstracts.lineActuals(friday.copy(rowsJson = ProjectAbstracts.rowsJson(rows.subList(2, 8)))))
@@ -129,6 +129,80 @@ class ProjectAbstractsTest {
             ProjectAbstracts.standing(project, emptyList(), uploaded)
         )
         assertEquals(listOf("+4.66%", "-7.58%", "0.00%", "-"), listOf(4.66, -7.58, 0.0, null).map(ProjectAbstracts::diffText))
+    }
+
+    // The same figures as web/logic.test.mjs "monthly abstract: to date from the latest abstract, previous from the one at the end of the month before".
+    @Test fun theMonthlyAbstractTakesToDateFromTheLatestAbstractAndPreviousFromTheOneAtTheEndOfTheMonthBefore() {
+        val part = row("part", "1", "LAND DEVELOPMENT")
+        fun item(no: String, name: String, qty: Double, unit: String, unitCost: Double, amount: Double, toDate: List<Double?>) =
+            AbstractExcel.Row("item", no, name, qty, unit, unitCost, amount, none3, none3, toDate, none2)
+        fun road(toDate: List<Double?>) = item("1.1", "Road Excavation", 1000.0, "cu.m.", 100.0, 100000.0, toDate)
+        fun subbase(toDate: List<Double?>) = item("1.2", "Subbase", 500.0, "cu.m.", 200.0, 100000.0, toDate)
+        val curb = item("1.3", "Curb and Gutter", 200.0, "l.m.", 50.0, 10000.0, listOf(50.0, 2500.0, 25.0))
+        fun sub(amount: Double, toDate: List<Double?>) = row("subtotal", "", "Subtotal", amount, toDate)
+        fun total(amount: Double, toDate: List<Double?>) = row("total", "", "GRAND TOTAL", amount, toDate)
+        fun filed(uuid: String, asOf: String, overall: Double, rows: List<AbstractExcel.Row>) = ProjectAbstract(
+            projectId = 7, asOf = asOf, overallPct = overall, rowsJson = ProjectAbstracts.rowsJson(rows), fileName = "$uuid.xlsx", uploadedBy = "Engr. Web", equivUnits = 100.0, uuid = uuid, updatedAt = 1
+        )
+        val sep = filed("sep", "2026-09-30", 5.0, listOf(part, road(listOf(100.0, 10000.0, 10.0)), total(200000.0, listOf(null, 10000.0, 5.0))))
+        // October leaves Subbase's cells empty; its two subtotals share a name, so they are matched in order.
+        val oct = filed("oct", "2026-10-30", 20.0, listOf(
+            part, road(listOf(400.0, 40000.0, 40.0)), subbase(none3),
+            sub(200000.0, listOf(null, 40000.0, 20.0)), sub(200000.0, listOf(null, 40000.0, 20.5)), total(200000.0, listOf(null, 40000.0, 20.0))
+        ))
+        // November's own PREVIOUS and THIS PERIOD (since an abstract of Nov 6 that is not filed here) are not the month's.
+        val novRoad = road(listOf(650.1234, 65012.34, 65.01)).copy(
+            prev = listOf(600.0, 60000.0, 60.0), period = listOf(50.1234, 5012.34, 5.01), balance = listOf(349.8766, 34987.66), equiv = listOf(60.0, 65.01, 34.99)
+        )
+        val novSub = sub(210000.0, listOf(null, 87612.34, 41.72))
+        val nov = filed("nov", "2026-11-13", 41.72, listOf(
+            part, novRoad, subbase(listOf(100.5, 20100.0, 20.1)), curb, novSub, novSub, total(210000.0, listOf(null, 87612.34, 41.72))
+        ))
+        val all = listOf(nov, sep, oct)
+
+        fun none(error: String) = ProjectAbstracts.Monthly(null, null, null, error)
+        assertEquals(none("Pick the date of the monthly abstract."), ProjectAbstracts.monthly(all, ""))
+        assertEquals(none("Pick the date of the monthly abstract."), ProjectAbstracts.monthly(all, "Nov 15, 2026"))
+        assertEquals(none("No abstract is filed on or before Sep 29, 2026."), ProjectAbstracts.monthly(all, "2026-09-29"))
+        assertEquals(none("No abstract is filed on or before Nov 15, 2026."), ProjectAbstracts.monthly(emptyList(), "2026-11-15"))
+
+        val made = ProjectAbstracts.monthly(all, "2026-11-15")
+        assertEquals(listOf(nov, oct, ""), listOf(made.to, made.from, made.error))
+        assertEquals(listOf(7L, "2026-11-15", 41.72, 100.0, "", ""), made.abstract!!.run { listOf(projectId, asOf, overallPct, equivUnits, fileName, uploadedBy) })
+        assertEquals(
+            listOf(
+                part,
+                // The row keeps its own to date, balance and equivalent units; previous and this period are the month's.
+                novRoad.copy(prev = listOf(400.0, 40000.0, 40.0), period = listOf(250.1234, 25012.34, 25.01)),
+                subbase(listOf(100.5, 20100.0, 20.1)).copy(prev = listOf(0.0, 0.0, 0.0), period = listOf(100.5, 20100.0, 20.1)), // October's cells were empty: previous is 0
+                curb.copy(prev = listOf(0.0, 0.0, 0.0), period = listOf(50.0, 2500.0, 25.0)), // a row new since October
+                novSub.copy(prev = listOf(null, 40000.0, 20.0), period = listOf(null, 47612.34, 21.72)),
+                novSub.copy(prev = listOf(null, 40000.0, 20.5), period = listOf(null, 47612.34, 21.22)),
+                total(210000.0, listOf(null, 87612.34, 41.72)).copy(prev = listOf(null, 40000.0, 20.0), period = listOf(null, 47612.34, 21.72)),
+            ),
+            ProjectAbstracts.rows(made.abstract!!.rowsJson)
+        )
+        assertEquals("To date is the abstract as of Nov 13, 2026. Previous is the abstract as of Oct 30, 2026.", ProjectAbstracts.monthlyNote(made.to!!, made.from))
+
+        // The month before is the one before the picked date's, whatever was filed last: Oct 31 reads October's against September's.
+        assertEquals(listOf(oct, sep), ProjectAbstracts.monthly(all, "2026-10-31").run { listOf(to, from) })
+        assertEquals(listOf(nov, nov), ProjectAbstracts.monthly(all, "2027-01-05").run { listOf(to, from) }) // January: previous is as of Dec 31
+        // Nothing filed in the picked month yet: both are the same abstract, so this period is zero.
+        val idle = ProjectAbstracts.monthly(all, "2026-10-15")
+        assertEquals(listOf(sep, sep), listOf(idle.to, idle.from))
+        assertEquals(listOf(none3, listOf(0.0, 0.0, 0.0), listOf(null, 0.0, 0.0)), ProjectAbstracts.rows(idle.abstract!!.rowsJson).map { it.period })
+
+        // No abstract by the end of the month before: previous is zero.
+        val first = ProjectAbstracts.monthly(all, "2026-09-30")
+        assertEquals(listOf(sep, null, ""), listOf(first.to, first.from, first.error))
+        assertEquals(
+            listOf(none3 to none3, listOf(0.0, 0.0, 0.0) to listOf(100.0, 10000.0, 10.0), listOf(null, 0.0, 0.0) to listOf(null, 10000.0, 5.0)),
+            ProjectAbstracts.rows(first.abstract!!.rowsJson).map { it.prev to it.period }
+        )
+        assertEquals(
+            "To date is the abstract as of Sep 30, 2026. Previous is zero: no abstract was filed by the end of the month before.",
+            ProjectAbstracts.monthlyNote(first.to!!, first.from)
+        )
     }
 
     // The same figures as web/logic.test.mjs: the billing abstract's part amounts and where its land development starts.

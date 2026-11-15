@@ -1548,10 +1548,10 @@ export function abstractParts(rows) {
 export const latestAbstract = abstracts => abstracts.reduce((best, a) =>
   (best == null || a.asOf > best.asOf || (a.asOf === best.asOf && (a.updatedAt || 0) > (best.updatedAt || 0)) ? a : best), undefined);
 
-/** ProjectAbstracts.inWeek: the latest abstract dated on one of the report's 7 days; null when the week has none. */
-export function abstractInWeek(abstracts, reportingWeek) {
-  const days = weekDays(reportingWeek);
-  return latestAbstract(abstracts.filter(a => days.includes(a.asOf))) ?? null;
+/** ProjectAbstracts.forWeek: the latest abstract dated on or before the report's last day; null when there is none. */
+export function abstractForWeek(abstracts, reportingWeek) {
+  const last = weekDays(reportingWeek)[6];
+  return (last && latestAbstract(abstracts.filter(a => a.asOf <= last))) ?? null;
 }
 
 /** An abstract's three Actual % as the weekly form shows them (abstractActuals of its parts); 0.00 for a line it has no part for. */
@@ -1730,6 +1730,35 @@ export const nextAbstractFields = (source, rows, asOf, uploadedBy) => ({
 
 /** The New abstract form's line: the overall its quantities give and what it continues, word for word on the phone. */
 export const nextAbstractNote = (source, same, rows) => `Overall to date ${overallText({ overallPct: rows.find(r => r.kind === 'total')?.toDate[2] })}, from ${overallText(source)} as of ${displayDate(source.asOf)}.${same ? ' Saving replaces the abstract already filed for this date.' : ''}`;
+
+/**
+ * ProjectAbstracts.monthly: the abstract of a month, computed and never saved, as { abstract, to, from, error }.
+ * `to` is the latest abstract filed on or before `date` (yyyy-MM-dd) and gives every row with its TO DATE; `from` is
+ * the latest one filed by the end of the month before (null with none) and gives PREVIOUS, row by row (the first row
+ * of `from` not yet matched with the same kind, item no. and name; 0 without one). THIS PERIOD is the difference. A
+ * cell with no TO DATE stays empty. `abstract` is dated `date`; `error` says why there is none, '' when there is.
+ */
+export function monthlyAbstract(abstracts, date) {
+  const none = error => ({ abstract: null, to: null, from: null, error });
+  // A day the calendar does not have (2026-02-30) is not a date either, as LocalDate.parse has it on the phone.
+  if (isoDay(date) == null || new Date(isoDay(date)).toISOString().slice(0, 10) !== date) return none('Pick the date of the monthly abstract.');
+  const upTo = day => latestAbstract(abstracts.filter(a => a.asOf <= day)) ?? null;
+  const to = upTo(date);
+  if (!to) return none(`No abstract is filed on or before ${displayDate(date)}.`);
+  // Day 0 of a month is the last day of the month before it.
+  const from = upTo(new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, 0)).toISOString().slice(0, 10));
+  const before = from ? abstractRows(from.rowsJson) : [], used = new Set();
+  const rows = abstractRows(to.rowsJson).map(r => {
+    const at = before.findIndex((p, i) => !used.has(i) && p.kind === r.kind && p.no === r.no && p.name === r.name);
+    used.add(at);
+    const prev = [0, 1, 2].map(k => (r.toDate?.[k] == null ? null : before[at]?.toDate?.[k] ?? 0));
+    return { ...r, prev, period: prev.map((p, k) => (p == null ? null : (k ? round2 : round4)(r.toDate[k] - p))) };
+  });
+  return { abstract: { asOf: date, overallPct: to.overallPct, equivUnits: to.equivUnits, rowsJson: JSON.stringify(rows), fileName: '', uploadedBy: '' }, to, from, error: '' };
+}
+
+/** The Monthly view's line under its date: the two abstracts it was made from, word for word on the phone. */
+export const monthlyAbstractNote = (to, from) => `To date is the abstract as of ${displayDate(to.asOf)}. ${from ? `Previous is the abstract as of ${displayDate(from.asOf)}.` : 'Previous is zero: no abstract was filed by the end of the month before.'}`;
 
 /** ProjectViewModel.deleteAbstract's audit entry, word for word. */
 export const deletedAbstractAudit = a => ({ actionType: 'Deleted abstract', details: `Abstract ${abstractLabel(a)}`, oldValue: overallText(a), newValue: '' });

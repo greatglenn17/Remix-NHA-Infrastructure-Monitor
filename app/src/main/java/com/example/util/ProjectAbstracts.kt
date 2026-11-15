@@ -15,8 +15,8 @@ import java.util.Locale
 /**
  * The uploaded abstracts of a project (Actual Accomplishment tab): each is kept under its "As of" date, and the latest
  * is the project's actual accomplishment. web/logic.js has the website's copy (abstractRows, latestAbstract,
- * abstractInWeek, abstractFields, abstractLineAmounts, abstractPeriodAmounts, abstractStanding, projectActualAfter);
- * change both together.
+ * abstractForWeek, abstractFields, abstractLineAmounts, abstractPeriodAmounts, abstractStanding, projectActualAfter,
+ * monthlyAbstract, monthlyAbstractNote); change both together.
  */
 object ProjectAbstracts {
     private fun round2(v: Double) = Math.round(v * 100) / 100.0
@@ -48,11 +48,10 @@ object ProjectAbstracts {
     /** The abstract of the latest "As of" date; of two with one date (uploaded on two devices), the one changed last. */
     fun latest(abstracts: List<ProjectAbstract>): ProjectAbstract? = abstracts.maxWithOrNull(compareBy({ it.asOf }, { it.updatedAt }))
 
-    /** The latest abstract dated within [reportingWeek]'s seven days: the one a weekly report of that week takes its actual from. */
-    fun inWeek(abstracts: List<ProjectAbstract>, reportingWeek: String): ProjectAbstract? {
-        val start = BlueBookForms.weekStart(reportingWeek) ?: return null
-        val days = (0L..6L).map { start.plusDays(it).toString() }
-        return latest(abstracts.filter { it.asOf in days })
+    /** The latest abstract dated on or before [reportingWeek]'s last day: the one a weekly report of that week takes its actual from; null when there is none. */
+    fun forWeek(abstracts: List<ProjectAbstract>, reportingWeek: String): ProjectAbstract? {
+        val last = BlueBookForms.weekStart(reportingWeek)?.plusDays(6)?.toString() ?: return null
+        return latest(abstracts.filter { it.asOf <= last })
     }
 
     /** A read workbook as the record to save, or null when it has no "As of" date to file it under. */
@@ -246,6 +245,40 @@ object ProjectAbstracts {
     fun nextNote(source: ProjectAbstract, same: ProjectAbstract?, rows: List<AbstractExcel.Row>): String =
         "Overall to date ${pct(rows.firstOrNull { it.kind == "total" }?.toDate?.getOrNull(2) ?: 0.0)}, from ${pct(source.overallPct)} as of ${ProjectSchedule.displayDate(source.asOf)}." +
             if (same != null) " Saving replaces the abstract already filed for this date." else ""
+
+    /** The abstract of a month ([monthly]): the [abstract] to show, the two it was made from, and [error], why there is none ("" when there is). */
+    data class Monthly(val abstract: ProjectAbstract?, val to: ProjectAbstract?, val from: ProjectAbstract?, val error: String)
+
+    /**
+     * The abstract of a month, computed and never saved. `to` is the latest abstract filed on or before [date]
+     * (yyyy-MM-dd) and gives every row with its TO DATE; `from` is the latest one filed by the end of the month before
+     * (null with none) and gives PREVIOUS, row by row (the first row of `from` not yet matched with the same kind, item
+     * no. and name; 0 without one). THIS PERIOD is the difference. A cell with no TO DATE stays empty. The abstract is
+     * dated [date].
+     */
+    fun monthly(abstracts: List<ProjectAbstract>, date: String): Monthly {
+        val day = runCatching { LocalDate.parse(date) }.getOrNull() ?: return Monthly(null, null, null, "Pick the date of the monthly abstract.")
+        fun upTo(last: String) = latest(abstracts.filter { it.asOf <= last })
+        val to = upTo(date) ?: return Monthly(null, null, null, "No abstract is filed on or before ${ProjectSchedule.displayDate(date)}.")
+        val from = upTo(day.withDayOfMonth(1).minusDays(1).toString())
+        // A row of `from` is taken out once matched, so two rows named "Subtotal" match in order.
+        val before = from?.let { rows(it.rowsJson) }.orEmpty().toMutableList<AbstractExcel.Row?>()
+        val rows = rows(to.rowsJson).map { r ->
+            val at = before.indexOfFirst { it != null && it.kind == r.kind && it.no == r.no && it.name == r.name }
+            val p = before.getOrNull(at)
+            if (at >= 0) before[at] = null
+            val prev = List(3) { k -> r.toDate.getOrNull(k)?.let { p?.toDate?.getOrNull(k) ?: 0.0 } }
+            r.copy(prev = prev, period = List(3) { k -> prev[k]?.let { was -> (r.toDate[k] ?: 0.0) - was }?.let { if (k == 0) round4(it) else round2(it) } })
+        }
+        return Monthly(
+            ProjectAbstract(projectId = to.projectId, asOf = date, overallPct = to.overallPct, rowsJson = rowsJson(rows), fileName = "", uploadedBy = "", equivUnits = to.equivUnits),
+            to, from, ""
+        )
+    }
+
+    /** The Monthly view's line under its date: the two abstracts it was made from, word for word on the website. */
+    fun monthlyNote(to: ProjectAbstract, from: ProjectAbstract?): String = "To date is the abstract as of ${ProjectSchedule.displayDate(to.asOf)}. " +
+        (from?.let { "Previous is the abstract as of ${ProjectSchedule.displayDate(it.asOf)}." } ?: "Previous is zero: no abstract was filed by the end of the month before.")
 
     /** "Mar 14, 2025: overall 10.73%", the wording the messages and the audit entries share. */
     fun summary(abstract: ProjectAbstract): String = "${ProjectSchedule.displayDate(abstract.asOf)}: overall ${pct(abstract.overallPct)}"

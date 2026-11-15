@@ -205,19 +205,25 @@ is read only.
 - **New weekly report** (Progress → Weekly) is the app's weekly report form without its photo and weather steps:
   the week (7 days from the first day picked, the Saturday of this week to start), the three accomplishment lines,
   manpower, equipment, activities and issues. With an approved bar chart the targets are its plan for the week's last
-  day and are not typed; without one they are typed, weighted by the Scope of Works. Save adds the `weekly_reports`
+  day and have no boxes; without one they are typed, weighted by the Scope of Works. Save adds the `weekly_reports`
   record (`L.newWeeklyReport`), sets the project's target and actual accomplishment, and writes the
   app's "Report Creation" audit entry. The new report has no photos and no weather log: add them with **Add photos**
   and **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
-  A new report's Actual % boxes start from the report of the latest week (`L.carriedActuals`), so a week without a new
-  abstract keeps the last actual.
-- **A week with an uploaded abstract takes its Actual % from it** (`L.abstractInWeek`, `L.abstractLineActuals`; the
-  phone's `ProjectAbstracts.inWeek`): when an abstract's "As of" date is one of the form's 7 days, the three Actual %
-  boxes show its parts (0.00 for a line it has no part for), are not typed, and the form says "Actual % is from the
-  abstract as of Nov 6, 2026 (Actual Accomplishment tab)." It follows the week picked, for a new report and a saved
-  one, and Save stores those figures as the report's. A week without an abstract is typed as before. The report's
-  overall is each line by its weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures).
-  The form no longer reads an Excel file itself: the abstract is uploaded on the Actual Accomplishment tab.
+  A new report's Actual % boxes, where it has them, start from the report of the latest week
+  (`L.carriedActuals`).
+- **A week takes its Actual % from the latest abstract on or before its last day** (`L.abstractForWeek`,
+  `L.abstractLineActuals`; the phone's `ProjectAbstracts.forWeek`): the three lines' actuals are that abstract's parts
+  (0.00 for a line it has no part for) and the form says "Actual % is from the abstract as of Nov 6, 2026 (Actual
+  Accomplishment tab)." It follows the week picked, for a new report and a saved one, and Save stores those figures
+  as the report's. A week before the first abstract is typed as before. The report's overall is each line by its
+  weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures). The form no longer reads an
+  Excel file itself: the abstract is uploaded on the Actual Accomplishment tab.
+- **A figure that is automatic has no box** in the form's Weekly accomplishment part. A line has a Target % box only
+  when the week has no approved bar chart plan, and an Actual % box only when no abstract is filed on or before the
+  week's last day; with both, the line is not shown at all. The part keeps its heading, the bar chart and abstract
+  notes and the "Overall: target, actual, variance" line, so the engineer sees what will be saved. The automatic
+  values sit in hidden inputs with the boxes' own `data-target` / `data-actual` attributes, so what is saved, the
+  audit entries and the project's figures are as before.
 - **Actual Accomplishment** (the project's third tab, `#/p/<id>/actual[/<as-of date>]`, shown for every project) holds
   the district's Abstract of Physical Accomplishment of the actual work, the "As of" one. **Upload abstract (Excel)**,
   for the people who can edit the project, reads the .xlsx in the browser (`apa-excel.js`, the port of
@@ -248,6 +254,22 @@ is read only.
     name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
     folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at BALANCE: the
     equivalent-units columns are read and kept on the record but not shown, because the abstract's format has none.
+  - **Weekly | Monthly**, a switch at the top of the tab once the project has an abstract. Weekly is the tab as
+    described here. **Monthly** (`#/p/<id>/actual/monthly[/<date>]`) is the abstract of a month, computed from the
+    filed ones and never saved (`L.monthlyAbstract`, the phone's `ProjectAbstracts.monthly`). Its **As of** date box
+    starts at today; changing it moves the address. TO DATE is the latest abstract filed on or before that date:
+    every row is its row, with its own quantity, unit, unit cost, amount, TO DATE and balance. PREVIOUS is the TO DATE
+    of the latest abstract filed by the last day of the month before, row by row (the first row not yet matched with
+    the same kind, item no. and name); 0 where that abstract has no such row or an empty cell, or when none was filed
+    by then. THIS PERIOD is TO DATE less PREVIOUS (quantities at 4 decimals, amounts and % at 2). A cell with no TO
+    DATE stays empty. A line under the date names the two abstracts (`L.monthlyAbstractNote`): "To date is the
+    abstract as of Nov 13, 2026. Previous is the abstract as of Oct 30, 2026.", or "... Previous is zero: no
+    abstract was filed by the end of the month before." A date before the first abstract says "No abstract is filed
+    on or before Sep 29, 2026."; an empty date box, "Pick the date of the monthly abstract." Below are the same
+    Target / Actual / +/- table (the target is the bar chart's plan on the picked date) and the same pay items
+    table, without the File and Uploaded by lines. Its one link, **Print abstract**
+    (`#/p/<id>/print/monthly-<date>`), prints the same sheet as the weekly one from the computed abstract. Monthly
+    has no Upload, New abstract, Print billing abstract or Delete.
   - **Two abstracts print from the tab**, for anyone who can open it. **Print abstract** is the abstract of the
     actual work, the detailed one, made every week and at month end: `#/p/<id>/print/abstract-<as-of date>`
     (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
