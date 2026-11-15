@@ -555,6 +555,11 @@ test('related file: named, worded and logged as the phone does', () => {
     { documentName: 'Notice to Proceed', status: 'Signed', remarks: 'Ref: NHA-2026-001 | Original' });
   assert.deepEqual(L.relatedDocument({ docType: other, title: ' ECC ', reference: ' ', status: 'Pending', remarks: 'DENR' }), { documentName: 'ECC', status: 'Pending', remarks: 'DENR' });
   assert.equal(L.relatedDocument({ docType: other, title: ' ', reference: '', status: 'Pending', remarks: '' }).documentName, '');
+  // The form refuses a title every client would read as an order; the types it offers are never one.
+  const titled = title => L.relatedDocument({ docType: other, title, reference: '', status: 'Approved', remarks: '' }).documentName;
+  assert.deepEqual(['Request Letter for Time Extension', 'variation order memo', 'WORK SUSPENSION notice', 'Work Resumption letter', 'ECC', 'Extension of time'].map(t => L.isOrderName(titled(t))),
+    [true, true, true, true, false, false]);
+  assert.equal(L.RELATED_TYPES.some(L.isOrderName), false);
   const ids = { uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], uid: 'a', now: 7 };
   const record = L.newDocumentRecord(ids, { documentName: 'ECC', status: 'Approved', remarks: 'DENR', fileUrl: 'nhafile:attachments/p1/x.pdf' });
   assert.equal(record.type, 'pending_documents');

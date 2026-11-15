@@ -26,10 +26,12 @@ object ProjectAttention {
         "Work Suspension Order", "Continuance of Work Suspension Order", "Work Resumption Order", "Variation Order", "Time Extension"
     )
 
+    /** A document with one of [ORDER_TYPES] in its name is an order, on every phone and the website. */
+    fun isOrderName(name: String): Boolean = ORDER_TYPES.any { name.contains(it, ignoreCase = true) }
+
     /** Time extensions, suspensions, resumptions and variation orders not yet Approved. */
     fun waitingApproval(documents: List<PendingDocument>): Int = documents.count { doc ->
-        !doc.status.equals("Approved", ignoreCase = true) &&
-            ORDER_TYPES.any { doc.documentName.contains(it, ignoreCase = true) }
+        !doc.status.equals("Approved", ignoreCase = true) && isOrderName(doc.documentName)
     }
 
     fun flags(

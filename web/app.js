@@ -2726,6 +2726,8 @@ function relatedFile(c, file) {
     e.preventDefault();
     const filed = isNew && L.relatedDocument(textFields(form));
     if (isNew && !filed.documentName) { err.textContent = 'Type the document title.'; return; }
+    // Saved, it would leave this list and count as an order (an approved one, if so marked).
+    if (isNew && L.isOrderName(filed.documentName)) { err.textContent = L.ORDER_TITLE_REFUSED; return; }
     if (!isNew && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
