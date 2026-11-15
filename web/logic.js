@@ -301,9 +301,10 @@ export function statusLevel(p, today) {
 }
 
 const ORDER_TYPES = ['variation order', 'time extension', 'work suspension', 'work resumption'];
+/** ProjectAttention.isOrderName: a document with one of these in its name is an order, on every phone and here. */
+export const isOrderName = name => ORDER_TYPES.some(t => (name || '').toLowerCase().includes(t));
 /** ProjectAttention.waitingApproval: orders not yet Approved. */
-export const waitingApproval = docs => docs.filter(d =>
-  !/^approved$/i.test((d.status || '').trim()) && ORDER_TYPES.some(t => (d.documentName || '').toLowerCase().includes(t))).length;
+export const waitingApproval = docs => docs.filter(d => !/^approved$/i.test((d.status || '').trim()) && isOrderName(d.documentName)).length;
 
 /** Total billed on the net, after retention, as the phone shows it. */
 export const billedTotal = payments => payments.reduce((t, p) => t + netAmount(p), 0);
@@ -700,7 +701,7 @@ export function mergedLetters(letters, docs) {
 
 /** RelatedFilesList: documents that are not orders or letters. */
 export const relatedFiles = docs => docs.filter(d =>
-  !/time extension|variation order|work suspension|work resumption/i.test(d.documentName || '') && !/^letter to contractor/i.test(d.documentName || ''));
+  !isOrderName(d.documentName) && !/^letter to contractor/i.test(d.documentName || ''));
 
 /** VariationOrdersLog: a variation order's type, status, approval date and reason. */
 export function variationLines(vo) {
@@ -1181,6 +1182,8 @@ export const newDocumentRecord = (ids, { documentName, remarks, status = 'Pendin
 export const RELATED_TYPES = ['Notice of Award', 'Notice to Proceed', 'Contract Agreement', 'Memorandum of Agreement', 'RFA / CAF', 'NHA Board Resolution',
   'Other / Specific Custom Document...'];
 export const RELATED_STATUSES = ['Approved', 'Notarized', 'Signed', 'Submitted', 'Pending'];
+/** AddRelatedDocumentDialog's refusal of a title that isOrderName, word for word. */
+export const ORDER_TITLE_REFUSED = 'This title names an order (variation order, time extension, work suspension or resumption). Add it as an order instead.';
 
 /**
  * AddRelatedDocumentDialog's document: named by the type picked, or by the title typed for the last type ('' when

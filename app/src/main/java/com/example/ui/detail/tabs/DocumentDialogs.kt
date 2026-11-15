@@ -58,7 +58,8 @@ fun AddRelatedDocumentDialog(
     } else {
         selectedPreset
     }
-
+    // Saved, it would leave Related Files and count as an order (an approved one, if so marked).
+    val isOrderTitle = com.example.util.ProjectAttention.isOrderName(finalDocName)
 
     val snapshot = { listOf(selectedPreset, customDocName, categoryRef, status, remarksText, fileUrl) }
     val initial = remember { snapshot() }
@@ -121,7 +122,10 @@ fun AddRelatedDocumentDialog(
                         onValueChange = { customDocName = it },
                         label = { Text("Specific Document Title") },
                         placeholder = { Text("e.g. Environmental Compliance Certificate") },
-                        
+                        isError = isOrderTitle,
+                        supportingText = if (isOrderTitle) {
+                            { Text("This title names an order (variation order, time extension, work suspension or resumption). Add it as an order instead.") }
+                        } else null,
                         modifier = Modifier.fillMaxWidth().testTag("input_related_doc_title"),
                         singleLine = true
                     )
@@ -246,7 +250,7 @@ fun AddRelatedDocumentDialog(
                     onAddDocument(finalDocName.ifBlank { "Project Related Document" }, status, fullRemarks, fileUrl)
                     onDismiss()
                 },
-                enabled = finalDocName.isNotBlank(),
+                enabled = finalDocName.isNotBlank() && !isOrderTitle,
             ) {
                 Text("Save Document", fontWeight = FontWeight.SemiBold)
             }
