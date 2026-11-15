@@ -137,7 +137,15 @@ test("an Engineer Admin's rename of what a Field Engineer had renamed takes the 
   await guard(events[0]);
   assert.strictEqual(await onRecord(), null);
   await guard(await write(letter("fe", 4)));
-  const now = await stored();
+  let now = await stored();
+  assert.deepStrictEqual([JSON.parse(now.data).documentName, now.updatedByUid, now.revision], ["Scanned letter", "fe", 4]);
+
+  // The same when the run for the approval itself comes last of all.
+  await ref().delete();
+  await db().doc("orderGuard/vo").delete();
+  const all = [await write(record("ea", "Approved")), await write(letter("fe", 2)), await write(letter("ea", 3)), await write(letter("fe", 4))];
+  for (const i of [2, 3, 0, 1]) await guard(all[i]);
+  now = await stored();
   assert.deepStrictEqual([JSON.parse(now.data).documentName, now.updatedByUid, now.revision], ["Scanned letter", "fe", 4]);
 });
 

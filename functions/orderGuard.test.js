@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { read, isApproved, approvedDataOf, concernsOrders, orderFix } = require("./orderGuard");
+const { read, isApproved, approvedDataOf, orderFix } = require("./orderGuard");
 
 const VO = "Variation Order No. 1 (Additive) - PHP 1,000,000.00";
 const json = (documentName, status = "Pending", more = {}) => JSON.stringify({ documentName, status, remarks: "", isCoreChecklist: 1, fileUrl: "", ...more });
@@ -38,9 +38,6 @@ test("data the app and the website never write is malformed, whatever a phone wo
   // As a phone writes it: its own key order, the slash escaped.
   assert.deepStrictEqual(live('{"fileUrl":"attachments\\/x.pdf","isCoreChecklist":1,"remarks":"","status":"Approved","documentName":"' + VO + '"}').order,
     { name: VO, status: "Approved", remarks: "" });
-  assert.ok(concernsOrders(null, { type: "pending_documents", data: "not json" }));
-  assert.ok(concernsOrders(doc(VO), doc("As-built plan")));
-  assert.ok(!concernsOrders(doc("As-built plan", "Approved"), doc("As-built plan", "Approved", { isDeleted: true })));
 });
 
 test("with no approval on record, a Field Engineer adds an order and works on it, and their other documents are theirs", () => {

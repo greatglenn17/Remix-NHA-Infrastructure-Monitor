@@ -52,9 +52,6 @@ const isApproved = (order) => !!order && fold(order.status) === "approved";
 /** The data string of the approved order a record holds, or null: what an approver's write leaves on record. */
 const approvedDataOf = (record) => (isApproved(read(record).order) ? record.data : null);
 
-/** Whether a write is about an order at all, as far as the record before or after it shows. */
-const concernsOrders = (before, after) => [before, after].some((record) => read(record).malformed || !!read(record).order);
-
 /**
  * What to do about a record as it is `now`, last written by an account with `role`, when `approvedData` is the data
  * string of the order as an approver last approved it (null: no approver has, or one took the approval back or
@@ -78,4 +75,4 @@ function orderFix({ now, role, approvedData }) {
   return { name: is.order.name, patch: { data: JSON.stringify({ ...JSON.parse(now.data), status: "Pending" }) } };
 }
 
-module.exports = { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, read, isApproved, approvedDataOf, concernsOrders, orderFix };
+module.exports = { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, read, isApproved, approvedDataOf, orderFix };

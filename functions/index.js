@@ -12,7 +12,7 @@ const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
 const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
-const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, concernsOrders, orderFix } = require("./orderGuard");
+const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, orderFix } = require("./orderGuard");
 // A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
 // new duplicate empty.
 const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
@@ -570,16 +570,15 @@ exports.guardOrderRecord = functions.region(REGION).firestore
     const after = change.after.data();
     try {
       // Most writes are of another type, or leave the record as it was (the server copying a project's assigned
-      // accounts onto its records): nothing is read for those.
+      // accounts onto its records): nothing is read for those. Every other write of a document is followed, order
+      // or not: an approver's write of one that is no order, on a record that was one, takes the approval back, and
+      // the run that would say it was an order may come later.
       if (after.type !== "pending_documents") return null;
       if (before && before.data === after.data && before.isDeleted === after.isDeleted && before.updatedByUid === after.updatedByUid
         && !(after.revision < before.revision)) return null;
       const db = getFirestore();
       const ref = change.after.ref;
       const mark = db.doc(`orderGuard/${id}`);
-      // No order before or after it, and none ever put on record for it: one read. With one on record, an approver
-      // who deletes or renames what a Field Engineer already deleted or renamed still takes the approval back.
-      if (!concernsOrders(before, after) && !(await mark.get()).exists) return null;
       const since = await orderGuardStart(db);
       const roles = new Map();
       const role = (uid) => roles.get(uid) ?? roles.set(uid, roleOf(uid)).get(uid);
