@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
@@ -97,9 +98,11 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithText("2  LAND DEVELOPMENT").assertExists()
         rule.onNodeWithText("Amount 2,000,000.00 · To date 25.21%").assertExists()
         // The pay items are a table of the sheet's columns, under their headings; an empty cell is blank.
-        listOf("ITEM DESCRIPTION", "THIS PERIOD", "BALANCE").forEach { rule.onAllNodesWithText(it).onFirst().assertExists() } // each open part has its own headings
+        listOf("ITEM DESCRIPTION", "THIS PERIOD", "TO DATE").forEach { rule.onAllNodesWithText(it).onFirst().assertExists() } // each open part has its own headings
+        rule.onAllNodesWithText("BALANCE").assertCountEquals(0) // the table ends at TO DATE, as on the website and the printed abstracts
         rule.onNodeWithTag("abstract_row_1").assert(hasText("2.1.1")).assert(hasText("Mobilization/Demobilization")).assert(hasText("l.s."))
-            .assert(hasText("400,000.00")).assert(hasText("0.25")).assert(hasText("100,000.00")).assert(hasText("25.00%")).assert(hasText("0.75")).assert(hasText("300,000.00"))
+            .assert(hasText("400,000.00")).assert(hasText("0.25")).assert(hasText("100,000.00")).assert(hasText("25.00%"))
+        rule.onNodeWithTag("abstract_row_1").assert(!hasText("0.75")).assert(!hasText("300,000.00")) // its balance (0.75, 300,000.00) is not shown
         rule.onNodeWithTag("abstract_row_2").assert(hasText("Subtotal (Land Development)")).assert(hasText("2,000,000.00")).assert(hasText("504,000.00")).assert(hasText("25.21%"))
         rule.onNodeWithTag("abstract_part_0").performClick()
         rule.onNodeWithTag("abstract_row_1").assertDoesNotExist()
