@@ -90,15 +90,21 @@ service cloud.firestore {
             && isEngineerAdmin()
             && request.resource.data.name is string && request.resource.data.name.size() > 0
             && request.resource.data.createdByUid == request.auth.uid
+            && !('serverCreatedAt' in request.resource.data)
+            && request.resource.data.get('updatedByUid', '') != 'duplicate-guard'
             && request.resource.data.assignedUids.size() == 1
             && request.auth.uid in request.resource.data.assignedUids);
+      // serverCreatedAt is the server's (functions: guardProjectDocument): it says which of two projects with one
+      // name is the older, so no client sets or changes it. That function leaves its own writes alone and knows them
+      // by updatedByUid 'duplicate-guard', so no client writes that either (each sends its own uid with every write).
       // The approved bar chart (the target % follows it) and deleting the project are the Super Admin's or an assigned
       // Engineer Admin's. A project is deleted by its isDeleted mark; the phones and the website also drop one with no
       // name. Bringing a deleted project back would be creating one.
       allow update: if isSuperAdmin()
         || (isWriter()
             && assigned(resource.data.assignedUids)
-            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedUids'])
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedUids', 'serverCreatedAt'])
+            && request.resource.data.get('updatedByUid', '') != 'duplicate-guard'
             && (isEngineerAdmin()
                 || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['barChartJson'])
                     && request.resource.data.get('isDeleted', false) != true

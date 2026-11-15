@@ -12,8 +12,22 @@ class ProjectReconcilerTest {
     private fun local(id: Long, uuid: String, name: String = "Bulakan Housing", location: String = "Bulakan, Bulacan") =
         LocalRef(id, uuid, ProjectReconciler.key(name, location))
 
-    private fun remote(uuid: String, createdAt: Long = 1L, deleted: Boolean = false, name: String = "Bulakan Housing", location: String = "Bulakan, Bulacan") =
-        RemoteRef(uuid, ProjectReconciler.key(name, location), createdAt, deleted)
+    private fun remote(
+        uuid: String, createdAt: Long = 1L, deleted: Boolean = false, name: String = "Bulakan Housing", location: String = "Bulakan, Bulacan",
+        serverCreatedAt: Long = Long.MAX_VALUE
+    ) = RemoteRef(uuid, ProjectReconciler.key(name, location), createdAt, deleted, serverCreatedAt)
+
+    /** A copy uploaded with createdAt = 0 is still the newer one by the server's own time. */
+    @Test
+    fun oldestIsByTheServersTime_notTheDateTheCreatorSent() {
+        val docs = listOf(
+            remote("real", createdAt = 1_700_000_000_000, serverCreatedAt = 100),
+            remote("planted", createdAt = 0, serverCreatedAt = 200),
+            remote("not-stamped-yet", createdAt = 0)
+        )
+        assertEquals(setOf("real"), ProjectReconciler.plan(local = emptyList(), remote = docs).insertRemote)
+        assertEquals(mapOf(9L to "real"), ProjectReconciler.plan(local = listOf(local(9, "restored")), remote = docs).adoptUuid)
+    }
 
     @Test
     fun key_ignoresCaseAndExtraWhitespace() {

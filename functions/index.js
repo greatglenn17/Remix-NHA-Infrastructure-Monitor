@@ -1,7 +1,7 @@
 const functions = require("firebase-functions/v1");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
@@ -11,6 +11,10 @@ const REGION = "asia-southeast1";
 const SUPER_ADMIN_EMAIL = "great.glenn17@gmail.com";
 const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
+const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
+// A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
+// new duplicate empty.
+const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
 // Roles a user may pick for themselves at registration. SUPER_ADMIN is never
 // taken from the client-written profile: only the account whose Firebase Auth
 // email is SUPER_ADMIN_EMAIL receives it. The profile's own email field is
@@ -372,3 +376,127 @@ async function notifySuperAdminsOnRegistration(userData) {
     console.error("FCM registration notification error:", error);
   }
 }
+
+/** The FCM tokens of one account's devices. */
+async function tokensOf(uid) {
+  if (!uid) return [];
+  const tokenDocs = await getFirestore().collection("users").doc(uid).collection("fcmTokens").get();
+  return tokenDocs.docs.map((t) => t.data().token).filter(Boolean);
+}
+
+/** Gives each of these project documents its `serverCreatedAt`, its creation time on the server, where it differs. */
+async function stampCreationTimes(docs) {
+  const unstamped = docs.filter((doc) => doc.get("serverCreatedAt") !== doc.createTime.toMillis());
+  if (unstamped.length === 0) return 0;
+  const writer = getFirestore().bulkWriter();
+  // A document removed meanwhile has nothing to stamp.
+  unstamped.forEach((doc) => writer.update(doc.ref, { serverCreatedAt: doc.createTime.toMillis() }).catch(() => {}));
+  await writer.close();
+  return unstamped.length;
+}
+
+/**
+ * Triggered whenever a project is written. Two jobs, in one trigger so they cannot race:
+ *
+ * 1. `serverCreatedAt` is set to the document's own creation time on the server, whatever a client wrote there, on
+ *    every project that lacks it (the ones from before this function too: unstamped, they would sort as the newest).
+ *    The phones use it, not the client's createdAt, to tell the older of two same-name projects (ProjectReconciler),
+ *    so a project uploaded with a made-up date cannot pass for the original.
+ * 2. Two live projects must not share a name and location (duplicateGuard.js). A project that becomes live under an
+ *    older project's name is marked deleted when it is new and empty; when it has data, or a phone sent it again
+ *    after that, it stays for the Super Admins to choose. A rename into another project's name is put back
+ *    (deleting there would let anyone who can rename a project delete it), and a deleted project brought back under
+ *    a name only newer projects have is deleted again. The Super Admins and whoever made the write are told.
+ */
+exports.guardProjectDocument = functions.region(REGION).firestore
+  .document("projects/{projectId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const id = context.params.projectId;
+    const db = getFirestore();
+    const projects = db.collection("projects");
+    const ref = projects.doc(id);
+    const after = change.after.data();
+    const createdMs = change.after.createTime.toMillis();
+    try {
+      const decide = async () => {
+        const all = await projects.get();
+        await stampCreationTimes(all.docs);
+        const others = all.docs.map((d) => ({ id: d.id, data: d.data(), createdMs: d.createTime.toMillis() }));
+        return guardAction({ id, before: change.before.exists ? change.before.data() : null, after, createdMs, others });
+      };
+      let act = await decide();
+      // Look again after the wait: the older project may be gone by then, and another may hold the name.
+      if (act?.kind === "extra") {
+        await new Promise((resolve) => setTimeout(resolve, GUARD_WAIT_MS));
+        act = await decide();
+      }
+      if (!act) return null;
+
+      // In one transaction, so a record or an edit that arrives meanwhile is seen or makes this run again.
+      const outcome = await db.runTransaction(async (tx) => {
+        const current = (await tx.get(ref)).data();
+        const other = (await tx.get(projects.doc(act.of))).data();
+        // Edited again, or the name freed, since the write this run is for: nothing to settle, or another run's.
+        if (!isLive(current) || !isLive(other) || projectKey(current) !== projectKey(after) || projectKey(other) !== projectKey(after)) return null;
+        // One revision up and a new edit time, so every phone takes the change (RemoteVersion.isNewer).
+        const edit = { revision: (Number(current.revision) || 1) + 1, updatedAt: Date.now(), updatedByUid: GUARD_UID };
+        if (act.kind === "rename") {
+          tx.update(ref, { name: act.name, location: act.location, ...edit });
+          return "renamed";
+        }
+        if (act.kind === "revived") {
+          // Without duplicateOf: a phone sends a project with that mark again (FirestoreSyncManager.reconcile).
+          tx.update(ref, { isDeleted: true, duplicateOf: FieldValue.delete(), ...edit });
+          return "revived";
+        }
+        const records = await tx.get(db.collection("records").where("projectUuid", "==", id).select("type", "isDeleted"));
+        // duplicateOf: removed once already and sent again by a phone that holds work for it.
+        if (current.duplicateOf || !isEmptyExtra(current, createdMs, records.docs.map((d) => d.data()))) return "kept";
+        tx.update(ref, { isDeleted: true, duplicateOf: act.of, ...edit });
+        return "removed";
+      });
+      if (!outcome) return null;
+      console.log(`Project ${id}: same name and location as project ${act.of} (${outcome})`);
+
+      const name = String(after.name);
+      const [title, message] = {
+        removed: ["Duplicate project removed", `"${name}" already exists, so the new copy was removed. The Super Admin can assign you to the existing project.`],
+        kept: ["Duplicate project", `Two projects are named "${name}". The newer one has data, so it was not removed: delete the one that should not stay.`],
+        renamed: ["Project name already used", `"${name}" already exists, so "${act.name}" keeps its name.`],
+        revived: ["Project not restored", `"${name}" was not restored: another project now has that name.`],
+      }[outcome];
+      const tokens = [...new Set([...(await superAdminTokens()), ...(outcome === "kept" ? [] : await tokensOf(after.updatedByUid))])];
+      if (tokens.length === 0) return null;
+      await getMessaging().sendEachForMulticast({
+        tokens,
+        data: {
+          // The phones list an AUDIT_ALERT in the bell.
+          type: "AUDIT_ALERT",
+          title,
+          message,
+          projectName: name,
+          actorName: "",
+          actorRole: "",
+          actionType: "Duplicate Project",
+          eventId: `duplicate_${id}`,
+        },
+        android: { priority: "high" },
+      });
+    } catch (error) {
+      console.error(`Duplicate guard error for project ${id}:`, error);
+    }
+    return null;
+  });
+
+/**
+ * Daily: stamps the projects guardProjectDocument has not seen (it stamps them all on any project write, so this only
+ * matters while no project is written). After its first run it finds nothing to do.
+ */
+exports.stampProjectCreationTimes = functions.region(REGION).pubsub
+  .schedule("every 24 hours")
+  .onRun(async () => {
+    const snap = await getFirestore().collection("projects").get();
+    console.log(`Stamped ${await stampCreationTimes(snap.docs)} of ${snap.size} projects with their creation time`);
+    return null;
+  });

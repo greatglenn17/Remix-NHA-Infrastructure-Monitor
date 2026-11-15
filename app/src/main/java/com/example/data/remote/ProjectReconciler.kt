@@ -17,7 +17,18 @@ package com.example.data.remote
 object ProjectReconciler {
 
     data class LocalRef(val id: Long, val uuid: String, val key: String)
-    data class RemoteRef(val uuid: String, val key: String, val createdAt: Long, val isDeleted: Boolean)
+    /**
+     * [serverCreatedAt] is the document's creation time on the server (functions: guardProjectDocument), which no
+     * client can set; a document the server has not stamped yet is brand new, so it counts as the newest.
+     * [createdAt] is the creator's own date and only orders documents the server's time does not.
+     */
+    data class RemoteRef(
+        val uuid: String,
+        val key: String,
+        val createdAt: Long,
+        val isDeleted: Boolean,
+        val serverCreatedAt: Long = Long.MAX_VALUE
+    )
 
     data class Plan(
         /** Local row id -> canonical cloud uuid it should take over. */
@@ -30,12 +41,15 @@ object ProjectReconciler {
         val deleteLocal: Set<Long>
     )
 
+    /** updatedByUid of the server's duplicate guard (functions: duplicateGuard.js); no client can write it. */
+    const val GUARD_UID = "duplicate-guard"
+
     fun key(name: String, location: String): String = "${name.normalized()}|${location.normalized()}"
 
     fun plan(local: List<LocalRef>, remote: List<RemoteRef>): Plan {
         val live = remote.filter { !it.isDeleted }
         val canonicalByKey = live.groupBy { it.key }
-            .mapValues { (_, docs) -> docs.minWith(compareBy<RemoteRef>({ it.createdAt }, { it.uuid })) }
+            .mapValues { (_, docs) -> docs.minWith(compareBy<RemoteRef>({ it.serverCreatedAt }, { it.createdAt }, { it.uuid })) }
         val liveByUuid = live.associateBy { it.uuid }
         val deletedUuids = remote.filter { it.isDeleted }.map { it.uuid }.toSet() - liveByUuid.keys
 

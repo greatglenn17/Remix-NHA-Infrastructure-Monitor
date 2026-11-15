@@ -145,6 +145,22 @@ class RecordSyncRemovalTest {
         assertNull(recordSync.buildDocument("audit_logs", signIn.uuid, "uid"))
     }
 
+    // A copy the duplicate guard removed as empty is sent again when it holds more than its "Project Creation" entry.
+    @Test
+    fun hasWork_isAnythingButAuditEntries_sentOrNot() = runBlocking {
+        val id = db.projectDao().insertProject(project("P"))
+        db.projectDao().insertAuditLog(com.example.data.model.AuditLog(projectId = id, user = "Engr. R. Santos", device = "Phone", actionType = "Project Creation"))
+        assertFalse(recordSync.hasWork(id))
+
+        db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "Doc"))
+        markAllSynced()
+        assertTrue(recordSync.hasWork(id))
+
+        val other = db.projectDao().insertProject(project("Q"))
+        db.projectDao().insertTimeExtension(timeExtension(other))
+        assertTrue(recordSync.hasWork(other))
+    }
+
     @Test
     fun pendingRecordEdit_keepsProject_andRemovalTombstonesNothing() = runBlocking {
         val p = project("P")

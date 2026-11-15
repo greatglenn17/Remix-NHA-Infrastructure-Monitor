@@ -223,7 +223,8 @@ class FirestoreSyncManager(
                 uuid = doc.id,
                 key = ProjectReconciler.key(doc.getString("name").orEmpty(), doc.getString("location").orEmpty()),
                 createdAt = doc.getLong("createdAt") ?: Long.MAX_VALUE,
-                isDeleted = doc.getBoolean("isDeleted") == true || doc.getString("name") == null
+                isDeleted = doc.getBoolean("isDeleted") == true || doc.getString("name") == null,
+                serverCreatedAt = doc.getLong("serverCreatedAt") ?: Long.MAX_VALUE
             )
         }
         val plan = ProjectReconciler.plan(
@@ -232,6 +233,20 @@ class FirestoreSyncManager(
         )
 
         for (id in plan.deleteLocal) {
+            // The server's duplicate guard removed this project as a new, empty copy of an older one, but it judged by
+            // what had reached the cloud. Work entered here since then (a record, a bar chart, an edit not sent yet)
+            // must not go with it: the project is sent again instead, and the guard then keeps it and tells the Super
+            // Admins.
+            val local = locals.first { it.id == id }
+            val removedAsEmpty = docs.any {
+                it.id == local.projectUuid && it.getString("updatedByUid") == ProjectReconciler.GUARD_UID && it.contains("duplicateOf")
+            }
+            if (removedAsEmpty &&
+                (recordSync.hasWork(id) || local.barChartJson.isNotBlank() || db.syncOutboxDao().hasPendingFor(local.projectUuid))
+            ) {
+                enqueueProjectEvent(local.projectUuid, "UPDATE", local.revision)
+                continue
+            }
             projectDao.deleteProjectById(id)
             Log.d(tag, "Reconciled remote tombstone deletion for local project $id")
         }
