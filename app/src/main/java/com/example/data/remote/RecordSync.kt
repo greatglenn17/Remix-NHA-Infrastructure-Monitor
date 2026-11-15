@@ -326,6 +326,11 @@ class RecordSync(private val db: AppDatabase) {
         sql.query("SELECT EXISTS(SELECT 1 FROM `$table` WHERE `$column` = ?)", arrayOf(projectId)).use { it.moveToFirst() && it.getInt(0) == 1 }
     }
 
+    /** Whether the project holds anything but its audit entries: a record, sent or not, or a row the cloud can't give back. */
+    fun hasWork(projectId: Long): Boolean = hasLocalOnlyRows(projectId) || (RecordSyncSchema.TABLES - "audit_logs").any { table ->
+        sql.query("SELECT EXISTS(SELECT 1 FROM `$table` WHERE projectId = ?)", arrayOf(projectId)).use { it.moveToFirst() && it.getInt(0) == 1 }
+    }
+
     /** Whether this phone still has to send something for the project, one of its records or one of its files. */
     fun hasPendingUpload(projectId: Long, projectUuid: String): Boolean {
         val open = "state IN ('PENDING', 'FAILED')"

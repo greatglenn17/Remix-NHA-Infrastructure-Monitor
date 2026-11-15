@@ -166,6 +166,34 @@ describe('creating projects', () => {
   it('creator naming someone else as the creator denied', () => assertFails(create(asEngAdmin(), ['eng'], 'x')));
   it('creator naming no creator denied', () => assertFails(setDoc(doc(asEngAdmin().firestore(), 'projects/N'), { name: 'N', assignedUids: ['eng'] })));
   it('field engineer cannot create', () => assertFails(create(asEng(), ['eng'])));
+  // The server's creation time decides which of two same-name projects is the older one.
+  it('creator cannot set the server\'s creation time', () =>
+    assertFails(setDoc(doc(asEngAdmin().firestore(), 'projects/N'), { name: 'N', assignedUids: ['eng'], createdByUid: 'eng', serverCreatedAt: 0 })));
+  it('nobody assigned can set, change or remove the server\'s creation time', async () => {
+    for (const ctx of [asEng, asEngAdmin]) {
+      await assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { serverCreatedAt: 0 }));
+    }
+    await testEnv.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), 'projects/P'), { serverCreatedAt: 5 }));
+    for (const ctx of [asEng, asEngAdmin]) {
+      await assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { serverCreatedAt: 0 }));
+      await assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { serverCreatedAt: deleteField() }));
+      await assertSucceeds(updateDoc(doc(ctx().firestore(), 'projects/P'), { name: 'Y', serverCreatedAt: 5 }));
+    }
+  });
+  // The duplicate guard skips its own writes, which it knows by this updatedByUid.
+  it('nobody assigned can sign a project write as the duplicate guard', async () => {
+    const guard = 'duplicate-guard';
+    await assertFails(setDoc(doc(asEngAdmin().firestore(), 'projects/N'), { name: 'N', assignedUids: ['eng'], createdByUid: 'eng', updatedByUid: guard }));
+    for (const ctx of [asEng, asEngAdmin]) {
+      await assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { name: 'Y', updatedByUid: guard }));
+    }
+    // After a write of the guard's, the next client write must carry the writer's own uid, as the app and the site do.
+    for (const ctx of [asEng, asEngAdmin]) {
+      await testEnv.withSecurityRulesDisabled((off) => updateDoc(doc(off.firestore(), 'projects/P'), { updatedByUid: guard }));
+      await assertFails(updateDoc(doc(ctx().firestore(), 'projects/P'), { name: 'Y' }));
+      await assertSucceeds(updateDoc(doc(ctx().firestore(), 'projects/P'), { name: 'Y', updatedByUid: 'eng' }));
+    }
+  });
   it('viewer cannot create', () => assertFails(create(asViewer(), ['viewer'], 'viewer')));
   it('admin can create with any list', () => assertSucceeds(create(asAdmin(), ['eng', 'x'])));
 });
