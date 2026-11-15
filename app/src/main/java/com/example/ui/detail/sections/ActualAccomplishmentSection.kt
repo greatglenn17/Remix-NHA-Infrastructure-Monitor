@@ -72,11 +72,12 @@ private fun StandingRow(name: String, cells: List<String>, header: Boolean = fal
 }
 
 /**
- * The widths of the pay items' 17 columns, as the website's table has them: item no., description, quantity, unit,
- * unit cost, amount; quantity, amount and % for previous, this period and to date; the balance's quantity and amount.
+ * The widths of the pay items' 15 columns, as the website's table has them: item no., description, quantity, unit,
+ * unit cost, amount; quantity, amount and % for previous, this period and to date. The table ends at TO DATE, as the
+ * printed abstracts do: a row's balance is kept on the record but not shown.
  * At the phone's font size a figure keeps to one line up to 9,999,999,999.99 (a quantity to 1,234,567.8901).
  */
-private val ITEM_WIDTHS: List<Int> = listOf(76, 200, 116, 56, 132, 132) + List(3) { listOf(116, 132, 68) }.flatten() + listOf(116, 132)
+private val ITEM_WIDTHS: List<Int> = listOf(76, 200, 116, 56, 132, 132) + List(3) { listOf(116, 132, 68) }.flatten()
 
 /**
  * [ITEM_WIDTHS] at the phone's font size: the figures are set in sp, so the columns grow with them. Each is a whole
@@ -113,8 +114,8 @@ private fun ItemsHeader(scroll: ScrollState) {
     TableRow(scroll, Modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
         listOf("ITEM NO.", "ITEM DESCRIPTION", "QTY", "UNIT", "UNIT COST", "AMOUNT").forEachIndexed { k, label -> ItemCell(label, w[k], TextAlign.Center, bold = true) }
         // Each with the place of its first column.
-        listOf("PREVIOUS" to 6, "THIS PERIOD" to 9, "TO DATE" to 12, "BALANCE" to 15).forEach { (label, first) ->
-            val under = if (label == "BALANCE") listOf("QTY", "AMOUNT") else listOf("QTY", "AMOUNT", "% WT")
+        listOf("PREVIOUS" to 6, "THIS PERIOD" to 9, "TO DATE" to 12).forEach { (label, first) ->
+            val under = listOf("QTY", "AMOUNT", "% WT")
             Column {
                 ItemCell(label, under.indices.fold(0.dp) { sum, k -> sum + w[first + k] }, TextAlign.Center, bold = true, fill = false)
                 Row { under.forEachIndexed { k, sub -> ItemCell(sub, w[first + k], TextAlign.Center, bold = true, fill = false) } }
@@ -124,7 +125,7 @@ private fun ItemsHeader(scroll: ScrollState) {
 }
 
 /**
- * Row [index] of the abstract in the table, every column as in the sheet and an empty cell left blank; a group is its
+ * Row [index] of the abstract in the table, the sheet's columns up to TO DATE and an empty cell left blank; a group is its
  * number, then its name across the rest. Groups, subtotals and the grand total are bold.
  */
 @Composable
@@ -139,8 +140,7 @@ private fun ItemRow(row: AbstractExcel.Row, index: Int, scroll: ScrollState) {
         else {
             ItemCell(row.name, w[1], TextAlign.Start, bold)
             val figures = listOf(qty(row.qty), row.unit, amount(row.unitCost), amount(row.amount)) +
-                listOf(row.prev, row.period, row.toDate).flatMap { f -> listOf(qty(f.getOrNull(0)), amount(f.getOrNull(1)), f.getOrNull(2)?.let(ProjectAbstracts::pct).orEmpty()) } +
-                listOf(qty(row.balance.getOrNull(0)), amount(row.balance.getOrNull(1)))
+                listOf(row.prev, row.period, row.toDate).flatMap { f -> listOf(qty(f.getOrNull(0)), amount(f.getOrNull(1)), f.getOrNull(2)?.let(ProjectAbstracts::pct).orEmpty()) }
             figures.forEachIndexed { k, text -> ItemCell(text, w[k + 2], if (k == 1) TextAlign.Center else TextAlign.End, bold) }
         }
     }
