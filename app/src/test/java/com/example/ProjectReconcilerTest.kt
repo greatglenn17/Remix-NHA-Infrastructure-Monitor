@@ -47,22 +47,43 @@ class ProjectReconcilerTest {
     }
 
     @Test
-    fun duplicateCloudDocs_collapseToOldestSoEveryPhoneAgrees() {
+    fun duplicateCloudDocs_aPhoneKeepsItsOwnLiveDocument() {
+        val remote = listOf(remote("phone-b", createdAt = 200), remote("phone-a", createdAt = 100))
+        for (uuid in listOf("phone-a", "phone-b")) {
+            val plan = ProjectReconciler.plan(local = listOf(local(1, uuid)), remote = remote)
+            // No second row for the other document either.
+            assertEquals(ProjectReconciler.Plan(emptyMap(), emptySet(), emptySet(), emptySet()), plan)
+        }
+    }
+
+    /** Anyone who may create a project can upload one with a victim project's name and createdAt = 0. */
+    @Test
+    fun olderDocWithTheSameName_neverTakesOverAProjectAlreadyInTheCloud() {
         val plan = ProjectReconciler.plan(
-            local = listOf(local(1, "phone-a")),
+            local = listOf(local(7, "real")),
+            remote = listOf(remote("real", createdAt = 1_700_000_000_000), remote("planted", createdAt = 0))
+        )
+        assertEquals(ProjectReconciler.Plan(emptyMap(), emptySet(), emptySet(), emptySet()), plan)
+    }
+
+    @Test
+    fun rowWithoutACloudDoc_adoptsTheOldestOfItsName() {
+        val plan = ProjectReconciler.plan(
+            local = listOf(local(9, "restored")),
             remote = listOf(remote("phone-b", createdAt = 200), remote("phone-a", createdAt = 100))
         )
-        // phone-a is the oldest cloud doc and already matches: nothing to do
-        assertTrue(plan.adoptUuid.isEmpty())
+        assertEquals(mapOf(9L to "phone-a"), plan.adoptUuid)
         assertTrue(plan.insertRemote.isEmpty())
         assertTrue(plan.uploadLocal.isEmpty())
+    }
 
-        val other = ProjectReconciler.plan(
-            local = listOf(local(9, "phone-b")),
+    @Test
+    fun rowWithoutACloudDoc_isLeftForTheMergeWhenAnotherRowHasThatProject() {
+        val plan = ProjectReconciler.plan(
+            local = listOf(local(1, "phone-b"), local(2, "restored")),
             remote = listOf(remote("phone-b", createdAt = 200), remote("phone-a", createdAt = 100))
         )
-        assertEquals(mapOf(9L to "phone-a"), other.adoptUuid)
-        assertTrue(other.insertRemote.isEmpty())
+        assertEquals(ProjectReconciler.Plan(emptyMap(), emptySet(), emptySet(), emptySet()), plan)
     }
 
     @Test
@@ -88,8 +109,22 @@ class ProjectReconcilerTest {
     @Test
     fun localDuplicates_areMergedIntoLowestId() {
         val merges = ProjectReconciler.localDuplicates(
-            listOf(local(10, "a"), local(4, "b"), local(12, "c", name = "Different"))
+            listOf(local(10, "a"), local(4, "b"), local(12, "c", name = "Different")),
+            liveUuids = emptySet()
         )
         assertEquals(mapOf(10L to 4L), merges)
+    }
+
+    /** Anyone assigned to a project can rename it to another project's name and location. */
+    @Test
+    fun localDuplicates_twoProjectsInTheCloudAreNeverMerged() {
+        val rows = listOf(local(4, "renamed"), local(10, "real"))
+        assertTrue(ProjectReconciler.localDuplicates(rows, liveUuids = setOf("renamed", "real")).isEmpty())
+    }
+
+    @Test
+    fun localDuplicates_aRowNotInTheCloudJoinsTheOneThatIs() {
+        val rows = listOf(local(4, "restored"), local(10, "cloud"), local(11, "restored-too"))
+        assertEquals(mapOf(4L to 10L, 11L to 10L), ProjectReconciler.localDuplicates(rows, liveUuids = setOf("cloud")))
     }
 }

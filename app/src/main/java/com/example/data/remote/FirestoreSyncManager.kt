@@ -212,11 +212,12 @@ class FirestoreSyncManager(
      * may instead have been unassigned; see [handleMissingProject].
      */
     private suspend fun reconcile(docs: List<DocumentSnapshot>, fromServer: Boolean, myUid: String, isSuperAdmin: Boolean) {
-        ProjectDuplicateMerger.merge(db)
-
         val projectDao = db.projectDao()
-        val locals = projectDao.getAllProjectsList()
         val liveDocs = docs.filter { it.getBoolean("isDeleted") != true && it.getString("name") != null }
+        // A cached snapshot may not hold every document yet, and a project whose own document is live must never be
+        // merged into another or moved to another's document by its name: both wait for the server's list.
+        if (fromServer) ProjectDuplicateMerger.merge(db, liveDocs.map { it.id }.toSet())
+        val locals = projectDao.getAllProjectsList()
         val remoteRefs = docs.map { doc ->
             ProjectReconciler.RemoteRef(
                 uuid = doc.id,
@@ -234,7 +235,7 @@ class FirestoreSyncManager(
             projectDao.deleteProjectById(id)
             Log.d(tag, "Reconciled remote tombstone deletion for local project $id")
         }
-        for ((id, uuid) in plan.adoptUuid) {
+        if (fromServer) for ((id, uuid) in plan.adoptUuid) {
             val oldUuid = locals.firstOrNull { it.id == id }?.projectUuid
             val sql = db.openHelper.writableDatabase
             db.runInTransaction {

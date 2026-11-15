@@ -377,11 +377,6 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         // Start realtime sync if user is already logged in (AuthStateListener in FirestoreSyncManager
         // will also trigger this automatically when Firebase Auth token is ready)
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                com.example.data.local.ProjectDuplicateMerger.merge(database)
-            } catch (e: Exception) {
-                android.util.Log.w("ProjectViewModel", "Duplicate project merge skipped: ${e.message}")
-            }
             if (_isLoggedIn.value) {
                 try {
                     firestoreSyncManager.startRealtimeSync()

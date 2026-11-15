@@ -6,8 +6,12 @@ import com.example.data.remote.ProjectReconciler
 
 /**
  * Collapses local project rows that describe the same project (same name + location)
- * into the oldest row. Child records are moved onto the kept row before the
+ * into one row. Child records are moved onto the kept row before the
  * duplicate is deleted, so no inspections, payments or reports are lost.
+ *
+ * A row whose own cloud document is live is never merged away
+ * ([ProjectReconciler.localDuplicates]): its records would be uploaded again under the
+ * kept project, for that project's assigned accounts to read.
  */
 object ProjectDuplicateMerger {
 
@@ -19,11 +23,12 @@ object ProjectDuplicateMerger {
         "sdp_lot_progress", "sdp_lot_inspections", "developer_requests", "contractor_letters", "project_abstracts"
     )
 
-    /** Returns the number of duplicate rows removed. */
-    suspend fun merge(db: AppDatabase): Int {
+    /** [liveUuids]: the projects the server says are live. Returns the number of duplicate rows removed. */
+    suspend fun merge(db: AppDatabase, liveUuids: Set<String>): Int {
         val projects = db.projectDao().getAllProjectsList()
         val merges = ProjectReconciler.localDuplicates(
-            projects.map { ProjectReconciler.LocalRef(it.id, it.projectUuid, ProjectReconciler.key(it.name, it.location)) }
+            projects.map { ProjectReconciler.LocalRef(it.id, it.projectUuid, ProjectReconciler.key(it.name, it.location)) },
+            liveUuids
         )
         if (merges.isEmpty()) return 0
 

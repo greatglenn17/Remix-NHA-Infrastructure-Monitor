@@ -305,7 +305,8 @@ class RecordSyncRemovalTest {
         db.projectDao().insertPendingDocument(doc)
         db.syncOutboxDao().enqueue(SyncOutboxEvent(entityType = Attachments.ENTITY_TYPE, entityUuid = "${duplicate.projectUuid}/$name", operation = "UPSERT", revision = 1, payloadJson = "{}"))
 
-        assertEquals(1, ProjectDuplicateMerger.merge(db))
+        assertEquals("both in the cloud: they stay apart", 0, ProjectDuplicateMerger.merge(db, setOf(keep.projectUuid, duplicate.projectUuid)))
+        assertEquals(1, ProjectDuplicateMerger.merge(db, setOf(keep.projectUuid)))
 
         assertEquals(keepId.toInt(), count("SELECT projectId FROM pending_documents WHERE uuid = ?", doc.uuid))
         assertEquals("nhafile:${keep.projectUuid}/$name", stringOf("SELECT fileUrl FROM pending_documents WHERE uuid = ?", doc.uuid))
