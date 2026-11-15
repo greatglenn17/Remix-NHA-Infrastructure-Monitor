@@ -1,8 +1,8 @@
 {
-  "versionCode": 303,
-  "versionName": "2.8.23",
-  "releaseNotes": "v2.8.23: On both printed abstracts, the contract duration, date started and completion date are at the top right of the header, with a blank line before the target accomplishment.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.23/NHA_Monitor_v2.8.23_Build303.apk",
-  "apkSha256": "51efe28ab0908a6237381a09fb1fd01466860054c16563c4b4ed077677e9cdb8",
+  "versionCode": 304,
+  "versionName": "2.8.24",
+  "releaseNotes": "v2.8.24: The Actual tab's pay items are a table, and the tab has a Monthly abstract: pick a date; previous is the abstract at the end of the month before. Print abstract has no BALANCE columns. The weekly report takes its target from the approved bar chart and its actual from the latest abstract, with boxes only where there is none.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.24/NHA_Monitor_v2.8.24_Build304.apk",
+  "apkSha256": "3321e5046c44957bef970a3a8f3eda0e7ad2426ff1daa173a3cab87abaf2c269",
   "isMandatory": true
 }
