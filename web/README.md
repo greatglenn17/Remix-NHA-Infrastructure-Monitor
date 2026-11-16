@@ -67,8 +67,7 @@ is read only.
   - **This billing** is typed in the boxes above the sheet and never saved: "Period covered", "Land acquisition
     (lots)", "Land development (lots)", "Milestone 1 (units)" and "Milestone 2 (units)". A line the abstract has no
     amount for has no box. Lots and units become an amount as quantity x (line amount / the project's Number of Units,
-    else its saleable lots), at 2 decimals. The phone still takes land development as an amount, started from the
-    abstract's own THIS PERIOD amount (`ProjectAbstracts.periodAmounts`). A blank, unreadable or negative figure is 0. Only
+    else its saleable lots), at 2 decimals. A blank, unreadable or negative figure is 0. Only
     the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
     leaving the page.
   - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
