@@ -1528,8 +1528,8 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   // Previous: the saved billings dated on or before the As-of date (March 14); the one of April 1 is not in it, the one of the day is.
   const saved = [...payments, { uuid: 'c', billingType: 'Land development', grossAmount: 1, date: '2025-04-01' }, { uuid: 'd', billingType: 'M1 - Housing unit', grossAmount: 56000, date: ' 2025-03-14 ' },
     { uuid: 'e', billingType: 'Land development', grossAmount: 9, date: '' }];
-  // Typed for this billing: 5 lots, the abstract's 104,000 of land development, 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
-  const period = { covered: 'March 1 - 14, 2025', lots: 5, development: L.abstractPeriodAmounts(uploaded)[1], m1: 2, m2: 1 };
+  // Typed for this billing: 5 lots, 5.2 lots of land development (104,000), 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
+  const period = { covered: 'March 1 - 14, 2025', lots: 5, development: 5.2, m1: 2, m2: 1 };
   const abstract = L.billingAbstract(project, [], saved, uploaded, period, 100);
   assert.equal(abstract.targetPct, 12); // no bar chart: the project's stored target
   assert.deepEqual(abstract.parts.map(p => [p.name, p.heading]), [['Land Acquisition Cost', undefined], ['Land Development', undefined], ['Housing Construction', ['3', 'HOUSING CONSTRUCTION']]]);
@@ -1541,6 +1541,9 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   ]);
   // A blank, unreadable or negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
   assert.deepEqual(L.billingAbstract(project, [], [], uploaded, { covered: '', lots: 1, development: -5, m1: 'x', m2: '' }, 3).parts.flatMap(p => p.lines.map(l => l.thisPeriod)), [333333.33, 0, 0, 0]);
+  // Land development is typed in lots too: 40 of 370 lots of 31,820,000 (86,000 a lot) are 3,440,000.
+  const dev = { ...uploaded, rowsJson: JSON.stringify([{ kind: 'part', name: 'LAND DEVELOPMENT' }, { kind: 'subtotal', amount: 31820000 }]) };
+  assert.deepEqual(L.billingAbstract(project, [], [], dev, { development: 40 }, 370).parts.flatMap(p => p.lines.map(l => l.thisPeriod)), [3440000]);
   // The target is the bar chart's plan on the As-of date when the project has one.
   assert.equal(L.billingAbstract({ dateStarted: '2025-01-01', targetAccomplishment: 12, barChartJson: JSON.stringify([{ effective: '', items: [{ name: 'Roads', amount: 60, bars: [[1, 100]] }, { name: 'Housing units', amount: 40, bars: [[51, 150]] }] }]) },
     [], [], uploaded, period, 100).targetPct, 53);

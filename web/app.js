@@ -3998,16 +3998,15 @@ function drawAbstractPrint(c) {
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
   if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
   document.title = `Billing Abstract - As of ${L.displayDate(asOf)}`; // not the detailed abstract's name, so the two PDFs do not replace each other
-  const [acquisition, development, housing] = L.abstractLineAmounts(abstract), start = L.abstractPeriodAmounts(abstract)[1];
-  // Land development starts from the abstract's own this-period amount; the rest start empty (0).
-  const typed = page.billing ??= { covered: '', lots: '', development: start > 0 ? start.toFixed(2) : '', m1: '', m2: '' };
+  const [acquisition, development, housing] = L.abstractLineAmounts(abstract);
+  const typed = page.billing ??= { covered: '', lots: '', development: '', m1: '', m2: '' };
   const box = (name, label, attrs = ' inputmode="decimal" placeholder="0"') => `<label class="field">${label}<input name="${name}" autocomplete="off" value="${esc(typed[name])}"${attrs}></label>`;
   // The box being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
   const active = document.activeElement?.closest?.('#apa-typed') ? document.activeElement : null;
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     ${section('This billing', 'receipt_long', `<div class="apa-typed" id="apa-typed">${box('covered', 'Period covered', '')}
-        ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (amount)') : ''}
+        ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (lots)') : ''}
         ${housing > 0 ? box('m1', 'Milestone 1 (units)') + box('m2', 'Milestone 2 (units)') : ''}</div>
       <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>`, 'no-print')}
     <div class="bb-scroll"><div class="bb full land" id="sheet"></div></div>`;
