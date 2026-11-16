@@ -121,7 +121,7 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithTag("upload_abstract").assertDoesNotExist()
     }
 
-    // "Print billing abstract": this billing's figures are typed, land development starting from the abstract's own this-period amount.
+    // "Print billing abstract": this billing's figures are typed, land development in lots and not started from the abstract's own this-period amount.
     @Test fun tab_printsTheBillingAbstractFromTheTypedFigures() {
         val withPeriod = abstract.copy(rowsJson = abstract.rowsJson.replace(""""period":[null,null,null],"toDate":[null,504000,25.21]""", """"period":[null,104000,5.2],"toDate":[null,504000,25.21]"""))
         var printed: Pair<ProjectAbstract, BillingAbstract.Period>? = null
@@ -135,12 +135,13 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithText("This billing").assertExists()
         rule.onNodeWithText("Previous is what the billings saved up to Mar 14, 2025 came to. Nothing typed here is saved.").assertExists()
         rule.onNodeWithTag("billing_lots").assertDoesNotExist() // the abstract has no land acquisition
-        rule.onNodeWithTag("billing_development").assert(hasText("104000.00"))
+        rule.onNodeWithTag("billing_development").assert(hasText("Land development (lots)")).assert(!hasText("104000.00"))
+        rule.onNodeWithTag("billing_development").performTextReplacement("5.2")
         rule.onNodeWithTag("billing_covered").performTextReplacement("March 1 - 14, 2025")
         rule.onNodeWithTag("billing_m1").performTextReplacement("2")
         rule.onNodeWithTag("billing_m2").performTextReplacement("two") // unreadable: 0
         rule.onNodeWithTag("confirm_print_billing_abstract").performClick()
-        assertEquals(withPeriod to BillingAbstract.Period("March 1 - 14, 2025", 0.0, 104000.0, 2.0, 0.0), printed)
+        assertEquals(withPeriod to BillingAbstract.Period("March 1 - 14, 2025", 0.0, 5.2, 2.0, 0.0), printed)
         rule.onNodeWithText("This billing").assertDoesNotExist()
     }
 

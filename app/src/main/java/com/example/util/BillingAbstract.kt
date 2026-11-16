@@ -94,7 +94,7 @@ object BillingAbstract {
 
     /**
      * This billing as typed on the tab, never saved: the period [covered], the land acquisition [lots], the land
-     * [development] amount in pesos, and the Milestone 1 and 2 housing units. A negative figure counts as 0.
+     * [development] lots, and the Milestone 1 and 2 housing units. A negative figure counts as 0.
      */
     data class Period(val covered: String = "", val lots: Double = 0.0, val development: Double = 0.0, val m1: Double = 0.0, val m2: Double = 0.0)
 
@@ -120,7 +120,7 @@ object BillingAbstract {
             targetPct = asOf?.let { BarChart.targetOn(project, documents, it) } ?: project.targetAccomplishment,
             parts = listOf(
                 Part("Land Acquisition Cost", null, listOf(counted("1", "LAND ACQUISITION COST", "LOT", HOUSING_BILLING_TYPES[0], acquisition, period.lots))),
-                Part("Land Development", null, listOf(line("2", "LAND DEVELOPMENT", "LOT", HOUSING_BILLING_TYPES[1], development, period.development.coerceAtLeast(0.0)))),
+                Part("Land Development", null, listOf(counted("2", "LAND DEVELOPMENT", "LOT", HOUSING_BILLING_TYPES[1], development, period.development))),
                 Part("Housing Construction", "3" to "HOUSING CONSTRUCTION", listOf(
                     counted("3.1", "MILESTONE 1 (80%)", "UNIT", HOUSING_BILLING_TYPES[2], m1, period.m1),
                     counted("3.2", "MILESTONE 2 (20%)", "UNIT", HOUSING_BILLING_TYPES[3], round2(housing - m1), period.m2)

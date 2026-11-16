@@ -155,8 +155,7 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
     val amounts = remember(abstract.rowsJson) { ProjectAbstracts.lineAmounts(abstract) }
     var covered by remember { mutableStateOf("") }
     var lots by remember { mutableStateOf("") }
-    // Land development starts from the abstract's own this-period amount; the rest start empty (0).
-    var development by remember { mutableStateOf(ProjectAbstracts.periodAmounts(abstract)[1].takeIf { it > 0 }?.let { "%.2f".format(Locale.US, it) }.orEmpty()) }
+    var development by remember { mutableStateOf("") }
     var m1 by remember { mutableStateOf("") }
     var m2 by remember { mutableStateOf("") }
     // A blank or unreadable number is 0, and so is a negative.
@@ -173,7 +172,7 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FigureBox("Period covered", covered, "billing_covered", number = false) { covered = it }
                 if (amounts[0] > 0) FigureBox("Land acquisition (lots)", lots, "billing_lots") { lots = it }
-                if (amounts[1] > 0) FigureBox("Land development (amount)", development, "billing_development") { development = it }
+                if (amounts[1] > 0) FigureBox("Land development (lots)", development, "billing_development") { development = it }
                 if (amounts[2] > 0) {
                     FigureBox("Milestone 1 (units)", m1, "billing_m1") { m1 = it }
                     FigureBox("Milestone 2 (units)", m2, "billing_m2") { m2 = it }
