@@ -143,8 +143,8 @@ class BillingAbstractTest {
         // Previous: the saved billings dated on or before the As-of date (March 14); the one of April 1 is not in it, the one of the day is.
         val saved = payments + billing(4, "Land development", 1.0, "2025-04-01") + billing(5, "M1 - Housing unit", 56_000.0, " 2025-03-14 ") +
             billing(6, "Land development", 9.0, "")
-        // Typed for this billing: 5 lots, the abstract's 104,000 of land development, 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
-        val period = BillingAbstract.Period("March 1 - 14, 2025", lots = 5.0, development = ProjectAbstracts.periodAmounts(uploaded)[1], m1 = 2.0, m2 = 1.0)
+        // Typed for this billing: 5 lots, 5.2 lots of land development (104,000), 2 units at Milestone 1 and 1 at Milestone 2, of 100 units.
+        val period = BillingAbstract.Period("March 1 - 14, 2025", lots = 5.0, development = 5.2, m1 = 2.0, m2 = 1.0)
         val abstract = BillingAbstract.of(project, emptyList(), saved, uploaded, period, 100)
         assertEquals(12.0, abstract.targetPct, 0.0) // no bar chart: the project's stored target
         assertEquals(listOf("Land Acquisition Cost" to null, "Land Development" to null, "Housing Construction" to ("3" to "HOUSING CONSTRUCTION")), abstract.parts.map { it.name to it.heading })
@@ -162,6 +162,9 @@ class BillingAbstractTest {
             listOf(333_333.33, 0.0, 0.0, 0.0),
             BillingAbstract.of(project, emptyList(), emptyList(), uploaded, BillingAbstract.Period(lots = 1.0, development = -5.0, m1 = -2.0), 3).parts.flatMap { it.lines }.map { it.thisPeriod }
         )
+        // Land development is typed in lots too: 40 of 370 lots of 31,820,000 (86,000 a lot) are 3,440,000.
+        val dev = uploaded.copy(rowsJson = ProjectAbstracts.rowsJson(listOf(row("part", "2", "LAND DEVELOPMENT"), row("subtotal", "", "Subtotal (Land Development)", 31_820_000.0))))
+        assertEquals(listOf(3_440_000.0), BillingAbstract.of(project, emptyList(), emptyList(), dev, BillingAbstract.Period(development = 40.0), 370).parts.flatMap { it.lines }.map { it.thisPeriod })
         // The target is the bar chart's plan on the As-of date when the project has one.
         val charted = project.copy(dateStarted = "2025-01-01", barChartJson = """[{"effective":"","items":[{"name":"Roads","amount":60,"bars":[[1,100]]},{"name":"Housing units","amount":40,"bars":[[51,150]]}]}]""")
         assertEquals(53.0, BillingAbstract.of(charted, emptyList(), emptyList(), uploaded, period, 100).targetPct, 0.0)
@@ -177,7 +180,7 @@ class BillingAbstractTest {
         fun sheet(period: BillingAbstract.Period) = BlueBookForms.billingAbstract(
             project, emptyList(), saved, abstract, period, 100, Signatories("Juan", "Engineer", "", "District Manager", "", "Regional Manager")
         )
-        val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 310_000.0))
+        val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 15.5))
         fun has(vararg cells: String, page: String = html) =
             assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(page))
         assertTrue(html.contains("<div class='period'>Period covered: February 1 - 28, 2025</div>"))
@@ -185,7 +188,7 @@ class BillingAbstractTest {
         assertTrue(!html.contains("equivalent", ignoreCase = true)) // the billing format has no equivalent-units columns
         // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
         has("1", "LAND ACQUISITION COST", "100", "LOT", "10,000.00", "1,000,000.00", "40", "400,000.00", "40.00%", "0", "0.00", "0.00%", "40", "400,000.00", "40.00%")
-        // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
+        // Land development is typed in lots, as land acquisition is: 15.5 lots at 20,000 a lot are 310,000.
         has("2", "LAND DEVELOPMENT", "100", "LOT", "20,000.00", "2,000,000.00", "0", "0.00", "0.00%", "15.5", "310,000.00", "15.50%", "15.5", "310,000.00", "15.50%")
         has("3.1", "MILESTONE 1 (80%)", "100", "UNIT", "56,000.00", "5,600,000.00")
         // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
