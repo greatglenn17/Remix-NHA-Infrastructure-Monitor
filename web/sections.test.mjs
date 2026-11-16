@@ -403,14 +403,14 @@ test('billing abstract: each line as quantity, amount and share before, in this 
     { uuid: 'late', billingType: 'Land development', grossAmount: 99, date: '2025-03-15' }];
   const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
   const sheet = period => P.billingAbstractHtml({ project, docs: [], payments, abstract, period, units: 100, signatories });
-  const html = sheet({ covered: ' February 1 - 28, 2025 ', lots: 0, development: 310000, m1: 0, m2: 0 });
+  const html = sheet({ covered: ' February 1 - 28, 2025 ', lots: 0, development: 15.5, m1: 0, m2: 0 });
   const row = (...cells) => new RegExp(cells.map(c => `>${c.replace(/[.()%]/g, '\\$&')}</td>`).join('<td[^>]*'));
   assert.match(html, /<div class='period'>Period covered: February 1 - 28, 2025<\/div>/);
   assert.match(sheet({ covered: ' ', lots: 0, development: 0, m1: 0, m2: 0 }), /<div class='period'>As of March 14, 2025<\/div>/); // no period typed
   assert.ok(!/equivalent/i.test(html)); // the billing format has no equivalent-units columns
   // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
   assert.match(html, row('1', 'LAND ACQUISITION COST', '100', 'LOT', '10,000.00', '1,000,000.00', '40', '400,000.00', '40.00%', '0', '0.00', '0.00%', '40', '400,000.00', '40.00%'));
-  // Land development is typed as an amount: 310,000 at 20,000 a lot is 15.5 lots.
+  // Land development is typed in lots, as land acquisition is: 15.5 lots at 20,000 a lot are 310,000.
   assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%'));
   assert.match(html, row('3.1', 'MILESTONE 1 (80%)', '100', 'UNIT', '56,000.00', '5,600,000.00'));
   // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.

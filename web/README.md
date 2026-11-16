@@ -65,10 +65,10 @@ is read only.
   - **Previous** is the gross of the saved billings of that billing type dated on or before the abstract's "As of"
     date (a billing without a date is not counted).
   - **This billing** is typed in the boxes above the sheet and never saved: "Period covered", "Land acquisition
-    (lots)", "Land development (amount)", "Milestone 1 (units)" and "Milestone 2 (units)". A line the abstract has no
+    (lots)", "Land development (lots)", "Milestone 1 (units)" and "Milestone 2 (units)". A line the abstract has no
     amount for has no box. Lots and units become an amount as quantity x (line amount / the project's Number of Units,
-    else its saleable lots), at 2 decimals; land development is typed as an amount and starts from the abstract's own
-    THIS PERIOD amount for that part (`L.abstractPeriodAmounts`). A blank, unreadable or negative figure is 0. Only
+    else its saleable lots), at 2 decimals. The phone still takes land development as an amount, started from the
+    abstract's own THIS PERIOD amount (`ProjectAbstracts.periodAmounts`). A blank, unreadable or negative figure is 0. Only
     the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
     leaving the page.
   - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the

@@ -1342,7 +1342,7 @@ export const abstractUnits = (project, saleable = 0) => Number.parseInt(String(p
  * amount has its lines { no, name, unit, type, amount, previous, thisPeriod }. The amounts are the abstract's own
  * (abstractLineAmounts), housing as Milestone 1 (80%) and Milestone 2 (20%). `previous` is the gross of the saved
  * billings of that type dated on or before the abstract's "As of" date. `thisPeriod` is typed and never saved:
- * `period` is { covered, lots, development, m1, m2 }, this billing's land acquisition lots, land development amount
+ * `period` is { covered, lots, development, m1, m2 }, this billing's land acquisition lots, land development lots
  * and Milestone 1 and 2 housing units; a quantity is an amount as quantity x (line amount / `units`), and anything
  * that is not a number above 0 counts as 0. `targetPct` is the plan on the "As of" date.
  */
@@ -1359,7 +1359,7 @@ export function billingAbstract(project, docs, payments, abstract, period, units
     targetPct: plannedTarget(project, docs, abstract.asOf) ?? (Number(project.targetAccomplishment) || 0),
     parts: [
       { name: 'Land Acquisition Cost', lines: [counted('1', 'LAND ACQUISITION COST', 'LOT', HOUSING_BILLING_TYPES[0], acquisition, period.lots)] },
-      { name: 'Land Development', lines: [line('2', 'LAND DEVELOPMENT', 'LOT', HOUSING_BILLING_TYPES[1], development, typed(period.development))] },
+      { name: 'Land Development', lines: [counted('2', 'LAND DEVELOPMENT', 'LOT', HOUSING_BILLING_TYPES[1], development, period.development)] },
       { name: 'Housing Construction', heading: ['3', 'HOUSING CONSTRUCTION'], lines: [
         counted('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], m1, period.m1), counted('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - m1), period.m2)] },
     ].filter(part => part.lines.some(l => l.amount > 0)),
