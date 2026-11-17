@@ -251,7 +251,7 @@ The content column is centred at 1320px max width, with 24px side padding (16px 
 
 ## Elevation & Depth
 
-Flat, with tonal layering. Depth comes from dark translucent panels over the dot grid plus a 1px white 8% hairline. There are no shadows. Project cards rise 2px on hover and their border turns 40% blue (150ms, none under reduced motion). Dialogs sit on a 60% black backdrop.
+Flat, with tonal layering. Depth comes from dark translucent panels over the dot grid plus a 1px white 8% hairline. There are no shadows. Project cards rise 2px on hover and their border turns 40% blue (150ms, none under reduced motion). Dialogs sit on a 60% black backdrop. Every question the site asks is its own small dialog, never the browser's: the question as its title, what it means under it, then Cancel (focused, so Enter and Esc keep things as they are) and the action named on its button ("Delete billing", "Delete SDP v2"), a rose filled button when it destroys. Unsaved edits ask "Discard your changes to …?" with Keep editing and Discard; a notice has OK alone.
 
 ### Shadow Vocabulary
 - None. Panels separate from the canvas by colour and hairline.

@@ -71,6 +71,40 @@ const s = {
 /** Escapes text for HTML; every value from Firestore goes through it. */
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icon = (name, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${name}</span>`;
+/**
+ * The house confirm, in place of the browser's: a small dialog with the question, what it means, Cancel (focused, so
+ * Enter or Esc keeps things as they are) and the action named on its button ("Delete billing"), rose when it destroys.
+ * Resolves true when the action is chosen.
+ */
+function ask(question, { action = 'OK', cancel = 'Cancel', danger = false, detail = '' } = {}) {
+  if (cancel && document.querySelector('dialog.ask[data-question]')) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const d = document.createElement('dialog');
+    d.className = 'help ask';
+    if (cancel) d.dataset.question = '';
+    d.innerHTML = `<h2>${esc(question)}</h2>${detail ? `<p>${esc(detail)}</p>` : ''}
+      <div class="actions">${cancel ? `<button type="button" class="text-btn" data-no>${esc(cancel)}</button>` : ''}<button type="button" class="btn${danger ? ' danger' : ''}" data-yes>${esc(action)}</button></div>`;
+    const finish = ok => {
+      d.close(); d.remove(); resolve(ok);
+      if (s.page?.redraw) { s.page.redraw = false; setTimeout(() => drawProject(s.page)); }
+    };
+    if (cancel) d.querySelector('[data-no]').onclick = () => finish(false);
+    d.querySelector('[data-yes]').onclick = () => finish(true);
+    d.addEventListener('cancel', e => { e.preventDefault(); finish(false); });
+    document.body.append(named(d));
+    d.showModal();
+    d.querySelector(cancel ? '[data-no]' : '[data-yes]').focus();
+  });
+}
+/** The house alert: a short title, what happened under it, and OK. */
+const tell = (title, detail = '') => ask(title, { action: 'OK', cancel: null, detail });
+const DISCARD = { action: 'Discard', cancel: 'Keep editing', danger: true };
+/** A delete or remove question, "Delete X? What goes. This cannot be undone.", asked with its first sentence as the title. */
+function askDanger(text, action = text.split(' ')[0]) {
+  const cut = text.lastIndexOf('? ');
+  return ask(cut < 0 ? text : text.slice(0, cut + 1), { action, danger: true, detail: cut < 0 ? '' : text.slice(cut + 2) });
+}
+
 let dialogCount = 0;
 /** Names a dialog by its heading, so a screen reader announces it. */
 const named = d => { const h = d.querySelector('h2'); if (h) { h.id ||= `dialog-title-${++dialogCount}`; d.setAttribute('aria-labelledby', h.id); } return d; };
@@ -343,7 +377,7 @@ async function editProfile() {
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ name: form.fullName.value.trim(), position: form.position.value.trim(), office: form.office.value.trim() });
   const initial = JSON.stringify(values());
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to your profile?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask('Discard your changes to your profile?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -598,7 +632,7 @@ function projectForm(c = null) {
   draw();
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm(project ? 'Discard your changes to this project?' : 'Discard this new project?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask(project ? 'Discard your changes to this project?' : 'Discard this new project?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -665,7 +699,7 @@ async function assignForm(c) {
   const values = () => [...list.querySelectorAll('input:checked')].map(i => i.value);
   let initial = '[]';
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the assignment?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask('Discard your changes to the assignment?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   document.body.append(named(d));
@@ -929,6 +963,7 @@ const CHIPS = {
 
 function drawProject(page) {
   if (page !== s.page) return;
+  if (document.querySelector('dialog.ask[data-question]')) { page.redraw = true; return; }
   const { project: stored, records, error } = page;
   if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
   // Until both the project and its records have answered: an empty records list would read as "none yet".
@@ -1150,7 +1185,7 @@ const curveTable = version => table(['Month', { text: 'Monthly', num: true }, { 
 function barChartForm(c) {
   const { project, documents } = c;
   const drafts = L.chartDrafts(project);
-  if (!drafts) { alert('Set the project\'s start date first; the bar chart counts its days from it.'); return; }
+  if (!drafts) { tell('Set the start date first', 'The bar chart counts its days from the project\'s start date.'); return; }
   let selected = drafts.length - 1, notes = [], sheets = []; // what the last import said; the chart sheets of a workbook with several
   const initial = L.chartJson(drafts);
   const d = document.createElement('dialog');
@@ -1255,7 +1290,7 @@ function barChartForm(c) {
   };
   draw();
   const done = () => { d.close(); d.remove(); };
-  const close = () => (L.chartJson(drafts) === initial || confirm('Discard your changes to the bar chart?')) && done();
+  const close = async () => (L.chartJson(drafts) === initial || await ask('Discard your changes to the bar chart?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -1604,7 +1639,7 @@ function editLot(c, lot) {
   const changed = () => JSON.stringify(values()) !== initial || form.photos.files.length > 0;
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (!changed() || confirm('Discard your changes to this lot?')) && done();
+  const close = async () => (!changed() || await ask('Discard your changes to this lot?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -1722,14 +1757,14 @@ function groupProgress(c, lots, done) {
 async function groupUse(c, lots, select, done) {
   const use = select.value, edits = L.lotsUseSave(lots, use, lotWho(c));
   select.value = '';
-  if (!edits.length) { alert(`The lots picked are already ${use}.`); return; }
-  if (!confirm(`Mark ${plural(edits.length, 'lot')} as ${use}?`)) return;
-  if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); return; }
+  if (!edits.length) { tell('Nothing to change', `The lots picked are already ${use}.`); return; }
+  if (!await ask(`Mark ${plural(edits.length, 'lot')} as ${use}?`, { action: `Mark ${plural(edits.length, 'lot')}` })) return;
+  if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then try again.'); return; }
   try {
     for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot');
     done();
   } catch (x) {
-    alert(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
+    tell('Not saved', L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
     drawProject(c.page);
   }
 }
@@ -1769,7 +1804,7 @@ function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
   const who = () => ({ user: s.profile.name || s.user.email, at: nowStamp() });
   const done = () => { d.close(); d.remove(); };
   // A lot not saved yet keeps its corners on the plan, so closing its form loses nothing.
-  const close = () => (!lot || JSON.stringify(values()) === initial || confirm('Discard your changes to this lot?')) && done();
+  const close = async () => (!lot || JSON.stringify(values()) === initial || await ask('Discard your changes to this lot?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   bindDelete(d, `Remove ${label}? The lot is taken off the plan on this website and on every phone. Its progress and billing history stay in the audit log.`, async () => {
@@ -1828,7 +1863,7 @@ function planForm(c) {
   form.onchange = () => { if (site) { d.querySelector('[data-site]').hidden = !fresh(); d.querySelector('[data-revised]').hidden = fresh(); } };
   const done = () => { d.close(); d.remove(); };
   const dirty = () => [el.planName, el.description, el.newSite, el.currentSiteName].some(i => i?.value) || el.pdf.files.length > 0;
-  const close = () => (!dirty() || confirm('Discard this plan?')) && done();
+  const close = async () => (!dirty() || await ask('Discard this plan?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -1947,7 +1982,7 @@ async function findLots(c, site, el) {
     foundLotsDialog(c, site, areas, [scan.page.width, scan.page.height]);
   } catch (x) {
     console.error('Find lots: the plan PDF could not be read', x);
-    alert(`The plan PDF could not be read in this browser (${x.code || x.message || x}).`);
+    tell('The plan PDF could not be read', `This browser could not open it (${x.code || x.message || x}). Try another copy of the PDF.`);
   }
   el.disabled = false;
   el.innerHTML = `${icon('search', 'sm')}Find lots`;
@@ -2002,13 +2037,13 @@ function foundLotsDialog(c, site, areas, page) {
 
 // One click on the plan's tools with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
 async function planAct(c, el, run) {
-  if (!navigator.onLine) { alert('You are offline. Connect to the internet, then try again.'); drawProject(c.page); return; }
+  if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then try again.'); drawProject(c.page); return; }
   if (el) el.disabled = true;
   try {
     await run();
     Object.assign(lotState(c.page), { sel: null, more: false, view: null, frame: null, renum: null });
   } catch (x) {
-    alert(L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.'));
+    tell('Not saved', L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.'));
   }
   drawProject(c.page);
 }
@@ -2045,17 +2080,17 @@ function bindPlanTools(c) {
   bind('frame-fit', 'onclick', el => act(el, () => saveEdit(c, site.plan, { frame: '' }, 'plan', null)));
   bind('plan-site', 'onclick', () => ownSiteForm(c, sites, site));
   bind('lots-find', 'onclick', el => findLots(c, site, el));
-  bind('lots-unfind', 'onclick', el => {
+  bind('lots-unfind', 'onclick', async el => {
     const found = site.lots.filter(L.foundLot), n = found.filter(l => !l.progress).length, kept = found.length - n;
-    if (confirm(`Remove ${plural(n, 'found lot')}? Lots Find lots added that have no progress yet are taken off the plan on every phone and the website. Lots you added yourself or renumbered stay${
-      kept ? `, and so ${kept === 1 ? 'does' : 'do'} the ${plural(kept, 'found lot')} that already ${kept === 1 ? 'has' : 'have'} progress` : ''}. Find lots can add them again.`)) {
+    if (await askDanger(`Remove ${plural(n, 'found lot')}? Lots Find lots added that have no progress yet are taken off the plan on every phone and the website. Lots you added yourself or renumbered stay${
+      kept ? `, and so ${kept === 1 ? 'does' : 'do'} the ${plural(kept, 'found lot')} that already ${kept === 1 ? 'has' : 'have'} progress` : ''}. Find lots can add them again.`, `Remove ${plural(n, 'lot')}`)) {
       act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); });
     }
   });
   bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
-  bind('plan-delete', 'onclick', el => {
+  bind('plan-delete', 'onclick', async el => {
     const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
-    if (confirm(`Delete SDP v${site.plan.version ?? 1}${of}? This removes the plan and its ${plural(site.lots.length, 'lot')}, with their progress, billing and inspection records, from every phone and the website. This cannot be undone.`)) {
+    if (await askDanger(`Delete SDP v${site.plan.version ?? 1}${of}? This removes the plan and its ${plural(site.lots.length, 'lot')}, with their progress, billing and inspection records, from every phone and the website. This cannot be undone.`, `Delete SDP v${site.plan.version ?? 1}`)) {
       act(el, () => deletePlan(c, site.plan));
     }
   });
@@ -2227,10 +2262,10 @@ async function bindLots(c) {
       // An outline being edited is saved onto its lot, with no form: only its corners (and an area nobody typed) change.
       const lot = site.lots.find(l => l.uuid === st.draw.lot), saved = lot && L.lotOutline(lot, [...st.draw], page, scale, lotWho(c));
       if (!lot) { st.draw = null; drawProject(c.page); return; }
-      if (!navigator.onLine) { alert('You are offline. Connect to the internet, then save again.'); return; }
+      if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then save again.'); return; }
       e.target.disabled = true;
       saveEdit(c, lot, saved.changes, 'lot', saved.audit).then(() => { Object.assign(st, { draw: null, view: null, sel: lot.uuid }); drawProject(c.page); },
-        x => { alert(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.')); e.target.disabled = false; });
+        x => { tell('Not saved', L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.')); e.target.disabled = false; });
     };
   }
   paint();
@@ -2564,7 +2599,7 @@ function editIssue(c, issue) {
   const initial = JSON.stringify(values());
   // rememberDiscardGuard: closing with unsaved changes asks first.
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm(isNew ? 'Discard this new issue?' : 'Discard your changes to this issue?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask(isNew ? 'Discard this new issue?' : 'Discard your changes to this issue?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -2681,7 +2716,7 @@ function addOrder(c, type, continued = '') {
   const snapshot = () => JSON.stringify(orderValues(form));
   const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
-  const close = () => (snapshot() === initial || confirm('Discard this new order?')) && done();
+  const close = async () => (snapshot() === initial || await ask('Discard this new order?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -2734,7 +2769,7 @@ function editOrder(c, o) {
   const snapshot = () => JSON.stringify([form.status.value, form.remarks.value]);
   const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
-  const close = () => (snapshot() === initial || confirm('Discard your changes to this order?')) && done();
+  const close = async () => (snapshot() === initial || await ask('Discard your changes to this order?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   const more = d.querySelector('[data-continue]');
@@ -2785,7 +2820,7 @@ function relatedFile(c, file) {
   const snapshot = () => JSON.stringify(textFields(form));
   const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
-  const close = () => ((snapshot() === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new document?' : 'Discard your changes to this file?')) && done();
+  const close = async () => ((snapshot() === initial && !hasPicked(form)) || await ask(isNew ? 'Discard this new document?' : 'Discard your changes to this file?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   // The phone logs nothing for a deleted document.
@@ -2847,7 +2882,7 @@ function editRequest(c, r) {
   const snapshot = () => JSON.stringify(isNew ? order() : values());
   const initial = snapshot();
   const done = () => { d.close(); d.remove(); };
-  const close = () => ((snapshot() === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new request?' : 'Discard your changes to this request?')) && done();
+  const close = async () => ((snapshot() === initial && !hasPicked(form)) || await ask(isNew ? 'Discard this new request?' : 'Discard your changes to this request?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   bindDelete(d, `Delete this ${r.requestType || ''} request? This cannot be undone.`, () => saveEdits(c, [[r, null, L.deletedRequestAudit(r)]], 'request'));
   const packedToday = d.querySelector('[data-today]');
@@ -2906,7 +2941,7 @@ function editLetter(c, l) {
   };
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?')) && done();
+  const close = async () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || await ask(isNew ? 'Discard this new letter?' : 'Discard your changes to this letter?', DISCARD)) && done();
   bindDelete(d, `Delete the letter "${l.subject || ''}"? This cannot be undone.`, () => saveEdits(c, [[l, null, L.deletedLetterAudit(l)]], 'letter'));
   // A signed receiving copy means the contractor has it; a reply letter in hand means the contractor replied.
   for (const [file, date] of [['receivedFileUrl', 'dateReceived'], ['replyFileUrl', 'dateReplied']]) {
@@ -2942,7 +2977,7 @@ function bindDelete(d, question, remove) {
   const del = d.querySelector('[data-delete]'), save = d.querySelector('.btn'), err = d.querySelector('.error');
   if (!del) return;
   del.onclick = async () => {
-    if (!confirm(question)) return;
+    if (!await askDanger(question)) return;
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then delete again.'; return; }
     del.disabled = save.disabled = true; err.textContent = '';
     try {
@@ -3054,7 +3089,7 @@ function editPhotos(c, report) {
   });
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to these photos?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask('Discard your changes to these photos?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -3189,7 +3224,7 @@ function weeklyForm(c, report = null) {
   const refiled = Boolean(report) && typed().some((t, k) => t.actual !== (start.lines[k]?.actual ?? ''));
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -3367,7 +3402,7 @@ function editWeather(c, report) {
   const up = () => { dragging = null; };
   addEventListener('pointerup', up);
   const done = () => { removeEventListener('pointerup', up); d.close(); d.remove(); };
-  const close = () => (!changed.size || confirm('Discard your changes to this weather?')) && done();
+  const close = async () => (!changed.size || await ask('Discard your changes to this weather?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
@@ -3464,14 +3499,14 @@ function billingForm(c, old = null) {
   if (old) { showType(); preview(); }
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
+  const close = async () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || await ask(old ? 'Discard your changes to this billing?' : 'Discard this new billing?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   const failed = x => { err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'); };
   const del = d.querySelector('[data-delete]');
   if (del) del.onclick = async () => {
     const edits = L.deletedBillingEdits(c.payments, old, c.cost), later = edits.length - 1;
-    if (!confirm(`Delete "${old.name || 'this billing'}"? This cannot be undone.${later ? ` The balance of ${plural(later, 'later billing')} will be recalculated.` : ''}`)) return;
+    if (!await askDanger(`Delete "${old.name || 'this billing'}"? This cannot be undone.${later ? ` The balance of ${plural(later, 'later billing')} will be recalculated.` : ''}`, 'Delete billing')) return;
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then delete again.'; return; }
     del.disabled = save.disabled = true; err.textContent = '';
     try {
@@ -3605,7 +3640,7 @@ function actualBody(c) {
       ${editable ? `<button class="${list.length ? 'text-btn' : 'btn'}" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
       ${editable && list.length ? `<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button>` : ''}
       ${editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : ''}
-      ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
+      ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
@@ -3671,8 +3706,8 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
   const draft = () => keep(c, 'abstract-draft', L.nextAbstractDraft(next));
   draft();
   asOf.onchange = () => { next.asOf = asOf.value; say(''); const sheet = nextAbstractSheet(c); document.getElementById('next-sheet').innerHTML = sheet.html; save.disabled = Boolean(sheet.error); draft(); boxes(); };
-  document.getElementById('next-discard').onclick = () => {
-    if (L.nextAbstractDraft(next) && !confirm('Discard what you typed for this abstract?')) return;
+  document.getElementById('next-discard').onclick = async () => {
+    if (L.nextAbstractDraft(next) && !await ask('Discard what you typed for this abstract?', DISCARD)) return;
     next.kept = false; draft();
     location.hash = `#/p/${page.id}/actual`;
   };
@@ -3687,7 +3722,7 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
     const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, typedQuantities(next.text));
     if (errors.length) { say(errors.slice(0, 3).join(' ') + (errors.length > 3 ? ` And ${errors.length - 3} more.` : '')); return; }
     const fields = L.nextAbstractFields(now.source, made(now), next.asOf, s.profile.name || s.user.email), old = now.same;
-    if (old && !confirm(`An abstract as of ${L.displayDate(fields.asOf)} is already filed. Replace it with this one?`)) return;
+    if (old && !await ask(`Replace the abstract as of ${L.displayDate(fields.asOf)}?`, { action: 'Replace', danger: true, detail: 'An abstract of that date is already filed; this one takes its place.' })) return;
     if (!navigator.onLine) { say('You are offline. Connect to the internet, then save again.'); return; }
     save.disabled = true;
     const actual = actualAfter([...all.filter(a => a.asOf !== fields.asOf), { ...fields, updatedAt: Infinity }]);
@@ -3736,7 +3771,7 @@ function bindActual(c) {
       const problem = L.abstractProblem(found);
       if (problem) { say(problem); return; }
       const fields = L.abstractFields(found, picked.name, s.profile.name || s.user.email), old = list.find(a => a.asOf === fields.asOf);
-      if (old && !confirm(`An abstract as of ${L.displayDate(fields.asOf)} is already uploaded. Replace it with this file?`)) return;
+      if (old && !await ask(`Replace the abstract as of ${L.displayDate(fields.asOf)}?`, { action: 'Replace', danger: true, detail: 'An abstract of that date is already uploaded; this file takes its place.' })) return;
       if (!navigator.onLine) { say('You are offline. Connect to the internet, then upload again.'); return; }
       // Infinity: this upload is the last saved of its date.
       const actual = actualAfter([...all.filter(a => a !== old), { ...fields, updatedAt: Infinity }]);
@@ -3751,7 +3786,7 @@ function bindActual(c) {
   const undo = document.getElementById('abstract-undo');
   if (undo) undo.onclick = async () => {
     const edit = L.abstractUndoEdit(kept(c, 'abstract-undo'), all);
-    if (!edit || !confirm(L.abstractUndoAsk(edit))) return;
+    if (!edit || !await askDanger(L.abstractUndoAsk(edit), 'Undo last save')) return;
     if (!navigator.onLine) { say('You are offline. Connect to the internet, then undo again.'); return; }
     undo.disabled = true;
     const rest = all.filter(a => a !== edit.rec);
@@ -3762,7 +3797,7 @@ function bindActual(c) {
     } catch (x) { failed(x); undo.disabled = false; }
   };
   if (del) del.onclick = async () => {
-    if (!confirm(`Delete the abstract as of ${L.displayDate(shown.asOf)}? This cannot be undone.`)) return;
+    if (!await askDanger(`Delete the abstract as of ${L.displayDate(shown.asOf)}? This cannot be undone.`, 'Delete abstract')) return;
     if (!navigator.onLine) { say('You are offline. Connect to the internet, then delete again.'); return; }
     del.disabled = true;
     try {
@@ -3908,7 +3943,7 @@ function signatoriesForm(c, weekly) {
   const values = () => Object.fromEntries(new FormData(form));
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
-  const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the signatories?')) && done();
+  const close = async () => (JSON.stringify(values()) === initial || await ask('Discard your changes to the signatories?', DISCARD)) && done();
   const mark = () => d.querySelectorAll('[data-fill]').forEach(b => b.setAttribute('aria-pressed', form.elements[b.dataset.fill].value.trim() === b.textContent));
   form.addEventListener('click', e => { const b = e.target.closest('[data-fill]'); if (b) { form.elements[b.dataset.fill].value = b.textContent; mark(); } });
   form.addEventListener('input', mark);
@@ -3950,7 +3985,7 @@ function recommendationsForm(c, month, saved) {
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), box = form.elements.recommendations;
   const initial = box.value;
   const done = () => { d.close(); d.remove(); };
-  const close = () => (box.value === initial || confirm('Discard your changes to the recommendations?')) && done();
+  const close = async () => (box.value === initial || await ask('Discard your changes to the recommendations?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
