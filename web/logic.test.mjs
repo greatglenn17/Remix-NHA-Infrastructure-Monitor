@@ -184,6 +184,19 @@ test('status: Suspended during an approved Full suspension, back when it ends or
   assert.equal(L.attentionFlags(at(5.12, 'On-going'), [], 0, '2026-01-30').filter(f => f.kind === 'behind').length, 0);
 });
 
+test('completion: approved time extensions decide it, even when the stored revised date lags', () => {
+  // 100 days from Jan 1 end Apr 10; 30 approved extension days move it to May 10. The stored date still says Apr 10.
+  const p = { ...chartProject([sih]), contractDurationDays: 100, completionDateOriginal: '2026-04-10', completionDateRevised: '2026-04-10', actualAccomplishment: 50 };
+  const te = approvedDoc('Time Extension No. 1 - 30 Days', '');
+  const on = L.withSchedule(p, [te], '2026-04-20');
+  assert.equal(on.completionDateRevised, '2026-05-10');
+  assert.equal(L.daysOverdue(on, '2026-04-20'), 0);
+  assert.deepEqual(L.attentionFlags(on, [te], 0, '2026-04-20').filter(f => f.kind === 'overdue' || f.kind === 'dueSoon').map(f => f.message), ['Due in 20 days']);
+  // Pending orders add nothing; a finished project keeps its stored date (the day it was completed).
+  assert.equal(L.withSchedule(p, [{ ...te, status: 'Pending' }], '2026-04-20').completionDateRevised, '2026-04-10');
+  assert.equal(L.withSchedule({ ...p, actualAccomplishment: 100, completionDateRevised: '2026-04-02' }, [te], '2026-04-20').completionDateRevised, '2026-04-02');
+});
+
 test('bar chart target: a revised chart applies from its effective date', () => {
   const revised = { label: 'Revised No. 1', effective: '2026-03-01', items: [{ name: 'All works', amount: 100, bars: [[1, 100]] }] };
   const p = chartProject([revised, sih]);

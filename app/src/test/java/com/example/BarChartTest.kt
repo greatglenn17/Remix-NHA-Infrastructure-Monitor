@@ -184,6 +184,21 @@ class BarChartTest {
     }
 
     @Test
+    fun completion_followsApprovedTimeExtensions_evenWhenTheStoredDateLags() {
+        // 360 days from Jan 1 end Dec 26; 30 approved extension days move it to Jan 25, 2027. The stored date still says Dec 26.
+        val p = project(listOf(sanIldefonso)).copy(completionDateOriginal = "2026-12-26", completionDateRevised = "2026-12-26", actualAccomplishment = 50.0)
+        val te = approved("Time Extension No. 1 - 30 Days", "")
+        val day = LocalDate.of(2027, 1, 5)
+        val on = BarChart.withSchedule(p, listOf(te), day)
+        assertEquals("2027-01-25", on.completionDateRevised)
+        assertEquals(null, com.example.util.ProjectAttention.overdue(on, day))
+        // Pending orders add nothing; a finished project keeps its stored date (the day it was completed).
+        assertEquals("2026-12-26", BarChart.withSchedule(p, listOf(te.copy(status = "Pending")), day).completionDateRevised)
+        val done = p.copy(actualAccomplishment = 100.0, targetAccomplishment = 100.0, completionDateRevised = "2026-12-20")
+        assertEquals("2026-12-20", BarChart.withSchedule(done, listOf(te), day).completionDateRevised)
+    }
+
+    @Test
     fun suspension_pausesThroughItsEnd_andGivesItsDaysToATimeExtension() {
         val p = project(listOf(sanIldefonso)).copy(actualAccomplishment = 99.0) // ahead, so not behind once it resumes
         // Saved before the effectivity date counted as day 1, with its End a day late.

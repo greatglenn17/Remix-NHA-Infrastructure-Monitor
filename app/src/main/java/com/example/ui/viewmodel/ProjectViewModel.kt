@@ -1855,13 +1855,15 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     /**
      * Saves the edit dialog. When [assignedUsers] is given (Super Admin editing the
      * assignment) the same save also carries the new assignment, as one outbox event.
+     * [newCompletion]: the dialog marked the project completed, so its completed-on date is saved (keepStoredCompletion).
      */
-    fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null) {
+    fun updateProjectMaster(project: Project, assignedUsers: List<RegisteredUser>? = null, newCompletion: Boolean = false) {
         viewModelScope.launch(missingProjectGuard) {
             val previousStatus = selectedProject.value?.displayStatus ?: "Unknown"
             val admin = currentUserAccount.value.role == UserRole.SUPER_ADMIN
             val current = projectDao.getProjectByIdOnce(project.id)
-            val base = AssignmentPolicy.mergeAssignment(project, current, if (admin) assignedUsers else null)
+            val merged = AssignmentPolicy.mergeAssignment(project, current, if (admin) assignedUsers else null)
+            val base = if (newCompletion) merged else keepStoredCompletion(merged, current)
             val updatedProject = base.copy(
                 revision = project.revision + 1,
                 updatedAt = System.currentTimeMillis(),
@@ -2033,7 +2035,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             selectedProject.value?.let { current ->
                 if (current.id == projectId) {
-                    val updated = current.copy(
+                    val updated = keepStoredCompletion(current, projectDao.getProjectByIdOnce(projectId)).copy(
                         status = newStatus,
                         revision = current.revision + 1,
                         updatedAt = System.currentTimeMillis(),
@@ -2062,11 +2064,20 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
+     * [updated] with [stored]'s revised completion date. withSchedule shows an unfinished project's date from its approved
+     * time extensions; that is worked out on every read, not a value the user entered, so a save keeps the stored one.
+     * Only the saves that set the date on purpose skip this: Add time extension and marking the project completed.
+     */
+    private fun keepStoredCompletion(updated: Project, stored: Project?): Project =
+        if (stored == null) updated else updated.copy(completionDateRevised = stored.completionDateRevised)
+
+    /**
      * Saves a change to a project's master record and queues it for upload. Writing to
      * the DAO directly skips the revision bump and the outbox, so other phones never see it.
      */
-    private suspend fun saveProjectChange(updated: Project, barChart: Boolean = false) {
-        val versioned = updated.copy(
+    private suspend fun saveProjectChange(updated: Project, barChart: Boolean = false, newCompletion: Boolean = false) {
+        val kept = if (newCompletion) updated else keepStoredCompletion(updated, projectDao.getProjectByIdOnce(updated.id))
+        val versioned = kept.copy(
             revision = updated.revision + 1,
             updatedAt = System.currentTimeMillis(),
             updatedByUid = authManager.currentFirebaseUser?.uid.orEmpty()
@@ -2147,7 +2158,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             projectDao.insertTimeExtension(extension)
 
             val updated = p.copy(completionDateRevised = computedRevisedDate)
-            saveProjectChange(updated)
+            saveProjectChange(updated, newCompletion = true)
 
             logAuditAction(
                 projectId = projectId,
