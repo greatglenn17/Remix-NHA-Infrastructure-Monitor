@@ -123,8 +123,9 @@ is read only.
 - **Name & use** on a lot's card is the lot's use, block and lot from the app's lot form (`L.lotNameSave`, with the
   app's "Lot Use Changed" and "Lot Renamed" audit entries), and **Remove lot**, which takes the lot off the plan on
   every phone (`L.lotRemoved`, "Lot Deactivated"); its progress and billing history stay in the audit log.
-- **The plan's own tools** (Progress → Lots, under the plan's name; put away while a lot is being drawn) are the
-  phone's plan header and plan menu (`bindPlanTools`):
+- **The plan's own tools** (Progress → Lots; put away while a lot is being drawn) are the phone's plan header and
+  plan menu (`bindPlanTools`). The scale sits under the plan's name, Find lots beside Add lot, and the rest fold
+  under **Plan setup**, which stays open while the page redraws:
   - **Scale**, for the people who can edit the project (`scaleForm`, `L.planScale`): the number printed after
     "SCALE 1:" (10 to 100000). The areas of the lots nobody typed an area for (blank, the add form's 50, or what the
     last scale gave) are worked out from it, with the app's "Project Edit" audit entry. When the PDF cannot be read
@@ -162,7 +163,7 @@ is read only.
   writes the corners onto the same lot, so its name, progress, billing and inspections stay, with a "Lot Geometry
   Changed" audit entry. An area nobody typed is worked out again from the plan's scale. A corner can be dragged while
   a new lot is being drawn too. The phone has no such tool: its Edit geometry starts a new lot.
-- **Find lots** in the plan's tools, for the `L.canManagePlans` roles, is the app's lot finder (`findLots`,
+- **Find lots** beside Add lot, for the `L.canManagePlans` roles, is the app's lot finder (`findLots`,
   `planScan`, `L.findLots`, `L.lotNames`, `L.foundLots`; `LotDetector` and `PlanLabels` on the phone, ported line for
   line). The plan PDF's first page is drawn about 3200 pixels across in the browser, every closed outline of the
   common lot size is a lot, larger clean rectangles inside the site are open spaces or facilities, and each lot takes
@@ -405,8 +406,8 @@ is read only.
     cost, latest weekly report, open issues, status of payment, and the lots status card (the six
     `SdpSummary` bands) for housing projects.
   - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
-    photo, and for housing projects the **Lots** of each site's plan in use: the phone's KPIs,
-    its search and filters, and the plan PDF with each lot coloured over it, as on the phone (drag to move, wheel
+    photo, and for housing projects the **Lots** of each site's plan in use: one line with the phone's figures (saleable lots, M1 and M2 billed, not billed, completed, average
+    progress), its search and filters, and the plan PDF with each lot coloured over it, as on the phone (drag to move, wheel
     or pinch to zoom, the zoom bar, double-click for 250%). Click a lot for its card, and "History & details" for its
     status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and

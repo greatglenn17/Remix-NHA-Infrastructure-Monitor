@@ -998,6 +998,8 @@ function drawProject(page) {
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
+  const chartCurve = document.getElementById('chart-curve');
+  if (chartCurve) chartCurve.ontoggle = () => { c.page.curve = chartCurve.open; };
   const projectAssign = document.getElementById('project-assign');
   if (projectAssign) projectAssign.onclick = () => assignForm(c);
   const projectDrive = document.getElementById('project-drive');
@@ -1110,7 +1112,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   return `
     <div class="bento">
       <div class="col c1">${attention}${profile}</div>
-      <div class="col c2">${dates}${barChartCard(project, documents, now)}</div>
+      <div class="col c2">${dates}${barChartCard(project, documents, now, page.curve)}</div>
       <div class="col c3">${costCard}${report}${construction}</div>
       ${paymentCard}
     </div>`;
@@ -1256,7 +1258,7 @@ function barChartForm(c) {
 }
 
 /** BarChartCard: the chart in force, today's planned % and its S-curve by month; Edit for those who manage the chart. */
-function barChartCard(project, documents, now) {
+function barChartCard(project, documents, now, curveOpen) {
   const edit = L.canEditChart(project, s.user.uid, s.claims) ? `<button class="text-btn" id="chart-edit">${icon('edit', 'sm')}Edit</button>` : '';
   const plan = L.planOn(project, documents, now);
   if (!plan) return section('Approved bar chart', 'stacked_line_chart', emptyLine('No bar chart yet. The target % is typed in each weekly report.'), '', edit);
@@ -1267,8 +1269,7 @@ function barChartCard(project, documents, now) {
     ${kv('Planned as of today', `${plan.plannedPct.toFixed(2)}%${day >= 1 && day <= last ? ` · Month ${month}, cell ${cell}` : ''}`)}
     ${kv('Chart length', `${last} calendar days`)}
     ${plan.versions.filter(v => v !== version).map(v => kv('Also on file', inForce(v))).join('')}
-    <p class="sub">S-curve</p>
-    ${curveTable(version)}`, '', edit);
+    <details class="curve" id="chart-curve"${curveOpen ? ' open' : ''}><summary>${icon('expand_more', 'sm')}S-curve · ${plural(L.chartMonths(version).length, 'month')}</summary>${curveTable(version)}</details>`, '', edit);
 }
 
 /** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
@@ -1391,8 +1392,8 @@ function monthlyView({ page, weekly, of, now }) {
 
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
-const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false });
-// draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
+const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false, setup: false });
+// setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 
@@ -1404,13 +1405,14 @@ function lotsView(c) {
   const edit = L.canEdit(c.project, s.user.uid, s.claims), manage = L.canManagePlans(c.project, s.user.uid, s.claims);
   const busy = st.draw || st.frame;
   const addLot = !busy && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
-  // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn.
+  // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn: the scale under the
+  // title, Find lots beside Add lot, and the rarely used ones folded under Plan setup.
   const scale = Number(site.plan.scaleDenominator) || 0, unfound = site.lots.filter(l => L.foundLot(l) && !l.progress).length;
+  const scaleLine = busy ? '' : edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '';
+  const findLots = !busy && manage && site.plan.pdfFileUrl ? `<button class="text-btn" id="lots-find">${icon('search', 'sm')}Find lots</button>` : '';
   const tools = busy ? '' : [
-    edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '',
     edit ? `<button class="text-btn" id="plan-turn">${icon('rotate_90_degrees_cw', 'sm')}Turn plan</button>` : '',
     edit && site.plan.pdfFileUrl ? '<button class="text-btn" id="plan-frame">Print area</button>' : '',
-    manage && site.plan.pdfFileUrl ? '<button class="text-btn" id="lots-find">Find lots</button>' : '',
     edit && unfound ? `<button class="text-btn" id="lots-unfind">Remove found lots (${unfound})</button>` : '',
     manage ? `<button class="text-btn" id="plan-site">Make v${esc(site.plan.version ?? 1)} its own site</button>` : '',
     manage ? `<button class="text-btn danger" id="plan-delete">${icon('delete', 'sm')}Delete plan</button>` : '',
@@ -1420,15 +1422,14 @@ function lotsView(c) {
     ? `<select id="plan-rev" aria-label="Revision in use">${site.plans.map(p => `<option value="${esc(p.uuid)}"${p === site.plan ? ' selected' : ''}>${esc(name(p))}</option>`).join('')}</select>`
     : `${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span>`;
   const k = L.lotStats(site.lots);
-  const tile = (label, value, cls = '') => `<div class="kpi ${cls}"><span>${label}</span><b>${value}</b></div>`;
   const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option${o === st[key] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
-    <div class="lots-head"><h3>${title}</h3>
+    <div class="lots-head"><div><h3>${title}</h3>${scaleLine}</div>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
-        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${upload}</span></div>
-    ${tools ? `<div class="lots-links plan-tools">${tools}</div>` : ''}
-    <div class="kpis">${tile('Saleable lots', k.total)}${tile('M1 billed', k.m1, 'link')}${tile('M2 billed', k.m2, 'link')}${tile('Not billed', k.notBilled, 'muted')}${tile('Completed', k.completed, 'ok')}${tile('Avg progress', `${k.avg.toFixed(1)}%`, 'watch')}</div>
+        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${findLots}${upload}</span></div>
+    ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
+    <p class="muted lot-sum">${plural(k.total, 'saleable lot')}: ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average progress ${k.avg.toFixed(1)}%.</p>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       ${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}
@@ -1929,7 +1930,7 @@ async function findLots(c, site, el) {
     alert(`The plan PDF could not be read in this browser (${x.code || x.message || x}).`);
   }
   el.disabled = false;
-  el.textContent = 'Find lots';
+  el.innerHTML = `${icon('search', 'sm')}Find lots`;
 }
 
 /** The phone's "Lots found in the plan" review (or "No lots found"): what Find lots found, and what adding it replaces. */
@@ -2014,6 +2015,7 @@ function bindPlanTools(c) {
   const st = lotState(c.page), { sites, site } = lotSite(c, st);
   const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
   const act = (el, run) => planAct(c, el, run);
+  bind('plan-setup', 'ontoggle', el => { st.setup = el.open; });
   bind('plan-scale', 'onclick', () => scaleForm(c, site));
   bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
   // The print area (setSdpPlanFrame): two clicks on the whole page mark it (bindLots), or the whole page, or the box around the lots.
@@ -3580,10 +3582,8 @@ function actualBody(c) {
   const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
   const tools = `${list.length ? abstractSwitch(false) : ''}<div class="toolbar apa-tools">
       ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
-      ${editable ? `<button class="btn" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
+      ${editable ? `<button class="${list.length ? 'text-btn' : 'btn'}" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
       ${editable && list.length ? `<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button>` : ''}
-      ${shown ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
-        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>` : ''}
       ${editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : ''}
       ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete</button>` : ''}
     </div>
@@ -3594,7 +3594,9 @@ function actualBody(c) {
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
       ${standingTable(c, shown)}
-      ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}`)}
+      ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}
+      <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>`)}
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
 
