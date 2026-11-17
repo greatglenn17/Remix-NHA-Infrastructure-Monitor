@@ -205,6 +205,10 @@ export function withEnd(remarks) {
   return /End: \d{4}-\d{2}-\d{2}/.test(r) ? r.replace(/End: \d{4}-\d{2}-\d{2}/g, end) : r.replace(eff[0], `${eff[0]} | ${end}`);
 }
 
+/** An order's remarks to read, not to edit: withEnd, its dates as "Aug 1, 2026" and its "|" separators as "·". */
+export const remarksText = remarks => withEnd(remarks)
+  .replace(/\b(Effectivity|End): (\d{4}-\d{2}-\d{2})\b/g, (_, k, d) => `${k}: ${displayDate(d)}`).split(/\s*\|\s*/).filter(Boolean).join(' · ');
+
 /** ProjectSchedule.suspensionEnd: the last day in a suspension's or continuance's remarks, or '' when it has none. */
 export const suspensionEnd = remarks => (/End: (\d{4}-\d{2}-\d{2})/.exec(withEnd(remarks)) || [])[1] || '';
 
@@ -300,6 +304,16 @@ export function statusLevel(p, today) {
   return p.status === 'Behind Schedule' && (s === 'ok' || s === 'neutral') ? 'watch' : s;
 }
 
+/**
+ * Web status badge (overdue is drawn separately). "Behind" means 10% or more behind (DESIGN.md's
+ * One-Meaning-Per-Word Rule), so a smaller slip that withSchedule marks Behind Schedule reads On-going,
+ * matching its grey "slipping" note and the Behind schedule filter. The stored status and prints are untouched.
+ */
+export function badgeStatus(p) {
+  const q = !isCompleted(p) && p.status === 'Behind Schedule' && slippage(p) > -10 ? { ...p, status: 'On-going' } : p;
+  return { text: displayStatus(q), level: statusLevel(q) };
+}
+
 const ORDER_TYPES = ['variation order', 'time extension', 'work suspension', 'work resumption'];
 /** ProjectAttention.isOrderName: a document with one of these in its name is an order, on every phone and here. */
 export const isOrderName = name => ORDER_TYPES.some(t => (name || '').toLowerCase().includes(t));
@@ -365,10 +379,29 @@ export function attentionFlags(project, docs, billed, today, requests = [], late
   // A suspended project is not expected to report; the start date counts until the first report.
   const stale = daysSince(latestReportAt ?? project.dateStarted);
   if (!finished && project.status !== 'Suspended' && stale != null && stale >= 14) {
-    flags.push({ kind: 'stale', level: 'stale', message: `No field update in ${plural(stale, 'day', 'days')}` });
+    // Web wording: with no report yet the count is from the start, so say so (the card footer reads "No field update yet").
+    flags.push({ kind: 'stale', level: 'stale', message: latestReportAt
+      ? `No field update in ${plural(stale, 'day', 'days')}`
+      : `No field update yet, ${plural(stale, 'day', 'days')} since the start` });
   }
   return flags.sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level]);
 }
+
+/**
+ * Web dashboard order, worst first: critical, then flagged, then the rest; within each, most days overdue, then
+ * furthest behind plan, then longest without a field update, then name. Items are { p, flags, lastUpdate }.
+ */
+export function attentionOrder(a, b, today) {
+  const tier = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.length ? 1 : 2);
+  // Finished and suspended projects are not expected to report (the stale rule above), so silence does not rank them up.
+  const quiet = it => { if (isCompleted(it.p) || it.p.status === 'Suspended') return 0; const at = isoDay(it.lastUpdate ?? it.p.dateStarted), now = isoDay(today); return at == null || now == null ? 0 : now - at; };
+  return tier(a) - tier(b) || daysOverdue(b.p, today) - daysOverdue(a.p, today)
+    || (isCompleted(a.p) ? 0 : slippage(a.p)) - (isCompleted(b.p) ? 0 : slippage(b.p))
+    || quiet(b) - quiet(a) || (a.p.name || '').localeCompare(b.p.name || '');
+}
+
+/** The flag that put a project first: overdue before the other critical ones, else its worst. */
+export const leadingFlag = flags => flags.find(f => f.kind === 'overdue') || flags[0];
 
 /**
  * ProjectAttention.slippage in words (PortfolioRow.scheduleText). Web wording: "behind" only from the

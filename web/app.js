@@ -49,7 +49,7 @@ const COUNTS = [
 // PortfolioCounts.TERM_HELP, from the same thresholds as ProjectAttention (the phone's sync chip terms are left out).
 const TERM_HELP = [
   ['Overdue', 'Unfinished projects past their completion date (the revised one, if any).'],
-  ['Behind schedule', 'Work done is 10% or more behind the plan, or the project is marked Behind Schedule. A smaller gap reads "slipping" on the card.'],
+  ['Behind schedule', 'Work done is 10% or more behind the plan. A smaller gap reads "slipping" on the card and the project stays On-going.'],
   ['Billing ahead of work', 'Billed is more than 10% ahead of work done, for example billed 65%, work done 38.50%.'],
   ['Waiting approval', 'Projects with a variation order, time extension, suspension or resumption not yet approved.'],
   ['Due in 30 days', 'Unfinished projects whose completion date (the revised one, if any) is 30 days away or less.'],
@@ -126,7 +126,7 @@ onAuthStateChanged(auth, async user => {
   getDoc(doc(db, 'users', user.uid)).then(d => { s.profile = { name: d.get('displayName') || '', title: d.get('position') || '', office: d.get('office') || '' }; }).catch(() => {});
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
-    <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit issues' : 'read only'}</span>
+    <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit' : 'read only'}</span>
     ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}Users</a>` : ''}
     <button id="profile" class="text-btn">${icon('person', 'sm')}Profile</button>
     <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
@@ -443,10 +443,12 @@ function progressLine(label, value, note, noteTone, fraction, tone, big = false)
 
 // Bar: green when finished; blue on plan or slipping under 10%; amber from 10% behind; red from 15% behind or
 // once past the completion date (PortfolioRow.varianceColor's thresholds, plus the web's overdue rule).
-function workDone(p, big) {
+function workDone(p, big, plan = '') {
   const now = today(), level = L.varianceLevel(L.slippage(p));
   const tone = L.isCompleted(p) ? 'ok' : L.daysOverdue(p, now) > 0 ? 'behind' : level === 'ok' || level === 'neutral' ? 'primary' : level;
-  const note = (tone === 'watch' || tone === 'behind' ? icon('warning', 'sm') : '') + esc(L.scheduleText(p, now));
+  // The header names what the gap is measured against (today's bar chart plan, else the stored target).
+  const basis = plan && !L.isCompleted(p) && L.daysOverdue(p, now) === 0 ? ` · ${plan}` : '';
+  const note = (tone === 'watch' || tone === 'behind' ? icon('warning', 'sm') : '') + esc(L.scheduleText(p, now) + basis);
   const noteTone = tone !== 'primary' ? tone : level === 'ok' ? 'ok' : 'muted';
   return progressLine('Work done', pct(p.actualAccomplishment), note, noteTone, (Number(p.actualAccomplishment) || 0) / 100, tone, big);
 }
@@ -456,7 +458,7 @@ const billedLine = (it, big) => progressLine('Billed', L.billedLabel(it.billed, 
 function statusBadge(p) {
   const late = L.daysOverdue(p, today());
   return late ? `<span class="badge lv-behind">Overdue by ${late} ${late === 1 ? 'day' : 'days'}</span>`
-    : `<span class="badge lv-${L.statusLevel(p)}">${esc(L.displayStatus(p))}</span>`;
+    : (b => `<span class="badge lv-${b.level}">${esc(b.text)}</span>`)(L.badgeStatus(p));
 }
 
 function renderDashboard() {
@@ -791,8 +793,8 @@ function redrawDashboard() {
   const shown = inScope
     .filter(it => !s.filter || it.flags.some(f => f.kind === s.filter))
     .filter(it => !q || [it.p.name, it.p.location, it.p.contractor].join(' ').toLowerCase().includes(q))
-    // Needs attention first (Portfolio.NEEDS_ATTENTION_SORT), then by name.
-    .sort((a, b) => rank(a) - rank(b) || a.p.name.localeCompare(b.p.name));
+    // Needs attention first, worst first (L.attentionOrder).
+    .sort((a, b) => L.attentionOrder(a, b, today()));
   document.getElementById('shown').textContent = shown.length === inScope.length ? '' : `Showing ${shown.length} of ${inScope.length}`;
 
   if (shown.length === 0) {
@@ -818,14 +820,12 @@ function showTermHelp() {
 
 // The screen's one finding: the project the sort puts first, with its worst flag.
 function finding(items) {
-  const flagged = items.filter(it => it.flags.length).sort((a, b) => rank(a) - rank(b) || a.p.name.localeCompare(b.p.name));
+  const flagged = items.filter(it => it.flags.length).sort((a, b) => L.attentionOrder(a, b, today()));
   if (!flagged.length) return items.length ? `<p class="finding calm">${icon('check_circle', 'sm')}No project needs attention.</p>` : '';
-  const [first] = flagged, f = first.flags[0], more = flagged.length - 1;
+  const [first] = flagged, f = L.leadingFlag(first.flags), more = flagged.length - 1;
   return `<p class="finding">${icon('warning', 'sm')}<span>First to look at: <a href="#/p/${esc(first.p.projectUuid)}">${esc(first.p.name)}</a>,
     ${esc(f.message.charAt(0).toLowerCase() + f.message.slice(1))}${more ? `<span class="nw"> · ${more} more flagged</span>` : ''}</span></p>`;
 }
-
-const rank = it => (it.flags.some(f => f.level === 'critical') ? 0 : it.flags.length ? 1 : 2);
 
 function tile(it) {
   const { p } = it;
@@ -935,7 +935,7 @@ function drawProject(page) {
         <div class="ph-badges">${statusBadge(project)}
           ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
       </div>
-      <div class="ph-bars">${workDone(project, true)}${billedLine({ billed, cost }, true)}</div>
+      <div class="ph-bars">${workDone(project, true, `${L.plannedTarget(stored, documents, today()) != null ? 'plan for today' : 'target'} ${pct(project.targetAccomplishment)}`)}${billedLine({ billed, cost }, true)}</div>
     </header>
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
@@ -1048,7 +1048,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     ${kv('Revised duration', revisedDays == null ? '-' : `${revisedDays} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
-    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.withEnd(d.remarks))}` : ''}</span></div>`).join('')
+    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.remarksText(d.remarks))}` : ''}</span></div>`).join('')
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
@@ -1056,7 +1056,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const issues = `<span class="badge ${openIssues ? 'lv-watch' : 'lv-ok quiet'}">${openIssues} open ${openIssues === 1 ? 'issue' : 'issues'}</span>`;
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv('Target', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv('Target that week', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const construction = housing ? constructionCard(L.lotSummary(records), payments, now) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
@@ -1290,7 +1290,7 @@ function reportCard(r, all, pid, editable = false) {
         <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
     <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-      <span class="muted">Target ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
+      <span class="muted">Target that week ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
     <details>
       <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
       <div class="rep-body">
@@ -3718,7 +3718,7 @@ function paymentsBody({ project, payments, cost, billed }) {
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
-      <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">DV ${esc(p.dvNo || 'N/A')}</p></div>
+      <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
         ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
       <p class="muted small">${esc(L.displayDate(p.date || '-'))} · ${esc(p.periodCovered || '-')}</p>
       ${p.billingType ? `<p class="muted small">${esc(p.billingType)} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${esc(L.formatPhp(Number(p.unitPrice) || 0))}</p>` : ''}
@@ -3739,7 +3739,7 @@ const entry = (title, lines, extra = '', cls = '') => `<div class="entry ${cls}"
 /** An order's attached copy and, when `editable`, the button that opens its status. */
 const orderExtra = (d, editable) => (d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '')
   + (editable ? `<button class="text-btn entry-edit" data-edit-order="${esc(d.uuid)}">${icon('edit', 'sm')}Update status</button>` : '');
-const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.withEnd(d.remarks)], orderExtra(d, editable), cls);
+const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.remarksText(d.remarks)], orderExtra(d, editable), cls);
 /** `addType`, when set, is the kind of order the card's Add button files. */
 const ordersCard = (title, ic, items, emptyText, addType = '') => section(title, ic, items || emptyLine(emptyText), '',
   addType ? `<button class="text-btn" data-add-order="${esc(addType)}">${icon('add_circle', 'sm')}Add</button>` : '');
@@ -3805,7 +3805,7 @@ function requestsCard(requests, now, editable = false) {
 /** RelatedFilesList: other project files with their status and attached copy; `editable` adds Add file, and the button that attaches a copy or deletes. */
 function relatedCard(files, editable = false) {
   const level = st => (st === 'Approved' ? 'ok' : st === 'Notarized' || st === 'Signed' ? 'primary' : st === 'Submitted' ? 'watch' : 'neutral');
-  return section(`Related files (${files.length})`, 'folder_open', files.length ? files.map(d => entry(d.documentName, [d.remarks || 'N/A'],
+  return section(`Related files (${files.length})`, 'folder_open', files.length ? files.map(d => entry(d.documentName, [d.remarks || 'No remarks'],
     `<span class="badge lv-${level(d.status)}">${esc(d.status || 'Pending')}</span>${d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '<small class="muted">No copy attached</small>'}`
     + (editable ? `<button class="text-btn entry-edit" data-edit-related="${esc(d.uuid)}">${icon(d.fileUrl ? 'edit' : 'upload_file', 'sm')}${d.fileUrl ? 'Edit' : 'Attach copy'}</button>` : ''))).join('')
     : emptyLine('No related project files or scanned documents uploaded yet.'), '',
