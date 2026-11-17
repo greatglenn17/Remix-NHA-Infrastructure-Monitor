@@ -86,6 +86,14 @@ small { font-size: 12px; }
 #who:empty { display: none; }
 
 main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
+/* Projector and big monitors: zoom the page so the 1320px column fills about 85% of the screen and 13px text reads at 16px
+   and up. Only where app.js set .zoomable (the browser reports the zoom to the plan editor); never on paper.
+   A zoomed page's vh and vw grow with it, so a height tied to the screen divides by --zoom. */
+:root { --zoom: 1; }
+@media screen and (min-width: 1800px) { .zoomable { zoom: 1.25; --zoom: 1.25; } }
+@media screen and (min-width: 2300px) { .zoomable { zoom: 1.5; --zoom: 1.5; } }
+@media screen and (min-width: 2800px) { .zoomable { zoom: 2; --zoom: 2; } }
+@media screen and (min-width: 3400px) { .zoomable { zoom: 2.5; --zoom: 2.5; } }
 
 /* Buttons and fields */
 .btn { font: 600 14px var(--sans); border: 0; border-radius: 6px; padding: 10px 18px; cursor: pointer;
@@ -93,7 +101,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .btn:hover { filter: brightness(1.1); }
 .btn:disabled { opacity: 0.6; cursor: progress; }
 .text-btn { font: 600 14px var(--sans); background: none; border: 0; color: var(--link); cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px; padding: 8px; border-radius: 6px; text-decoration: none; }
+  display: inline-flex; align-items: center; gap: 4px; padding: 8px; border-radius: 6px; text-decoration: none; min-height: 40px; }
 .text-btn:hover { background: var(--primary-container); }
 .text-btn.danger { color: var(--behind); margin-right: auto; }
 /* A card's own action under its content, lined up with the text above it. */
@@ -151,7 +159,7 @@ main[data-fresh] .bar i { animation: fill 700ms cubic-bezier(0.16, 1, 0.3, 1) bo
 body.signed-out .appbar { display: none; }
 body.signed-out main { max-width: none; padding: 0; }
 /* The blurred construction-site photo (user's, 2026-11-08) behind the whole sign-in page, darkened so the text stays readable. */
-.signin { display: grid; grid-template-columns: minmax(320px, 5fr) 6fr; min-height: 100vh;
+.signin { display: grid; grid-template-columns: minmax(320px, 5fr) 6fr; min-height: calc(100vh / var(--zoom));
   background: linear-gradient(rgb(11 15 23 / 0.45), rgb(11 15 23 / 0.45)), url(signin-bg.webp) center / cover no-repeat var(--bg); }
 .hero { /* taste-skill-ignore: the app's LoginScreen hero gradient, see-through over the photo */ background: linear-gradient(135deg, rgb(30 58 138 / 0.82), rgb(11 15 23 / 0.55)); color: #fff; padding: 56px 48px; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; border-right: 1px solid var(--border); }
 .hero-logo { margin-bottom: 12px; }
@@ -185,7 +193,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .pf-stats { margin-top: 6px; }
 /* PortfolioCounts: the banner's filters. Red only for overdue and behind; the rest stay quiet with a coloured icon. */
 .pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
-.pill { font: 400 14px var(--sans); display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
+.pill { font: 400 14px var(--sans); white-space: nowrap; max-width: 100%; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px;
   border: 1px solid var(--outline); background: var(--field); color: var(--text); cursor: pointer; transition: border-color 150ms ease-out; }
 .pill:hover { border-color: var(--text-2); }
 .pill b { font-size: 16px; font-weight: 600; }
@@ -387,12 +395,14 @@ thead .num { font-family: inherit; }
   .ph-loc { margin-bottom: 10px; }
   .ghost-rows { display: none; }
   #who .email { display: none; }
-  #who { flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; }
-  #who .text-btn { white-space: nowrap; }
   .search { max-width: none; }
   /* Filters on a phone: one per row, so each label stays on one line. */
-  .pills { display: grid; grid-template-columns: 1fr; gap: 6px; }
-  .pill { min-width: 0; text-align: left; border-radius: 8px; }
+  .pills { justify-content: flex-start; gap: 6px; }
+  /* The bar scrolls off so a phone's height goes to the projects; its links keep their names for screen readers. */
+  .appbar { position: static; }
+  #who { flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  #who .lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #who .text-btn { min-width: 44px; justify-content: center; }
   /* Badges drop under the name so long names keep both lines. */
   .tile-top { flex-wrap: wrap; }
   .tile-badges { order: 3; flex-basis: calc(100% - 60px); max-width: none; display: flex; flex-wrap: wrap; gap: 4px; margin-left: 60px; }
@@ -470,7 +480,7 @@ span.file.gone { text-decoration: none; }
 /* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (about
    11px at 1366) and the headings wrap. A narrower card (a tablet, a phone) keeps the 13px type and scrolls sideways. */
 @container (min-width: 1080px) {
-  .apa-items { font-size: min(13px, 0.9cqw); }
+  .apa-items { font-size: max(12px, min(13px, 0.9cqw)); }
   .apa-items th, .apa-items td { padding: 0.55em 0.3em; }
   .apa-items thead th { font-size: 0.92em; letter-spacing: 0; white-space: normal; }
   .apa-items td:nth-child(2) { min-width: 9em; }
@@ -666,7 +676,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
 /* The plan viewer (SubdivisionPlanTab): the plan moves and zooms inside a fixed frame, with the zoom bar and lot card over it. */
-.lot-viewer { position: relative; height: min(70vh, 720px); min-height: 360px; margin: 4px 0 12px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; background: var(--surface-variant); touch-action: none; }
+.lot-viewer { position: relative; height: min(calc(70vh / var(--zoom)), 720px); min-height: 360px; margin: 4px 0 12px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; background: var(--surface-variant); touch-action: none; }
 .lot-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; cursor: grab; user-select: none; }
 .lot-stage:active { cursor: grabbing; }
 .lot-stage img, .lot-stage svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
@@ -739,7 +749,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .issue-card .logged { margin: 10px 0 0; font-style: italic; text-align: right; }
 /* Edit button and the edit form (AddIssueDialog). */
 .ic-actions { display: flex; justify-content: flex-end; margin: 8px -8px -6px 0; }
-.edit-form { width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow-y: auto; }
+.edit-form { width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh / var(--zoom) - 32px); overflow-y: auto; }
 .edit-form form { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 14px; margin: 0; }
 .edit-form h2 { margin: 0; }
 .edit-form [data-today] { justify-self: start; margin-top: -8px; }
@@ -842,6 +852,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 
 /* Touch screens: controls are at least 44px tall for a finger, and fields are 16px so iPhone Safari does not zoom in on focus. */
 @media (pointer: coarse) {
-  .btn, .btn.lc-more, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select { min-height: 44px; }
+  .btn, .btn.lc-more, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select,
+  .seg button, .zoom-bar button { min-height: 44px; }
+  .zoom-bar button { min-width: 44px; }
   input, select, textarea { font-size: 16px !important; }
 }

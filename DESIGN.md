@@ -239,14 +239,14 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 
 ## Layout
 
-The content column is centred at 1320px max width, with 24px side padding (16px under 600px) and 20px top / 48px bottom padding inside `main`. Spacing follows a 4px base (4, 8, 12, 16, 20, 24px). Gaps between cards are 12px, and gaps between paired bars are 16px to 24px.
+The content column is centred at 1320px max width, with 24px side padding (16px under 600px) and 20px top / 48px bottom padding inside `main`. On a projector or big monitor the whole page zooms in proportion (CSS `zoom`: 1.25 from 1800px wide, 1.5 from 2300px, 2 from 2800px, 2.5 from 3400px), so the same layout fills about 85% of the screen and 13px text reads at 16px and up; never on paper, and only in browsers that report the zoom (`Element.currentCSSZoom`), which the plan editor needs to place a click. Spacing follows a 4px base (4, 8, 12, 16, 20, 24px). Gaps between cards are 12px, and gaps between paired bars are 16px to 24px.
 
 - **App bar:** sticky, canvas-coloured, with a bottom hairline. Brand block (40px logo, then the title and office line) on the left, user and Sign out pushed to the right.
 - **Sign-in:** a full-bleed two-column grid (hero 5fr, form 6fr) with no app bar, over a blurred photo of houses under construction (`web/signin-bg.webp`, supplied by the user, darkened 45%). Under 900px it stacks, hero first. The form is at most 400px wide, centred, on a 90% canvas card with a hairline and 12px corners.
 - **Dashboard:** the command banner (count and on-going/completed line on the left; the filter pills on the right; the priority callout across the bottom; stacked under 900px), then one control row (search with a Cmd/Ctrl+K hint, the My / All projects segmented control, then "What these mean" and "Showing N of M" on the right), then a project grid of `auto-fill, minmax(min(380px, 100%), 1fr)`, which gives two or three columns on desktop.
 - **Project card:** a header row (48px photo, name and town, status badge on the right), Work done over Billed, an optional flag line, and a footer under a hairline with the completion date and the waiting-approval badge. Under 600px the badges drop under the name.
 - **Project Summary:** a header card (36px name, 30px under 640px; town; status badge top right with a hairline in its own colour; Work done and Billed side by side while each has 300px, stacked below that), then a bento grid: column 1 Needs attention and Project profile, column 2 Key dates, column 3 Contract cost and Latest weekly report, with Status of payment across all three. From 1100px down it is two columns (profile left, the rest stacked right); under 900px, one.
-- **Phone widths:** the filter pills stack one per row under 600px so a long label never wraps. The payments table moves the date under the billing name under 560px.
+- **Phone widths:** under 600px the filter pills wrap side by side at their own widths (a label never wraps), and the app bar scrolls away with the page, its Users, Profile and Sign out showing only their icons (the names stay for screen readers). The payments table moves the date under the billing name under 560px.
 
 ## Elevation & Depth
 
@@ -260,12 +260,12 @@ Flat, with tonal layering. Depth comes from dark translucent panels over the dot
 
 ## Shapes
 
-4px (view badge, focus ring, key hint), 6px (buttons, inner blocks, segments), 8px (inputs, photos, the segmented control), 12px (cards, the callout, dialogs), 5px for the 10px-tall progress bars, and full pills for status badges and filter pills (8px on phones, where they stack). Photos are clipped to their radius with `object-fit: cover`. A site photo is a 64px placeholder until it loads, then 16:9.
+4px (view badge, focus ring, key hint), 6px (buttons, inner blocks, segments), 8px (inputs, photos, the segmented control), 12px (cards, the callout, dialogs), 5px for the 10px-tall progress bars, and full pills for status badges and filter pills. Photos are clipped to their radius with `object-fit: cover`. A site photo is a 64px placeholder until it loads, then 16:9.
 
 ## Components
 
 ### Buttons
-- **Shape:** gently rounded (6px), at least 40px tall. On touch screens (`pointer: coarse`) buttons, text buttons, chips, pills and file links are at least 44px tall, and field text is 16px so iPhone Safari does not zoom in on focus.
+- **Shape:** gently rounded (6px), at least 40px tall. On touch screens (`pointer: coarse`) buttons, text buttons, chips, pills, file links, the segmented control and the plan's zoom buttons are at least 44px tall, and field text is 16px so iPhone Safari does not zoom in on focus.
 - **Primary:** Action Blue fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
 - **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px primary outline with a 2px offset. Disabled is 0.6 opacity.
 - **Text button:** blue 600 14px, 8px padding, Blue Haze background on hover. Used for Sign out, Back, Forgot password, and "What these mean" (always labelled; it opens the help that explains every status word and its threshold). An icon leads the label.
@@ -290,7 +290,7 @@ My projects | All projects, for accounts that see every project (not Super Viewe
 - **Error:** a 13px/500 Behind Red line under the fields, with `role="alert"`.
 
 ### Navigation
-- **App bar:** a canvas-coloured sticky bar with a bottom hairline. The 40px app logo leads, then the brand title (16px/600) with the office line under it. The logo is also the favicon. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, and the Sign out text button. Navigation between pages is a Back text button with no menu.
+- **App bar:** a canvas-coloured bar with a bottom hairline, sticky from 600px up. The 40px app logo leads, then the brand title (16px/600) with the office line under it. The logo is also the favicon. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, and the Sign out text button. Navigation between pages is a Back text button with no menu.
 
 ### Status Badge
 A small pill in 700 12px, with status colour text on its container. An overdue project's badge reads "Overdue by N days" in rose on both its card and its header. The **view-only** variant is quieter: 4px radius, 500 weight, Soft Panel with `text-2` and an eye icon.
