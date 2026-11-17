@@ -118,8 +118,24 @@ val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 1
  * [payments] with each billing's share and balance after it on the net. A billing saves them from the gross, with
  * the contract cost of that day and every billing before it (in the order added), so the net balance after it is
  * the saved one plus the retention held so far.
+ * Given [cost] (the current contract cost), every share and balance is on it instead, so the rows add up to the total
+ * under them even after a variation order changed the cost; the website shows the same. Each share is the step in the
+ * running total rounded as it is shown, so the shown shares add up to the shown total.
  */
-fun netBillings(payments: List<ProjectPayment>): List<ProjectPayment> {
+fun netBillings(payments: List<ProjectPayment>, cost: Double = 0.0): List<ProjectPayment> {
+    if (cost > 0) {
+        fun r2(x: Double) = String.format(java.util.Locale.US, "%.2f", x).toDouble()
+        var paid = 0.0
+        var shown = 0.0
+        val byId = payments.sortedBy { it.id }.associate { p ->
+            paid += p.netAmount
+            val upTo = r2(paid / cost * 100)
+            val share = r2(upTo - shown)
+            shown = upTo
+            p.id to p.copy(percentage = share, balanceAmount = cost - paid, balancePercentage = r2(100 - upTo))
+        }
+        return payments.map { byId.getValue(it.id) }
+    }
     var held = 0.0
     val byId = payments.sortedBy { it.id }.associate { p ->
         held += p.grossAmount - p.netAmount

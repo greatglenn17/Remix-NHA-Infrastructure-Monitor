@@ -184,7 +184,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 ### Primary
 - **Action Blue** (`primary`): the Sign in button. **Link Blue** (`link`): text buttons, links, focus rings, the caret and section-head icons. Selected filters and the "missing data" note use **Blue Haze** (`primary-container`) with `on-primary-container` text.
 - **Progress Blue** (`accent`): the Work done bar while a project is on or ahead of plan or slipping by less than 10%.
-- **Billed Violet** (`billed`, #C4B5FD): every Billed bar, so money never reads as a work colour. It is lighter than Progress Blue so the two bars read apart on a projector.
+- **Billed Violet** (`billed`, #C4B5FD): every Billed bar, so money never reads as a work colour. It is lighter than Progress Blue so the two bars read apart on a projector. Violet is money only: the lot map's progress scale runs red (not started), pink (1–25%), orange, yellow, blue, green (finished). Billing % and balances on the phone and website screens are all on the current contract cost, so the rows add up to the total (the printed reports keep each billing's % as filed); once approved variation orders moved the cost, a note under the billings says from what.
 - **Brand Gradient** (`hero-start` navy to `hero-end` canvas, 135deg): used only on the sign-in hero panel, see-through (82% to 55%) so the background photo shows. Text on it is white.
 
 ### Top bar

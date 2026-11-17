@@ -1147,7 +1147,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
       <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
-      <tbody>${L.netBillings(payments).map(p => `<tr>
+      <tbody>${L.netBillings(payments, cost).map(p => `<tr>
         <td>${esc(p.name || '-')}${p.periodCovered ? `<br><span class="muted">${esc(p.periodCovered)}</span>` : ''}<span class="pdate"><br>${esc(L.displayDate(p.date))}</span></td>
         <td>${esc(L.displayDate(p.date))}</td>
         <td class="num">${L.formatDecimal(L.netAmount(p))}</td>
@@ -1158,7 +1158,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
         <th class="num">${L.formatDecimal(billed)}</th>
         <th class="num">${cost > 0 ? pct(billed / cost * 100) : '-'}</th>
         <th class="num">${L.formatDecimal(cost - billed)}</th></tr></tfoot>
-    </table></div>`, 'wide pay-sum');
+    </table></div>${baseNote(project, cost)}`, 'wide pay-sum');
 
   // The phone's order (SummarySection.kt) read down the columns: report and construction, the profile, plan and dates,
   // then cost beside the payments. Without the housing card, Contract cost moves up under the report (at every width) so column 1 is
@@ -3809,16 +3809,20 @@ function bindActual(c) {
 
 /* ---------- Payments (MoneySection, PaymentCard) ---------- */
 
+/** Which cost the billing % are on, once a variation order moved it; nothing otherwise. */
+const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
+
 function paymentsBody({ project, payments, cost, billed }) {
   const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
     ${kv('Balance', L.formatPhp(cost - billed))}
+    ${baseNote(project, cost)}
     <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>
     ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
-  return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments).map(p => {
+  return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
       <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>

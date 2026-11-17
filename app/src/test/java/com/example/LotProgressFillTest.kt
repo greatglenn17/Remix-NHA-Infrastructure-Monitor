@@ -16,10 +16,10 @@ class LotProgressFillTest {
     @Test
     fun bandsChangeColourAtTheirEdges() {
         val c = LightNHAColors
-        val red = c.behind; val violet = Color(0xFF7C3AED); val orange = Color(0xFFEA580C); val yellow = Color(0xFFCA8A04) // light-theme violet, orange, yellow
+        val red = c.behind; val pink = Color(0xFFF472B6); val orange = Color(0xFFEA580C); val yellow = Color(0xFFCA8A04) // light-theme pink, orange, yellow
         val blue = Color(0xFF2563EB); val green = c.onTrack
         // A lot just found, with nothing recorded, is not yet started: red, apart from 1-25%.
-        mapOf(0 to red, 1 to violet, 25 to violet, 26 to orange, 50 to orange, 51 to yellow, 75 to yellow,
+        mapOf(0 to red, 1 to pink, 25 to pink, 26 to orange, 50 to orange, 51 to yellow, 75 to yellow,
             76 to blue, 99 to blue, 100 to green).forEach { (p, colour) ->
             assertEquals("at $p%", colour, lotProgressFill(p, c))
         }

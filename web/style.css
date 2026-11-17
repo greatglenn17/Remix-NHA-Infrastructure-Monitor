@@ -574,7 +574,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .n-watch { color: var(--watch); }
 
 /* Status of construction (ConstructionCard): the lot map's progress colours, Color.kt DarkNHAColors (behind, progressQuarter1-4, onTrack). */
-.lot-0 { background: #FCA5A5; } .lot-1 { background: #A78BFA; } .lot-2 { background: #FB923C; }
+.lot-0 { background: #FCA5A5; } .lot-1 { background: #DB2777; } .lot-2 { background: #FB923C; }
 .lot-3 { background: #FACC15; } .lot-4 { background: #60A5FA; } .lot-5 { background: #4ADE80; }
 .asof { font-size: 12px; margin-bottom: 8px; }
 .lot-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--track); margin-bottom: 8px; }
@@ -698,7 +698,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-wait { position: absolute; left: 16px; top: 12px; white-space: nowrap; }
 .lot-note { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2; margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--surface); }
 .lot-stage polygon { fill-opacity: 0.4; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.lot-stage polygon.lot-0 { fill: #FCA5A5; stroke: #FCA5A5; } .lot-stage polygon.lot-1 { fill: #A78BFA; stroke: #A78BFA; }
+.lot-stage polygon.lot-0 { fill: #FCA5A5; stroke: #FCA5A5; } .lot-stage polygon.lot-1 { fill: #DB2777; stroke: #DB2777; }
 .lot-stage polygon.lot-2 { fill: #FB923C; stroke: #FB923C; } .lot-stage polygon.lot-3 { fill: #FACC15; stroke: #FACC15; }
 .lot-stage polygon.lot-4 { fill: #60A5FA; stroke: #60A5FA; } .lot-stage polygon.lot-5 { fill: #4ADE80; stroke: #4ADE80; }
 .lot-stage polygon.lot-n { fill: #A3A3A3; stroke: #A3A3A3; }
@@ -735,6 +735,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .ld-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .ld-head h3 { margin: 0; font-size: 16px; flex: 1; }
 .lot-pct { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; color: #0B0F17; }
+.lot-pct.lot-1 { color: #fff; } /* 4.6:1 on the deep pink, where the dark text is 4.2:1 */
 .lot-detail h4 { margin: 12px 0 6px; font-size: 13px; }
 .insp { margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--surface); font-size: 12px; }
 .insp b { margin-left: 6px; font-size: 13px; }
