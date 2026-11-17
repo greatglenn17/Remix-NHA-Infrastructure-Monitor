@@ -200,6 +200,8 @@ body.signed-out main { max-width: none; padding: 0; }
   color: var(--watch-text); background: var(--watch-c); border: 1px solid var(--watch-line); }
 .finding a { color: inherit; font-weight: 600; }
 .finding.calm { color: var(--ok); background: var(--ok-c); border-color: var(--ok-line); }
+/* "The billings could not load…": spans the banner like the finding above it. */
+.portfolio .alert { grid-column: 1 / -1; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0 12px; }
 /* Right end of the toolbar: the help, then "Showing x of y" when a filter or search narrows the list. */
 .toolbar .help-btn { margin-left: auto; order: 1; }
@@ -234,6 +236,7 @@ body.signed-out main { max-width: none; padding: 0; }
   border-top: 1px solid var(--border); padding-top: 10px; margin-top: auto; }
 .meta > span { display: inline-flex; align-items: center; gap: 4px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--text-2); display: grid; gap: 8px; justify-items: center; }
+.empty.error { color: var(--behind); font-size: 14px; }
 
 /* Project page */
 .back { margin: -4px 0 8px -8px; color: var(--text-2); transition: color 150ms ease-out; }
