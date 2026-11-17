@@ -305,6 +305,12 @@ body.signed-out main { max-width: none; padding: 0; }
 .alert.critical { color: var(--behind-text); background: var(--behind-c); border-color: var(--behind-line); }
 .alert.warning { color: var(--watch-text); background: var(--watch-c); border-color: var(--watch-line); }
 .alert.stale { color: var(--neutral); background: var(--neutral-c); border-color: var(--border); }
+/* A Needs attention alert is a link to where the flag is dealt with: the destination sits at the right. */
+a.alert { flex-wrap: wrap; text-decoration: none; transition: border-color 0.15s; }
+a.alert:hover { border-color: currentColor; }
+/* The message keeps beside its icon; the destination wraps under it, at the right, when the row is narrow. */
+a.alert b { flex: 1 1 14em; min-width: 0; }
+.alert .go { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; white-space: nowrap; }
 .pulse { width: 8px; height: 8px; margin: 0 4px; border-radius: 50%; background: var(--behind); flex: none; animation: pulse 1.6s ease-out infinite; }
 @keyframes pulse { from { box-shadow: 0 0 0 0 rgb(244 63 94 / 0.6); } to { box-shadow: 0 0 0 8px rgb(244 63 94 / 0); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; box-shadow: 0 0 0 3px var(--behind-c); } }
@@ -440,6 +446,9 @@ thead .num { font-family: inherit; }
   border: 1px solid var(--outline); background: var(--field); color: var(--text-2); }
 .chips button:hover { color: var(--text); }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
+/* What waits under a chip (orders not approved, requests not packaged, open issues): an amber count after its name. */
+.chip-n { display: inline-block; margin-left: 2px; min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--watch-c);
+  color: var(--watch-text); font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 .project-head + .tabs + .bento, .tabs + .stack, .tabs + .card, .tabs + .section { margin-top: 12px; }
 .stack { display: grid; gap: 12px; }
 .list-title { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 4px 0 10px; }
