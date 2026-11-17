@@ -253,7 +253,10 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 /* The mono's full-width point and percent sign are drawn in a little at this size. */
 .pl.big .pl-head .fig { letter-spacing: -0.04em; }
-/* On a phone the note takes its own line under the figure, so "36.27% behind" is never cut. */
+/* A note too long for the figure's line ("36.56% behind · plan for today 77.81%") moves under it, right-aligned, instead of being cut. */
+.pl.big .pl-head { flex-wrap: wrap; row-gap: 2px; }
+.pl.big .pl-head small { margin-left: auto; }
+/* On a phone the note always takes its own line under the figure. */
 @media (max-width: 600px) { .pl.big .pl-head { flex-wrap: wrap; } .pl.big .pl-head small { flex-basis: 100%; justify-content: flex-end; } .pl.big .pl-head small .icon { margin-right: 0; } }
 /* Header bars: taller, with a tick every 10% so an empty bar still reads as a scale. */
 .pl.big .bar { height: 10px; border-radius: 5px; margin-top: 10px;

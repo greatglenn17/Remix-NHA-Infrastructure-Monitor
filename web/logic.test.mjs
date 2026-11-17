@@ -66,7 +66,7 @@ test('status levels, view-only tag and attention flags follow the app', () => {
     ['requests', 'warning', '2 developer requests not yet packaged (oldest received 10 days ago)'],
     ['stale', 'stale', 'No field update in 19 days']]);
   assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08', [], '2026-10-26').length, 0, '13 days is still recent');
-  assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08')[0].message, 'No field update in 38 days', 'no report yet: from the start date');
+  assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08')[0].message, 'No field update yet, 38 days since the start', 'no report yet: from the start date');
   assert.equal(L.attentionFlags({ ...quiet, status: 'Suspended' }, [], 0, '2026-11-08').length, 0, 'a suspended project is not expected to report');
   assert.equal(L.attentionFlags(quiet, [], 0, '2026-11-08', [{ dateReceived: 'soon' }])[0].message, '1 developer request not yet packaged');
   assert.equal(L.latestReportDay([{ createdAtTimestamp: new Date(2026, 9, 20, 9).getTime() }, { createdAtTimestamp: new Date(2026, 9, 3).getTime() }]), '2026-10-20');
@@ -1665,4 +1665,48 @@ test('an unfinished New abstract is kept as a draft: its date and what was typed
   // Read back from the browser: the form as it was left; anything else is no draft.
   assert.deepEqual(L.keptNextAbstract(JSON.stringify(L.nextAbstractDraft(next))), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, kept: true });
   for (const text of [null, '', '{', '[]', '{"asOf":5,"text":{}}', '{"asOf":"2026-11-20","text":[1]}', '{"asOf":"2026-11-20"}']) assert.equal(L.keptNextAbstract(text), null);
+});
+
+test('web status: the badge says Behind Schedule only from 10% behind, matching the note and the filter', () => {
+  const p = { status: 'Behind Schedule', actualAccomplishment: 40, targetAccomplishment: 41.5 };
+  assert.deepEqual(L.badgeStatus(p), { text: 'On-going', level: 'neutral' }, 'a 1.50% slip reads slipping, not behind');
+  assert.equal(L.scheduleText(p), '1.50% slipping');
+  assert.deepEqual(L.badgeStatus({ ...p, actualAccomplishment: 31.5 }), { text: 'Behind Schedule', level: 'watch' }, '10% behind');
+  assert.deepEqual(L.badgeStatus({ ...p, actualAccomplishment: 20 }), { text: 'Behind Schedule', level: 'behind' });
+  assert.deepEqual(L.badgeStatus({ ...p, status: 'Suspended' }), { text: 'Suspended', level: 'neutral' });
+  assert.deepEqual(L.badgeStatus({ ...p, actualAccomplishment: 100 }), { text: 'Completed', level: 'ok' });
+  assert.equal(L.displayStatus(p), 'Behind Schedule', 'the stored word, used on prints, is unchanged');
+});
+
+test('web dashboard order: worst first, not by name', () => {
+  const today = '2026-11-17';
+  const it = (name, actual, target, completion, flags, lastUpdate = null, dateStarted = '2026-01-05') =>
+    ({ p: { name, actualAccomplishment: actual, targetAccomplishment: target, completionDateOriginal: completion, dateStarted }, flags, lastUpdate });
+  const crit = [{ kind: 'behind', level: 'critical' }];
+  const medium = it('Medium-Rise', 50, 66.6, '2027-06-30', crit);
+  const resettle = it('Resettlement', 41.25, 77.81, '2027-03-31', crit);
+  const site = it('Site Development', 0, 30, '2026-11-12', [{ kind: 'behind', level: 'critical' }, { kind: 'overdue', level: 'critical' }]);
+  const drainage = it('Drainage', 40, 41.5, '2027-01-31', [{ kind: 'waiting', level: 'warning' }]);
+  const calm = it('A calm one', 60, 50, '2027-12-31', []);
+  const order = [calm, drainage, medium, resettle, site].sort((a, b) => L.attentionOrder(a, b, today)).map(x => x.p.name);
+  assert.deepEqual(order, ['Site Development', 'Resettlement', 'Medium-Rise', 'Drainage', 'A calm one']);
+  assert.equal(L.leadingFlag(site.flags).kind, 'overdue', 'the overdue flag is the one named');
+  const stale = it('B', 50, 50, '2027-12-31', [{ kind: 'stale', level: 'stale' }], '2026-10-01');
+  const staler = it('C', 50, 50, '2027-12-31', [{ kind: 'stale', level: 'stale' }], '2026-09-01');
+  assert.deepEqual([stale, staler].sort((a, b) => L.attentionOrder(a, b, today)).map(x => x.p.name), ['C', 'B'], 'longest without an update first');
+});
+
+test('order remarks read with display dates and dots', () => {
+  assert.equal(L.remarksText('Duration: 10 Days | Effectivity: 2026-08-01'), 'Duration: 10 Days · Effectivity: Aug 1, 2026 · End: Aug 10, 2026');
+  assert.equal(L.remarksText(''), '');
+  assert.equal(L.remarksText('Approved by the RD'), 'Approved by the RD');
+  // A reference number that looks like a date stays as typed.
+  assert.equal(L.remarksText('Effectivity: 2026-08-01 | Remarks: Memo No. 2026-11-001'), 'Effectivity: Aug 1, 2026 · Remarks: Memo No. 2026-11-001');
+});
+
+test('web dashboard order: a finished or suspended project is not ranked up for going quiet', () => {
+  const today = '2026-11-17';
+  const it = (name, p, lastUpdate) => ({ p: { name, actualAccomplishment: 40, targetAccomplishment: 40, completionDateOriginal: '2027-06-01', ...p }, lastUpdate, flags: [] });
+  const items = [it('Active', {}, '2026-11-15'), it('Done', { actualAccomplishment: 100, targetAccomplishment: 100, status: 'Completed', completionDateOriginal: '2025-01-01' }, '2025-01-01'), it('Paused', { status: 'Suspended' }, '2026-03-01'), it('Quiet', {}, '2026-10-01')];
+  assert.deepEqual(items.sort((a, b) => L.attentionOrder(a, b, today)).map(x => x.p.name), ['Quiet', 'Active', 'Done', 'Paused']);
 });
