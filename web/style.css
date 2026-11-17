@@ -115,7 +115,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .search { position: relative; flex: 1 1 240px; max-width: 320px; }
 .search > .icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-2); }
 .search input { padding-left: 38px; padding-right: 50px; font-size: 14px; }
-.search input::placeholder { color: var(--text-2); }
+::placeholder { color: var(--text-2); opacity: 1; }
 .search kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none;
   font: 400 12px var(--mono); color: var(--text-2); border: 1px solid var(--outline); border-radius: 4px; padding: 1px 5px; }
 .search input:focus ~ kbd, .search input:not(:placeholder-shown) ~ kbd { display: none; }
@@ -124,7 +124,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 /* Segmented My / All projects */
 .seg { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); }
 .seg[hidden] { display: none; }
-.seg button { font: 400 13px var(--sans); color: var(--text-2); background: none; border: 0; border-radius: 6px; padding: 7px 12px; min-height: 36px; cursor: pointer; }
+.seg button { font: 400 13px var(--sans); color: var(--text-2); background: none; border: 0; border-radius: 6px; padding: 7px 12px; min-height: 40px; cursor: pointer; }
 .seg button:hover { color: var(--text); }
 .seg button[aria-pressed="true"] { background: var(--surface-variant); color: var(--text); }
 
@@ -436,7 +436,7 @@ thead .num { font-family: inherit; }
 @media (max-width: 340px) { .tabs a { padding: 10px 1px; font-size: 12px; } }
 /* SectionChips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.chips button { font: 400 13px var(--sans); min-height: 36px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+.chips button { font: 400 13px var(--sans); min-height: 40px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--outline); background: var(--field); color: var(--text-2); }
 .chips button:hover { color: var(--text); }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
@@ -450,7 +450,7 @@ thead .num { font-family: inherit; }
 .lv-primary { color: var(--on-primary-container); background: var(--primary-container); }
 
 /* Attached files: a link once Storage gives its address; grey when it cannot. */
-.file { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--link); text-decoration: none; border-radius: 6px; padding: 6px 4px; min-height: 32px; }
+.file { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--link); text-decoration: none; border-radius: 6px; padding: 6px 4px; min-height: 40px; }
 a.file:not([href]) { color: var(--text-2); cursor: progress; }
 .file:hover { text-decoration: underline; }
 .file.gone { color: var(--text-2); font-weight: 400; text-decoration: line-through; cursor: default; }
@@ -532,7 +532,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* Monthly */
 .month-head { padding-top: 12px; max-width: 320px; }
 .month-head select, .wx select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
-.month h3 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
+.month h2 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
 .month > p { margin-bottom: 12px; }
 
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
@@ -597,7 +597,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb td.day { font-weight: bold; width: 18%; }
 /* Room to write a few lines; typed recommendations make it taller. Short, so the sign-offs fit under section VII. */
 .bb td.rec { height: 15mm; }
-.bb td.empty { text-align: center; color: #555; }
+.bb td.empty { display: table-cell; text-align: center; color: #555; }
 .bb tr.tot { break-before: avoid; }
 .bb tr.tot td { font-weight: bold; }
 .bb h1 { font-size: 13pt; text-align: center; margin: 3mm 0 0; }
@@ -626,7 +626,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb table.sig { margin-top: 6mm; }
 .bb table.sig td { border: none; width: 33%; }
 .bb .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
-.bb .note { font-size: 8pt; font-style: italic; }
+.bb .note { font-size: 8pt; font-style: italic; color: #000; }
 .bb .keep { break-inside: avoid; }
 /* Status of Construction (BlueBookForms.sdpPlan): the plan as big as one page allows, the legend over its bottom-left corner. */
 .bb.land { width: 285mm; }
@@ -664,7 +664,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* Lots (SubdivisionPlanTab, read-only): a one-line count, filters, and each block's lots as coloured squares. */
 .lot-n { background: #A3A3A3; }
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-.lots-head h3 { margin: 0; font-size: 16px; }
+.lots-head h2 { margin: 0; font-size: 16px; }
 .lots-head select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
 .plan-tools { margin: -8px 0 8px; }
 .plan-tools .lots-links { display: flex; padding-bottom: 8px; }
@@ -701,7 +701,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-stage polygon.sel { fill: var(--watch); fill-opacity: 0.65; stroke: var(--watch); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
 .lot-legend .dot.billed { background: none; border: 2px dashed var(--primary); width: 8px; height: 8px; }
 .zoom-bar { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
-.zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; cursor: pointer; }
+.zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; min-height: 40px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 .zoom-bar b { font-size: 12px; color: var(--link); min-width: 36px; text-align: center; }
 .lot-card { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 16px 16px 0 0; background: var(--surface-variant); }
@@ -712,9 +712,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lc-head b { font-size: 16px; }
 .lc-head .lot-pct { display: inline-flex; padding: 2px; border-radius: 6px; color: #111; }
 .lc-head .icon-btn { margin-left: auto; }
-.icon-btn { display: inline-flex; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text-2); cursor: pointer; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding: 6px; border: 0; border-radius: 6px; background: none; color: var(--text-2); cursor: pointer; }
 .icon-btn:hover { background: var(--surface); }
-.btn.lc-more { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 32px; font-size: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); }
+.btn.lc-more { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; min-height: 40px; font-size: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--outline); }
 .lc-bill { font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--outline); color: var(--text-2); }
 .lc-bill.on { color: #052e16; background: var(--ok); border-color: var(--ok); }
 @media (max-width: 600px) { .zoom-bar [data-zoom]:not([data-zoom="reset"]) { display: none; } }
@@ -741,13 +741,13 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .issue-card { padding: 12px 16px 14px; min-width: 0; }
 .issue-card.critical { border-color: color-mix(in srgb, var(--behind) 40%, transparent); }
 .ic-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--outline); }
-.ic-head p { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.ic-head h2 { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .ic-head .icon { color: var(--text-2); }
 .ic-head .behind { color: var(--behind); }
 .ic-badges { display: flex; gap: 6px; }
-.issue-card h4 { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); }
-.issue-card h4.link { color: var(--link); }
-.issue-card h4 + p { margin: 0; font-size: 14px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
+.issue-card h3 { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.issue-card h3.link { color: var(--link); }
+.issue-card h3 + p { margin: 0; font-size: 14px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
 .issue-card .logged { margin: 10px 0 0; font-style: italic; text-align: right; }
 /* Edit button and the edit form (AddIssueDialog). */
 .ic-actions { display: flex; justify-content: flex-end; margin: 8px -8px -6px 0; }
@@ -844,18 +844,18 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-brush i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
 .wx-row { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px 10px; margin: 0; min-width: 0; }
 .wx-row legend { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 0 4px; }
-.wx-row legend .text-btn { font-size: 12px; min-height: 32px; }
+.wx-row legend .text-btn { font-size: 12px; }
 .wx-hours { display: grid; grid-template-columns: 26px repeat(12, minmax(0, 1fr)); gap: 3px; align-items: center; }
-.wx-hours > span { font-size: 11px; }
-.wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 11px var(--sans); color: #0B0F17; cursor: pointer; user-select: none; }
+.wx-hours > span { font-size: 12px; }
+.wx-h { min-width: 0; min-height: 32px; padding: 0; border: 0; border-radius: 4px; font: 600 12px var(--sans); color: #0B0F17; cursor: pointer; user-select: none; }
 .wx-h:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
 .wx-row legend { flex-wrap: wrap; }
-.wx-row legend select { font: 400 12px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 32px; }
+.wx-row legend select { font: 400 12px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 6px; padding: 4px 6px; min-height: 40px; }
 
 /* Touch screens: controls are at least 44px tall for a finger, and fields are 16px so iPhone Safari does not zoom in on focus. */
 @media (pointer: coarse) {
   .btn, .btn.lc-more, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select,
-  .seg button, .zoom-bar button { min-height: 44px; }
-  .zoom-bar button { min-width: 44px; }
+  .seg button, .zoom-bar button, .icon-btn { min-height: 44px; }
+  .zoom-bar button, .icon-btn { min-width: 44px; }
   input, select, textarea { font-size: 16px !important; }
 }

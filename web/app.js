@@ -71,6 +71,9 @@ const s = {
 /** Escapes text for HTML; every value from Firestore goes through it. */
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icon = (name, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${name}</span>`;
+let dialogCount = 0;
+/** Names a dialog by its heading, so a screen reader announces it. */
+const named = d => { const h = d.querySelector('h2'); if (h) { h.id ||= `dialog-title-${++dialogCount}`; d.setAttribute('aria-labelledby', h.id); } return d; };
 const today = () => new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd in the viewer's time zone
 const pct = n => `${(Number(n) || 0).toFixed(2)}%`;
 const clamp = f => Math.max(0, Math.min(1, f || 0));
@@ -362,7 +365,7 @@ async function editProfile() {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -486,7 +489,7 @@ const billedLine = (it, big) => (['project_payments', 'pending_documents'].some(
 function statusBadge(p) {
   const late = L.daysOverdue(p, today());
   return late ? `<span class="badge lv-behind">Overdue by ${late} ${late === 1 ? 'day' : 'days'}</span>`
-    : (b => `<span class="badge lv-${b.level}">${esc(b.text)}</span>`)(L.badgeStatus(p));
+    : (b => `<span class="badge lv-${b.level}">${esc(L.shownWord(b.text))}</span>`)(L.badgeStatus(p));
 }
 
 function renderDashboard() {
@@ -638,7 +641,7 @@ function projectForm(c = null) {
     dropFiles(L.unusedFiles([...c.records, project], [], [], null));
     location.hash = '#/';
   });
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -665,7 +668,7 @@ async function assignForm(c) {
   const close = () => (JSON.stringify(values()) === initial || confirm('Discard your changes to the assignment?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
   let users;
   try {
@@ -742,7 +745,7 @@ function driveForm(c) {
   const done = () => { open = false; driveWait?.close(); d.close(); d.remove(); };
   d.querySelector('[data-cancel]').onclick = done;
   d.addEventListener('cancel', e => { e.preventDefault(); done(); });
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
   if (!driveClientId) { go.hidden = true; err.textContent = 'Google Drive is not set up for this site yet. The steps are in web/README.md, under "Copy to Google Drive".'; return; }
   form.onsubmit = async e => {
@@ -843,7 +846,7 @@ function showTermHelp() {
   d.innerHTML = `<h2>What these mean</h2><dl>${TERM_HELP.map(([t, m]) => `<div><dt>${esc(t)}</dt><dd>${esc(m)}</dd></div>`).join('')}</dl>
     <form method="dialog"><button class="text-btn">Close</button></form>`;
   d.addEventListener('close', () => d.remove());
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1257,7 +1260,7 @@ function barChartForm(c) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1382,8 +1385,8 @@ function monthlyView({ page, weekly, of, now }) {
       <label class="field">Month <select id="month">${months.map(m => `<option${m === month ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></label>
       ${key ? `<a class="text-btn" href="#/p/${esc(page.id)}/print/${key}">${icon('print', 'sm')}Print</a>` : ''}
     </div>
-    <h3>Monthly accomplishment report – ${esc(month)}</h3>
-    <p><span class="badge lv-${level}">${v >= 0 ? `AHEAD (${signedPct(v)})` : `SLIPPAGE (${signedPct(v)})`}</span></p>
+    <h2>Monthly accomplishment report – ${esc(month)}</h2>
+    <p><span class="badge lv-${level}">${v >= 0 ? `Ahead (${signedPct(v)})` : `Slippage (${signedPct(v)})`}</span></p>
     ${rows.length ? table(['Reporting week', { text: 'Target %', num: 1 }, { text: 'Actual %', num: 1 }, { text: 'Variance %', num: 1 }],
       rows.map(r => { const rv = (Number(r.actualAccomplishmentPct) || 0) - (Number(r.targetAccomplishmentPct) || 0);
         return `<tr><td>${esc(r.reportingWeek)}</td><td class="num">${pct(r.targetAccomplishmentPct)}</td><td class="num">${pct(r.actualAccomplishmentPct)}</td><td class="num n-${noteLevel(rv)}"><b>${signedPct(rv)}</b></td></tr>`; }).join(''),
@@ -1426,10 +1429,10 @@ function lotsView(c) {
     ? `<select id="plan-rev" aria-label="Revision in use">${site.plans.map(p => `<option value="${esc(p.uuid)}"${p === site.plan ? ' selected' : ''}>${esc(name(p))}</option>`).join('')}</select>`
     : `${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span>`;
   const k = L.lotStats(site.lots);
-  const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option${o === st[key] ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></label>`;
+  const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option value="${esc(o)}"${o === st[key] ? ' selected' : ''}>${esc(L.shownWord(o))}</option>`).join('')}</select></label>`;
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
-    <div class="lots-head"><div><h3>${title}</h3>${scaleLine}</div>
+    <div class="lots-head"><div><h2>${title}</h2>${scaleLine}</div>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${findLots}${upload}</span></div>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
@@ -1506,7 +1509,7 @@ function lotDetail(l, inspections) {
   const history = !inspections.length ? emptyLine('No inspection recorded yet.')
     : `<p class="muted small">Timeline: ${esc([...inspections].reverse().map(x => `${pctOf(x)}%`).join(' → '))}</p>${inspections.map(x => `<div class="insp">
       <i class="dot lot-${L.lotBand(pctOf(x))}"></i><b>${esc(`${pctOf(x)}% • ${x.constructionStatus || ''}`)}</b><span>${esc(x.billingStatus || 'NOT BILLED')}</span>
-      <p>${esc(`${x.inspectionDate || ''} by ${x.inspectedBy || ''}${x.change ? ` (${x.change})` : ''}`)}</p>
+      <p>${esc(`${x.inspectionDate ? L.displayDate(x.inspectionDate) : ''} by ${x.inspectedBy || ''}${x.change ? ` (${x.change})` : ''}`)}</p>
       ${(x.remarks || '').trim() ? `<p>Remarks: ${esc(x.remarks)}</p>` : ''}</div>`).join('')}`;
   const p = l.progress || {};
   const road = L.lotUse(l) === 'Road Lot';
@@ -1541,7 +1544,7 @@ function editLot(c, lot) {
   const refs = L.attachmentList(p.photosJson), drained = Number(p.drainageProgress) >= 100;
   const billed = [p.billingStatus === 'BILLED', p.m2BillingStatus === 'BILLED'];
   const info = i => { const [date, by, refNo] = i ? [p.m2BillingDate, p.m2BilledBy, p.m2BillingReference] : [p.billingDate, p.billedBy, p.billingReference];
-    return `${date || 'N/A'} • By: ${by || 'N/A'}${refNo ? ` • Ref No: ${refNo}` : ''}`; };
+    return `${date ? L.displayDate(date) : 'N/A'} • By: ${by || 'N/A'}${refNo ? ` • Ref No: ${refNo}` : ''}`; };
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
   d.innerHTML = `<form novalidate>
@@ -1617,7 +1620,7 @@ function editLot(c, lot) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   loadFiles(d);
   d.showModal();
 }
@@ -1664,7 +1667,7 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
       button.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1778,7 +1781,7 @@ function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1839,7 +1842,7 @@ function planForm(c) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1875,7 +1878,7 @@ function scaleForm(c, site) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1915,7 +1918,7 @@ function ownSiteForm(c, sites, site) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -1980,7 +1983,7 @@ function foundLotsDialog(c, site, areas, page) {
     }
     drawProject(c.page);
   }; });
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2386,8 +2389,8 @@ function weatherView({ page, weekly, project }) {
     const own = Array.isArray(report?._weather) ? report._weather : [];
     const days = report ? L.weekDays(report.reportingWeek) : [];
     body = !report ? emptyLine('No weekly reports submitted yet.') : `
-      <label class="field">Report<select data-wx="report">${weekly.map((r, i) => `<option value="${esc(r.uuid)}"${r === report ? ' selected' : ''}>Week ${weekly.length - i}: ${esc(r.reportingWeek)}</option>`).join('')}</select></label>
-      <h3 class="wx-title">Weekly report weather mapping <span class="muted">7 days</span></h3>
+      <label class="field">Report<select data-wx="report">${weekly.map((r, i) => `<option value="${esc(r.uuid)}"${r === report ? ' selected' : ''}>Week ${weekly.length - i}: ${esc((r.reportingWeek || '').replace(/^Week \d+: /, ''))}</option>`).join('')}</select></label>
+      <h2 class="wx-title">Weekly report weather mapping <span class="muted">7 days</span></h2>
       ${days.length && L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn wx-edit-btn" data-edit-weather="${esc(report.uuid)}">${icon('edit', 'sm')}Edit weather</button>` : ''}
       <p class="muted small">Reporting period: ${esc(report.reportingWeek)}</p>
       ${days.length ? `<div class="wx-grid">${days.map(d => {
@@ -2406,9 +2409,9 @@ function weatherView({ page, weekly, project }) {
   }
   const mode = (key, label, ic) => `<button data-wx="mode" value="${key}" aria-pressed="${st.mode === key}">${icon(ic, 'sm')}${label}</button>`;
   return `<section class="card section wx">
-    <div class="chips" role="group" aria-label="Weather view">${mode('week', 'Weekly Report Range', 'date_range')}${mode('month', 'Monthly View', 'calendar_month')}</div>
+    <div class="chips" role="group" aria-label="Weather view">${mode('week', 'Weekly report range', 'date_range')}${mode('month', 'Monthly view', 'calendar_month')}</div>
     ${body}
-    <p class="wx-legend">${P.WEATHER.map(([, label, hex]) => `<span><i style="background:${hex}"></i>${label}</span>`).join('')}</p>
+    <p class="wx-legend">${P.WEATHER.map(([, label, hex]) => `<span><i style="background:${hex}"></i>${esc(L.shownWord(label))}</span>`).join('')}</p>
     <p class="muted small">Inner ring 12 AM to 11 AM, outer ring 12 PM to 11 PM. A day with no log stays blank.</p>
   </section>`;
 }
@@ -2435,7 +2438,7 @@ function auditCard(log) {
   const [level, ic] = L.auditBadge(log.actionType);
   const t = new Date(Number(log.timestamp) || 0);
   const two = n => String(n).padStart(2, '0');
-  const when = `${t.getFullYear()}-${two(t.getMonth() + 1)}-${two(t.getDate())} ${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}`;
+  const when = L.displayDate(`${t.getFullYear()}-${two(t.getMonth() + 1)}-${two(t.getDate())} ${two(t.getHours())}:${two(t.getMinutes())}:${two(t.getSeconds())}`);
   const value = (label, v, cls) => (v?.trim() ? `<p><b class="${cls}">${label}:</b> ${esc(v)}</p>` : '');
   return `<li class="card audit-card">
     <div class="ac-head"><span class="ac-badge n-${level}">${icon(ic, 'sm')}${esc(log.actionType || '-')}</span><time class="muted small">${when}</time></div>
@@ -2484,11 +2487,11 @@ function issueResults(c, st) {
 function issueCard(i, now, editable = false) {
   const overdue = L.isOverdueIssue(i, now), critical = L.isCriticalIssue(i), status = i.status || 'Pending';
   const level = /resolved/i.test(status) ? 'ok' : /critical/i.test(status) ? 'behind' : 'watch';
-  const block = (label, text, cls = '') => (text?.trim() ? `<h4 class="${cls}">${esc(label)}</h4><p>${esc(text)}</p>` : '');
+  const block = (label, text, cls = '') => (text?.trim() ? `<h3 class="${cls}">${esc(label)}</h3><p>${esc(text)}</p>` : '');
   return `<li class="card issue-card${critical ? ' critical' : ''}">
-    <div class="ic-head"><p>${icon('event', 'sm')}<span>${esc(L.displayDate(i.date))}${i.targetDate?.trim()
-      ? `<span class="${overdue ? 'behind' : 'muted'}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (OVERDUE)' : ''}</span>` : ''}</span></p>
-      <div class="ic-badges">${critical ? '<span class="badge lv-behind">CRITICAL</span>' : ''}<span class="badge lv-${level}">${esc(status.toUpperCase())}</span></div></div>
+    <div class="ic-head"><h2>${icon('event', 'sm')}<span>${esc(L.displayDate(i.date))}${i.targetDate?.trim()
+      ? `<span class="${overdue ? 'behind' : 'muted'}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (overdue)' : ''}</span>` : ''}</span></h2>
+      <div class="ic-badges">${critical ? '<span class="badge lv-behind">Critical</span>' : ''}<span class="badge lv-${level}">${esc(L.shownWord(status))}</span></div></div>
     ${block('Issue description', i.description || '-')}
     ${block(`Action taken${i.actionBy?.trim() ? ` by ${i.actionBy.trim()}` : ''}`, i.actionTaken, 'link')}
     ${block('Remarks / notes', i.remarks)}
@@ -2536,7 +2539,7 @@ function editIssue(c, issue) {
     <label class="field">Action taken by<select name="actionBy">${opt('', issue.actionBy || '', 'Not set')}${L.ISSUE_ACTION_BY.map(v => opt(v, issue.actionBy || '')).join('')}</select></label>
     <label class="field">Target date (optional)<input type="date" name="targetDate" value="${esc(issue.targetDate || '')}"></label>
     <label class="check"><input type="checkbox" name="isCritical"${L.isCriticalIssue(issue) ? ' checked' : ''}>Critical issue</label>
-    <label class="field">Status<select name="status">${statuses.map(v => opt(v, status)).join('')}</select></label>
+    <label class="field">Status<select name="status">${statuses.map(v => opt(v, status, L.shownWord(v))).join('')}</select></label>
     <p class="error" role="alert"></p>
     <div class="actions">${!isNew && L.canDeleteIssue(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete issue</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
   </form>`;
@@ -2572,7 +2575,7 @@ function editIssue(c, issue) {
   };
   // deleteProjectIssue, with the phone's question.
   if (!isNew) bindDelete(d, 'Delete this issue entry? This cannot be undone.', () => saveEdits(c, [[issue, null, L.deletedIssueAudit(issue)]], 'issue'));
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2684,7 +2687,7 @@ function addOrder(c, type, continued = '') {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2739,7 +2742,7 @@ function editOrder(c, o) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2793,7 +2796,7 @@ function relatedFile(c, file) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2858,7 +2861,7 @@ function editRequest(c, r) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -2914,7 +2917,7 @@ function editLetter(c, l) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -3066,7 +3069,7 @@ function editPhotos(c, report) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   loadFiles(d);
   d.showModal();
 }
@@ -3200,7 +3203,7 @@ function weeklyForm(c, report = null) {
   // deleteWeeklyReport: the project's site photo becomes the newest left on the other reports.
   if (report) bindDelete(d, `Delete the weekly report for ${report.reportingWeek}? This cannot be undone.`, () => saveEdits(c, [[report, null, L.deletedWeeklyAudit(report)]], 'weekly report',
     { latestUpdatePhotoUrl: L.latestSitePhoto(c.weekly.filter(r => r.uuid !== report.uuid)) }));
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -3282,7 +3285,7 @@ function dropFiles(refs) {
 function editWeather(c, report) {
   const days = L.weatherForm(report), changed = new Set();
   let brush = 'RAINY';
-  const label = Object.fromEntries(P.WEATHER.map(([k, l]) => [k, l]));
+  const label = Object.fromEntries(P.WEATHER.map(([k, l]) => [k, L.shownWord(l)]));
   const colour = Object.fromEntries(P.WEATHER.map(([k, , hex]) => [k, hex]));
   const hourName = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
   const cell = (di, h) => `<button type="button" class="wx-h" data-d="${di}" data-h="${h}" style="background:${colour[days[di].hours[h]]}"
@@ -3369,7 +3372,7 @@ function editWeather(c, report) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -3480,7 +3483,7 @@ function billingForm(c, old = null) {
       done();
     } catch (x) { failed(x); save.disabled = false; }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -3845,8 +3848,8 @@ function requestsCard(requests, now, editable = false) {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
     const title = L.requestTitle(r);
     return entry(title, [
-      `Requested: ${r.dateRequested || '-'}  ·  Received: ${r.dateReceived || '-'}`,
-      r.datePackaged ? `Packaged: ${r.datePackaged}` : `NOT YET PACKAGED${waiting == null ? '' : ` · ${waiting} days since received`}`,
+      `Requested: ${L.displayDate(r.dateRequested)}  ·  Received: ${L.displayDate(r.dateReceived)}`,
+      r.datePackaged ? `Packaged: ${L.displayDate(r.datePackaged)}` : `Not yet packaged${waiting == null ? '' : ` · ${waiting} days since received`}`,
       title === (r.requestType || '-') && r.details?.trim() && `Details: ${r.details}`, // an order number is in the title instead
     ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
       + (editable ? `<button class="text-btn entry-edit" data-edit-request="${esc(r.uuid)}">${icon('edit', 'sm')}${r.datePackaged ? 'Edit' : 'Edit or mark packaged'}</button>` : ''),
@@ -3913,7 +3916,7 @@ function signatoriesForm(c, weekly) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 
@@ -3953,7 +3956,7 @@ function recommendationsForm(c, month, saved) {
       save.disabled = false;
     }
   };
-  document.body.append(d);
+  document.body.append(named(d));
   d.showModal();
 }
 

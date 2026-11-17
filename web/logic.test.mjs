@@ -94,6 +94,10 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.statusLevel({ ...late, status: 'Suspended' }, '2026-11-08'), 'neutral');
   assert.equal(L.displayDate('2026-10-20'), 'Oct 20, 2026');
   assert.equal(L.displayDate('TBA'), 'TBA');
+  assert.equal(L.displayDate('2026-11-12 14:05'), 'Nov 12, 2026, 14:05');
+  assert.equal(L.displayDate('2026-11-12 14:05:09'), 'Nov 12, 2026, 14:05:09');
+  assert.equal(L.shownWord('M1 BILLED'), 'M1 billed');
+  assert.equal(L.shownWord('100% / RFO'), '100% / RFO');
   assert.equal(L.formatPhp(-1234.5), '-₱1,234.50');
   assert.equal(L.netAmount({ grossAmount: 1000, retentionPct: 10 }), 900);
   assert.equal(L.isOpenIssue({ status: 'Pending' }), true);

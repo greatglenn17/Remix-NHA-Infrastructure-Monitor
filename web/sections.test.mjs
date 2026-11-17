@@ -113,7 +113,7 @@ test('letters: old document letters merged in, newest first; related files leave
   assert.equal(merged[1].receivedFileUrl, 'nhafile:x.jpg');
   assert.deepEqual(L.relatedFiles(docs).map(d => d.uuid), ['d2']);
   assert.deepEqual(L.variationLines({ documentName: 'Variation Order No. 1 (Additive) - PHP 5', status: 'Approved', remarks: 'Extra drainage | Date Approved: 2026-03-01' }),
-    ['Type: Additive', 'Status: Approved', 'Date Approved: 2026-03-01', 'Reason: Extra drainage']);
+    ['Type: Additive', 'Status: Approved', 'Date Approved: Mar 1, 2026', 'Reason: Extra drainage']);
 });
 
 test('lots status: six bands, plans in use only, saleable lots only, latest progress wins', () => {
