@@ -59,7 +59,7 @@ const TERM_HELP = [
 const main = document.getElementById('app');
 const who = document.getElementById('who');
 const s = {
-  user: null, claims: {}, profile: {}, projects: null, projectsError: null,
+  user: null, claims: {}, profile: {}, projects: null, projectsError: null, loaded: {},
   payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), unsub: [], unsubPage: [], page: null,
   filter: null, mineOnly: false, q: '',
 };
@@ -102,8 +102,14 @@ function listenRecords(type, into) {
       if (!into.has(pid)) into.set(pid, []);
       into.get(pid).push(r);
     }
+    s.loaded[type] = true;
     redrawDashboard();
-  }, e => console.warn(`records ${type}:`, e.message));
+  }, e => {
+    // A listener that fails stops for good: say so on the dashboard instead of showing its records as none.
+    console.warn(`records ${type}:`, e.code || e);
+    s.loaded[type] = L.errorText(e, 'this account cannot read them', 'they could not be read');
+    redrawDashboard();
+  });
 }
 
 onAuthStateChanged(auth, async user => {
@@ -111,7 +117,7 @@ onAuthStateChanged(auth, async user => {
   if (user && signingUp) return;
   s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  s.user = user; s.projects = null; s.payments.clear(); s.docs.clear(); s.requests.clear(); s.weekly.clear(); s.page = null; s.profile = {};
+  s.user = user; s.projects = null; s.projectsError = null; s.loaded = {}; s.payments.clear(); s.docs.clear(); s.requests.clear(); s.weekly.clear(); s.page = null; s.profile = {};
   document.body.classList.toggle('signed-out', !user);
   if (!user) {
     who.innerHTML = '';
@@ -137,7 +143,7 @@ onAuthStateChanged(auth, async user => {
     s.projects = snap.docs.map(d => ({ ...d.data(), projectUuid: d.id }))
       .filter(p => p.isDeleted !== true && p.name);
     redrawDashboard();
-  }, e => { s.projectsError = e.message; redrawDashboard(); }));
+  }, e => { console.warn('projects:', e.code || e); s.projectsError = L.errorText(e, 'This account cannot read the project list.', 'Reload the page to try again.'); redrawDashboard(); }));
   s.unsub.push(listenRecords('project_payments', s.payments), listenRecords('pending_documents', s.docs),
     // For the attention flags: requests not yet packaged, and the newest weekly report (no field update in 14 days).
     listenRecords('developer_requests', s.requests), listenRecords('weekly_reports', s.weekly));
@@ -315,7 +321,8 @@ async function editProfile() {
   d.className = 'help edit-form';
   const done = () => { d.close(); d.remove(); };
   let stored;
-  try { stored = await getDoc(doc(db, 'users', s.user.uid)); } catch { stored = null; }
+  let loadError = '';
+  try { stored = await getDoc(doc(db, 'users', s.user.uid)); } catch (x) { stored = null; loadError = `Your profile could not be loaded. ${L.errorText(x, 'This account cannot read its profile.', 'Close this and try again.')}`; }
   const v = name => esc(stored?.get(name) || '');
   d.innerHTML = `<form novalidate>
     <h2>Update profile &amp; position</h2>
@@ -323,8 +330,8 @@ async function editProfile() {
     <label class="field">Full name<input name="fullName" autocomplete="name" value="${v('displayName')}" required></label>
     <label class="field">Position / title<input name="position" autocomplete="organization-title" placeholder="e.g. Supervising Project Engineer" value="${v('position')}" required></label>
     <label class="field">Office / department / region<input name="office" autocomplete="organization" placeholder="e.g. NHA Regional Office III" value="${v('office')}" required></label>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save changes</button></div>
+    <p class="error" role="alert">${esc(loadError)}</p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${loadError ? ' disabled' : ''}>Save changes</button></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ name: form.fullName.value.trim(), position: form.position.value.trim(), office: form.office.value.trim() });
@@ -347,7 +354,7 @@ async function editProfile() {
       s.profile = { name: f.name, title: f.position, office: f.office };
       done();
     } catch (x) {
-      err.textContent = `Could not save: ${x.message}`;
+      err.textContent = L.errorText(x, 'This account cannot change its profile.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -371,7 +378,7 @@ function renderUsers() {
   s.unsubPage.push(onSnapshot(collection(db, 'users'), snap => {
     users = L.manageableUsers(snap.docs.map(d => L.userRow(d.id, d.data())));
     list.innerHTML = users.length ? users.map(userCard).join('') : '<li class="empty">No other users have registered yet.</li>';
-  }, e => { list.innerHTML = `<li class="error">Could not load users: ${esc(e.message)}</li>`; }));
+  }, e => { list.innerHTML = `<li class="empty error">Could not load users. ${esc(L.errorText(e, 'This account cannot read the user list.', 'Reload the page to try again.'))}</li>`; }));
   list.onclick = e => {
     const b = e.target.closest('button[data-uid]');
     const user = b && users.find(u => u.uid === b.dataset.uid);
@@ -413,7 +420,7 @@ async function setUser(user, change, done, say) {
     await updateDoc(doc(db, 'users', user.uid), L.userChange(user, change));
     say(done);
   } catch (err) {
-    say(`Could not change it: ${err.message}`);
+    say(`Could not change it. ${L.errorText(err, 'This account cannot change users.', 'Try again.')}`);
     // The listener only redraws on a change, so put the controls back as they were.
     main.querySelectorAll(`[data-uid="${CSS.escape(user.uid)}"], [data-sees-all="${CSS.escape(user.uid)}"]`).forEach(el => { el.disabled = false; });
     const box = main.querySelector(`[data-sees-all="${CSS.escape(user.uid)}"]`);
@@ -424,13 +431,28 @@ async function setUser(user, change, done, say) {
 /* ---------- Dashboard (DashboardScreen + PortfolioCounts + PortfolioRow) ---------- */
 
 /** One project as the dashboard sees it (ProjectViewModel's PortfolioItem). */
+const RECORD_TYPES = ['project_payments', 'pending_documents', 'developer_requests', 'weekly_reports'];
+const RECORD_WORDS = { project_payments: 'billings', pending_documents: 'orders', developer_requests: 'developer requests', weekly_reports: 'weekly reports' };
+/** The record types whose listener failed. */
+const failedTypes = () => RECORD_TYPES.filter(t => typeof s.loaded[t] === 'string');
+/** The dashboard's one notice when some records could not load: what is missing and why, so no card reads as "none". */
+function notLoaded() {
+  const failed = failedTypes();
+  if (!failed.length) return '';
+  const words = failed.map(t => RECORD_WORDS[t]);
+  const list = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0];
+  return `<p class="alert warning">${icon('warning', 'sm')}<span>The ${esc(list)} could not load (${esc(s.loaded[failed[0]])}). Flags that depend on them are left out. Reload the page to try again.</span></p>`;
+}
+
 function itemOf(project) {
   const docs = s.docs.get(project.projectUuid) || [];
-  const p = L.withSchedule(project, docs, today());
+  // Without the orders the chart's plan would drop approved suspensions: keep the target and status the phone saved.
+  const p = typeof s.loaded.pending_documents === 'string' ? project : L.withSchedule(project, docs, today());
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
   const lastUpdate = L.latestReportDay(s.weekly.get(p.projectUuid) || []);
-  return { p, docs, billed, cost, lastUpdate, flags: L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate), waiting: L.waitingApproval(docs) };
+  const flags = L.flagsWithout(L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate), failedTypes());
+  return { p, docs, billed, cost, lastUpdate, flags, waiting: L.waitingApproval(docs) };
 }
 
 /** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. A figure (`L.isFigure`) is set in the mono; a value in words is not. */
@@ -452,8 +474,10 @@ function workDone(p, big, plan = '') {
   const noteTone = tone !== 'primary' ? tone : level === 'ok' ? 'ok' : 'muted';
   return progressLine('Work done', pct(p.actualAccomplishment), note, noteTone, (Number(p.actualAccomplishment) || 0) / 100, tone, big);
 }
-const billedLine = (it, big) => progressLine('Billed', L.billedLabel(it.billed, it.cost),
-  it.billed > 0 ? esc(L.formatPhp(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big);
+// Billed % needs the billings and the orders (approved variation orders change the contract cost).
+const billedLine = (it, big) => (['project_payments', 'pending_documents'].some(t => typeof s.loaded[t] === 'string') && !big
+  ? progressLine('Billed', 'Not loaded', '', 'muted', 0, 'billed') : progressLine('Billed', L.billedLabel(it.billed, it.cost),
+  it.billed > 0 ? esc(L.formatPhp(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big));
 /** The status badge on cards and the project header; an overdue project says so instead of "On-going". */
 function statusBadge(p) {
   const late = L.daysOverdue(p, today());
@@ -585,7 +609,7 @@ function projectForm(c = null) {
         await addRecords(c, [[ids => L.auditRecord({ ...ids, user, ...edit.audit }), []]], edit.fields);
         done();
       } catch (x) {
-        err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+        err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
         save.disabled = false;
       }
       return;
@@ -594,7 +618,7 @@ function projectForm(c = null) {
     try {
       await setDoc(doc(db, 'projects', uuid), made);
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot add a project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot add a project.', 'Could not save. Try again.');
       save.disabled = false;
       return;
     }
@@ -663,7 +687,7 @@ async function assignForm(c) {
       await addRecords(c, [[ids => L.auditRecord({ ...ids, assignedUids: fields.assignedUids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot assign people to this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot assign people to this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -754,8 +778,9 @@ function driveForm(c) {
 function redrawDashboard() {
   const grid = document.getElementById('grid');
   if (!grid || !s.user) return;
-  if (s.projectsError) { grid.outerHTML = `<p class="error">Could not load projects: ${esc(s.projectsError)}</p>`; return; }
-  if (s.projects === null) { grid.innerHTML = '<li class="empty">Loading projects…</li>'; return; }
+  // innerHTML, not outerHTML: #grid stays, so the next good snapshot can still draw.
+  if (s.projectsError) { grid.innerHTML = `<li class="empty error">Could not load projects. ${esc(s.projectsError)}</li>`; return; }
+  if (s.projects === null || RECORD_TYPES.some(t => !s.loaded[t])) { grid.innerHTML = '<li class="empty">Loading projects…</li>'; return; }
 
   const mineAvailable = L.seesAll(s.claims) && s.claims.role !== 'SUPER_VIEWER';
   const all = s.projects.map(itemOf);
@@ -777,7 +802,7 @@ function redrawDashboard() {
     ${counts.length ? `<div class="pills" role="group" aria-label="Show only projects that are">
       ${counts.map(c => `<button class="pill ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')}
     </div>` : ''}
-    ${finding(inScope)}`;
+    ${finding(inScope)}${notLoaded()}`;
   banner.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
   // The banner was rebuilt: keep keyboard focus on the filter just pressed.
   if (focused) banner.querySelector(`[data-kind="${focused}"]`)?.focus();
@@ -821,7 +846,8 @@ function showTermHelp() {
 // The screen's one finding: the project the sort puts first, with its worst flag.
 function finding(items) {
   const flagged = items.filter(it => it.flags.length).sort((a, b) => L.attentionOrder(a, b, today()));
-  if (!flagged.length) return items.length ? `<p class="finding calm">${icon('check_circle', 'sm')}No project needs attention.</p>` : '';
+  // No all-clear while some records could not load: their flags were left out, not found clear.
+  if (!flagged.length) return items.length && !failedTypes().length ? `<p class="finding calm">${icon('check_circle', 'sm')}No project needs attention.</p>` : '';
   const [first] = flagged, f = L.leadingFlag(first.flags), more = flagged.length - 1;
   return `<p class="finding">${icon('warning', 'sm')}<span>First to look at: <a href="#/p/${esc(first.p.projectUuid)}">${esc(first.p.name)}</a>,
     ${esc(f.message.charAt(0).toLowerCase() + f.message.slice(1))}${more ? `<span class="nw"> · ${more} more flagged</span>` : ''}</span></p>`;
@@ -849,7 +875,7 @@ function tile(it) {
     <div class="meta">
       <span>${icon('event', 'sm')}Completion ${esc(completion)}</span>
       ${it.waiting ? `<span class="badge lv-watch">${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
-      <span>${icon('update', 'sm')}${it.lastUpdate ? `Field update ${esc(L.displayDate(it.lastUpdate))}` : 'No field update yet'}</span>
+      <span>${icon('update', 'sm')}${it.lastUpdate ? `Field update ${esc(L.displayDate(it.lastUpdate))}` : typeof s.loaded.weekly_reports === 'string' ? 'Field updates not loaded' : 'No field update yet'}</span>
     </div>
   </a></li>`;
 }
@@ -857,18 +883,18 @@ function tile(it) {
 /* ---------- Project page (ProjectHeader, the five ProjectSection tabs) ---------- */
 
 function renderProject(projectUuid, section, sub) {
-  const page = s.page = { id: projectUuid, project: undefined, records: [], error: null, section, sub, chips: {}, month: null };
+  const page = s.page = { id: projectUuid, project: undefined, records: null, error: null, section, sub, chips: {}, month: null };
   main.innerHTML = '<p class="muted">Loading project…</p>';
   freshScreen();
   const draw = () => drawProject(page);
   s.unsubPage.push(onSnapshot(doc(db, 'projects', projectUuid), d => {
     page.project = d.exists() && d.data().isDeleted !== true ? { ...d.data(), projectUuid: d.id } : null;
     draw();
-  }, e => { page.error = e.code === 'permission-denied' ? 'This account cannot open this project. Ask the Super Admin to assign it to you.' : e.message; draw(); }));
+  }, e => { console.warn('project:', e.code || e); page.error = L.errorText(e, 'This account cannot open this project. Ask the Super Admin to assign it to you.', 'Could not load this project. Reload the page to try again.'); draw(); }));
   s.unsubPage.push(onSnapshot(scoped('records', where('projectUuid', '==', projectUuid)), snap => {
     page.records = snap.docs.map(d => L.parseRecord({ ...d.data(), uuid: d.id })).filter(r => !r.isDeleted);
     draw();
-  }, e => { page.error = e.message; draw(); }));
+  }, e => { console.warn('project records:', e.code || e); page.error = `Could not load this project's records. ${L.errorText(e, 'This account cannot read them.', 'Reload the page to try again.')}`; draw(); }));
 }
 
 const backLink = `<a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>`;
@@ -898,7 +924,8 @@ function drawProject(page) {
   if (page !== s.page) return;
   const { project: stored, records, error } = page;
   if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
-  if (stored === undefined) return;
+  // Until both the project and its records have answered: an empty records list would read as "none yet".
+  if (stored === undefined || (stored && records === null)) return;
   if (stored === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
   const of = type => records.filter(r => r.type === type);
   const documents = of('pending_documents');
@@ -1216,7 +1243,7 @@ function barChartForm(c) {
       await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.chartAudit(json) }), []]], { barChartJson: json });
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this project\'s bar chart.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot change this project\'s bar chart.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1577,7 +1604,7 @@ function editLot(c, lot) {
       }
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1624,7 +1651,7 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
         ...(contractor == null ? {} : { contractor: el.contractor.value }) });
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       button.disabled = false;
     }
   };
@@ -1677,7 +1704,7 @@ async function groupUse(c, lots, select, done) {
     for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot');
     done();
   } catch (x) {
-    alert(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.');
+    alert(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
     drawProject(c.page);
   }
 }
@@ -1738,7 +1765,7 @@ function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
       done();
       onSaved();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1799,7 +1826,7 @@ function planForm(c) {
       done();
       drawProject(c.page);
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot upload a plan for this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot upload a plan for this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1835,7 +1862,7 @@ function scaleForm(c, site) {
       await saveEdits(c, L.planScale(site.plan, site.lots, drawn && !drawn.problem ? drawn.page : null, scale, { user: s.profile.name || s.user.email, at: nowStamp() }), 'plan');
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1875,7 +1902,7 @@ function ownSiteForm(c, sites, site) {
       done();
       drawProject(c.page);
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -1939,7 +1966,7 @@ function foundLotsDialog(c, site, areas, page) {
       Object.assign(lotState(c.page), { sel: null, more: false, view: null, group: null, renum: null });
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.');
       d.querySelectorAll('button').forEach(x => { x.disabled = false; });
     }
     drawProject(c.page);
@@ -1956,7 +1983,7 @@ async function planAct(c, el, run) {
     await run();
     Object.assign(lotState(c.page), { sel: null, more: false, view: null, frame: null, renum: null });
   } catch (x) {
-    alert(x.code === 'permission-denied' ? 'This account cannot change this plan.' : x.message || 'Could not save. Try again.');
+    alert(L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.'));
   }
   drawProject(c.page);
 }
@@ -2114,7 +2141,7 @@ async function bindLots(c) {
               renum.ids = []; // stays open, so the next click picks the next block
               drawProject(c.page);
             } catch (x) {
-              err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+              err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
               save.disabled = false;
             }
           };
@@ -2177,7 +2204,7 @@ async function bindLots(c) {
       if (!navigator.onLine) { alert('You are offline. Connect to the internet, then save again.'); return; }
       e.target.disabled = true;
       saveEdit(c, lot, saved.changes, 'lot', saved.audit).then(() => { Object.assign(st, { draw: null, view: null, sel: lot.uuid }); drawProject(c.page); },
-        x => { alert(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.'); e.target.disabled = false; });
+        x => { alert(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.')); e.target.disabled = false; });
     };
   }
   paint();
@@ -2514,7 +2541,7 @@ function editIssue(c, issue) {
       }));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2628,7 +2655,7 @@ function addOrder(c, type, continued = '') {
       await addRecord(c, ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2683,7 +2710,7 @@ function editOrder(c, o) {
       await saveEdit(c, o, { status, remarks }, 'order', L.orderStatusAudit(o, status));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2737,7 +2764,7 @@ function relatedFile(c, file) {
         : saveEdit(c, file, { fileUrl }, 'file', L.fileAttachedAudit(file, fileUrl)));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2802,7 +2829,7 @@ function editRequest(c, r) {
       } else await saveEdit(c, r, saved, 'request', L.requestAudit(f));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2858,7 +2885,7 @@ function editLetter(c, l) {
       await (isNew ? addRecord(c, ids => L.newLetterRecord(ids, saved), L.letterAudit(f)) : saveEdit(c, l, saved, 'letter', L.letterAudit(f)));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -2881,7 +2908,7 @@ function bindDelete(d, question, remove) {
       await remove();
       d.close(); d.remove();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not delete. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not delete. Try again.');
       del.disabled = save.disabled = false;
     }
   };
@@ -3010,7 +3037,7 @@ function editPhotos(c, report) {
       await saveEdits(c, [[report, changes, { actionType: 'Edited Weekly Report', details: `Modified report for ${report.reportingWeek}` }]], 'weekly report', { latestUpdatePhotoUrl: cover });
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -3141,7 +3168,7 @@ function weeklyForm(c, report = null) {
       }
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -3313,7 +3340,7 @@ function editWeather(c, report) {
       await saveEdit(c, report, changes, 'weekly report', { actionType: 'Edited Weekly Report', details: `Modified report and weather for ${report.reportingWeek}` });
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -3399,7 +3426,7 @@ function billingForm(c, old = null) {
   const close = () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || confirm(old ? 'Discard your changes to this billing?' : 'Discard this new billing?')) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
-  const failed = x => { err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.'; };
+  const failed = x => { err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'); };
   const del = d.querySelector('[data-delete]');
   if (del) del.onclick = async () => {
     const edits = L.deletedBillingEdits(c.payments, old, c.cost), later = edits.length - 1;
@@ -3650,7 +3677,7 @@ function bindActual(c) {
     history.replaceState(null, '', `#/p/${page.id}/actual${asOf ? `/${asOf}` : ''}`);
     drawProject(page);
   };
-  const failed = x => say(x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.');
+  const failed = x => say(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
   const pick = document.getElementById('abstract-as-of'), file = document.getElementById('abstract-file'), del = document.getElementById('abstract-delete');
   if (pick) pick.onchange = () => { location.hash = `#/p/${page.id}/actual/${pick.value}`; };
@@ -3857,7 +3884,7 @@ function signatoriesForm(c, weekly) {
       await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -3897,7 +3924,7 @@ function recommendationsForm(c, month, saved) {
         : addRecord(c, ids => L.newMonthlyRecord({ ...ids, preparedBy: s.profile.name || s.user.email }, month, weeks, text), L.monthlyAudit(month, weeks, false)));
       done();
     } catch (x) {
-      err.textContent = x.code === 'permission-denied' ? 'This account cannot edit this project.' : x.message || 'Could not save. Try again.';
+      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
     }
   };
@@ -4260,7 +4287,10 @@ const photoUrls = new Map();
 function photoUrl(refText) {
   const path = L.storagePathOf(refText);
   if (!path) return Promise.resolve(null);
-  if (!photoUrls.has(path)) photoUrls.set(path, getDownloadURL(ref(storage, path)).catch(() => null));
+  if (!photoUrls.has(path)) photoUrls.set(path, getDownloadURL(ref(storage, path)).catch(x => {
+    if (x?.code !== 'storage/object-not-found' && x?.code !== 'storage/unauthorized') photoUrls.delete(path);
+    return null;
+  }));
   return photoUrls.get(path);
 }
 

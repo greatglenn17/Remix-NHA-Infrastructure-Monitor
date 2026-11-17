@@ -403,6 +403,34 @@ export function attentionOrder(a, b, today) {
 /** The flag that put a project first: overdue before the other critical ones, else its worst. */
 export const leadingFlag = flags => flags.find(f => f.kind === 'overdue') || flags[0];
 
+// The record types each flag is worked out from. Behind and overdue need none: without the orders the dashboard
+// keeps the target and status the phone saved on the project (itemOf), so they rest on the project's own fields.
+const FLAG_SOURCES = { stale: ['weekly_reports', 'pending_documents'], billingAhead: ['project_payments', 'pending_documents'],
+  waiting: ['pending_documents'], requests: ['developer_requests'] };
+/** The flags still sound when the record types in `failed` could not load: a flag built on missing records is left out, not shown wrong. */
+export const flagsWithout = (flags, failed) => flags.filter(f => !(FLAG_SOURCES[f.kind] || []).some(t => failed.includes(t)));
+
+const NO_CONNECTION = 'The connection dropped. Check the internet, then try again.';
+const TROUBLE = {
+  unavailable: NO_CONNECTION, 'deadline-exceeded': NO_CONNECTION, 'storage/retry-limit-exceeded': NO_CONNECTION, 'auth/network-request-failed': NO_CONNECTION,
+  unauthenticated: 'Your sign-in has run out. Sign out, sign in again, then try again.',
+  'auth/user-token-expired': 'Your sign-in has run out. Sign out, sign in again, then try again.',
+  'resource-exhausted': 'The server is busy. Try again in a few minutes.', 'storage/quota-exceeded': 'The server is busy. Try again in a few minutes.',
+  aborted: 'Someone else saved at the same moment. Try again.',
+  'storage/object-not-found': 'The file is missing from storage.',
+};
+/**
+ * What went wrong, in words: `denied` when this account may not do it, a plain sentence for a Firebase code,
+ * the app's own message for an Error it threw on purpose (no code), else `fallback`. Raw Firebase text never shows.
+ */
+export function errorText(x, denied, fallback) {
+  const code = x?.code;
+  if (code === 'permission-denied' || code === 'storage/unauthorized') return denied;
+  if (typeof code === 'string') return TROUBLE[code] || fallback;
+  // A TypeError is a fault in the page, not a sentence for the user.
+  return x instanceof Error && !(x instanceof TypeError) && x.message ? x.message : fallback;
+}
+
 /**
  * ProjectAttention.slippage in words (PortfolioRow.scheduleText). Web wording: "behind" only from the
  * Behind schedule threshold (10%), "slipping" below it, and "past completion date" once overdue.

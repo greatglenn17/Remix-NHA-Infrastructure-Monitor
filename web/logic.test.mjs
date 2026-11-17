@@ -1710,3 +1710,27 @@ test('web dashboard order: a finished or suspended project is not ranked up for 
   const items = [it('Active', {}, '2026-11-15'), it('Done', { actualAccomplishment: 100, targetAccomplishment: 100, status: 'Completed', completionDateOriginal: '2025-01-01' }, '2025-01-01'), it('Paused', { status: 'Suspended' }, '2026-03-01'), it('Quiet', {}, '2026-10-01')];
   assert.deepEqual(items.sort((a, b) => L.attentionOrder(a, b, today)).map(x => x.p.name), ['Quiet', 'Active', 'Done', 'Paused']);
 });
+
+test('web errors: plain sentences for Firebase codes, the app\'s own messages kept, raw text never', () => {
+  const fb = (code, message = 'Failed to get document because the client is offline.') => Object.assign(new Error(message), { code });
+  const denied = 'This account cannot edit this project.', fallback = 'Could not save. Try again.';
+  assert.equal(L.errorText(fb('permission-denied'), denied, fallback), denied);
+  assert.equal(L.errorText(fb('storage/unauthorized'), denied, fallback), denied);
+  assert.equal(L.errorText(fb('unavailable'), denied, fallback), 'The connection dropped. Check the internet, then try again.');
+  assert.equal(L.errorText(fb('unauthenticated'), denied, fallback), 'Your sign-in has run out. Sign out, sign in again, then try again.');
+  assert.equal(L.errorText(fb('internal', 'INTERNAL ASSERTION FAILED'), denied, fallback), fallback);
+  assert.equal(L.errorText(new Error('The plan must be a PDF file.'), denied, fallback), 'The plan must be a PDF file.');
+  assert.equal(L.errorText(new TypeError("Cannot read properties of undefined (reading 'x')"), denied, fallback), fallback);
+  assert.equal(L.errorText(undefined, denied, fallback), fallback);
+  assert.equal(L.errorText('oops', denied, fallback), fallback);
+});
+
+test('web dashboard: a flag built on records that failed to load is left out', () => {
+  const flags = [{ kind: 'overdue' }, { kind: 'behind' }, { kind: 'stale' }, { kind: 'billingAhead' }, { kind: 'waiting' }, { kind: 'requests' }, { kind: 'dueSoon' }];
+  const kinds = failed => L.flagsWithout(flags, failed).map(f => f.kind);
+  assert.deepEqual(kinds([]), ['overdue', 'behind', 'stale', 'billingAhead', 'waiting', 'requests', 'dueSoon']);
+  assert.deepEqual(kinds(['weekly_reports']), ['overdue', 'behind', 'billingAhead', 'waiting', 'requests', 'dueSoon']);
+  assert.deepEqual(kinds(['project_payments']), ['overdue', 'behind', 'stale', 'waiting', 'requests', 'dueSoon']);
+  assert.deepEqual(kinds(['pending_documents']), ['overdue', 'behind', 'requests', 'dueSoon']);
+  assert.deepEqual(kinds(['developer_requests']), ['overdue', 'behind', 'stale', 'billingAhead', 'waiting', 'dueSoon']);
+});
