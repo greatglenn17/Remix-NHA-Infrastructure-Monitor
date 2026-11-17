@@ -56,6 +56,10 @@ const TERM_HELP = [
   ['Bar colours', 'Work done is blue on plan or slipping, amber from 10% behind, red from 15% behind or once overdue, green when finished. Billed is violet.'],
 ];
 
+// Big screens and projectors zoom the page (style.css, .zoomable) only where the browser reports the zoom
+// (Element.currentCSSZoom): the plan editor needs it to turn a click into a point on the plan.
+if ('currentCSSZoom' in Element.prototype) document.documentElement.classList.add('zoomable');
+
 const main = document.getElementById('app');
 const who = document.getElementById('who');
 const s = {
@@ -133,9 +137,9 @@ onAuthStateChanged(auth, async user => {
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit' : 'read only'}</span>
-    ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}Users</a>` : ''}
-    <button id="profile" class="text-btn">${icon('person', 'sm')}Profile</button>
-    <button id="out" class="text-btn">${icon('logout', 'sm')}Sign out</button>`;
+    ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}<span class="lbl">Users</span></a>` : ''}
+    <button id="profile" class="text-btn">${icon('person', 'sm')}<span class="lbl">Profile</span></button>
+    <button id="out" class="text-btn">${icon('logout', 'sm')}<span class="lbl">Sign out</span></button>`;
   document.getElementById('out').onclick = () => signOut(auth);
   document.getElementById('profile').onclick = editProfile;
   s.unsub.push(onSnapshot(scoped('projects'), snap => {
@@ -2249,13 +2253,28 @@ async function bindLots(c) {
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
   if (!st.view) reset(); else apply();
   paint();
+  // The frame follows the window, and on a big screen the page zoom (style.css): fit the plan again when its size changes.
+  const refit = new ResizeObserver(() => {
+    if (!viewer.isConnected) { refit.disconnect(); return; }
+    if (viewer.clientWidth === W && viewer.clientHeight === H) return;
+    W = viewer.clientWidth; H = viewer.clientHeight;
+    fit = Math.min(W / d.width, H / d.height);
+    stage.style.width = `${d.width * fit}px`;
+    stage.style.height = `${d.height * fit}px`;
+    reset();
+  });
+  refit.observe(viewer);
 
   viewer.querySelectorAll('[data-zoom]').forEach(b => { b.onclick = () => (b.dataset.zoom === 'reset' ? reset() : Number(b.dataset.zoom) === 1 ? reset() : zoomAt(Number(b.dataset.zoom))); });
   viewer.querySelectorAll('[data-zoom-step]').forEach(b => { b.onclick = () => zoomAt(view().s * Number(b.dataset.zoomStep)); });
 
   // Drag to move, two fingers to pinch, a click without a drag picks the lot under it (or clears the selection).
   // Inside the viewer's border, where the stage is placed; a corner of a new lot lands exactly under the pointer.
-  const local = e => { const r = viewer.getBoundingClientRect(); return [e.clientX - r.left - viewer.clientLeft, e.clientY - r.top - viewer.clientTop]; };
+  // Pointer and box are in screen pixels, the stage in CSS pixels: divide by the page zoom (big screens, .zoomable).
+  const local = e => {
+    const r = viewer.getBoundingClientRect(), z = viewer.currentCSSZoom || 1;
+    return [(e.clientX - r.left) / z - viewer.clientLeft, (e.clientY - r.top) / z - viewer.clientTop];
+  };
   // The point of the page under a place inside the viewer; a place off the page counts as its edge.
   const pageAt = ([px, py]) => { const v = view(), k = v.s * fit; return d.at((px - v.x) / k, (py - v.y) / k).map(n => Math.round(Math.min(1, Math.max(0, n)) * 1e6) / 1e6); };
   // traceSdpLot: the closed outline around a click becomes the lot being added, and its form opens (Save lot).
