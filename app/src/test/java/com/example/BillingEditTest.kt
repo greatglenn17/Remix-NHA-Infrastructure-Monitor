@@ -94,4 +94,14 @@ class BillingEditTest {
         assertEquals(listOf(90.0, 72.0, 42.0), listOf(1L, 2L, 3L).map { net.getValue(it).balancePercentage })
         assertEquals("the gross stays", 2000.0, net.getValue(2L).grossAmount, 1e-9)
     }
+    // On the current cost (a variation order took it from 10,000 to 12,000), the shown shares add up to the total.
+    @Test
+    fun netBillings_onTheCurrentCostAddUpToTheTotal() {
+        val net = netBillings(listOf(first, second.copy(retentionPct = 10.0), third), 12000.0).associateBy { it.id }
+        // Net 1,000, 1,800 and 3,000 of 12,000: running 8.33, 23.33, 48.33.
+        assertEquals(listOf(8.33, 15.0, 25.0), listOf(1L, 2L, 3L).map { net.getValue(it).percentage })
+        assertEquals(listOf(11000.0, 9200.0, 6200.0), listOf(1L, 2L, 3L).map { net.getValue(it).balanceAmount })
+        assertEquals(listOf(91.67, 76.67, 51.67), listOf(1L, 2L, 3L).map { net.getValue(it).balancePercentage })
+        assertEquals("%.2f".format(java.util.Locale.US, 5800.0 / 12000 * 100), "%.2f".format(java.util.Locale.US, net.values.sumOf { it.percentage }))
+    }
 }

@@ -266,7 +266,7 @@ private fun PaymentStatusCard(payments: List<ProjectPayment>, contractCost: Doub
             Column {
                 Cells(row("Billing / period covered", "Date", "Net amount (PHP)", "%", "Balance (PHP)"), bold = true, color = scheme.onSurfaceVariant)
                 HorizontalDivider(color = scheme.outlineVariant)
-                netBillings(payments).forEach { p ->
+                netBillings(payments, contractCost).forEach { p ->
                     Cells(
                         row(
                             listOf(p.name, p.periodCovered).filter { it.isNotBlank() }.joinToString("\n").ifBlank { "-" },

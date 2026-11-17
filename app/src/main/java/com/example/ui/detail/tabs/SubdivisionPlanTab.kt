@@ -160,7 +160,7 @@ fun isLotMatchingFilter(
     return true
 }
 
-/** Not yet started (0%) red, 1-25% violet, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
+/** Not yet started (0%) red, 1-25% pink, 26-50% orange, 51-75% yellow, 76-99% blue, 100% (RFO) green. */
 fun lotProgressFill(progress: Int, nha: NHAColors): Color =
     listOf(nha.behind, nha.progressQuarter1, nha.progressQuarter2, nha.progressQuarter3, nha.progressQuarter4, nha.onTrack)[com.example.util.SdpSummary.band(progress)]
 

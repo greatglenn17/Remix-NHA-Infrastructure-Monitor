@@ -64,7 +64,7 @@ fun MoneySection(
             modifier = Modifier.fillMaxSize()
         ) {
             item { BillingSummary(payments, contractCost, actualPercent) }
-            val net = netBillings(payments).associateBy { it.id }
+            val net = netBillings(payments, contractCost).associateBy { it.id }
             payments.chunked(perRow).forEach { row ->
                 item(key = row.first().id) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {

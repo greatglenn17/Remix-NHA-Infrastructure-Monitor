@@ -58,8 +58,21 @@ export const netAmount = p => (Number(p.grossAmount) || 0) * (1 - (Number(p.rete
 /**
  * netBillings: each billing's share and balance after it on the net. They are saved from the gross with that day's
  * contract cost, so the net balance is the saved one plus the retention held by then. `payments` in the order added.
+ * Given `cost` (the current contract cost), every share and balance is on it instead, so the rows add up to the total
+ * shown under them even after a variation order changed the cost, as the phone shows them. Each share is the step in the running total rounded
+ * to 2 places, so the shown shares add up to the shown total to the last digit.
  */
-export function netBillings(payments) {
+export function netBillings(payments, cost = 0) {
+  if (cost > 0) {
+    const r2 = x => Number(x.toFixed(2)); // as pct() shows it, so the last row and the footer round alike
+    let paid = 0, shown = 0;
+    return payments.map(p => {
+      paid += netAmount(p);
+      const upTo = r2(paid / cost * 100), percentage = r2(upTo - shown);
+      shown = upTo;
+      return { ...p, percentage, balanceAmount: cost - paid, balancePercentage: r2(100 - upTo) };
+    });
+  }
   let held = 0;
   return payments.map(p => {
     const gross = Number(p.grossAmount) || 0, share = Number(p.percentage) || 0, balanceShare = Number(p.balancePercentage) || 0;
@@ -327,6 +340,10 @@ export const waitingApproval = docs => docs.filter(d => !/^approved$/i.test((d.s
 
 /** Total billed on the net, after retention, as the phone shows it. */
 export const billedTotal = payments => payments.reduce((t, p) => t + netAmount(p), 0);
+
+/** The line under a billing table when approved variation orders moved the contract cost: which cost its % are on. */
+export const costBaseNote = (original, cost) => original > 0 && cost > 0 && Math.abs(cost - original) >= 0.005
+  ? `Shares and balances are on the current contract cost, ${formatPhp(cost)}. Approved variation orders changed it from ${formatPhp(original)}.` : '';
 
 /** BillingProgress.label. */
 export function billedLabel(billed, cost) {
@@ -1076,7 +1093,7 @@ export const ROAD_STATES = ['Not completed', 'Concreting', 'Completed'];
 export const roadState = p => (p >= 100 ? 2 : p > 0 ? 1 : 0);
 
 /** lotFill on paper (LightNHAColors): the six bands, then neutral for lots that are not built on. */
-export const LOT_PRINT_HEX = ['#B91C1C', '#7C3AED', '#EA580C', '#CA8A04', '#2563EB', '#15803D'];
+export const LOT_PRINT_HEX = ['#B91C1C', '#F472B6', '#EA580C', '#CA8A04', '#2563EB', '#15803D'];
 export const lotPrintHex = l => { const c = lotColour(l).slice(4); return c === 'n' ? '#6B6B6B' : LOT_PRINT_HEX[c]; };
 
 /** ProjectViewModel.polygonOf: the lot's [[x, y], ...] (0..1 of the page); [] when unreadable. */

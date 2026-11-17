@@ -49,6 +49,21 @@ test('billings on the net: the total, and each share and balance after retention
   const net = L.netBillings(pays);
   assert.deepEqual(net.map(p => [p.percentage, p.balanceAmount, Math.round(p.balancePercentage * 100) / 100]), [[9, 910, 91], [9, 820, 82]]);
   assert.equal(pays[0].balanceAmount, 900); // the saved ones are left as they are
+  // A variation order took the cost to 1,200: on it, the rows add up to the total (180 of 1,200 = 15%).
+  const now = L.netBillings(pays, 1200);
+  assert.deepEqual(now.map(p => [p.percentage, p.balanceAmount, p.balancePercentage]), [[7.5, 1110, 92.5], [7.5, 1020, 85]]);
+  assert.equal(now.reduce((t, p) => t + p.percentage, 0), L.billedTotal(pays) / 1200 * 100);
+  // Shown to 2 places, the shares add up to the total: 9M + 4M of 51.5M are 17.48% + 7.76% = 25.24%, not 17.48% + 7.77%.
+  const vo = L.netBillings([{ grossAmount: 9e6 }, { grossAmount: 4e6 }], 51.5e6);
+  assert.deepEqual(vo.map(p => [p.percentage, p.balancePercentage]), [[17.48, 82.52], [7.76, 74.76]]);
+  assert.equal((vo[0].percentage + vo[1].percentage).toFixed(2), (13e6 / 51.5e6 * 100).toFixed(2));
+  assert.match(L.costBaseNote(1000, 1200), /current contract cost, ₱1,200\.00\. Approved variation orders changed it from ₱1,000\.00/);
+  assert.equal(L.costBaseNote(1000, 1000), '');
+  assert.equal(L.costBaseNote(0, 1200), '');
+  assert.equal(L.costBaseNote(1000, 0), ''); // no current cost: the saved shares show, so no note
+  // A running total on a half rounds as the footer shows it: 1,809,000 of 20,000,000 is 9.045%, shown 9.04 in both.
+  const half = L.netBillings([{ grossAmount: 2010000, retentionPct: 10 }], 20e6);
+  assert.equal(half[0].percentage.toFixed(2), (1809000 / 20e6 * 100).toFixed(2));
 });
 
 test('photo lists in every shape older versions saved, and their titles', () => {
