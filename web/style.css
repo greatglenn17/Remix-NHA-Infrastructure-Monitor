@@ -274,11 +274,15 @@ body.signed-out main { max-width: none; padding: 0; }
   background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--tick) calc(10% - 1px) 10%), var(--track); }
 .pl.big .bar i { border-radius: 5px; }
 
-/* Bento: identity on the left, dates in the middle, money and reports on the right, payments across. */
-.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-/* Each column's last card grows to the tallest column, so no dead space is left under the short ones. */
+/* Bento: the phone's order (SummarySection.kt) read down three columns, with Needs attention across the top and the money
+   across the foot, as the phone's header and footer. Cards keep their own height: a short column ends early on bare
+   canvas, never inside a stretched, empty card. */
+.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; margin-top: 12px; }
+.bento > .section, .bento > .bento-foot { grid-column: 1 / -1; }
 .bento .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.bento .col > :last-child { flex: 1; }
+/* Foot: Contract cost under column 1 and the payment table under 2 and 3; the table alone (.wide) spans all three. */
+.bento-foot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; min-width: 0; }
+.bento-foot > .section + .wide { grid-column: 2 / -1; }
 .section { padding: 4px 16px 16px; min-width: 0; }
 .section-head { display: flex; align-items: center; gap: 8px; min-height: 48px; }
 .section-head .icon { color: var(--link); }
@@ -368,16 +372,14 @@ tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
 thead .num { font-family: inherit; }
 .pay .pdate { display: none; }
 
-@media (max-width: 1100px) {
-  /* Two columns: profile on the left; dates, cost and report stacked on the right. */
-  .bento { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; }
-  .bento .c1 { grid-row: span 2; }
-  .bento .c3 { grid-column: 2; }
+/* Under 1140px a third is narrower than the profile (349px): report and construction beside the profile, then plan and
+   dates beside cost and payments. */
+@media (max-width: 1140px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento > .bento-foot { grid-column: auto; display: flex; flex-direction: column; align-items: stretch; }
 }
 @media (max-width: 900px) {
-  .bento { grid-template-columns: 1fr; grid-template-rows: none; }
-  .bento .c1 { grid-row: auto; }
-  .bento .c3 { grid-column: auto; }
+  .bento { grid-template-columns: minmax(0, 1fr); }
   .portfolio { grid-template-columns: 1fr; }
   .pills { justify-content: flex-start; }
   .signin { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -407,8 +409,10 @@ thead .num { font-family: inherit; }
   .tile-top { flex-wrap: wrap; }
   .tile-badges { order: 3; flex-basis: calc(100% - 60px); max-width: none; display: flex; flex-wrap: wrap; gap: 4px; margin-left: 60px; }
 }
-/* SummarySection under 480dp: the date moves under the billing name so the amounts fit. */
-@media (max-width: 560px) {
+/* SummarySection under 480dp: the date moves under the billing name so the amounts fit. The card's own width decides
+   (it sits full width, beside Contract cost, or in one of two columns); 494px is its inside at the old 560px screen. */
+.pay-sum { container-type: inline-size; }
+@container (max-width: 494px) {
   .pay th:nth-child(2), .pay td:nth-child(2) { display: none; }
   .pay .pdate { display: inline; color: var(--text-2); font-weight: 400; }
   .pay th:first-child { width: 30%; }
