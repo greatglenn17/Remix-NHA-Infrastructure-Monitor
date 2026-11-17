@@ -64,7 +64,7 @@ const main = document.getElementById('app');
 const who = document.getElementById('who');
 const s = {
   user: null, claims: {}, profile: {}, projects: null, projectsError: null, loaded: {},
-  payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), unsub: [], unsubPage: [], page: null,
+  payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), issues: new Map(), unsub: [], unsubPage: [], page: null,
   filter: null, mineOnly: false, q: '',
 };
 
@@ -124,7 +124,7 @@ onAuthStateChanged(auth, async user => {
   if (user && signingUp) return;
   s.unsub.forEach(u => u()); s.unsub = [];
   s.unsubPage.forEach(u => u()); s.unsubPage = [];
-  s.user = user; s.projects = null; s.projectsError = null; s.loaded = {}; s.payments.clear(); s.docs.clear(); s.requests.clear(); s.weekly.clear(); s.page = null; s.profile = {};
+  s.user = user; s.projects = null; s.projectsError = null; s.loaded = {}; s.payments.clear(); s.docs.clear(); s.requests.clear(); s.weekly.clear(); s.issues.clear(); s.page = null; s.profile = {};
   document.body.classList.toggle('signed-out', !user);
   if (!user) {
     who.innerHTML = '';
@@ -152,8 +152,8 @@ onAuthStateChanged(auth, async user => {
     redrawDashboard();
   }, e => { console.warn('projects:', e.code || e); s.projectsError = L.errorText(e, 'This account cannot read the project list.', 'Reload the page to try again.'); redrawDashboard(); }));
   s.unsub.push(listenRecords('project_payments', s.payments), listenRecords('pending_documents', s.docs),
-    // For the attention flags: requests not yet packaged, and the newest weekly report (no field update in 14 days).
-    listenRecords('developer_requests', s.requests), listenRecords('weekly_reports', s.weekly));
+    // For the attention flags: requests not yet packaged, the newest weekly report (no field update in 14 days), critical issues past target.
+    listenRecords('developer_requests', s.requests), listenRecords('weekly_reports', s.weekly), listenRecords('project_issues', s.issues));
   route();
 });
 
@@ -438,8 +438,8 @@ async function setUser(user, change, done, say) {
 /* ---------- Dashboard (DashboardScreen + PortfolioCounts + PortfolioRow) ---------- */
 
 /** One project as the dashboard sees it (ProjectViewModel's PortfolioItem). */
-const RECORD_TYPES = ['project_payments', 'pending_documents', 'developer_requests', 'weekly_reports'];
-const RECORD_WORDS = { project_payments: 'billings', pending_documents: 'orders', developer_requests: 'developer requests', weekly_reports: 'weekly reports' };
+const RECORD_TYPES = ['project_payments', 'pending_documents', 'developer_requests', 'weekly_reports', 'project_issues'];
+const RECORD_WORDS = { project_payments: 'billings', pending_documents: 'orders', developer_requests: 'developer requests', weekly_reports: 'weekly reports', project_issues: 'issues' };
 /** The record types whose listener failed. */
 const failedTypes = () => RECORD_TYPES.filter(t => typeof s.loaded[t] === 'string');
 /** The dashboard's one notice when some records could not load: what is missing and why, so no card reads as "none". */
@@ -458,7 +458,7 @@ function itemOf(project) {
   const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
   const cost = L.currentCost(p, docs);
   const lastUpdate = L.latestReportDay(s.weekly.get(p.projectUuid) || []);
-  const flags = L.flagsWithout(L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate), failedTypes());
+  const flags = L.flagsWithout(L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate, s.issues.get(p.projectUuid) || []), failedTypes());
   return { p, docs, billed, cost, lastUpdate, flags, waiting: L.waitingApproval(docs) };
 }
 
@@ -955,7 +955,11 @@ function drawProject(page) {
   const housing = /housing/i.test(project.projectType || '');
   const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues']
     : page.section === 'documents' && L.canViewAuditLogs(s.claims) ? [...CHIPS.documents, 'Audit log'] : CHIPS[page.section];
+  // A chip named in the URL (#/p/<id>/documents/variation-orders) wins, so a reload or a shared link opens it.
+  const linked = chips?.find(x => L.chipSlug(x) === page.sub);
+  if (linked) page.chips[page.section] = linked;
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
+  const counts = chips ? L.chipCounts(documents, of('developer_requests'), of('project_issues')) : {};
   const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
   // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
@@ -974,9 +978,13 @@ function drawProject(page) {
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
     </nav>
-    ${chips ? `<div class="chips" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}</button>`).join('')}</div>` : ''}
+    ${chips ? `<div class="chips" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
-  main.querySelectorAll('[data-chip]').forEach(b => { b.onclick = () => { page.chips[page.section] = b.dataset.chip; drawProject(page); }; });
+  main.querySelectorAll('[data-chip]').forEach(b => { b.onclick = () => {
+    page.chips[page.section] = b.dataset.chip; page.sub = L.chipSlug(b.dataset.chip);
+    history.replaceState(null, '', `#/p/${page.id}/${page.section}/${page.sub}`);
+    drawProject(page);
+  }; });
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
@@ -997,6 +1005,8 @@ function drawProject(page) {
     document.getElementById('monthly-sheet').innerHTML = monthlySheet(c, monthlyAsOf.value);
   };
   if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
+  // The critical-issue alert opens Issues filtered to the ones past their target date.
+  main.querySelectorAll('[data-issues]').forEach(a => { a.onclick = () => { page.issues = { query: '', filter: a.dataset.issues }; }; });
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
@@ -1039,7 +1049,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const latest = weekly[0];
   const openIssues = of('project_issues').filter(L.isOpenIssue).length;
   const orders = L.chained(documents.filter(d => SCHEDULE_ORDER.test(d.documentName || '')));
-  const flags = L.attentionFlags(project, documents, billed, now, of('developer_requests'), L.latestReportDay(weekly));
+  const flags = L.attentionFlags(project, documents, billed, now, of('developer_requests'), L.latestReportDay(weekly), of('project_issues'));
   const housing = /housing/i.test(project.projectType || '');
   const finished = L.isCompleted(project);
   // KeyDatesCard: approved time extensions first, else the stored revised date; Days left counts down to the same date
@@ -1049,9 +1059,12 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const revised = fromOrders || (stored !== '-' ? stored : '');
   const revisedDays = L.revisedDurationDays(project, L.addedDays(documents));
 
-  // Needs attention: one alert box per flag; critical ones (overdue, 15%+ behind) carry a pulsing dot.
-  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => `
-    <p class="alert ${f.level}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon(f.level === 'stale' ? 'schedule' : 'warning', 'sm')}<b>${esc(f.message)}</b></p>`).join('')}</div>`) : '';
+  // Needs attention: one alert box per flag, linking to the tab and chip where it is dealt with; critical ones carry a pulsing dot.
+  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => {
+    const to = L.flagTarget(f, documents), where = to.chip || SECTIONS.find(([key]) => key === to.section)?.[1] || 'Summary';
+    return `
+    <a class="alert ${f.level}"${f.kind === 'issue' ? ' data-issues="Overdue"' : ''} href="#/p/${esc(page.id)}${to.section === 'summary' ? '' : `/${to.section}`}${to.chip ? `/${L.chipSlug(to.chip)}` : ''}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon(f.level === 'stale' ? 'schedule' : 'warning', 'sm')}<b>${esc(f.message)}</b><span class="go">${esc(where)}${icon('chevron_right', 'sm')}</span></a>`;
+  }).join('')}</div>`) : '';
   const profile = section('Project profile', 'apartment', `
     <div class="site-photo" id="site-photo">${icon('architecture')}<span>No site photo yet</span></div>
     <div class="attrs">

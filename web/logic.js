@@ -347,9 +347,10 @@ const LEVEL_RANK = { critical: 0, warning: 1, stale: 2 };
 
 /**
  * ProjectAttention.flags: critical, then warning, then stale. `today` and `latestReportAt` are yyyy-MM-dd;
- * `requests` are the project's developer requests.
+ * `requests` are the project's developer requests, `issues` its issues. Web only: a critical issue past its target date
+ * is flagged (the phone shows it on the Issues tab alone).
  */
-export function attentionFlags(project, docs, billed, today, requests = [], latestReportAt = null) {
+export function attentionFlags(project, docs, billed, today, requests = [], latestReportAt = null, issues = []) {
   const flags = [];
   const finished = isCompleted(project);
   const slip = slippage(project);
@@ -381,6 +382,8 @@ export function attentionFlags(project, docs, billed, today, requests = [], late
     if (days < 0) flags.push({ kind: 'overdue', level: 'critical', message: `Overdue by ${plural(-days, 'day', 'days')}` });
     else if (days <= 30) flags.push({ kind: 'dueSoon', level: 'warning', message: `Due in ${plural(days, 'day', 'days')}` });
   }
+  const lateIssues = issues.filter(i => isCriticalIssue(i) && isOverdueIssue(i, today)).length;
+  if (lateIssues) flags.push({ kind: 'issue', level: 'critical', message: `${plural(lateIssues, 'critical issue', 'critical issues')} past target date` });
   // A suspended project is not expected to report; the start date counts until the first report.
   const stale = daysSince(latestReportAt ?? project.dateStarted);
   if (!finished && project.status !== 'Suspended' && stale != null && stale >= 14) {
@@ -411,7 +414,38 @@ export const leadingFlag = flags => flags.find(f => f.kind === 'overdue') || fla
 // The record types each flag is worked out from. Behind and overdue need none: without the orders the dashboard
 // keeps the target and status the phone saved on the project (itemOf), so they rest on the project's own fields.
 const FLAG_SOURCES = { stale: ['weekly_reports', 'pending_documents'], billingAhead: ['project_payments', 'pending_documents'],
-  waiting: ['pending_documents'], requests: ['developer_requests'] };
+  waiting: ['pending_documents'], requests: ['developer_requests'], issue: ['project_issues'] };
+
+/** A chip's name in the URL: "Variation Orders" is #/p/<id>/documents/variation-orders. */
+export const chipSlug = name => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** The Documents chip an order is listed under. */
+export function orderChip(name) {
+  const n = (name || '').toLowerCase();
+  return n.includes('time extension') ? 'Time Extensions' : n.includes('variation order') ? 'Variation Orders' : 'Suspension / Resumption';
+}
+
+const waits = d => !/^approved$/i.test((d.status || '').trim()) && isOrderName(d.documentName);
+const FLAG_TARGETS = { behind: ['progress', 'Weekly'], stale: ['progress', 'Weekly'], issue: ['progress', 'Issues'], billingAhead: ['payments'],
+  requests: ['documents', 'Developer Requests'], overdue: ['documents', 'Time Extensions'], dueSoon: ['documents', 'Time Extensions'] };
+/** Where a flag is dealt with: a project section and, when it has them, its chip (the first order still waiting, for "waiting"). */
+export function flagTarget(flag, docs = []) {
+  if (flag.kind === 'waiting') return { section: 'documents', chip: orderChip(docs.find(waits)?.documentName) };
+  const [section, chip = null] = FLAG_TARGETS[flag.kind] || ['summary'];
+  return { section, chip };
+}
+
+/** What waits under each chip: orders not yet approved, developer requests not yet packaged, open issues. */
+export function chipCounts(docs, requests = [], issues = []) {
+  const n = {};
+  for (const d of docs.filter(waits)) n[orderChip(d.documentName)] = (n[orderChip(d.documentName)] || 0) + 1;
+  const unpackaged = requests.filter(r => !String(r.datePackaged ?? '').trim()).length;
+  if (unpackaged) n['Developer Requests'] = unpackaged;
+  const open = issues.filter(isOpenIssue).length;
+  if (open) n.Issues = open;
+  return n;
+}
+export const CHIP_COUNT_WORDS = { 'Developer Requests': 'not packaged', Issues: 'open' };
 /** The flags still sound when the record types in `failed` could not load: a flag built on missing records is left out, not shown wrong. */
 export const flagsWithout = (flags, failed) => flags.filter(f => !(FLAG_SOURCES[f.kind] || []).some(t => failed.includes(t)));
 

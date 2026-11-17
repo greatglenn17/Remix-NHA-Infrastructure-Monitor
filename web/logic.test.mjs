@@ -197,6 +197,21 @@ test('completion: approved time extensions decide it, even when the stored revis
   assert.equal(L.withSchedule({ ...p, actualAccomplishment: 100, completionDateRevised: '2026-04-02' }, [te], '2026-04-20').completionDateRevised, '2026-04-02');
 });
 
+test('needs attention: each flag links to where it is dealt with; chips count what waits', () => {
+  const docs = [{ documentName: 'Time Extension No. 1 - 30 Days', status: 'Approved' }, { documentName: 'Variation Order No. 2', status: 'Pending' },
+    { documentName: 'Variation Order No. 3', status: 'Submitted' }, { documentName: 'Work Suspension Order No. 1', status: 'Pending' }];
+  assert.deepEqual(L.flagTarget({ kind: 'waiting' }, docs), { section: 'documents', chip: 'Variation Orders' });
+  assert.deepEqual(L.flagTarget({ kind: 'billingAhead' }), { section: 'payments', chip: null });
+  assert.deepEqual(L.flagTarget({ kind: 'issue' }), { section: 'progress', chip: 'Issues' });
+  assert.equal(L.chipSlug('Suspension / Resumption'), 'suspension-resumption');
+  const issues = [{ isCritical: 1, status: 'Pending', targetDate: '2026-11-01' }, { isCritical: 0, status: 'Pending', targetDate: '2026-11-01' },
+    { isCritical: 1, status: 'Resolved', targetDate: '2026-11-01' }, { isCritical: 1, status: 'Pending', targetDate: '2026-12-01' }];
+  assert.deepEqual(L.chipCounts(docs, [{ datePackaged: '' }, { datePackaged: '2026-11-02' }], issues),
+    { 'Variation Orders': 2, 'Suspension / Resumption': 1, 'Developer Requests': 1, Issues: 3 });
+  const flags = L.attentionFlags({ actualAccomplishment: 50, targetAccomplishment: 50 }, [], 0, '2026-11-18', [], '2026-11-17', issues);
+  assert.deepEqual(flags.map(f => [f.kind, f.level, f.message]), [['issue', 'critical', '1 critical issue past target date']]);
+});
+
 test('bar chart target: a revised chart applies from its effective date', () => {
   const revised = { label: 'Revised No. 1', effective: '2026-03-01', items: [{ name: 'All works', amount: 100, bars: [[1, 100]] }] };
   const p = chartProject([revised, sih]);

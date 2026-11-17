@@ -4,6 +4,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from './logic.js';
 import * as P from './print.js';
+import { readFileSync } from 'node:fs';
+
+test('every icon the pages draw is in the icon font subset (index.html icon_names), or it shows as its name', () => {
+  const read = name => readFileSync(new URL(name, import.meta.url), 'utf8');
+  const subset = new Set(/icon_names=([^&"]+)/.exec(read('index.html'))[1].split(','));
+  const used = new Set();
+  for (const src of [read('app.js'), read('print.js')]) {
+    // icon('name'), icon(x ? 'a' : 'b', 'sm'), and the section tabs' ['key', 'Label', 'icon'] rows.
+    for (const [, args] of src.matchAll(/\bicon\(([^()]*)\)/g)) for (const [, n] of args.replace(/[!=]==? *'[^']*'/g, '').matchAll(/'([a-z][a-z0-9_]*)'/g)) if (n !== 'sm') used.add(n);
+    for (const [, n] of src.matchAll(/\['[a-z]+', '[A-Z][^']*', '([a-z_]+)'\]/g)) used.add(n);
+  }
+  assert.deepEqual([...used].filter(n => !subset.has(n)).sort(), []);
+});
 
 test('weekly report lists read like the phone, with its defaults and older keys', () => {
   assert.deepEqual(L.manpowerOf('[{"designation":"Mason","count":"4"},{}]'), [
