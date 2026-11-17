@@ -1,6 +1,6 @@
 ---
 name: NHA Monitor Web
-description: A read-only portfolio and project Summary viewer for NHA Monitor, in a dark command-center palette.
+description: The NHA Monitor portfolio, project tabs and edit forms on a wide screen, in a dark command-center palette.
 colors:
   primary: "#2563EB"
   on-primary: "#FFFFFF"
@@ -49,12 +49,12 @@ typography:
     letterSpacing: "-0.3px"
   title-lg:
     fontFamily: "IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "22px"
+    fontSize: "36px"
     fontWeight: 600
-    letterSpacing: "-0.2px"
+    letterSpacing: "-0.025em"
   title:
     fontFamily: "IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "15px"
+    fontSize: "16px"
     fontWeight: 600
     lineHeight: 1.3
   title-sm:
@@ -72,7 +72,7 @@ typography:
     fontWeight: 400
   label:
     fontFamily: "IBM Plex Sans, system-ui, sans-serif"
-    fontSize: "12px"
+    fontSize: "13px"
     fontWeight: 400
   label-sm:
     fontFamily: "IBM Plex Sans, system-ui, sans-serif"
@@ -86,6 +86,7 @@ rounded:
   xs: "4px"
   sm: "6px"
   md: "8px"
+  lg: "12px"
   full: "999px"
 spacing:
   xs: "4px"
@@ -117,43 +118,43 @@ components:
   filter-pill-selected:
     backgroundColor: "{colors.primary-container}"
     textColor: "{colors.on-primary-container}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.full}"
   input:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.field}"
     textColor: "{colors.text}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.md}"
     padding: "11px 12px"
     height: "44px"
   card:
     backgroundColor: "{colors.surface}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.lg}"
   badge-ok:
     backgroundColor: "{colors.ok-container}"
     textColor: "{colors.ok}"
     typography: "{typography.label-sm}"
-    rounded: "{rounded.sm}"
-    padding: "3px 8px"
+    rounded: "{rounded.full}"
+    padding: "3px 9px"
   badge-watch:
     backgroundColor: "{colors.watch-container}"
     textColor: "{colors.watch}"
     typography: "{typography.label-sm}"
-    rounded: "{rounded.sm}"
-    padding: "3px 8px"
+    rounded: "{rounded.full}"
+    padding: "3px 9px"
   badge-behind:
     backgroundColor: "{colors.behind-container}"
     textColor: "{colors.behind}"
     typography: "{typography.label-sm}"
-    rounded: "{rounded.sm}"
-    padding: "3px 8px"
+    rounded: "{rounded.full}"
+    padding: "3px 9px"
   badge-view:
     backgroundColor: "{colors.surface-variant}"
     textColor: "{colors.text-2}"
     rounded: "{rounded.xs}"
     padding: "2px 6px"
   progress-bar:
-    backgroundColor: "{colors.border}"
+    backgroundColor: "{colors.track}"
     rounded: "{rounded.bar}"
-    height: "6px"
+    height: "10px"
 ---
 
 # Design System: NHA Monitor Web
@@ -164,7 +165,7 @@ components:
 
 The web viewer is the NHA Monitor Android app shown on a laptop or a meeting-room projector. It is not a separate identity. Its layouts, type, shapes and components follow the app (`app/src/main/java/com/example/ui/`). Its colours do not: on 2026-11-08 the user asked for an executive "Architectural Command Center" look, a #0B0F17 canvas with a blueprint dot grid and #111827 panels, always dark. Someone who uses the app on a phone should find the same header, the same chips, and the same bars in the same places.
 
-The look is a quiet control room: a near-black canvas with a faint dot grid, dark panels with white 8% hairlines and 12px corners, blue for action and on-plan progress, violet for money, and four status colours that only ever describe a project's state. Density is moderate. Screens have to read on a projector, so the hierarchy comes from weight (600 titles over 400 body) and grey secondary text, not from big type. Everything is read-only and quiet. Colour appears where it carries meaning (progress, slippage, attention) and almost nowhere else.
+The look is a quiet control room: a near-black canvas with a faint dot grid, dark panels with white 8% hairlines and 12px corners, blue for action and on-plan progress, violet for money, and four status colours that only ever describe a project's state. Density is moderate. Screens have to read on a projector, so the hierarchy comes from weight (600 titles over 400 body) and grey secondary text, not from big type. Everything is quiet: edit actions sit with what they change, mostly as text buttons (outlined buttons on the lot card), and a filled button is kept for a view's one main action (New project, Log issue, New abstract). Colour appears where it carries meaning (progress, slippage, attention) and almost nowhere else.
 
 It rejects the generic admin template (side menu, KPI cards, blue-on-white data tables) and it does not imitate official NHA or government branding beyond the app's own logo (`web/logo.svg`, drawn from the app's `ic_nha_logo`), which sits beside the title in the app bar and above the sign-in heading (user's request, 2026-11-08).
 
@@ -174,7 +175,7 @@ It rejects the generic admin template (side menu, KPI cards, blue-on-white data 
 - Blue for interaction and on-plan work, violet for Billed. Status colours are for status only.
 - IBM Plex Sans for text and IBM Plex Mono for measured figures (user's choice, 2026-11-14, replacing Inter), two weights only (400 and 600), nothing under 12px, all text at least 4.5:1 contrast (2026-11-10). The Blue Book prints keep their own form styling.
 - Material Symbols Outlined icons at 20px (16px small), always next to a text label.
-- One motion: the progress bars fill in when data arrives.
+- Little motion: the bars fill in when data arrives, cards lift on hover, a few colours fade and critical alerts pulse; the movement stops under reduced motion.
 
 ## Colors
 
@@ -187,7 +188,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 - **Brand Gradient** (`hero-start` navy to `hero-end` canvas, 135deg): used only on the sign-in hero panel, see-through (82% to 55%) so the background photo shows. Text on it is white.
 
 ### Top bar
-- **Canvas** (`bar-bg`) with a bottom hairline, `bar-text` title, `bar-text-2` secondary text, a `bar-chip` fill for the read-only badge and **Sky** (`bar-link`) for Sign out.
+- **Canvas** (`bar-bg`) with a bottom hairline, `bar-text` title, `bar-text-2` secondary text, a `bar-chip` fill for the view-only badge and **Sky** (`bar-link`) for Sign out.
 
 ### Status (semantic, from the app's onTrack / watch / behind / neutral)
 - **Emerald** (`ok`) on `ok-container`: completed projects, the finished Work done bar, "on schedule" and "ahead" notes, success notes.
@@ -223,16 +224,16 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 ### Hierarchy
 - **Display** (600, 34px, 1.15, -0.6px; 26px under 900px): the sign-in hero headline only, with a measure of about 14ch.
 - **Headline** (600, 24px, -0.3px): the sign-in form title.
-- **Banner Count** (700, 30px, -0.03em, uppercase, tabular; 26px under 600px): the project count in the dashboard banner.
-- **Title Large** (600, 22px, -0.2px): the project name and the large progress figure in the project header.
-- **Card Figure** (700, 17px to 20px, `clamp(17px, 1.25vw, 20px)`, IBM Plex Mono): the Work done and Billed values on project cards, sized to read from the back of a meeting room.
+- **Banner Count** (600, 30px, -0.03em, uppercase, tabular; 26px under 600px): the project count in the dashboard banner.
+- **Project Name** (600, 36px, -0.025em; 30px under 640px): the project name in the project header. Its Work done and Billed figures are 26px (see Progress Line).
+- **Card Figure** (600, 17px to 20px, `clamp(17px, 1.25vw, 20px)`, IBM Plex Mono): the Work done and Billed values on project cards, sized to read from the back of a meeting room.
 - **Title** (600, 16px, 1.3): project card names, clamped to two lines.
 - **Title Small** (600, 14px): section-card headings and dialog terms.
 - **Body** (400, 15px, 1.45): default text and input values.
-- **Body Small** (13px): key-value rows, tables, logs, field labels (500), the app-bar user line.
-- **Label** (500, 13px): card metadata, town, flag lines and progress-line notes, in `text-2`.
-- **Label Small** (700, 12px): status badges (13px in the project header).
-- **Office line** (600, 11px or 12px, uppercase, 0.6px or 1px tracking): the office name under the brand title in the app bar and at the foot of the sign-in hero. It always sits under its title and is never a section label.
+- **Body Small** (13px): key-value rows, tables, logs, field labels, the app-bar user line.
+- **Label** (400, 13px): card metadata, town, flag lines and progress-line notes, in `text-2`.
+- **Label Small** (600, 12px): status badges (13px in the project header).
+- **Office line** (600, 12px, uppercase, 0.6px or 1px tracking): the office name under the brand title in the app bar and at the foot of the sign-in hero. It always sits under its title and is never a section label.
 
 ### Named Rules
 **The Figures-In-Mono Rule.** A value that is only a measured figure (an amount, a percentage or a number: `L.isFigure` on the site, `isFigure` in Type.kt) is set in IBM Plex Mono: table number cells, the Work done and Billed values, filter counts, key-value amounts, the Contract cost amounts and the timeline dates. Words, and figures mixed with words ("36.27% behind", "540 days", status badges, table headings), stay in IBM Plex Sans, whose figures are tabular as drawn. Monospace is never used for names or labels.
@@ -267,11 +268,11 @@ Flat, with tonal layering. Depth comes from dark translucent panels over the dot
 ### Buttons
 - **Shape:** gently rounded (6px), at least 40px tall. On touch screens (`pointer: coarse`) buttons, text buttons, chips, pills, file links, the segmented control and the plan's zoom buttons are at least 44px tall, and field text is 16px so iPhone Safari does not zoom in on focus.
 - **Primary:** Action Blue fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
-- **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px primary outline with a 2px offset. Disabled is 0.6 opacity.
+- **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px Link Blue outline with a 2px offset. Disabled is 0.6 opacity.
 - **Text button:** blue 600 14px, 8px padding, Blue Haze background on hover. Used for Sign out, Back, Forgot password, and "What these mean" (always labelled; it opens the help that explains every status word and its threshold). An icon leads the label.
 
 ### Filter Pills and Priority Callout
-- **Filter pills** (banner, the dashboard's only counter row): one toggle button per flag that has projects: Overdue, Behind schedule, Billing ahead of work, Waiting approval (projects with an order waiting), Due in 30 days. Field fill, 1px `outline` stroke, pill radius, 500 14px, at least 40px tall, a 16px icon and a bold tabular count before the label. Overdue and Behind are tinted rose; the rest stay neutral with an amber icon. Pressed (`aria-pressed="true"`) is Blue Haze with a Link Blue border; pressing again clears it, and focus stays on the pill when the banner redraws.
+- **Filter pills** (banner, the dashboard's only counter row): one toggle button per flag that has projects: Overdue, Behind schedule, Billing ahead of work, Waiting approval (projects with an order waiting), Due in 30 days. Field fill, 1px `outline` stroke, pill radius, 400 14px, at least 40px tall, a 16px icon and a 600 16px mono count before the label. Overdue and Behind are tinted rose; the rest stay neutral with an amber icon. Pressed (`aria-pressed="true"`) is Blue Haze with a Link Blue border; pressing again clears it, and focus stays on the pill when the banner redraws.
 - **Priority callout:** the dashboard's one finding, "First to look at: <project>, <worst flag> · N more flagged", in an amber box (container fill, 30% outline, 12px radius) with a warning icon. With nothing flagged it turns emerald.
 
 ### Segmented Control
@@ -285,18 +286,18 @@ My projects | All projects, for accounts that see every project (not Super Viewe
 - **Internal Padding:** 16px to 20px. Section cards use a 48px-tall head row with a blue 20px icon and a 14px/600 title.
 
 ### Inputs / Fields
-- **Style:** Field fill, 1px `outline` stroke, 8px radius, 11px 12px padding, at least 44px tall. The label sits above (13px/500, `text-2`). The search field has a 38px left inset for the icon and a Cmd/Ctrl+K hint on the right that hides on focus, when typed in, and on touch screens.
+- **Style:** Field fill, 1px `outline` stroke, 8px radius, 11px 12px padding, at least 44px tall. The label sits above (13px/400, `text-2`). The search field has a 38px left inset for the icon and a Cmd/Ctrl+K hint on the right that hides on focus, when typed in, and on touch screens.
 - **Focus:** the border turns Progress Blue and gains a 1px ring (`box-shadow: 0 0 0 1px`).
-- **Error:** a 13px/500 Behind Red line under the fields, with `role="alert"`.
+- **Error:** a 13px/400 Rose line under the fields, with `role="alert"`.
 
 ### Navigation
-- **App bar:** a canvas-coloured bar with a bottom hairline, sticky from 600px up. The 40px app logo leads, then the brand title (16px/600) with the office line under it. The logo is also the favicon. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, and the Sign out text button. Navigation between pages is a Back text button with no menu.
+- **App bar:** a canvas-coloured bar with a bottom hairline, sticky from 600px up. The 40px app logo leads, then the brand title (16px/600) with the office line under it. The logo is also the favicon. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, then Users (Super Admin only), Profile and Sign out as text buttons. A project's pages are its five tabs under the header; Back returns to the dashboard. There is no side menu.
 
 ### Status Badge
-A small pill in 700 12px, with status colour text on its container. An overdue project's badge reads "Overdue by N days" in rose on both its card and its header. The **view-only** variant is quieter: 4px radius, 500 weight, Soft Panel with `text-2` and an eye icon.
+A small pill in 600 12px, with status colour text on its container. An overdue project's badge reads "Overdue by N days" in rose on both its card and its header. The **view-only** variant is quieter: 4px radius, 400 weight, Soft Panel with `text-2` and an eye icon.
 
 ### Project Summary cards
-- **Needs attention:** one alert box per flag (12px radius, 1px outline). Critical flags (overdue, 15%+ behind) are rose with a pulsing dot (still under reduced motion); warnings are amber with a warning icon.
+- **Needs attention:** one alert box per flag (12px radius, 1px outline). Critical flags (overdue, 15%+ behind) are rose with a pulsing dot (under reduced motion the dot stops, with a faint rose halo); warnings are amber with a warning icon.
 - **Project profile:** a 2:1 blueprint placeholder (16px blue grid on deep navy, compass icon, "No site photo yet") until a photo loads, then 16:9. Attribute values are IBM Plex Sans (a figure on its own is mono); the contractor is Link Blue; empty values show a faded dash.
 - **Key dates:** a vertical timeline. Filled blue dot = date passed (the line after it turns blue), hollow = ahead, rose dot with a halo = a completion date passed on an unfinished project, dashed = not set. Days left is a badge: rose when overdue, without a glow. "No time extension or suspension orders" carries a faded amber warning icon.
 - **Contract cost:** Original cost and Current cost as Field modules, each with a 16px icon label and the amount in bold monospace (22px to 28px).
@@ -304,7 +305,7 @@ A small pill in 700 12px, with status colour text on its container. An overdue p
 - **Status of payment:** the billing table (in a card under 494px wide inside, from its own width rather than the screen's, the date moves under the billing name); with no billings, a ledger box (receipt icon, centred "No billings yet", faint placeholder rows on the right, hidden on phones).
 
 ### Progress Line (signature)
-The label (14px `text-2`) on the left; the value (Card Figure) and a 13px note on the right; a 10px bar on the 16% track with 5px corners beneath. **Work done** is emerald when finished, rose when overdue or 15%+ behind, amber from 10% behind, and Progress Blue otherwise; its note is "past completion date", "12.00% behind" (with a warning icon, in the matching colour), "3.75% slipping" (grey), "ahead" or "on schedule". **Billed** is always Billed Violet, with the peso amount as its note. The two always appear as a pair on every project card and header, never as portfolio averages. In the project header the value is 26px/700, each line sits in its own Field module, and the 10px track shows a faint tick every 10%. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
+The label (14px `text-2`) on the left; the value (Card Figure) and a 13px note on the right; a 10px bar on the 16% track with 5px corners beneath. **Work done** is emerald when finished, rose when overdue or 15%+ behind, amber from 10% behind, and Progress Blue otherwise; its note is "past completion date", "12.00% behind" (with a warning icon, in the matching colour), "3.75% slipping" (grey), "ahead" or "on schedule". **Billed** is always Billed Violet, with the peso amount as its note. The two always appear as a pair on every project card and header, never as portfolio averages. In the project header the value is 26px/600, each line sits in its own Field module, and the 10px track shows a faint tick every 10%. When fresh data arrives, the bars fill from the left (700ms, `cubic-bezier(0.16, 1, 0.3, 1)`, scaleX). This is turned off under `prefers-reduced-motion`.
 
 ## Do's and Don'ts
 
@@ -322,5 +323,5 @@ The label (14px `text-2`) on the left; the value (Card Figure) and a 13px note o
 - **Don't** imitate official NHA or government branding; the app's own logo is the one exception.
 - **Do** keep the unofficial notice on the sign-in panel ("Unofficial app. Not issued or endorsed by the National Housing Authority."), in 13px white at 80%, under the office line. The app says the same on its login hero and in About NHA Monitor (user's wording, 2026-11-08).
 - **Don't** use the brand gradient outside the sign-in hero.
-- **Don't** use tracked uppercase lines as section labels or eyebrows. The office line and the banner count are the only uppercase text.
-- **Don't** add motion beyond the bar fill, the card hover lift, the back link's colour fade and the critical-alert pulse, and never animate when reduced motion is requested.
+- **Don't** use tracked uppercase lines as section labels or eyebrows. The office line, the banner count and table column headings are the only uppercase text.
+- **Don't** add motion beyond the bar fill, the card hover lift, the back link's and filter pills' colour fades and the critical-alert pulse, and never animate when reduced motion is requested.

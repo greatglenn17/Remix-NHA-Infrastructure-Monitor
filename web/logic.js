@@ -444,11 +444,13 @@ export function scheduleText(project, today) {
   return 'on schedule';
 }
 
-/** "2026-10-20" as "Oct 20, 2026"; anything else as stored (ProjectSchedule.displayDate). */
+/** "2026-10-20" as "Oct 20, 2026", a stamp "2026-10-20 14:05" as "Oct 20, 2026, 14:05"; anything else as stored (ProjectSchedule.displayDate). */
 export function displayDate(s) {
-  const t = isoDay(s);
+  const [, day, time] = /^(\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}(?::\d{2})?))?$/.exec(String(s ?? '').trim()) || [];
+  const t = isoDay(day);
   if (t == null) return s || '-';
-  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const d = new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  return time ? `${d}, ${time}` : d;
 }
 
 const pesoFmt = new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -769,7 +771,7 @@ export function variationLines(vo) {
   const approved = ((/\|\s*Date Approved:\s*([^|]+)/.exec(vo.remarks || '') || [])[1] || '').trim();
   const clean = (vo.remarks || '').replace(/^Remarks:\s*/i, '').replace(/\|\s*Date Approved:[^|]*/g, '').trim();
   const type = /additive/i.test(vo.documentName || '') ? 'Additive' : /deductive/i.test(vo.documentName || '') ? 'Deductive' : '';
-  return [type ? `Type: ${type}` : '', `Status: ${vo.status || ''}`, `Date Approved: ${approved || '-'}`,
+  return [type ? `Type: ${type}` : '', `Status: ${vo.status || ''}`, `Date Approved: ${displayDate(approved)}`,
     /^reason:/i.test(clean) ? clean : clean ? `Reason: ${clean}` : ''].filter(Boolean);
 }
 
@@ -911,6 +913,11 @@ export function lotStats(lots) {
 
 /** The Lots filter's choices (LOT_PROGRESS_FILTERS and the billing and status menus). */
 export const LOT_FILTERS = { band: ['ALL', ...LOT_BANDS], billing: ['ALL', 'M1 BILLED', 'M2 BILLED', 'NOT BILLED'], completion: ['ALL', 'COMPLETED', 'INCOMPLETE'] };
+
+/** Sentence case for the screen of words stored as the phone writes them; stored and compared values keep their spelling. */
+const SHOWN = { 'Behind Schedule': 'Behind schedule', ALL: 'All', 'M1 BILLED': 'M1 billed', 'M2 BILLED': 'M2 billed', 'NOT BILLED': 'Not billed',
+  COMPLETED: 'Completed', INCOMPLETE: 'Incomplete', 'No Action': 'No action', 'Rain Showers': 'Rain showers' };
+export const shownWord = w => SHOWN[w] ?? w;
 
 /** isLotMatchingFilter: `f` is {query, band, billing, completion}; the query matches "b3-l12", "b3l12", "block 3", "lot 12" or the unit. */
 export function lotMatches(l, f) {
