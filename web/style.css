@@ -449,6 +449,12 @@ thead .num { font-family: inherit; }
 .chips button { font: 400 13px var(--sans); min-height: 40px; padding: 6px 14px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--outline); background: var(--field); color: var(--text-2); }
 .chips button:hover { color: var(--text); }
+/* On a phone the section chips are one row that scrolls sideways, not four rows above the content. */
+@media (max-width: 600px) {
+  .chips.scroll-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 8px -16px; padding: 4px 16px; } /* 4px above and below: room for the focus ring */
+  .chips.scroll-row::-webkit-scrollbar { display: none; }
+  .chips.scroll-row button { flex: none; }
+}
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
 /* What waits under a chip (orders not approved, requests not packaged, open issues): an amber count after its name. */
 .chip-n { display: inline-block; margin-left: 2px; min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--watch-c);
@@ -683,9 +689,14 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .lots-links { display: flex; padding-bottom: 8px; }
 .plan-tools .danger { margin: 0 0 0 auto; }
 .lot-sum { margin: 0; font-size: 14px; }
-.lot-filters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 16px 0 4px; }
+.lot-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 16px 0 4px; }
+.lot-filters .grow { flex: 1 1 240px; }
+.lot-filters .pill { min-height: 44px; }
+.lot-filters .pill[aria-expanded="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
+.lot-filter-set { flex: 1 1 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lot-filter-set[hidden] { display: none; }
 .lot-filters select { font: 400 14px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 8px; min-height: 44px; width: 100%; }
-@media (max-width: 700px) { .lot-filters { grid-template-columns: repeat(3, 1fr); } .lot-filters .grow { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .lot-filter-set { grid-template-columns: 1fr; } }
 .lot-count { margin: 8px 0 4px; font-size: 13px; }
 .lot-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -713,7 +724,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-draw p { flex: 1 1 240px; margin: 0; }
 .lot-stage polygon.sel { fill: var(--watch); fill-opacity: 0.65; stroke: var(--watch); stroke-opacity: 1; stroke-width: 3; stroke-dasharray: none; }
 .lot-legend .dot.billed { background: none; border: 2px dashed var(--primary); width: 8px; height: 8px; }
-.zoom-bar { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
+.zoom-bar { width: fit-content; margin: -4px 0 12px auto; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
 .zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; min-height: 40px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 .zoom-bar b { font-size: 12px; color: var(--link); min-width: 36px; text-align: center; }

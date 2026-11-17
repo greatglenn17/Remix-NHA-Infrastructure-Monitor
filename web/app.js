@@ -993,8 +993,11 @@ function drawProject(page) {
   // A chip named in the URL (#/p/<id>/documents/variation-orders) wins, so a reload or a shared link opens it.
   const linked = chips?.find(x => L.chipSlug(x) === page.sub);
   if (linked) page.chips[page.section] = linked;
-  const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section] : chips[0]);
   const counts = chips ? L.chipCounts(documents, of('developer_requests'), of('project_issues')) : {};
+  const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section]
+    : (page.section === 'documents' && chips.find(x => counts[x])) || chips[0]);
+  // The opening chip stays put once shown, so a count clearing on a redraw does not switch the view.
+  if (chips) page.chips[page.section] = chip;
   const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
   // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
@@ -1013,7 +1016,7 @@ function drawProject(page) {
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
     </nav>
-    ${chips ? `<div class="chips" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
+    ${chips ? `<div class="chips scroll-row" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
   main.querySelectorAll('[data-chip]').forEach(b => { b.onclick = () => {
     page.chips[page.section] = b.dataset.chip; page.sub = L.chipSlug(b.dataset.chip);
@@ -1021,6 +1024,12 @@ function drawProject(page) {
     drawProject(page);
   }; });
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
+  // Only the row scrolls, sideways, never the page: the chosen chip in view when the row is wider than the screen.
+  const chipRow = main.querySelector('.chips.scroll-row'), chosen = chipRow?.querySelector('[aria-pressed="true"]');
+  if (chosen && chipRow.scrollWidth > chipRow.clientWidth) {
+    const r = chosen.getBoundingClientRect(), row = chipRow.getBoundingClientRect();
+    if (r.right > row.right) chipRow.scrollLeft = r.left - row.left - 16;
+  }
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
   main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
@@ -1451,6 +1460,8 @@ const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', bi
 // setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
+/** "Filters", or "Filters (2)" with two of Progress, Billing and Status narrowed. */
+const filterLabel = st => { const n = ['band', 'billing', 'completion'].filter(k => st[k] !== 'ALL').length; return n ? `Filters (${n})` : 'Filters'; };
 
 function lotsView(c) {
   const st = lotState(c.page);
@@ -1461,11 +1472,12 @@ function lotsView(c) {
   const busy = st.draw || st.frame;
   const addLot = !busy && site.plan.pdfFileUrl && edit ? `<button class="text-btn" id="lot-add">${icon('add_circle', 'sm')}Add lot</button>` : '';
   // The plan's own tools (the phone's header and plan menu), put away while a lot is being drawn: the scale under the
-  // title, Find lots beside Add lot, and the rarely used ones folded under Plan setup.
+  // title, Add lot as the one action beside the plan, and the rest folded under Plan setup.
   const scale = Number(site.plan.scaleDenominator) || 0, unfound = site.lots.filter(l => L.foundLot(l) && !l.progress).length;
   const scaleLine = busy ? '' : edit ? `<button class="text-btn" id="plan-scale">${scale ? `Scale 1:${scale} (change)` : 'Set the plan scale to work out lot areas'}</button>` : scale ? `<span class="muted small">Scale 1:${scale}</span>` : '';
   const findLots = !busy && manage && site.plan.pdfFileUrl ? `<button class="text-btn" id="lots-find">${icon('search', 'sm')}Find lots</button>` : '';
   const tools = busy ? '' : [
+    findLots, upload,
     edit ? `<button class="text-btn" id="plan-turn">${icon('rotate_90_degrees_cw', 'sm')}Turn plan</button>` : '',
     edit && site.plan.pdfFileUrl ? '<button class="text-btn" id="plan-frame">Print area</button>' : '',
     edit && unfound ? `<button class="text-btn" id="lots-unfind">Remove found lots (${unfound})</button>` : '',
@@ -1482,12 +1494,13 @@ function lotsView(c) {
     ${sites.length > 1 ? `<div class="chips" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
     <div class="lots-head"><div><h2>${title}</h2>${scaleLine}</div>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
-        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}${findLots}${upload}</span></div>
+        ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}</span></div>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
     <p class="muted lot-sum">${plural(k.total, 'saleable lot')}: ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average progress ${k.avg.toFixed(1)}%.</p>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
-      ${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}
+      <button class="pill" id="lot-filter-toggle" aria-expanded="${Boolean(st.filters)}" aria-controls="lot-filter-set">${icon('filter_list', 'sm')}<span id="lot-filter-n">${filterLabel(st)}</span></button>
+      <div class="lot-filter-set" id="lot-filter-set"${st.filters ? '' : ' hidden'}>${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}</div>
     </div>
     <p class="muted lot-count" id="lot-count"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
@@ -1498,12 +1511,12 @@ function lotsView(c) {
       <button class="text-btn" id="frame-close">Close</button><button class="text-btn" id="frame-page">Whole page</button><button class="text-btn" id="frame-fit">Fit to lots</button></div>` : ''}
     ${site.lots.length || busy ? `<div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
-      <div class="zoom-bar" role="group" aria-label="Zoom">
-        ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
-        <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
-        <button data-zoom="reset">Reset</button></div>
       <div class="lot-card" id="lot-card" hidden></div>
-    </div>` : emptyLine('No lots drawn on this plan yet.')}
+    </div>
+    <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
+      ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
+      <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
+      <button data-zoom="reset">Reset</button></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div id="lot-results"></div>
   </section>`;
 }
@@ -2246,7 +2259,9 @@ async function bindLots(c) {
     if (found.length === 1 && d?.centres.has(found[0].uuid)) { st.sel = found[0].uuid; centreOn(d.centres.get(found[0].uuid), 2); }
     paint();
   };
-  main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; paint(); }; });
+  main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; document.getElementById('lot-filter-n').textContent = filterLabel(st); paint(); }; });
+  const filterToggle = document.getElementById('lot-filter-toggle');
+  filterToggle.onclick = () => { st.filters = !st.filters; filterToggle.setAttribute('aria-expanded', st.filters); document.getElementById('lot-filter-set').hidden = !st.filters; };
   main.querySelectorAll('[data-lot-site]').forEach(b => { b.onclick = () => { Object.assign(st, { site: b.dataset.lotSite, sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null }); drawProject(c.page); }; });
   const add = document.getElementById('lot-add');
   if (add) add.onclick = () => { Object.assign(st, { draw: [], sel: null, more: false, view: null, group: null, renum: null }); drawProject(c.page); };
@@ -2270,6 +2285,7 @@ async function bindLots(c) {
   }
   paint();
   if (!viewer) return;
+  const zoomBar = document.getElementById('zoom-bar');
 
   // The view: the plan fitted to the viewer is 100%; x, y move it, s zooms it (0.2 to 5, as on the phone).
   let fit = 1, W = 0, H = 0;
@@ -2278,7 +2294,7 @@ async function bindLots(c) {
     const v = view();
     stage.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
     document.getElementById('zoom-pct').textContent = `${Math.round(v.s * 100)}%`;
-    viewer.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
+    zoomBar.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
   };
   const reset = () => { st.view = { s: 1, x: (W - d.width * fit) / 2, y: (H - d.height * fit) / 2 }; apply(); };
   const zoomAt = (s, px = W / 2, py = H / 2) => {
@@ -2322,8 +2338,8 @@ async function bindLots(c) {
   });
   refit.observe(viewer);
 
-  viewer.querySelectorAll('[data-zoom]').forEach(b => { b.onclick = () => (b.dataset.zoom === 'reset' ? reset() : Number(b.dataset.zoom) === 1 ? reset() : zoomAt(Number(b.dataset.zoom))); });
-  viewer.querySelectorAll('[data-zoom-step]').forEach(b => { b.onclick = () => zoomAt(view().s * Number(b.dataset.zoomStep)); });
+  zoomBar.querySelectorAll('[data-zoom]').forEach(b => { b.onclick = () => (b.dataset.zoom === 'reset' ? reset() : Number(b.dataset.zoom) === 1 ? reset() : zoomAt(Number(b.dataset.zoom))); });
+  zoomBar.querySelectorAll('[data-zoom-step]').forEach(b => { b.onclick = () => zoomAt(view().s * Number(b.dataset.zoomStep)); });
 
   // Drag to move, two fingers to pinch, a click without a drag picks the lot under it (or clears the selection).
   // Inside the viewer's border, where the stage is placed; a corner of a new lot lands exactly under the pointer.
