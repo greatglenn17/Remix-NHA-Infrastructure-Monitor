@@ -266,11 +266,16 @@ export function isSuspendedOn(docs, today) {
   return now != null && periods(docs).some(({ d, begin, end }) => pausedItems(d, docs) == null && begin <= now && (end == null || now < end));
 }
 
-/** BarChart.withSchedule: today's target from the chart, then Suspended during a Full suspension, else Behind Schedule at any negative slippage, else On-going. */
+/**
+ * BarChart.withSchedule: today's target from the chart; then, unless finished, the revised completion from approved time
+ * extensions (the stored date can lag them) and the status: Suspended during a Full suspension, else Behind Schedule at
+ * any negative slippage, else On-going. A finished project keeps its stored date, the day it was completed.
+ */
 export function withSchedule(project, docs, today) {
   const p = withPlannedTarget(project, docs, today);
   if (isCompleted(p)) return p;
-  return { ...p, status: isSuspendedOn(docs, today) ? 'Suspended' : slippage(p) < 0 ? 'Behind Schedule' : 'On-going' };
+  const due = revisedCompletion(p, docs);
+  return { ...p, ...(due ? { completionDateRevised: due } : {}), status: isSuspendedOn(docs, today) ? 'Suspended' : slippage(p) < 0 ? 'Behind Schedule' : 'On-going' };
 }
 
 /** ProjectViewModel.isMine (AssignmentPolicy.isVisible without seesAll): assigned, or the creator of a list-less project. */

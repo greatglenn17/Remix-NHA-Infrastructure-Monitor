@@ -546,7 +546,7 @@ fun ProjectDetailScreen(
                     completionDateOriginal = completionDateOriginal,
                     assignedStaff = assignedStaff
                 ).markedCompleted(completedOn, finalAccomplishment)
-                viewModel.updateProjectMaster(updated, assignedUsers)
+                viewModel.updateProjectMaster(updated, assignedUsers, newCompletion = completedOn != null)
                 projectToEdit = null
             }
         )

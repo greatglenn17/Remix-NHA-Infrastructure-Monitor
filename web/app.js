@@ -1042,11 +1042,11 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const flags = L.attentionFlags(project, documents, billed, now, of('developer_requests'), L.latestReportDay(weekly));
   const housing = /housing/i.test(project.projectType || '');
   const finished = L.isCompleted(project);
-  // KeyDatesCard: approved time extensions first, else the stored revised date; Days left counts down to the same date.
+  // KeyDatesCard: approved time extensions first, else the stored revised date; Days left counts down to the same date
+  // (withSchedule already moved an unfinished project's date to the orders').
   const fromOrders = L.revisedCompletion(project, documents);
   const stored = (project.completionDateRevised || '').trim();
   const revised = fromOrders || (stored !== '-' ? stored : '');
-  const dated = fromOrders ? { ...project, completionDateRevised: fromOrders } : project;
   const revisedDays = L.revisedDurationDays(project, L.addedDays(documents));
 
   // Needs attention: one alert box per flag; critical ones (overdue, 15%+ behind) carry a pulsing dot.
@@ -1073,7 +1073,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     const state = !has ? 'none' : date > now ? 'next' : completion && !finished ? 'late' : 'done';
     return `<li class="step ${state}"><span>${esc(label)}</span><b>${has ? esc(L.displayDate(date)) : '-'}</b></li>`;
   };
-  const daysLeft = L.daysLeftText(dated, now);
+  const daysLeft = L.daysLeftText(project, now);
   const dates = section('Key dates', 'event', `
     <ol class="timeline">
       ${step('Date started', project.dateStarted, false)}

@@ -158,9 +158,18 @@ object BarChart {
         else -> project.copy(status = ProjectStatus.ONGOING.label)
     }
 
-    /** [project] as of [date]: its target from the chart, then its status from its suspension orders. */
+    /**
+     * [project] as of [date]: its target from the chart; then, unless finished, the revised completion from approved time
+     * extensions (the stored date can lag them, and the dashboard, flags and header must match the Summary's Key dates)
+     * and its status from its suspension orders. A finished project keeps its stored date, the day it was completed.
+     */
     fun withSchedule(project: Project, documents: List<PendingDocument>, date: LocalDate): Project =
-        withScheduleStatus(withPlannedTarget(project, documents, date), documents, date)
+        withScheduleStatus(withRevisedCompletion(withPlannedTarget(project, documents, date), documents), documents, date)
+
+    private fun withRevisedCompletion(project: Project, documents: List<PendingDocument>): Project =
+        if (project.isCompleted) project
+        else ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
+            ?.let { project.copy(completionDateRevised = it) } ?: project
 
     /**
      * The work items a Partial suspension pauses ("Items: A; B" in its remarks; a continuance without its own list
