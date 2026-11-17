@@ -224,6 +224,10 @@ body.signed-out main { max-width: none; padding: 0; }
 .help dt { font-size: 14px; font-weight: 600; }
 .help dd { margin: 2px 0 0; font-size: 14px; color: var(--text-2); }
 .help form { display: flex; justify-content: flex-end; margin-top: 16px; }
+/* The house confirm (ask): the question, what it means, then Cancel and the named action; a destructive action is a rose button. */
+.ask p { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+.ask .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.btn.danger { background: var(--behind); color: var(--bg); }
 
 /* Project cards */
 .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap: 12px; }
