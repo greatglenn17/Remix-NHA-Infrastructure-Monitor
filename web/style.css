@@ -438,7 +438,7 @@ thead .num { font-family: inherit; }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
 .project-head + .tabs + .bento, .tabs + .stack, .tabs + .card, .tabs + .section { margin-top: 12px; }
 .stack { display: grid; gap: 12px; }
-.list-title { font-size: 13px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-2); margin: 4px 0 10px; }
+.list-title { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 4px 0 10px; }
 .card.empty { display: grid; justify-items: center; gap: 6px; padding: 40px 16px; }
 .card.empty > .icon { font-size: 40px; color: var(--text-2); }
 .card.empty p { color: var(--text); font-weight: 600; }
@@ -460,11 +460,11 @@ span.file.gone { text-decoration: none; }
 .rep-head .text-btn { flex: none; margin: -6px -8px 0 0; }
 .rep-actions { display: flex; flex: none; gap: 12px; }
 .rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; }
-.report details { margin-top: 10px; border-top: 1px solid var(--border); }
-.report summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
-.report summary::-webkit-details-marker { display: none; }
-.report summary .icon { transition: transform 150ms ease-out; }
-.report details[open] summary .icon { transform: rotate(180deg); }
+.report details, details.curve { margin-top: 10px; border-top: 1px solid var(--border); }
+.report summary, .curve summary, .plan-tools summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
+.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker { display: none; }
+.report summary .icon, .curve summary .icon, .plan-tools summary .icon { transition: transform 150ms ease-out; }
+.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon { transform: rotate(180deg); }
 .rep-body h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
 .rep-body h4:first-child { margin-top: 2px; }
 .grid-table { font-size: 13px; }
@@ -475,6 +475,7 @@ span.file.gone { text-decoration: none; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns up to TO DATE. */
 .apa-tools { align-items: end; margin-bottom: 6px; }
+.apa-tools .text-btn.danger { margin: 0 0 0 auto; }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
 .apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
 /* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (about
@@ -656,18 +657,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }
 }
 
-/* Lots (SubdivisionPlanTab, read-only): KPIs, filters, and each block's lots as coloured squares. */
+/* Lots (SubdivisionPlanTab, read-only): a one-line count, filters, and each block's lots as coloured squares. */
 .lot-n { background: #A3A3A3; }
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lots-head h3 { margin: 0; font-size: 16px; }
 .lots-head select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
-.plan-tools { display: flex; margin: -4px 0 12px; }
-.plan-tools .danger { margin-right: 0; }
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
-.kpi { background: var(--surface-variant); border-radius: 8px; padding: 8px 10px; }
-.kpi span { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
-.kpi b { display: block; font: 600 20px var(--mono); }
-.kpi.link b { color: var(--link); } .kpi.muted b { color: var(--neutral); } .kpi.ok b { color: var(--ok); } .kpi.watch b { color: var(--watch); }
+.plan-tools { margin: -8px 0 8px; }
+.plan-tools .lots-links { display: flex; padding-bottom: 8px; }
+.plan-tools .danger { margin: 0 0 0 auto; }
+.lot-sum { margin: 0; font-size: 14px; }
 .lot-filters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 16px 0 4px; }
 .lot-filters select { font: 400 14px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 8px; min-height: 44px; width: 100%; }
 @media (max-width: 700px) { .lot-filters { grid-template-columns: repeat(3, 1fr); } .lot-filters .grow { grid-column: 1 / -1; } }
@@ -743,7 +741,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .ic-head .icon { color: var(--text-2); }
 .ic-head .behind { color: var(--behind); }
 .ic-badges { display: flex; gap: 6px; }
-.issue-card h4 { margin: 10px 0 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
+.issue-card h4 { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .issue-card h4.link { color: var(--link); }
 .issue-card h4 + p { margin: 0; font-size: 14px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
 .issue-card .logged { margin: 10px 0 0; font-style: italic; text-align: right; }
@@ -753,7 +751,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .edit-form form { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 14px; margin: 0; }
 .edit-form h2 { margin: 0; }
 .edit-form [data-today] { justify-self: start; margin-top: -8px; }
-.edit-form h3 { margin: 6px 0 -10px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--link); }
+.edit-form h3 { margin: 6px 0 -10px; font-size: 14px; color: var(--link); }
 .edit-form h3 + p { margin: 0; font-size: 13px; }
 .edit-form .field + .chips { margin: -6px 0 0; }
 .order-fields { display: grid; gap: 14px; }
@@ -791,8 +789,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 
 /* Weather (WeatherChartTab); the clock SVG is the print's, recoloured for the dark site */
 .wx .field { margin-top: 4px; }
-.wx-title { margin: 16px 0 2px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--link); }
-.wx-title .muted { float: right; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.wx-title { margin: 16px 0 2px; font-size: 14px; color: var(--link); }
+.wx-title .muted { float: right; font-size: 12px; }
 /* Clocks at least 130px wide (two a row on a phone) so the 9.5- and 12-unit labels below draw at 12px+ (the viewBox is 100 units). */
 .wx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(130px, 100%), 1fr)); gap: 8px; margin: 12px 0; padding: 8px; border-radius: 8px; background: var(--surface-variant); }
 .wx-grid.month { gap: 4px; }
