@@ -145,7 +145,6 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .pl-head b { font-size: clamp(17px, 1.25vw, 20px); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
 .pl-head small { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .n-ok { color: var(--ok); } .n-watch { color: var(--watch); } .n-behind { color: var(--behind); } .n-muted { color: var(--text-2); }
-.pl.big .pl-head b { font-size: 22px; letter-spacing: -0.2px; }
 .bar { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; margin-top: 6px; }
 .bar i { display: block; height: 100%; border-radius: 5px; transform-origin: left; }
 .bar.ok i { background: var(--ok); } .bar.watch i { background: var(--watch); } .bar.behind i { background: var(--behind); }
@@ -219,7 +218,7 @@ body.signed-out main { max-width: none; padding: 0; }
 /* PortfolioCounts "What these mean" help */
 .help { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-solid); color: var(--text); padding: 20px; max-width: min(440px, calc(100vw - 32px)); }
 .help::backdrop { background: rgb(0 0 0 / 0.6); }
-.help h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+.help h2 { font-size: 16px; font-weight: 600; line-height: 1.3; margin-bottom: 12px; }
 .help dl { display: grid; gap: 12px; margin: 0; }
 .help dt { font-size: 14px; font-weight: 600; }
 .help dd { margin: 2px 0 0; font-size: 14px; color: var(--text-2); }
@@ -264,7 +263,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .ph-badges .badge:not(.view) { font-size: 13px; padding: 4px 11px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
 /* Side by side while both figures fit, stacked below that. */
 .ph-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
-.ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 10px; }
+.ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 8px; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 /* The mono's full-width point and percent sign are drawn in a little at this size. */
 .pl.big .pl-head .fig { letter-spacing: -0.04em; }
@@ -301,7 +300,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .scope { background: var(--surface-variant); border-radius: 6px; padding: 8px; margin-top: 4px; }
 .scope b { font-size: 14px; font-weight: 600; display: block; }
 .log { padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
-.log b { font-weight: 600; } .log span { display: block; color: var(--text-2); font-size: 12px; }
+.log b { font-weight: 600; } .log > span { display: block; color: var(--text-2); font-size: 12px; }
 
 /* Needs attention: one alarm box per flag */
 .alerts { display: grid; gap: 8px; }
@@ -348,7 +347,7 @@ a.alert b { flex: 1 1 14em; min-width: 0; }
 
 /* Contract cost modules */
 .money { display: grid; gap: 10px; }
-.money > div { display: grid; gap: 4px; padding: 12px 14px; border-radius: 10px; background: var(--field); border: 1px solid var(--border); min-width: 0; }
+.money > div { display: grid; gap: 4px; padding: 12px 14px; border-radius: 8px; background: var(--field); border: 1px solid var(--border); min-width: 0; }
 .money span { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 400; color: var(--text-2); }
 .money b { font: 600 clamp(22px, 2vw, 28px)/1.15 var(--mono); letter-spacing: -0.02em; color: var(--text); overflow-wrap: anywhere; }
 
@@ -400,6 +399,10 @@ thead .num { font-family: inherit; }
   .appbar-in, main { padding-left: 16px; padding-right: 16px; }
   .portfolio { padding: 16px; }
   .portfolio h1 { font-size: 26px; }
+  /* The filter pills are one row that scrolls sideways, not five rows stacked over the projects. */
+  .portfolio .pills { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 4px 16px; }
+  .portfolio .pills::-webkit-scrollbar { display: none; }
+  .portfolio .pills .pill { flex: none; }
   .ph-bars { gap: 10px; }
   .project-head { padding: 16px; }
   .ph-top { flex-direction: column; gap: 0; }
@@ -408,7 +411,7 @@ thead .num { font-family: inherit; }
   .ghost-rows { display: none; }
   #who .email { display: none; }
   .search { max-width: none; }
-  /* Filters on a phone: one per row, so each label stays on one line. */
+  /* Filters on a phone: a label never wraps (the banner row scrolls sideways; see the 600px block). */
   .pills { justify-content: flex-start; gap: 6px; }
   /* The bar scrolls off so a phone's height goes to the projects; its links keep their names for screen readers. */
   .appbar { position: static; }
@@ -566,8 +569,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* Documents: LogEntry rows; continuances sit under their suspension; requests not yet packaged stand out. */
 .entry { display: grid; gap: 2px; padding: 10px 12px; margin-top: 6px; border-radius: 6px; background: var(--surface-variant); font-size: 13px; min-width: 0; }
 .entry b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.entry span { color: var(--text-2); overflow-wrap: anywhere; }
-.entry .badge { justify-self: start; margin-top: 4px; }
+.entry b .badge, .log b .badge { margin: 0 0 0 6px; vertical-align: 1px; }
+.entry > span:not(.badge) { color: var(--text-2); overflow-wrap: anywhere; }
+.entry > .badge { justify-self: start; margin-top: 4px; }
 .entry .file, .entry .entry-edit { justify-self: start; }
 .entry-edit { background: var(--primary-container); margin-top: 6px; white-space: nowrap; }
 .entry-edit:hover { filter: brightness(1.25); }
@@ -728,7 +732,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; min-height: 40px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 .zoom-bar b { font-size: 12px; color: var(--link); min-width: 36px; text-align: center; }
-.lot-card { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 16px 16px 0 0; background: var(--surface-variant); }
+.lot-card { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 12px 12px 0 0; background: var(--surface-variant); }
 .lot-card p { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
 .lot-card .lc-upd { color: var(--link); }
 .lot-card .btn { margin-top: 10px; }
@@ -742,7 +746,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lc-bill { font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--outline); color: var(--text-2); }
 .lc-bill.on { color: #052e16; background: var(--ok); border-color: var(--ok); }
 @media (max-width: 600px) { .zoom-bar [data-zoom]:not([data-zoom="reset"]) { display: none; } }
-.lot-detail { background: var(--surface-variant); border-radius: 10px; padding: 12px 14px; margin: 8px 0 4px; scroll-margin: 80px; }
+.lot-detail { background: var(--surface-variant); border-radius: 8px; padding: 12px 14px; margin: 8px 0 4px; scroll-margin: 80px; }
 .ld-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .ld-head h3 { margin: 0; font-size: 16px; flex: 1; }
 .lot-pct { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; color: #0B0F17; }
@@ -830,7 +834,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-day svg { display: block; width: 100%; height: auto; }
 .wx-day svg circle[fill='#fff'] { fill: var(--bg); }
 .wx-day svg [stroke='#888'] { stroke: var(--outline); }
-.wx-day svg text { fill: var(--text-2); font-size: 9.5px; }
+.wx-day svg text { fill: var(--text-2); font-size: 9.5px; } /* viewBox units (0 0 100 100): about 13px on screen at the clock's 135px */
 .wx-day svg text[font-weight='bold'] { fill: var(--text); font-size: 12px; font-weight: 600; }
 .wx-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; margin: 8px 0; font-size: 12px; font-weight: 600; }
 .wx-legend span { display: inline-flex; align-items: center; gap: 6px; }
