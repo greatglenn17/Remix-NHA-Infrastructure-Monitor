@@ -1107,14 +1107,18 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
         <th class="num">${L.formatDecimal(billed)}</th>
         <th class="num">${cost > 0 ? pct(billed / cost * 100) : '-'}</th>
         <th class="num">${L.formatDecimal(cost - billed)}</th></tr></tfoot>
-    </table></div>`, 'wide');
+    </table></div>`, 'wide pay-sum');
 
+  // The phone's order (SummarySection.kt) read down the columns: report and construction, the profile, plan and dates,
+  // then cost beside the payments. Without the housing card, Contract cost moves up under the report (at every width) so column 1 is
+  // not one short card; that is the one place the order leaves the phone's.
   return `
     <div class="bento">
-      <div class="col c1">${attention}${profile}</div>
-      <div class="col c2">${dates}${barChartCard(project, documents, now, page.curve)}</div>
-      <div class="col c3">${costCard}${report}${construction}</div>
-      ${paymentCard}
+      ${attention}
+      <div class="col">${report}${construction || costCard}</div>
+      <div class="col">${profile}</div>
+      <div class="col">${barChartCard(project, documents, now, page.curve)}${dates}</div>
+      <div class="bento-foot">${construction ? costCard : ''}${paymentCard}</div>
     </div>`;
 }
 
