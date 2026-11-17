@@ -847,6 +847,7 @@ function redrawDashboard() {
   banner.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
   // The banner was rebuilt: keep keyboard focus on the filter just pressed.
   if (focused) banner.querySelector(`[data-kind="${focused}"]`)?.focus();
+  keepInView(banner.querySelector('.pills'));
 
   const scopeEl = document.getElementById('scope');
   scopeEl.hidden = !mineAvailable;
@@ -916,7 +917,7 @@ function tile(it) {
     <div class="meta">
       <span>${icon('event', 'sm')}Completion ${esc(completion)}</span>
       ${it.waiting ? `<span class="badge lv-watch">${icon('description', 'sm')}${it.waiting === 1 ? '1 order waiting approval' : `${it.waiting} orders waiting approval`}</span>` : ''}
-      <span>${icon('update', 'sm')}${it.lastUpdate ? `Field update ${esc(L.displayDate(it.lastUpdate))}` : typeof s.loaded.weekly_reports === 'string' ? 'Field updates not loaded' : 'No field update yet'}</span>
+      ${!it.lastUpdate && flags[0]?.kind === 'stale' ? '' : `<span>${icon('update', 'sm')}${it.lastUpdate ? `Field update ${esc(L.displayDate(it.lastUpdate))}` : typeof s.loaded.weekly_reports === 'string' ? 'Field updates not loaded' : 'No field update yet'}</span>`}
     </div>
   </a></li>`;
 }
@@ -1024,12 +1025,7 @@ function drawProject(page) {
     drawProject(page);
   }; });
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
-  // Only the row scrolls, sideways, never the page: the chosen chip in view when the row is wider than the screen.
-  const chipRow = main.querySelector('.chips.scroll-row'), chosen = chipRow?.querySelector('[aria-pressed="true"]');
-  if (chosen && chipRow.scrollWidth > chipRow.clientWidth) {
-    const r = chosen.getBoundingClientRect(), row = chipRow.getBoundingClientRect();
-    if (r.right > row.right) chipRow.scrollLeft = r.left - row.left - 16;
-  }
+  keepInView(main.querySelector('.chips.scroll-row'));
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
   main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
@@ -1141,7 +1137,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     ${kv('Revised duration', revisedDays == null ? '-' : `${revisedDays} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
     <p class="sub">Time extensions &amp; suspensions</p>
-    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}</b><span>Status: ${esc(d.status)}${d.remarks ? ` · ${esc(L.remarksText(d.remarks))}` : ''}</span></div>`).join('')
+    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}${orderBadge(d)}</b>${d.remarks ? `<span>${esc(L.remarksText(d.remarks))}</span>` : ''}</div>`).join('')
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
@@ -1460,6 +1456,13 @@ const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', bi
 // setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
+/** A row that scrolls sideways on a phone, redrawn at its start: scroll only the row (never the page) so its pressed button shows. */
+function keepInView(rowEl) {
+  const on = rowEl?.querySelector('[aria-pressed="true"]');
+  if (!on || rowEl.scrollWidth <= rowEl.clientWidth) return;
+  const r = on.getBoundingClientRect(), row = rowEl.getBoundingClientRect();
+  if (r.right > row.right) rowEl.scrollLeft = r.left - row.left - 16;
+}
 /** "Filters", or "Filters (2)" with two of Progress, Billing and Status narrowed. */
 const filterLabel = st => { const n = ['band', 'billing', 'completion'].filter(k => st[k] !== 'ALL').length; return n ? `Filters (${n})` : 'Filters'; };
 
@@ -3858,11 +3861,13 @@ function paymentsBody({ project, payments, cost, billed }) {
 /* ---------- Documents (DocumentsSection, ContractorLettersCard, DeveloperRequestsCard) ---------- */
 
 /** LogEntry: a title and its lines (blank ones skipped), with any attached file under them. */
-const entry = (title, lines, extra = '', cls = '') => `<div class="entry ${cls}"><b>${esc(title)}</b>${lines.filter(x => x && x.trim()).map(x => `<span>${esc(x)}</span>`).join('')}${extra}</div>`;
+const entry = (title, lines, extra = '', cls = '', tag = '') => `<div class="entry ${cls}"><b>${esc(title)}${tag}</b>${lines.filter(x => x && x.trim()).map(x => `<span>${esc(x)}</span>`).join('')}${extra}</div>`;
 /** An order's attached copy and, when `editable`, the button that opens its status. */
 const orderExtra = (d, editable) => (d.fileUrl ? fileLink(d.fileUrl, 'Attached copy') : '')
   + (editable ? `<button class="text-btn entry-edit" data-edit-order="${esc(d.uuid)}">${icon('edit', 'sm')}Update status</button>` : '');
-const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [`Status: ${d.status || ''}`, L.remarksText(d.remarks)], orderExtra(d, editable), cls);
+/** An order's status as a badge: green once Approved, amber while it waits. */
+const orderBadge = d => `<span class="badge ${/^approved$/i.test((d.status || '').trim()) ? 'lv-ok' : 'lv-watch'}">${esc(d.status || 'No status')}</span>`;
+const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [L.remarksText(d.remarks)], orderExtra(d, editable), cls, orderBadge(d));
 /** `addType`, when set, is the kind of order the card's Add button files. */
 const ordersCard = (title, ic, items, emptyText, addType = '') => section(title, ic, items || emptyLine(emptyText), '',
   addType ? `<button class="text-btn" data-add-order="${esc(addType)}">${icon('add_circle', 'sm')}Add</button>` : '');
@@ -3875,7 +3880,7 @@ function documentsBody(c, chip) {
   if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d, editable)).join(''), 'No time extensions.', add(te));
   if (chip === 'Variation Orders') {
     const vos = named('variation order');
-    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(d.documentName, L.variationLines(d), orderExtra(d, editable))).join(''), 'No variation orders recorded.', add(vo));
+    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(d.documentName, L.variationLines(d), orderExtra(d, editable), '', orderBadge(d))).join(''), 'No variation orders recorded.', add(vo));
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
   if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable);

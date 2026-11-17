@@ -404,7 +404,7 @@ export function attentionFlags(project, docs, billed, today, requests = [], late
   // A suspended project is not expected to report; the start date counts until the first report.
   const stale = daysSince(latestReportAt ?? project.dateStarted);
   if (!finished && project.status !== 'Suspended' && stale != null && stale >= 14) {
-    // Web wording: with no report yet the count is from the start, so say so (the card footer reads "No field update yet").
+    // Web wording: with no report yet the count is from the start, so say so (the card footer then leaves out its own "No field update yet").
     flags.push({ kind: 'stale', level: 'stale', message: latestReportAt
       ? `No field update in ${plural(stale, 'day', 'days')}`
       : `No field update yet, ${plural(stale, 'day', 'days')} since the start` });
@@ -827,7 +827,8 @@ export function variationLines(vo) {
   const approved = ((/\|\s*Date Approved:\s*([^|]+)/.exec(vo.remarks || '') || [])[1] || '').trim();
   const clean = (vo.remarks || '').replace(/^Remarks:\s*/i, '').replace(/\|\s*Date Approved:[^|]*/g, '').trim();
   const type = /additive/i.test(vo.documentName || '') ? 'Additive' : /deductive/i.test(vo.documentName || '') ? 'Deductive' : '';
-  return [type ? `Type: ${type}` : '', `Status: ${vo.status || ''}`, `Date Approved: ${displayDate(approved)}`,
+  // The status is a badge after the order's name (app.js orderBadge), not a line.
+  return [type ? `Type: ${type}` : '', `Date Approved: ${displayDate(approved)}`,
     /^reason:/i.test(clean) ? clean : clean ? `Reason: ${clean}` : ''].filter(Boolean);
 }
 
