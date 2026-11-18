@@ -119,6 +119,41 @@ document.addEventListener('keydown', e => {
   if (q && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); q.focus(); q.select(); }
 });
 
+/**
+ * Once a new page has drawn, focus goes to its heading (or, for another section of the open project, to the tab just
+ * chosen; on a print view or an error, to its back link), so keyboard and screen-reader users start there and hear
+ * where they are. main itself is not a live region: every live snapshot redraws it, and a screen reader would read
+ * the whole page each time. What must be heard goes through announce, or is a role="alert" message.
+ */
+function land() {
+  if (!s.land) return;
+  const to = (s.land === 'tab' && main.querySelector('nav.tabs [aria-current="page"]')) || main.querySelector('.print-bar .back') || main.querySelector('h1') || main.querySelector('.back');
+  if (!to) return; // still loading: the next draw lands
+  s.land = null;
+  announce('');
+  // The user already moved on while it loaded (typing in search, a header link): focus stays where they put it.
+  const at = document.activeElement;
+  if (at && at !== document.body && at !== s.landFrom && at.isConnected) return;
+  if (to.tagName === 'H1') to.tabIndex = -1;
+  to.focus({ preventScroll: true });
+}
+
+/** Writes `html` into `el` unless it already holds exactly that (drawn here, untouched since), so an alert is read once. */
+function drawOnce(el, html) {
+  if (el.drawn === html && el.drawnFirst && el.drawnFirst === el.firstChild) return;
+  el.innerHTML = el.drawn = html;
+  el.drawnFirst = el.firstChild;
+}
+
+/** Says `text` to screen readers through one status line outside main, which redraws never replace; '' clears it. */
+function announce(text, wait = 100) {
+  const say = document.getElementById('say');
+  clearTimeout(announce.t);
+  say.textContent = '';
+  // Emptied first and filled a moment later, so the same words twice are read twice.
+  if (text) announce.t = setTimeout(() => { say.textContent = text; }, wait);
+}
+
 /** Every bar on a freshly opened screen fills in once; later redraws (typing in search) stay still. */
 function freshScreen() {
   main.dataset.fresh = '';
@@ -199,6 +234,8 @@ const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|driv
 function route() {
   const m = PAGE.exec(location.hash);
   window.scrollTo(0, 0);
+  s.land = m && s.page?.id === m[1] ? 'tab' : 'page';
+  s.landFrom = document.activeElement;
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
@@ -411,15 +448,21 @@ function renderUsers() {
     <a class="text-btn back" href="#/">${icon('arrow_back', 'sm')}All projects</a>
     <div class="users-head"><h1>Manage users &amp; roles</h1>
       <p class="muted">A new role or approval applies the next time that person opens the app or this website.</p></div>
-    <p class="note users-msg" role="status" hidden></p>
+    <p class="note users-msg" hidden></p>
     <ul class="user-cards" id="users"><li class="empty">Loading users…</li></ul>`;
   const list = document.getElementById('users'), msg = main.querySelector('.users-msg');
   let users = [];
-  const say = text => { msg.textContent = text; msg.hidden = !text; };
+  const say = text => { msg.textContent = text; msg.hidden = !text; announce(text); };
+  land();
   s.unsubPage.push(onSnapshot(collection(db, 'users'), snap => {
     users = L.manageableUsers(snap.docs.map(d => L.userRow(d.id, d.data())));
+    // The list is rebuilt: focus goes back to the same control of the same person (Approve is gone once approved).
+    const at = document.activeElement?.closest?.('#users [data-uid], #users [data-sees-all]');
+    const uid = at && (at.dataset.uid || at.dataset.seesAll);
+    const again = at && (at.dataset.role ? `[data-uid="${CSS.escape(uid)}"][data-role="${at.dataset.role}"]` : at.dataset.seesAll ? `[data-sees-all="${CSS.escape(uid)}"]` : `[data-uid="${CSS.escape(uid)}"][data-approve], [data-uid="${CSS.escape(uid)}"][aria-pressed="true"]`);
     list.innerHTML = users.length ? users.map(userCard).join('') : '<li class="empty">No other users have registered yet.</li>';
-  }, e => { list.innerHTML = `<li class="empty error">Could not load users. ${esc(L.errorText(e, 'This account cannot read the user list.', 'Reload the page to try again.'))}</li>`; }));
+    if (again) list.querySelector(again)?.focus();
+  }, e => { list.innerHTML = `<li class="empty error"><span role="alert">Could not load users. ${esc(L.errorText(e, 'This account cannot read the user list.', 'Reload the page to try again.'))}</span></li>`; }));
   list.onclick = e => {
     const b = e.target.closest('button[data-uid]');
     const user = b && users.find(u => u.uid === b.dataset.uid);
@@ -541,6 +584,7 @@ function renderDashboard() {
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
   document.getElementById('help').onclick = showTermHelp;
   if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = () => projectForm();
+  if (s.projects === null || RECORD_TYPES.some(t => !s.loaded[t])) announce('Loading projects…');
   redrawDashboard();
 }
 
@@ -820,7 +864,7 @@ function redrawDashboard() {
   const grid = document.getElementById('grid');
   if (!grid || !s.user) return;
   // innerHTML, not outerHTML: #grid stays, so the next good snapshot can still draw.
-  if (s.projectsError) { grid.innerHTML = `<li class="empty error">Could not load projects. ${esc(s.projectsError)}</li>`; return; }
+  if (s.projectsError) { drawOnce(grid, `<li class="empty error"><span role="alert">Could not load projects. ${esc(s.projectsError)}</span></li>`); return; }
   if (s.projects === null || RECORD_TYPES.some(t => !s.loaded[t])) { grid.innerHTML = '<li class="empty">Loading projects…</li>'; return; }
 
   const mineAvailable = L.seesAll(s.claims) && s.claims.role !== 'SUPER_VIEWER';
@@ -835,7 +879,8 @@ function redrawDashboard() {
   if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
   const banner = document.getElementById('portfolio');
   const focused = document.activeElement?.closest?.('#portfolio [data-kind]')?.dataset.kind;
-  banner.innerHTML = `
+  const onHead = document.activeElement?.matches?.('#portfolio h1');
+  const html = `
     <div class="pf-total">
       <h1>${inScope.length} ${inScope.length === 1 ? 'project' : 'projects'}</h1>
       <p class="pf-stats">${inScope.length - done} on-going · ${done} completed</p>
@@ -844,17 +889,24 @@ function redrawDashboard() {
       ${counts.map(c => `<button class="pill ${c.tone}" data-kind="${c.kind}" aria-pressed="${s.filter === c.kind}">${icon(c.icon, 'sm')}<b>${c.n}</b> ${esc(c.label)}</button>`).join('')}
     </div>` : ''}
     ${finding(inScope)}${notLoaded()}`;
-  banner.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
-  // The banner was rebuilt: keep keyboard focus on the filter just pressed.
-  if (focused) banner.querySelector(`[data-kind="${focused}"]`)?.focus();
+  if (banner.drawn !== html) {
+    banner.innerHTML = banner.drawn = html;
+    banner.querySelectorAll('[data-kind]').forEach(b => { b.onclick = () => { s.filter = s.filter === b.dataset.kind ? null : b.dataset.kind; redrawDashboard(); }; });
+    // The banner was rebuilt: keep keyboard focus on the filter just pressed.
+    if (focused) banner.querySelector(`[data-kind="${focused}"]`)?.focus();
+    if (onHead) { const h = banner.querySelector('h1'); h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  }
   keepInView(banner.querySelector('.pills'));
+  land();
 
   const scopeEl = document.getElementById('scope');
+  const onScope = document.activeElement?.closest?.('#scope [data-mine]')?.dataset.mine;
   scopeEl.hidden = !mineAvailable;
   scopeEl.innerHTML = mineAvailable ? `
     <button data-mine="1" aria-pressed="${s.mineOnly}">My projects</button>
     <button data-mine="0" aria-pressed="${!s.mineOnly}">All projects</button>` : '';
-  scopeEl.querySelectorAll('[data-mine]').forEach(b => { b.onclick = () => { s.mineOnly = b.dataset.mine === '1'; redrawDashboard(); }; });
+  scopeEl.querySelectorAll('[data-mine]').forEach(b => { b.onclick = () => { s.mineOnly = b.dataset.mine === '1'; redrawDashboard(); announce(banner.querySelector('h1').textContent); }; });
+  if (onScope) scopeEl.querySelector(`[data-mine="${onScope}"]`)?.focus();
 
   const q = s.q.trim().toLowerCase();
   const shown = inScope
@@ -868,7 +920,13 @@ function redrawDashboard() {
     grid.innerHTML = `<li class="empty">${inScope.length
       ? `No project matches.<button class="text-btn" id="clear">Clear search and filters</button>`
       : 'No projects for this account yet. Projects appear here once the Super Admin assigns them in the app.'}</li>`;
-    document.getElementById('clear')?.addEventListener('click', () => { s.q = ''; s.filter = null; renderDashboard(); });
+    document.getElementById('clear')?.addEventListener('click', () => {
+      const box = document.getElementById('q');
+      s.q = box.value = ''; s.filter = null;
+      redrawDashboard();
+      box.focus();
+      announce(`Showing all ${banner.querySelector('h1').textContent}`);
+    });
     return;
   }
   grid.innerHTML = shown.map(tile).join('');
@@ -927,6 +985,7 @@ function tile(it) {
 function renderProject(projectUuid, section, sub) {
   const page = s.page = { id: projectUuid, project: undefined, records: null, error: null, section, sub, chips: {}, month: null };
   main.innerHTML = '<p class="muted">Loading project…</p>';
+  announce('Loading project…');
   freshScreen();
   const draw = () => drawProject(page);
   s.unsubPage.push(onSnapshot(doc(db, 'projects', projectUuid), d => {
@@ -966,10 +1025,17 @@ function drawProject(page) {
   if (page !== s.page) return;
   if (document.querySelector('dialog.ask[data-question]')) { page.redraw = true; return; }
   const { project: stored, records, error } = page;
-  if (error) { main.innerHTML = `${backLink}<p class="error">${esc(error)}</p>`; return; }
+  // A page without a heading (an error, a print view) lands on its back link; it keeps focus through a redraw.
+  let onBack = document.activeElement?.matches?.('main .back');
+  const settle = () => {
+    if (onBack && document.activeElement === document.body) main.querySelector('.back')?.focus({ preventScroll: true });
+    land();
+    onBack = document.activeElement?.matches?.('main .back');
+  };
+  if (error) { drawOnce(main, `${backLink}<p class="error" role="alert">${esc(error)}</p>`); settle(); return; }
   // Until both the project and its records have answered: an empty records list would read as "none yet".
   if (stored === undefined || (stored && records === null)) return;
-  if (stored === null) { main.innerHTML = `${backLink}<p class="muted">This project was deleted or does not exist.</p>`; return; }
+  if (stored === null) { drawOnce(main, `${backLink}<p class="muted" role="alert">This project was deleted or does not exist.</p>`); settle(); return; }
   const of = type => records.filter(r => r.type === type);
   const documents = of('pending_documents');
   const project = L.withSchedule(stored, documents, today());
@@ -980,7 +1046,11 @@ function drawProject(page) {
   const cost = L.currentCost(project, documents);
   const billed = L.billedTotal(payments);
   const c = { page, project, records, of, documents, payments, weekly, cost, billed, now: today() };
-  if (page.section === 'print') return drawPrint(c);
+  if (page.section === 'print') {
+    const drawn = drawPrint(c);
+    settle();
+    return Promise.resolve(drawn).then(() => { if (page === s.page) settle(); });
+  }
   // #/p/<project>/drive, the link the phone's Copy to Google Drive opens: the summary, with the copy dialog over it.
   if (page.section === 'drive') {
     page.section = 'summary';
@@ -1001,9 +1071,11 @@ function drawProject(page) {
   if (chips) page.chips[page.section] = chip;
   const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
+  // The heading, back link or tab that had focus stays focused through a live redraw.
+  const onHead = document.activeElement?.matches?.('main h1') ? 'h1' : document.activeElement?.matches?.('main .back') ? '.back' : document.activeElement?.matches?.('nav.tabs a') ? `nav.tabs a[href="${CSS.escape(document.activeElement.getAttribute('href'))}"]` : null;
   // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
   const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
-  main.innerHTML = `
+  const head = `
     ${backLink}
     <header class="card project-head">
       <div class="ph-top">
@@ -1016,16 +1088,28 @@ function drawProject(page) {
     </header>
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
-    </nav>
+    </nav>`;
+  const rest = `
     ${chips ? `<div class="chips scroll-row" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
+  const kept = main.firstElementChild;
+  if (kept?.classList.contains('ph-keep') && kept.drawn === head) {
+    while (kept.nextSibling) kept.nextSibling.remove();
+    kept.insertAdjacentHTML('afterend', rest);
+  } else {
+    main.innerHTML = `<div class="ph-keep">${head}</div>${rest}`;
+    main.firstElementChild.drawn = head;
+  }
   main.querySelectorAll('[data-chip]').forEach(b => { b.onclick = () => {
     page.chips[page.section] = b.dataset.chip; page.sub = L.chipSlug(b.dataset.chip);
     history.replaceState(null, '', `#/p/${page.id}/${page.section}/${page.sub}`);
     drawProject(page);
   }; });
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
+  const back = onHead && document.activeElement === document.body && main.querySelector(onHead);
+  if (back) { if (back.tagName === 'H1') back.tabIndex = -1; back.focus({ preventScroll: true }); }
   keepInView(main.querySelector('.chips.scroll-row'));
+  land();
   const month = document.getElementById('month');
   if (month) month.onchange = () => { page.month = month.value; drawProject(page); };
   main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
@@ -1505,7 +1589,7 @@ function lotsView(c) {
       <button class="pill" id="lot-filter-toggle" aria-expanded="${Boolean(st.filters)}" aria-controls="lot-filter-set">${icon('filter_list', 'sm')}<span id="lot-filter-n">${filterLabel(st)}</span></button>
       <div class="lot-filter-set" id="lot-filter-set"${st.filters ? '' : ' hidden'}>${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}</div>
     </div>
-    <p class="muted lot-count" id="lot-count"></p>
+    <p class="muted lot-count" id="lot-count" role="status"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
     ${st.draw ? `<div class="lot-draw" role="group" aria-label="${st.draw.lot ? 'Edit outline' : 'Add lot'}"><p class="muted small" id="draw-hint" aria-live="polite"></p>
       ${st.draw.lot ? '' : `<button class="pill" id="draw-trace" aria-pressed="${Boolean(st.trace)}">Trace with a click</button>`}
@@ -2515,11 +2599,14 @@ function auditCard(log) {
   </li>`;
 }
 
+/** "3 issues shown", or the empty line's own words. */
+const resultCount = (results, card, one) => { const n = results.querySelectorAll(card).length; return n ? `${plural(n, one)} shown` : results.querySelector('p')?.textContent.trim() || ''; };
+
 function bindAudit(c) {
   const st = auditState(c.page);
   const results = document.getElementById('audit-results');
   // Only the results redraw while typing, so the search box keeps its focus.
-  const redraw = () => { results.innerHTML = auditResults(c, st); };
+  const redraw = () => { results.innerHTML = auditResults(c, st); announce(resultCount(results, '.audit-card', 'audit log record'), 600); };
   document.getElementById('audit-q').oninput = e => { st.query = e.target.value; redraw(); };
   main.querySelectorAll('[data-audit-filter]').forEach(b => {
     b.onclick = () => {
@@ -2571,7 +2658,7 @@ function bindIssues(c) {
   const st = issueState(c.page);
   const results = document.getElementById('issue-results');
   // Only the results redraw while typing, so the search box keeps its focus.
-  const redraw = () => { results.innerHTML = issueResults(c, st); };
+  const redraw = () => { results.innerHTML = issueResults(c, st); announce(resultCount(results, '.issue-card', 'issue'), 600); };
   results.onclick = e => {
     const uuid = e.target.closest('[data-edit-issue]')?.dataset.editIssue;
     const issue = uuid && c.of('project_issues').find(i => i.uuid === uuid);
@@ -3771,6 +3858,9 @@ function bindActual(c) {
     Object.assign(page, { sub: asOf, note: text });
     history.replaceState(null, '', `#/p/${page.id}/actual${asOf ? `/${asOf}` : ''}`);
     drawProject(page);
+    if (document.activeElement !== document.body) { announce(text); return; }
+    const note = document.getElementById('abstract-note');
+    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
   };
   const failed = x => say(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
@@ -3821,7 +3911,7 @@ function bindActual(c) {
     del.disabled = true;
     try {
       await saveEdits(c, [[shown, null, L.deletedAbstractAudit(shown)]], 'abstract', actualAfter(all.filter(a => a !== shown)));
-      show(null, '');
+      show(null, `The abstract as of ${L.displayDate(shown.asOf)} was deleted.`);
     } catch (x) { failed(x); del.disabled = false; }
   };
 }
@@ -4049,7 +4139,7 @@ async function drawPrint(c) {
   const { page, project, of, documents, weekly } = c;
   const report = weekly.find(r => r.uuid === page.sub);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/progress">${icon('arrow_back', 'sm')}Weekly reports</a>`;
-  if (!report) { main.innerHTML = `${back}<p class="muted">This weekly report was deleted or does not exist.</p>`; return; }
+  if (!report) { drawOnce(main, `${back}<p class="muted" role="alert">This weekly report was deleted or does not exist.</p>`); return; }
   // The file name "Save as PDF" offers, as the phone names it (BlueBookPrint.pdfName).
   document.title = `Weekly Report - ${(report.reportingWeek || '').replace(/^Week \d+: /, '')}`;
   const token = page.printToken = {};
@@ -4101,7 +4191,7 @@ function drawActualAbstractPrint(c) {
   const made = monthly ? L.monthlyAbstract(c.of('project_abstracts'), asOf) : null;
   const abstract = made ? made.abstract : abstractsOf(c).list.find(a => a.asOf === asOf);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${monthly ? 'monthly/' : ''}${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
-  if (!abstract) { main.innerHTML = `${back}<p class="muted">${esc(made?.error || 'This abstract was deleted or does not exist.')}</p>`; return; }
+  if (!abstract) { drawOnce(main, `${back}<p class="muted" role="alert">${esc(made?.error || 'This abstract was deleted or does not exist.')}</p>`); return; }
   document.title = `Abstract of Physical Accomplishment - As of ${L.displayDate(asOf)}`; // the file name "Save as PDF" offers
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <p class="muted no-print print-note">A4 landscape, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
@@ -4124,7 +4214,7 @@ function drawAbstractPrint(c) {
   const { page, project, records, documents, payments } = c, asOf = page.sub.slice(4);
   const abstract = abstractsOf(c).list.find(a => a.asOf === asOf);
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
-  if (!abstract) { main.innerHTML = `${back}<p class="muted">This abstract was deleted or does not exist.</p>`; return; }
+  if (!abstract) { drawOnce(main, `${back}<p class="muted" role="alert">This abstract was deleted or does not exist.</p>`); return; }
   document.title = `Billing Abstract - As of ${L.displayDate(asOf)}`; // not the detailed abstract's name, so the two PDFs do not replace each other
   const [acquisition, development, housing] = L.abstractLineAmounts(abstract);
   const typed = page.billing ??= { covered: '', lots: '', development: '', m1: '', m2: '' };

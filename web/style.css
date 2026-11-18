@@ -55,6 +55,9 @@ body {
 }
 ::selection { background: var(--primary-container); color: var(--on-primary-container); }
 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+h1[tabindex="-1"]:focus, #abstract-note:focus { outline: none; }
+/* Read out, not shown: the page's spoken messages (announce in app.js). */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* focused on arrival to be read (app.js land), not to be acted on */
 a { color: var(--link); text-underline-offset: 3px; }
 h1, h2, h3, p { margin: 0; }
 /* Two weights only, 400 and 600 (readable on a projector); the Blue Book prints keep the form's bold. */
@@ -462,7 +465,8 @@ thead .num { font-family: inherit; }
 /* What waits under a chip (orders not approved, requests not packaged, open issues): an amber count after its name. */
 .chip-n { display: inline-block; margin-left: 2px; min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--watch-c);
   color: var(--watch-text); font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums; }
-.project-head + .tabs + .bento, .tabs + .stack, .tabs + .card, .tabs + .section { margin-top: 12px; }
+.ph-keep { display: contents; }
+.ph-keep + .bento, .ph-keep + .stack, .ph-keep + .card, .ph-keep + .section { margin-top: 12px; }
 .stack { display: grid; gap: 12px; }
 .list-title { font-size: 14px; font-weight: 600; color: var(--text-2); margin: 4px 0 10px; }
 .card.empty { display: grid; justify-items: center; gap: 6px; padding: 40px 16px; }
