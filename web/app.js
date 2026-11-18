@@ -1117,6 +1117,7 @@ function drawProject(page) {
   main.querySelectorAll('[data-wx]').forEach(el => { el[el.tagName === 'SELECT' ? 'onchange' : 'onclick'] = () => { page.wx[el.dataset.wx] = el.value; drawProject(page); }; });
   if (document.getElementById('site-photo')) showPhoto(project.latestUpdatePhotoUrl, document.getElementById('site-photo'));
   if (document.getElementById('lot-results')) bindLots(c);
+  else if (page.lots) page.lots.refocus = false; // no plan drawn: a flag left by an unfinished one must not steal focus later
   const planUpload = document.getElementById('plan-upload');
   if (planUpload) planUpload.onclick = () => planForm(c);
   bindPlanTools(c);
