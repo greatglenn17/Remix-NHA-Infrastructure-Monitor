@@ -1113,6 +1113,21 @@ export const roadState = p => (p >= 100 ? 2 : p > 0 ? 1 : 0);
 export const LOT_PRINT_HEX = ['#B91C1C', '#F472B6', '#EA580C', '#CA8A04', '#2563EB', '#15803D'];
 export const lotPrintHex = l => { const c = lotColour(l).slice(4); return c === 'n' ? '#6B6B6B' : LOT_PRINT_HEX[c]; };
 
+/**
+ * The lot an arrow key moves to from `from`: the nearest centre that way, a step sideways counting double; null when
+ * no lot lies that way. `centres`: Map of id to [x, y] on the plan as shown; `dir`: [dx, dy], y down.
+ */
+export function nextLot(centres, from, [dx, dy]) {
+  const [fx, fy] = centres.get(from);
+  let best = null, score = Infinity;
+  for (const [id, [x, y]] of centres) {
+    const along = (x - fx) * dx + (y - fy) * dy, across = Math.abs((x - fx) * dy - (y - fy) * dx);
+    if (id === from || along <= 0) continue;
+    if (along + 2 * across < score) { score = along + 2 * across; best = id; }
+  }
+  return best;
+}
+
 /** ProjectViewModel.polygonOf: the lot's [[x, y], ...] (0..1 of the page); [] when unreadable. */
 export function lotPolygon(l) {
   try {

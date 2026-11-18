@@ -710,7 +710,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
 /* The plan viewer (SubdivisionPlanTab): the plan moves and zooms inside a fixed frame, with the zoom bar and lot card over it. */
-.lot-viewer { position: relative; height: min(calc(70vh / var(--zoom)), 720px); min-height: 360px; margin: 4px 0 12px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; background: var(--surface-variant); touch-action: none; }
+.lot-viewer { position: relative; height: min(calc(70vh / var(--zoom)), 720px); min-height: 360px; margin: 4px 0 12px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; overflow: clip; background: var(--surface-variant); touch-action: none; } /* clip: not a scroll container, so focusing a lot never scrolls the plan away from where clicks are measured */
 .lot-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; cursor: grab; user-select: none; }
 .lot-stage:active { cursor: grabbing; }
 .lot-stage img, .lot-stage svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
@@ -767,6 +767,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lc-group .field { margin: 0; }
 .lot-card .chips { margin: 8px 0 0; }
 .lot-stage polygon.frame { fill: none; stroke: #1D4ED8; stroke-width: 2.5; stroke-dasharray: 12 8; pointer-events: none; }
+/* Lot numbers: 11px on screen at any zoom (app.js fitLabels sets --k), haloed white so they read over the plan's lines. */
+.lot-stage text.lot-no { font: 600 calc(11px / var(--k, 1)) var(--sans); fill: var(--bg); stroke: #fff; stroke-width: calc(3px / var(--k, 1)); stroke-linejoin: round; paint-order: stroke; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.lot-stage text.lot-no.dim { opacity: 0.35; }
+.lot-stage text.lot-no.hide { display: none; }
+.lot-stage polygon[data-lot]:focus { outline: none; }
+.lot-stage polygon.ring.focus { stroke: var(--link); stroke-width: 4; } /* the lot with keyboard focus, over every ring (app.js, its focusin) */
 .lot-stage text.renum-no { fill: #111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 
 /* Issues (IssueCard) */
