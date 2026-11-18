@@ -2241,20 +2241,23 @@ async function bindLots(c) {
     const pts = (st.draw || []).map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)));
     return pts.length ? `<${pts.length > 2 ? 'polygon' : 'polyline'} class="draft" points="${pts.join(' ')}"/>${pts.map(([x, y]) => `<path class="draft" d="M${x} ${y}h0.01"/>`).join('')}` : '';
   };
-  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters, the selection outlined; a block
-  // being renumbered shows the number each lot would get.
+  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
+  // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
+  // drawn after every lot so a neighbour never covers the ring.
   const shapes = () => {
     if (!svg) return;
     const [lots, numbers] = st.renum ? numbered() : [[], []], no = new Map(lots.map((l, i) => [l.uuid, numbers[i]]));
+    const rings = [];
     svg.innerHTML = site.lots.map(l => {
       const pts = d.shapes.get(l.uuid);
       if (!pts || l.uuid === st.draw?.lot) return ''; // a lot whose outline is being edited shows as the draft only
       const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
       const picked = st.renum ? st.renum.ids.includes(l.uuid) : st.group ? st.group.includes(l.uuid) : l.uuid === st.sel;
       const [x, y] = d.centres.get(l.uuid);
+      if (picked) rings.push(pts);
       return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
         no.has(l.uuid) ? `<text class="renum-no" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>` : ''}`;
-    }).join('') + draft();
+    }).join('') + rings.map(pts => `<polygon class="ring halo" points="${pts}"/><polygon class="ring" points="${pts}"/>`).join('') + draft();
   };
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
