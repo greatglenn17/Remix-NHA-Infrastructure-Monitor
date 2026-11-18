@@ -449,11 +449,24 @@ export function orderChip(name) {
 const waits = d => !/^approved$/i.test((d.status || '').trim()) && isOrderName(d.documentName);
 const FLAG_TARGETS = { behind: ['progress', 'Weekly'], stale: ['progress', 'Weekly'], issue: ['progress', 'Issues'], billingAhead: ['payments'],
   requests: ['documents', 'Developer Requests'], overdue: ['documents', 'Time Extensions'], dueSoon: ['documents', 'Time Extensions'] };
-/** Where a flag is dealt with: a project section and, when it has them, its chip (the first order still waiting, for "waiting"). */
+/** Where a flag is dealt with: a project section and, when it has them, its chip (a "waiting" flag split by waitingAlerts names its own). */
 export function flagTarget(flag, docs = []) {
-  if (flag.kind === 'waiting') return { section: 'documents', chip: orderChip(docs.find(waits)?.documentName) };
+  if (flag.kind === 'waiting') return { section: 'documents', chip: flag.chip || orderChip(docs.find(waits)?.documentName) };
   const [section, chip = null] = FLAG_TARGETS[flag.kind] || ['summary'];
   return { section, chip };
+}
+
+const ORDER_CHIPS = [['Suspension / Resumption', 'suspension or resumption order'], ['Time Extensions', 'time extension'], ['Variation Orders', 'variation order']];
+/**
+ * The "N orders waiting approval" flag as one alert per Documents chip, in the chips' order, so each leads to a chip
+ * showing the same count: "1 time extension waiting approval", "2 suspension or resumption orders waiting approval".
+ * The flag itself, and the dashboard's count, stay whole, as on the phone.
+ */
+export function waitingAlerts(flag, docs) {
+  const n = {};
+  for (const d of docs.filter(waits)) n[orderChip(d.documentName)] = (n[orderChip(d.documentName)] || 0) + 1;
+  const parts = ORDER_CHIPS.filter(([chip]) => n[chip]);
+  return parts.length > 1 ? parts.map(([chip, word]) => ({ ...flag, chip, message: `${plural(n[chip], word, `${word}s`)} waiting approval` })) : [flag];
 }
 
 /** What waits under each chip: orders not yet approved, developer requests not yet packaged, open issues. */

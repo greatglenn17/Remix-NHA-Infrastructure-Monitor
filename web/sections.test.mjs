@@ -325,6 +325,26 @@ test('lots: sites, labels, KPIs, filters, colours and blocks read like the phone
   assert.deepEqual([0, 30, 100].map(L.roadState), [0, 1, 2]);
 });
 
+test('waiting orders: one alert per Documents chip, each with that chip\'s count', () => {
+  const docs = [
+    { documentName: 'Time Extension No. 1', status: 'Pending' },
+    { documentName: 'Work Suspension Order No. 1', status: 'For review' },
+    { documentName: 'Work Resumption Order No. 1', status: '' },
+    { documentName: 'Variation Order No. 1', status: 'Approved' },
+  ];
+  const flag = { kind: 'waiting', level: 'warning', message: '3 orders waiting approval' };
+  const alerts = L.waitingAlerts(flag, docs);
+  assert.deepEqual(alerts.map(a => [a.message, L.flagTarget(a, docs).chip]), [
+    ['2 suspension or resumption orders waiting approval', 'Suspension / Resumption'],
+    ['1 time extension waiting approval', 'Time Extensions'],
+  ]);
+  // Each alert's count is its chip's count.
+  const counts = L.chipCounts(docs);
+  for (const a of alerts) assert.equal(Number(a.message.split(' ')[0]), counts[a.chip]);
+  // All under one chip: the flag stays as it is.
+  assert.deepEqual(L.waitingAlerts(flag, docs.slice(1, 3)), [flag]);
+});
+
 test('issues: overdue and the search and filter chips read like the phone', () => {
   const today = '2026-11-09';
   const a = { description: 'Right-of-way at Block 3', status: 'Pending', isCritical: 1, targetDate: '2026-11-01', loggedBy: 'Engr. Cruz' };
