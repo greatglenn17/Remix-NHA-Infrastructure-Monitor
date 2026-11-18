@@ -1778,3 +1778,8 @@ test('web dashboard: a flag built on records that failed to load is left out', (
   assert.deepEqual(kinds(['pending_documents']), ['overdue', 'behind', 'requests', 'dueSoon']);
   assert.deepEqual(kinds(['developer_requests']), ['overdue', 'behind', 'stale', 'billingAhead', 'waiting', 'dueSoon']);
 });
+
+test('billingText: the billing labels in sentence case, as the lot card and plan say them', () => {
+  assert.deepEqual(['M1 BILLED (80%)', 'M2 BILLED (20%)', 'M1 + M2 BILLED (100%)', 'NOT BILLED', '', undefined, 'BILLED'].map(L.billingText),
+    ['M1 billed · 80%', 'M2 billed · 20%', 'M1 + M2 billed · 100%', 'Not billed', 'Not billed', 'Not billed', 'M1 billed · 80%']);
+});

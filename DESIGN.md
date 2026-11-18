@@ -9,6 +9,7 @@ colors:
   on-primary-container: "#93C5FD"
   accent: "#3B82F6"
   billed: "#C4B5FD"
+  billed-edge: "#6D28D9"
   canvas: "#0B0F17"
   dots: "rgb(148 163 184 / 0.13)"
   surface: "rgb(17 24 39 / 0.9)"
@@ -184,7 +185,7 @@ A near-black canvas with a faint dot grid, dark translucent panels with white 8%
 ### Primary
 - **Action Blue** (`primary`): the Sign in button. **Link Blue** (`link`): text buttons, links, focus rings, the caret and section-head icons. Selected filters and the "missing data" note use **Blue Haze** (`primary-container`) with `on-primary-container` text.
 - **Progress Blue** (`accent`): the Work done bar while a project is on or ahead of plan or slipping by less than 10%.
-- **Billed Violet** (`billed`, #C4B5FD): every Billed bar, so money never reads as a work colour. It is lighter than Progress Blue so the two bars read apart on a projector. Violet is money only: the lot map's progress scale runs pale slate (not started, an empty lot; rose on the phone and red on paper), pink (1–25%), orange, yellow, blue, green (finished). A lot picked on the plan keeps its band's colour and is ringed white over a dark halo, never filled with another band's colour (the phone still fills it amber). Billing % and balances on the phone and website screens are all on the current contract cost, so the rows add up to the total (the printed reports keep each billing's % as filed); once approved variation orders moved the cost, a note under the billings says from what.
+- **Billed Violet** (`billed`, #C4B5FD): every Billed bar, so money never reads as a work colour. It is lighter than Progress Blue so the two bars read apart on a projector. Billed is violet everywhere on the website: a billed lot on the plan has a dashed edge in **Billed Edge** (`billed-edge`, #6D28D9, the same violet deep enough for a line: 3.8:1 or more on every lot band's fill; the phone still draws it blue), the legend's Billed swatch is the same dashed outline in Billed Violet (the legend sits on the dark panel), and the lot card says "M1 billed · 80%" on a Billed Violet badge ("Not billed" outlined). Violet is money only: the lot map's progress scale runs pale slate (not started, an empty lot; rose on the phone and red on paper), pink (1–25%), orange, yellow, blue, green (finished). A lot picked on the plan keeps its band's colour and is ringed white over a dark halo, never filled with another band's colour (the phone still fills it amber). Billing % and balances on the phone and website screens are all on the current contract cost, so the rows add up to the total (the printed reports keep each billing's % as filed); once approved variation orders moved the cost, a note under the billings says from what.
 - **Brand Gradient** (`hero-start` navy to `hero-end` canvas, 135deg): used only on the sign-in hero panel, see-through (82% to 55%) so the background photo shows. Text on it is white.
 
 ### Top bar

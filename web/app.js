@@ -1621,7 +1621,7 @@ function lotCard(l, editable = false) {
   const line = (road ? `Road: ${L.ROAD_STATES[L.roadState(pct)]} • Drainage: ${Number(p.drainageProgress) >= 100 ? 'Completed' : 'Not completed'}`
     : `Progress: ${pct}% (${p.constructionStatus || 'Not Started'})`) + ` • Area: ${Number(l.lotAreaSqM) || 0} sq.m • Unit: ${l.housingUnitNumber || 'N/A'}`;
   return `<div class="lc-head"><span class="lot-pct ${L.lotColour(l)}">${icon('home_work', 'sm')}</span><b>${esc(L.lotLabel(l))}</b>
-      <span class="lc-bill${billed ? ' on' : ''}">${billed ? `● ${esc(billing)}` : 'NOT BILLED'}</span>
+      <span class="lc-bill${billed ? ' on' : ''}">${esc(L.billingText(billing))}</span>
       <button class="icon-btn" id="lot-card-close" aria-label="Close">${icon('close', 'sm')}</button></div>
     <p>${esc(line)}</p>
     ${p.lastModifiedBy ? `<p class="lc-upd">Last updated: ${esc(p.lastModifiedDate ? L.displayDate(p.lastModifiedDate) : '')} by ${esc(p.lastModifiedBy)}</p>` : ''}
@@ -1661,7 +1661,7 @@ function lotDetail(l, inspections) {
   const pctOf = x => Number(x.physicalProgress) || 0;
   const history = !inspections.length ? emptyLine('No inspection recorded yet.')
     : `<p class="muted small">Timeline: ${esc([...inspections].reverse().map(x => `${pctOf(x)}%`).join(' → '))}</p>${inspections.map(x => `<div class="insp">
-      <i class="dot lot-${L.lotBand(pctOf(x))}"></i><b>${esc(`${pctOf(x)}% • ${x.constructionStatus || ''}`)}</b><span>${esc(x.billingStatus || 'NOT BILLED')}</span>
+      <i class="dot lot-${L.lotBand(pctOf(x))}"></i><b>${esc(`${pctOf(x)}% • ${x.constructionStatus || ''}`)}</b><span>${esc(L.billingText(x.billingStatus))}</span>
       <p>${esc(`${x.inspectionDate ? L.displayDate(x.inspectionDate) : ''} by ${x.inspectedBy || ''}${x.change ? ` (${x.change})` : ''}`)}</p>
       ${(x.remarks || '').trim() ? `<p>Remarks: ${esc(x.remarks)}</p>` : ''}</div>`).join('')}`;
   const p = l.progress || {};
@@ -1674,7 +1674,7 @@ function lotDetail(l, inspections) {
     ${kv('Use', L.lotUse(l))}
     ${kv('Physical progress', `${L.lotProgress(l)}% (${p.constructionStatus || 'Not Started'})`)}
     ${road ? kv('Drainage progress', `${Number(p.drainageProgress) || 0}%`) : ''}
-    ${kv('Developer billing', L.lotBillingLabel(l.progress))}
+    ${kv('Developer billing', L.billingText(L.lotBillingLabel(l.progress)))}
     ${kv('M1 (80%)', bill(p.billingStatus, p.billingDate, p.billingReference))}
     ${kv('M2 (20%)', bill(p.m2BillingStatus, p.m2BillingDate, p.m2BillingReference))}
     ${kv('Housing unit', l.housingUnitNumber || 'N/A')}
@@ -2263,7 +2263,7 @@ async function bindLots(c) {
       const pts = d.shapes.get(l.uuid);
       if (!pts || l.uuid === st.draw?.lot) return ''; // a lot whose outline is being edited shows as the draft only
       const billing = L.lotBillingLabel(l.progress), billed = billing !== 'NOT BILLED', match = L.lotMatches(l, st);
-      const name = `${L.lotLabel(l)}, ${L.lotProgress(l)}%${billed ? `, ${billing.replace('BILLED', 'billed')}` : ''}${match ? '' : ', outside the filters'}`;
+      const name = `${L.lotLabel(l)}, ${L.lotProgress(l)}%${billed ? `, ${L.billingText(billing)}` : ''}${match ? '' : ', outside the filters'}`;
       const lotNo = L.unassigned(l) ? '' : l.lotNumber.trim();
       const picked = st.renum ? st.renum.ids.includes(l.uuid) : st.group ? st.group.includes(l.uuid) : l.uuid === st.sel;
       const [x, y] = d.centres.get(l.uuid);

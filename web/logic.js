@@ -876,6 +876,13 @@ export function lotBillingLabel(p) {
   return m1 && m2 ? 'M1 + M2 BILLED (100%)' : m1 ? 'M1 BILLED (80%)' : m2 ? 'M2 BILLED (20%)' : 'NOT BILLED';
 }
 
+/**
+ * A billing label (lotBillingLabel, or a stored billingStatus) as the screens say it: "M1 billed · 80%", "Not billed".
+ * Inspections saved before M2 (2026-10-31) hold a plain "BILLED", which was the M1 mark.
+ */
+export const billingText = label => (!label || label === 'NOT BILLED' ? 'Not billed' : label === 'BILLED' ? 'M1 billed · 80%'
+  : label.replace(' BILLED (', ' billed · ').replace(/\)$/, ''));
+
 /** SdpSummary.BAND_VALUES and ROAD_CONCRETING: the % a band or a road state saves (the top of the band; concreting is 50%). */
 export const LOT_BAND_VALUES = [0, 25, 50, 75, 99, 100];
 export const ROAD_VALUES = [0, 50, 100];
