@@ -562,7 +562,6 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .month > p { margin-bottom: 12px; }
 
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
-.two-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px 16px; margin-top: 10px; }
 .pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
 .pay-card { padding: 12px 16px 14px; min-width: 0; }
 .pc-head { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; }

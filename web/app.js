@@ -1231,7 +1231,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
     ${kv('Target that week', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
-  const construction = housing ? constructionCard(L.lotSummary(records), payments, now) : '';
+  const construction = housing ? constructionCard(L.lotSummary(records), payments, now, L.sdpSites(records).length > 1) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
@@ -1417,7 +1417,7 @@ function barChartCard(project, documents, now, curveOpen) {
 }
 
 /** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
-function constructionCard(summary, payments, now) {
+function constructionCard(summary, payments, now, multiSite) {
   if (!summary.saleable) return '';
   return section('Status of construction', 'home_work', `
     <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
@@ -1425,6 +1425,7 @@ function constructionCard(summary, payments, now) {
     ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
     <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'unit')}</b></div>
     <p class="sub strong">Status of billing</p>
+    <p class="muted small">From the billings under Payments, as a share of ${summary.saleable === 1 ? 'the 1 unit' : `all ${summary.saleable} units`}${multiSite ? ' on every site' : ''}.</p>
     <table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${summary.saleable}</th></tr></thead>
       <tbody>${L.billingStatus(payments, summary.saleable).map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>`);
 }
@@ -1583,7 +1584,7 @@ function lotsView(c) {
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}</span></div>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
-    <p class="muted lot-sum">${plural(k.total, 'saleable lot')}: ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average progress ${k.avg.toFixed(1)}%.</p>
+    <p class="muted lot-sum">${sites.length > 1 ? `${esc(site.site || 'Main site')}, as marked on its lots` : 'As marked on the lots'}: ${plural(k.total, 'saleable lot')}, ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average progress ${k.avg.toFixed(1)}%.</p>
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       <button class="pill" id="lot-filter-toggle" aria-expanded="${Boolean(st.filters)}" aria-controls="lot-filter-set">${icon('filter_list', 'sm')}<span id="lot-filter-n">${filterLabel(st)}</span></button>
@@ -3922,13 +3923,13 @@ function bindActual(c) {
 const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
 
 function paymentsBody({ project, payments, cost, billed }) {
-  const actual = Number(project.actualAccomplishment) || 0, editable = L.canEdit(project, s.user.uid, s.claims);
+  const editable = L.canEdit(project, s.user.uid, s.claims);
   const summary = section('Billing summary', 'payments', `
     ${kv('Current contract cost', L.formatPhp(cost))}
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
+    ${billed > 0 && cost > 0 ? kv('Billed share', L.billedLabel(billed, cost)) : ''}
     ${kv('Balance', L.formatPhp(cost - billed))}
     ${baseNote(project, cost)}
-    <div class="two-bars">${progressLine('Billed', L.billedLabel(billed, cost), '', 'muted', cost > 0 ? billed / cost : 0, 'billed')}${progressLine('Work done', pct(actual), '', 'muted', actual / 100, 'neutral')}</div>
     ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
