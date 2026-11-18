@@ -13,6 +13,7 @@ const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
 const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
 const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, orderFix } = require("./orderGuard");
+const { assignedKey, assignmentFix } = require("./assignmentGuard");
 // A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
 // new duplicate empty.
 const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
@@ -180,14 +181,6 @@ exports.notifyOnProjectWrite = functions.region(REGION).firestore
   });
 
 /**
- * Normalises an assignedUids value to a sorted JSON string for comparison.
- * A missing or non-array value counts as an empty list.
- */
-function assignedUidsKey(uids) {
-  return JSON.stringify(Array.isArray(uids) ? [...uids].sort() : []);
-}
-
-/**
  * Triggered whenever a project is written. When its assignedUids change, copies the
  * project's current list onto every record of that project so Firestore rules can check
  * access per record. The list is re-read from the project document right before writing,
@@ -209,7 +202,7 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION)
     if (!Array.isArray(after.assignedUids)) return null;
 
     const before = change.before.exists ? change.before.data() : null;
-    if (assignedUidsKey(before && before.assignedUids) === assignedUidsKey(after.assignedUids)) {
+    if (assignedKey(before && before.assignedUids) === assignedKey(after.assignedUids)) {
       return null;
     }
 
@@ -235,6 +228,42 @@ exports.syncProjectAssignmentToRecords = functions.region(REGION)
       throw error;
     }
 
+    return null;
+  });
+
+/**
+ * Triggered whenever a record is written. A record that arrives with a different copy of assignedUids than its
+ * project's (a phone whose project is behind, or an older app) takes the project's list, so the accounts assigned now
+ * can read it (assignmentGuard.js). A write that leaves the record's list as it was is not looked at: only a new
+ * record, or one whose list just changed, can bring an older copy. The project and the record are read in a
+ * transaction, so a reassignment made meanwhile is never overwritten (syncProjectAssignmentToRecords then copies the
+ * new list). Only assignedUids is written, as that function does: revision and updatedAt stay, so no phone treats it
+ * as an edit, and the write that follows changes nothing, so this ends there.
+ */
+exports.guardRecordAssignment = functions.region(REGION)
+  .runWith({ failurePolicy: true })
+  .firestore
+  .document("records/{recordId}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return null;
+    const after = change.after.data();
+    const before = change.before.exists ? change.before.data() : null;
+    if (before && assignedKey(before.assignedUids) === assignedKey(after.assignedUids)) return null;
+    if (typeof after.projectUuid !== "string" || after.projectUuid === "") return null;
+    const db = getFirestore();
+    try {
+      const fixed = await db.runTransaction(async (tx) => {
+        const [record, project] = await tx.getAll(change.after.ref, db.collection("projects").doc(after.projectUuid));
+        if (!record.exists || !project.exists || record.get("projectUuid") !== after.projectUuid) return null;
+        const list = assignmentFix(record.data(), project.data());
+        if (list) tx.update(record.ref, { assignedUids: list });
+        return list;
+      });
+      if (fixed) console.log(`Gave record ${context.params.recordId} the assignedUids of project ${after.projectUuid}`);
+    } catch (error) {
+      console.error(`Assignment guard error for record ${context.params.recordId}:`, error);
+      throw error; // retried (failurePolicy): the fix is the same however often it runs
+    }
     return null;
   });
 
