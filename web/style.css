@@ -267,6 +267,13 @@ body.signed-out main { max-width: none; padding: 0; }
 /* Side by side while both figures fit, stacked below that. */
 .ph-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
 .ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 8px; }
+/* Every tab but Summary: the name, status and both figures at card size, so the tab's own work starts high. */
+.project-head.slim { padding: 14px 20px 16px; }
+.project-head.slim .ph-top { align-items: center; margin-bottom: 12px; }
+.project-head.slim .ph-top h1 { font-size: 22px; }
+.project-head.slim .ph-badges { flex-direction: row; flex-wrap: wrap; margin-bottom: 0; }
+.project-head.slim .ph-bars { gap: 10px 32px; }
+.project-head.slim .ph-bars .pl { padding: 0; background: none; border: 0; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 /* The mono's full-width point and percent sign are drawn in a little at this size. */
 .pl.big .pl-head .fig { letter-spacing: -0.04em; }
@@ -411,6 +418,8 @@ thead .num { font-family: inherit; }
   .ph-top { flex-direction: column; gap: 0; }
   .ph-badges { flex-direction: row; flex-wrap: wrap; margin-bottom: 16px; }
   .ph-loc { margin-bottom: 10px; }
+  .project-head.slim { padding: 12px 16px 14px; }
+  .project-head.slim .ph-top { align-items: flex-start; gap: 6px; margin-bottom: 10px; }
   .ghost-rows { display: none; }
   #who .email { display: none; }
   .search { max-width: none; }
@@ -491,10 +500,11 @@ span.file.gone { text-decoration: none; }
 .rep-actions { display: flex; flex: none; gap: 12px; }
 .rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; }
 .report details, details.curve { margin-top: 10px; border-top: 1px solid var(--border); }
-.report summary, .curve summary, .plan-tools summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
-.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker { display: none; }
-.report summary .icon, .curve summary .icon, .plan-tools summary .icon { transition: transform 150ms ease-out; }
-.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon { transform: rotate(180deg); }
+.more-alerts > .alerts { margin-top: 8px; }
+.report summary, .curve summary, .plan-tools summary, .more-alerts summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
+.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker, .more-alerts summary::-webkit-details-marker { display: none; }
+.report summary .icon, .curve summary .icon, .plan-tools summary .icon, .more-alerts summary .icon { transition: transform 150ms ease-out; }
+.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon, .more-alerts[open] summary .icon { transform: rotate(180deg); }
 .rep-body h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
 .rep-body h4:first-child { margin-top: 2px; }
 .grid-table { font-size: 13px; }

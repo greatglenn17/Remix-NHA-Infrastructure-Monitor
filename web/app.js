@@ -558,8 +558,9 @@ function workDone(p, big, plan = '') {
   const noteTone = tone !== 'primary' ? tone : level === 'ok' ? 'ok' : 'muted';
   return progressLine('Work done', pct(p.actualAccomplishment), note, noteTone, (Number(p.actualAccomplishment) || 0) / 100, tone, big);
 }
-// Billed % needs the billings and the orders (approved variation orders change the contract cost).
-const billedLine = (it, big) => (['project_payments', 'pending_documents'].some(t => typeof s.loaded[t] === 'string') && !big
+// Billed % needs the billings and the orders (approved variation orders change the contract cost). A project page
+// (onPage) has its own; a card's may not have loaded.
+const billedLine = (it, big, onPage = big) => (['project_payments', 'pending_documents'].some(t => typeof s.loaded[t] === 'string') && !onPage
   ? progressLine('Billed', 'Not loaded', '', 'muted', 0, 'billed') : progressLine('Billed', L.billedLabel(it.billed, it.cost),
   it.billed > 0 ? esc(L.formatPhp(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big));
 /** The status badge on cards and the project header; an overdue project says so instead of "On-going". */
@@ -1077,16 +1078,18 @@ function drawProject(page) {
   const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
   // A lot on the plan that had focus: the plan, drawn again once its picture loads, takes it back (bindLots).
   if (document.activeElement?.closest?.('#lot-stage') && page.lots) page.lots.refocus = true;
+  // The full header (town, large figures) is the Summary's; the other tabs get a slim one, so their work starts higher.
+  const full = page.section === 'summary';
   const head = `
     ${backLink}
-    <header class="card project-head">
+    <header class="card project-head${full ? '' : ' slim'}">
       <div class="ph-top">
         <div class="ph-title"><h1>${esc(project.name)}</h1>
-          <p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p></div>
+          ${full ? `<p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p>` : ''}</div>
         <div class="ph-badges">${statusBadge(project)}
           ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
       </div>
-      <div class="ph-bars">${workDone(project, true, `${L.plannedTarget(stored, documents, today()) != null ? 'plan for today' : 'target'} ${pct(project.targetAccomplishment)}`)}${billedLine({ billed, cost }, true)}</div>
+      <div class="ph-bars">${workDone(project, full, full ? `${L.plannedTarget(stored, documents, today()) != null ? 'plan for today' : 'target'} ${pct(project.targetAccomplishment)}` : '')}${billedLine({ billed, cost }, full, true)}</div>
     </header>
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
@@ -1138,6 +1141,8 @@ function drawProject(page) {
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
+  const moreAlerts = document.getElementById('more-alerts');
+  if (moreAlerts) moreAlerts.ontoggle = () => { page.moreAlerts = moreAlerts.open; };
   const chartCurve = document.getElementById('chart-curve');
   if (chartCurve) chartCurve.ontoggle = () => { c.page.curve = chartCurve.open; };
   const projectAssign = document.getElementById('project-assign');
@@ -1186,12 +1191,20 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const revised = fromOrders || (stored !== '-' ? stored : '');
   const revisedDays = L.revisedDurationDays(project, L.addedDays(documents));
 
-  // Needs attention: one alert box per flag, linking to the tab and chip where it is dealt with; critical ones carry a pulsing dot.
-  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.flatMap(f => (f.kind === 'waiting' ? L.waitingAlerts(f, documents) : [f])).map(f => {
+  // Needs attention: one alert box per flag, linking to the tab and chip where it is dealt with; critical ones carry a
+  // pulsing dot. The three most urgent show (critical, then warnings, then a stale report, each kept in its order); the
+  // rest fold under "N more", which stays open through a live redraw.
+  const rank = { critical: 0, warning: 1, stale: 2 };
+  const alerts = flags.flatMap(f => (f.kind === 'waiting' ? L.waitingAlerts(f, documents) : [f]))
+    .sort((a, b) => (rank[a.level] ?? 1) - (rank[b.level] ?? 1)).map(f => {
     const to = L.flagTarget(f, documents), where = to.chip || SECTIONS.find(([key]) => key === to.section)?.[1] || 'Summary';
     return `
     <a class="alert ${f.level}"${f.kind === 'issue' ? ' data-issues="Overdue"' : ''} href="#/p/${esc(page.id)}${to.section === 'summary' ? '' : `/${to.section}`}${to.chip ? `/${L.chipSlug(to.chip)}` : ''}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon(f.level === 'stale' ? 'schedule' : 'warning', 'sm')}<b>${esc(f.message)}</b><span class="go">${esc(where)}${icon('chevron_right', 'sm')}</span></a>`;
-  }).join('')}</div>`) : '';
+  });
+  const SHOWN = 3;
+  const attention = alerts.length ? section('Needs attention', 'notification_important', `<div class="alerts">${alerts.slice(0, SHOWN).join('')}</div>${
+    alerts.length > SHOWN ? `<details class="more-alerts" id="more-alerts"${page.moreAlerts ? ' open' : ''}><summary>${icon('expand_more', 'sm')}${alerts.length - SHOWN} more</summary>
+      <div class="alerts">${alerts.slice(SHOWN).join('')}</div></details>` : ''}`) : '';
   const profile = section('Project profile', 'apartment', `
     <div class="site-photo" id="site-photo">${icon('architecture')}<span>No site photo yet</span></div>
     <div class="attrs">
