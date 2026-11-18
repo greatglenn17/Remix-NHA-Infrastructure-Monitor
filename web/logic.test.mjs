@@ -102,6 +102,10 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.netAmount({ grossAmount: 1000, retentionPct: 10 }), 900);
   assert.equal(L.isOpenIssue({ status: 'Pending' }), true);
   assert.equal(L.isOpenIssue({ status: 'Resolved' }), false);
+  // Saved before Pending / Resolved: Approved, No Action and Closed read as resolved; anything else stays open.
+  assert.deepEqual(['Approved', 'No Action', 'Closed', 'Open', '', 'Critical'].map(status => L.isOpenIssue({ status })), [false, false, false, true, true, true]);
+  assert.deepEqual(['No Action', 'Pending', undefined].map(status => L.issueStatus({ status })), ['Resolved', 'Pending', 'Pending']);
+  assert.deepEqual(L.ISSUE_STATUSES, ['Pending', 'Resolved']);
   const id = '0123abcd-0123-0123-0123-0123456789ab';
   assert.equal(L.storagePathOf(`nhafile:${id}/${id}.jpg`), `attachments/${id}/${id}.jpg`);
   assert.equal(L.storagePathOf(`nhafile:${id}.pdf`), `attachments/${id}.pdf`);

@@ -300,6 +300,7 @@ A small pill in 600 12px, with status colour text on its container. An overdue p
 ### Project Summary cards
 - **Chip counts:** a Progress or Documents chip with something waiting carries an amber pill after its name, in words: "2 waiting" (orders not approved), "1 not packaged" (developer requests), "3 open" (issues). The chip and its view are in the URL (`#/p/<id>/documents/variation-orders`), so a reload or a shared link opens the same view.
 - **Order status:** a Pending, Approved or other status is a badge after the order's name (green once Approved, amber otherwise), not a "Status:" line; remarks go under it.
+- **Issue status:** an issue is Pending (amber) until Resolved (green), the only two the form offers, on the phone and the website alike. Closed, Approved and No Action, saved before that, show and count as Resolved, so an issue can always be taken out of the open count and the dashboard flags.
 - **Phone rows:** under 600px the dashboard's filter pills and the section chips are each one row that scrolls sideways.
 - **Chip row:** the section chips wrap on a wide screen; under 600px they are one row that scrolls sideways, with the chosen chip kept in view. Documents opens on the first chip with something waiting until one is picked.
 - **Lots tools:** beside the plan only Plan PDF, Print and Add lot; Find lots, Upload plan and the rarer tools sit under Plan setup. Search stays out; Progress, Billing and Status open from a "Filters (n)" pill that counts the narrowed ones. The zoom bar is docked under the plan, never over it.

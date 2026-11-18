@@ -83,8 +83,12 @@ export function netBillings(payments, cost = 0) {
   });
 }
 
-/** Same rule as the Issues tab's "Resolved" filter. */
-export const isOpenIssue = i => !/resolved|closed/i.test(i.status || '');
+/** An issue is settled once Resolved. Closed, Approved and No Action, saved before the two statuses, read as Resolved too (isResolved on the phone). */
+export const isResolvedIssue = i => /resolved|closed|approved|no action/i.test(i.status || '');
+/** Still to deal with: the open count, the Pending filter and the dashboard flags. */
+export const isOpenIssue = i => !isResolvedIssue(i);
+/** The status an issue shows and its form offers: Pending until resolved (shownStatus on the phone). */
+export const issueStatus = i => (isResolvedIssue(i) ? 'Resolved' : 'Pending');
 
 /** ProjectSchedule.effectiveCompletion: the revised date when set, else the original. */
 export function effectiveCompletion(project) {
@@ -1023,10 +1027,10 @@ export const billedUnits = p => Number(p.units) || (Number(p.unitPrice) > 0 ? Ma
 /** billingUnitName. */
 export const billingUnitName = type => (/^land/i.test(type || '') ? 'lot' : 'housing unit');
 
-/** ProjectIssue.isOverdue: still Pending and the target date (yyyy-MM-dd) is before `today`. */
+/** ProjectIssue.isOverdue: not resolved and the target date (yyyy-MM-dd) is before `today`. */
 export function isOverdueIssue(i, today) {
   const t = (i.targetDate || '').trim();
-  return /pending/i.test(i.status || '') && /^\d{4}-\d{2}-\d{2}$/.test(t) && t < today;
+  return isOpenIssue(i) && /^\d{4}-\d{2}-\d{2}$/.test(t) && t < today;
 }
 
 /** ProjectIssue.isCritical (sent as 1/0). */
@@ -1039,11 +1043,10 @@ export const ISSUE_FILTERS = ['All', 'Critical', 'Pending', 'Overdue', 'Resolved
 export function issueMatches(i, query, filter, today) {
   const q = (query || '').trim().toLowerCase();
   if (q && ![i.description, i.actionTaken, i.remarks, i.loggedBy].some(t => (t || '').toLowerCase().includes(q))) return false;
-  const status = i.status || '';
   if (filter === 'Critical') return isCriticalIssue(i);
   if (filter === 'Overdue') return isOverdueIssue(i, today);
-  if (filter === 'Resolved') return /resolved|closed/i.test(status);
-  if (filter === 'Pending') return /pending|open/i.test(status);
+  if (filter === 'Resolved') return isResolvedIssue(i);
+  if (filter === 'Pending') return isOpenIssue(i);
   return true;
 }
 
@@ -1138,8 +1141,8 @@ export const isWriter = claims => (claims.approved ?? Boolean(claims.role)) === 
 /** The project rule on top: the Super Admin, or a writer assigned to the project. */
 export const canEdit = (project, uid, claims) => isWriter(claims) && (claims.role === 'SUPER_ADMIN' || (project.assignedUids || []).includes(uid));
 
-/** AddIssueDialog's choices. */
-export const ISSUE_STATUSES = ['Pending', 'Approved', 'No Action'];
+/** AddIssueDialog's choices: an issue is pending until it is resolved. */
+export const ISSUE_STATUSES = ['Pending', 'Resolved'];
 export const ISSUE_ACTION_BY = ['Implementing Office', 'Contractor/Developer'];
 
 /**

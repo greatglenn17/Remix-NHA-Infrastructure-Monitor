@@ -21,6 +21,7 @@ import com.example.data.model.Permission
 import com.example.data.model.use
 import com.example.data.model.Project
 import com.example.data.model.hasPermission
+import com.example.data.model.isResolved
 import com.example.ui.components.TopAppBarHeader
 import com.example.ui.theme.Motion
 import kotlinx.coroutines.launch
@@ -231,9 +232,7 @@ fun ProjectDetailScreen(
                             documents = pendingDocuments,
                             latestReport = latestReport,
                             // Same rule as the Issues tab's "Resolved" filter.
-                            openIssues = projectIssues.count {
-                                !it.status.contains("Resolved", ignoreCase = true) && !it.status.contains("Closed", ignoreCase = true)
-                            },
+                            openIssues = projectIssues.count { !it.isResolved },
                             canEditProject = currentUser.role.hasPermission(Permission.EDIT_PROJECT),
                             onEditProject = { projectToEdit = currentProject },
                             currentUserRole = currentUser.role,
