@@ -1538,7 +1538,7 @@ function monthlyView({ page, weekly, of, now }) {
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false, setup: false });
-// setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
+// focus: the lot the arrow keys last moved to; setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 /** A row that scrolls sideways on a phone, redrawn at its start: scroll only the row (never the page) so its pressed button shows. */
@@ -1592,6 +1592,7 @@ function lotsView(c) {
     </div>
     <p class="muted lot-count" id="lot-count" role="status"></p>
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
+    <p class="sr-only" id="lot-keys">On the plan, the arrow keys move between lots, Enter or Space picks one and Escape clears it.</p>
     ${st.draw ? `<div class="lot-draw" role="group" aria-label="${st.draw.lot ? 'Edit outline' : 'Add lot'}"><p class="muted small" id="draw-hint" aria-live="polite"></p>
       ${st.draw.lot ? '' : `<button class="pill" id="draw-trace" aria-pressed="${Boolean(st.trace)}">Trace with a click</button>`}
       <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">${st.draw.lot ? 'Save outline' : 'Save lot'}</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
@@ -2244,20 +2245,29 @@ async function bindLots(c) {
   // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
   // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
   // drawn after every lot so a neighbour never covers the ring.
+  // Each lot is an option of one keyboard stop (the plan): the lot last moved to, else the one picked, else the first.
+  const usable = id => id && d.shapes.has(id) && id !== st.draw?.lot;
+  const rovingLot = () => [st.focus, st.sel].find(usable) || site.lots.find(l => usable(l.uuid) && L.lotMatches(l, st))?.uuid || site.lots.find(l => usable(l.uuid))?.uuid;
   const shapes = () => {
     if (!svg) return;
+    const had = svg.contains(document.activeElement) ? document.activeElement.dataset.lot : null; // redrawn, it keeps the focus
     const [lots, numbers] = st.renum ? numbered() : [[], []], no = new Map(lots.map((l, i) => [l.uuid, numbers[i]]));
-    const rings = [];
+    const rings = [], roving = rovingLot();
     svg.innerHTML = site.lots.map(l => {
       const pts = d.shapes.get(l.uuid);
       if (!pts || l.uuid === st.draw?.lot) return ''; // a lot whose outline is being edited shows as the draft only
-      const billed = L.lotBillingLabel(l.progress) !== 'NOT BILLED';
+      const billing = L.lotBillingLabel(l.progress), billed = billing !== 'NOT BILLED', match = L.lotMatches(l, st);
+      const name = `${L.lotLabel(l)}, ${L.lotProgress(l)}%${billed ? `, ${billing.replace('BILLED', 'billed')}` : ''}${match ? '' : ', outside the filters'}`;
+      const lotNo = L.unassigned(l) ? '' : l.lotNumber.trim();
       const picked = st.renum ? st.renum.ids.includes(l.uuid) : st.group ? st.group.includes(l.uuid) : l.uuid === st.sel;
       const [x, y] = d.centres.get(l.uuid);
       if (picked) rings.push(pts);
-      return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
-        no.has(l.uuid) ? `<text class="renum-no" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>` : ''}`;
-    }).join('') + rings.map(pts => `<polygon class="ring halo" points="${pts}"/><polygon class="ring" points="${pts}"/>`).join('') + draft();
+      return `<polygon data-lot="${esc(l.uuid)}" role="option" aria-selected="${picked}" aria-label="${esc(name)}" tabindex="${l.uuid === roving ? 0 : -1}" class="${L.lotColour(l)}${match ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
+        no.has(l.uuid) ? `<text class="renum-no" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>`
+        : lotNo ? `<text class="lot-no${match ? '' : ' dim'}" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-c="${lotNo.length}" data-s="${d.spans.get(l.uuid).toFixed(1)}">${esc(lotNo)}</text>` : ''}`;
+    }).join('') + rings.map(pts => `<polygon class="ring halo" aria-hidden="true" points="${pts}"/><polygon class="ring" aria-hidden="true" points="${pts}"/>`).join('') + draft();
+    fitLabels();
+    if (had) svg.querySelector(`[data-lot="${CSS.escape(had)}"]`)?.focus({ preventScroll: true });
   };
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
@@ -2342,6 +2352,22 @@ async function bindLots(c) {
     if (close) close.onclick = () => { st.more = false; paint(); };
   };
   const pick = id => { st.sel = id; st.more = false; paint(); };
+  // A lot clicked or picked with the keyboard (none: a click off the lots).
+  const choose = id => {
+    if (st.renum) {
+      // Renumbering: a click adds the lot to the block or takes it out (one always stays); after a save it picks the next block.
+      const ids = st.renum.ids;
+      if (id && !ids.length) startRenum(site.lots.find(l => l.uuid === id));
+      else if (id) { st.renum.ids = !ids.includes(id) ? [...ids, id] : ids.length > 1 ? ids.filter(x => x !== id) : ids; paint(); }
+      return;
+    }
+    if (st.group) {
+      // Group select: a click adds the lot to the lots picked, or takes it out.
+      if (id) { st.group = st.group.includes(id) ? st.group.filter(x => x !== id) : [...st.group, id]; paint(); }
+      return;
+    }
+    pick(id && id !== st.sel ? id : null);
+  };
 
   document.getElementById('lot-q').oninput = e => {
     st.query = e.target.value;
@@ -2386,6 +2412,14 @@ async function bindLots(c) {
     stage.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
     document.getElementById('zoom-pct').textContent = `${Math.round(v.s * 100)}%`;
     zoomBar.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
+    fitLabels();
+  };
+  // Lot numbers stay 11px on screen at any zoom (--k: screen pixels to a plan pixel), shown only where one fits its lot.
+  const fitLabels = () => {
+    if (!svg || !st.view) return;
+    const k = fit * st.view.s;
+    svg.style.setProperty('--k', k);
+    svg.querySelectorAll('text.lot-no').forEach(t => t.classList.toggle('hide', Number(t.dataset.c) * 7 + 4 > Number(t.dataset.s) * k));
   };
   const reset = () => { st.view = { s: 1, x: (W - d.width * fit) / 2, y: (H - d.height * fit) / 2 }; apply(); };
   const zoomAt = (s, px = W / 2, py = H / 2) => {
@@ -2412,8 +2446,33 @@ async function bindLots(c) {
   stage.style.width = `${d.width * fit}px`;
   stage.style.height = `${d.height * fit}px`;
   stage.innerHTML = `<img src="${d.image}" alt="Subdivision plan" draggable="false">
-    <svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="none" aria-hidden="true"></svg>`;
+    <svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="none" role="listbox" aria-label="Lots on the plan" aria-describedby="lot-keys"></svg>`;
   svg = stage.querySelector('svg');
+  // The keyboard: the arrow keys move to the nearest lot that way, brought into view; Enter or Space picks it as a
+  // click would; Escape clears the lot picked.
+  svg.onkeydown = e => {
+    const at = e.target.dataset?.lot, dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (dir && at) {
+      e.preventDefault();
+      const ids = site.lots.filter(l => usable(l.uuid) && L.lotMatches(l, st)).map(l => l.uuid);
+      const to = L.nextLot(new Map([at, ...ids].map(id => [id, d.centres.get(id)])), at, dir);
+      const el = to && svg.querySelector(`[data-lot="${CSS.escape(to)}"]`);
+      if (!el) return;
+      st.focus = to;
+      e.target.tabIndex = -1;
+      el.tabIndex = 0;
+      el.focus({ preventScroll: true });
+      const v = view(), [cx, cy] = d.centres.get(to), x = cx * fit * v.s + v.x, y = cy * fit * v.s + v.y;
+      if (x < 0 || y < 0 || x > W || y > H) centreOn([cx, cy], v.s);
+    } else if ((e.key === 'Enter' || e.key === ' ') && at && !st.draw && !st.frame) {
+      e.preventDefault();
+      st.focus = at;
+      choose(at);
+    } else if (e.key === 'Escape' && st.sel) {
+      e.preventDefault();
+      pick(null);
+    }
+  };
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
   if (!st.view) reset(); else apply();
   paint();
@@ -2509,20 +2568,7 @@ async function bindLots(c) {
       if (pt.every(n => n >= 0 && n <= 1) && !(last && Math.hypot(here[0] - last[0], here[1] - last[1]) * k < 4)) { st.draw.push(pt); paint(); }
       return;
     }
-    const hit = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot);
-    if (st.renum) {
-      // Renumbering: a click adds the lot to the block or takes it out (one always stays); after a save it picks the next block.
-      const id = hit?.dataset.lot, ids = st.renum.ids;
-      if (id && !ids.length) startRenum(site.lots.find(l => l.uuid === id));
-      else if (id) { st.renum.ids = !ids.includes(id) ? [...ids, id] : ids.length > 1 ? ids.filter(x => x !== id) : ids; paint(); }
-      return;
-    }
-    if (st.group) {
-      // Group select: a click adds the lot to the lots picked, or takes it out.
-      if (hit) { const id = hit.dataset.lot; st.group = st.group.includes(id) ? st.group.filter(x => x !== id) : [...st.group, id]; paint(); }
-      return;
-    }
-    pick(hit && hit.dataset.lot !== st.sel ? hit.dataset.lot : null);
+    choose(document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot)?.dataset.lot);
   };
   stage.ondblclick = e => { if (st.draw || st.frame) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
   viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };

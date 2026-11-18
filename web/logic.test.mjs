@@ -3,6 +3,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from './logic.js';
 
+test('nextLot: an arrow key moves to the nearest lot that way, a step sideways counting double', () => {
+  // A 3 x 2 grid of lots, a, b, c over d, e, f, 10 apart; g sits low and to the right of c.
+  const c = new Map([['a', [0, 0]], ['b', [10, 0]], ['c', [20, 0]], ['d', [0, 10]], ['e', [10, 10]], ['f', [20, 10]], ['g', [26, 4]]]);
+  assert.deepEqual([[1, 0], [-1, 0], [0, 1], [0, -1]].map(dir => L.nextLot(c, 'b', dir)), ['c', 'a', 'e', null]);
+  assert.equal(L.nextLot(c, 'c', [1, 0]), 'g');
+  assert.equal(L.nextLot(c, 'a', [-1, 0]), null);
+});
+
 test('roles that see every project', () => {
   assert.equal(L.seesAll({ role: 'SUPER_ADMIN' }), true);
   assert.equal(L.seesAll({ role: 'SUPER_VIEWER' }), true);
