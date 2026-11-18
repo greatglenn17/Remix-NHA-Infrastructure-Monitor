@@ -1184,7 +1184,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const revisedDays = L.revisedDurationDays(project, L.addedDays(documents));
 
   // Needs attention: one alert box per flag, linking to the tab and chip where it is dealt with; critical ones carry a pulsing dot.
-  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.map(f => {
+  const attention = flags.length ? section('Needs attention', 'notification_important', `<div class="alerts">${flags.flatMap(f => (f.kind === 'waiting' ? L.waitingAlerts(f, documents) : [f])).map(f => {
     const to = L.flagTarget(f, documents), where = to.chip || SECTIONS.find(([key]) => key === to.section)?.[1] || 'Summary';
     return `
     <a class="alert ${f.level}"${f.kind === 'issue' ? ' data-issues="Overdue"' : ''} href="#/p/${esc(page.id)}${to.section === 'summary' ? '' : `/${to.section}`}${to.chip ? `/${L.chipSlug(to.chip)}` : ''}">${f.level === 'critical' ? '<i class="pulse" aria-hidden="true"></i>' : icon(f.level === 'stale' ? 'schedule' : 'warning', 'sm')}<b>${esc(f.message)}</b><span class="go">${esc(where)}${icon('chevron_right', 'sm')}</span></a>`;
