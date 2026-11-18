@@ -2215,8 +2215,6 @@ function planBase(site, whole = false) {
 
 async function bindLots(c) {
   const st = lotState(c.page);
-  const refocus = st.refocus; // the plan had focus before this redraw (drawProject)
-  st.refocus = false;
   const site = lotSite(c, st).site;
   const viewer = document.getElementById('lot-plan');
   const count = document.getElementById('lot-count');
@@ -2248,6 +2246,8 @@ async function bindLots(c) {
   };
   // Each lot is an option of one keyboard stop (the plan): the lot that last had focus, else the one picked, else the first.
   const usable = id => id && d.shapes.has(id) && id !== st.draw?.lot;
+  let restoring = false; // focus being put back after a redraw: the plan stays where the user left it
+  const restore = el => { restoring = true; el?.focus({ preventScroll: true }); restoring = false; };
   const rovingLot = () => [st.focus, st.sel].find(usable) || site.lots.find(l => usable(l.uuid) && L.lotMatches(l, st))?.uuid || site.lots.find(l => usable(l.uuid))?.uuid;
   // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
   // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
@@ -2273,7 +2273,7 @@ async function bindLots(c) {
     }).join('') + rings.map(pts => `<polygon class="ring halo" aria-hidden="true" points="${pts}"/>`).join('')
       + rings.map(pts => `<polygon class="ring" aria-hidden="true" points="${pts}"/>`).join('') + draft();
     fitLabels();
-    if (had) svg.querySelector(`[data-lot="${CSS.escape(had)}"]`)?.focus({ preventScroll: true });
+    if (had) restore(svg.querySelector(`[data-lot="${CSS.escape(had)}"]`));
   };
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
@@ -2472,8 +2472,9 @@ async function bindLots(c) {
       pick(null);
     }
   };
-  // Whichever lot gets focus (arrow key, Tab, click, a redraw) becomes the plan's one Tab stop, is brought into view,
-  // and, focused from the keyboard, is ringed blue above every other lot and ring.
+  // Whichever lot gets focus (arrow key, Tab, click, a redraw) becomes the plan's one Tab stop. Focused from the
+  // keyboard it is ringed blue above every other lot and ring and, unless focus is only being put back after a
+  // redraw, brought into view; a mouse press never moves the plan under the pointer.
   const focusRing = () => svg.querySelector('polygon.ring.focus')?.remove();
   svg.addEventListener('focusin', e => {
     const id = e.target.dataset?.lot;
@@ -2482,7 +2483,9 @@ async function bindLots(c) {
     svg.querySelectorAll('[data-lot][tabindex="0"]').forEach(x => { if (x !== e.target) x.tabIndex = -1; });
     e.target.tabIndex = 0;
     focusRing();
-    if (e.target.matches(':focus-visible')) svg.insertAdjacentHTML('beforeend', `<polygon class="ring focus" aria-hidden="true" points="${d.shapes.get(id)}"/>`);
+    if (!e.target.matches(':focus-visible')) return;
+    svg.insertAdjacentHTML('beforeend', `<polygon class="ring focus" aria-hidden="true" points="${d.shapes.get(id)}"/>`);
+    if (restoring) return;
     const v = view(), [cx, cy] = d.centres.get(id), x = cx * fit * v.s + v.x, y = cy * fit * v.s + v.y;
     if (x < 0 || y < 0 || x > W || y > H) centreOn([cx, cy], v.s);
   });
@@ -2490,7 +2493,10 @@ async function bindLots(c) {
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
   if (!st.view) reset(); else apply();
   paint();
-  if (refocus && document.activeElement === document.body) svg.querySelector('[data-lot][tabindex="0"]')?.focus({ preventScroll: true });
+  // The plan had focus before this redraw (drawProject): it takes it back, read only once the plan is on screen, so a
+  // second redraw while the picture loads still finds the flag.
+  if (st.refocus && document.activeElement === document.body) restore(svg.querySelector('[data-lot][tabindex="0"]'));
+  st.refocus = false;
   // The frame follows the window, and on a big screen the page zoom (style.css): fit the plan again when its size changes.
   const refit = new ResizeObserver(() => {
     if (!viewer.isConnected) { refit.disconnect(); return; }
