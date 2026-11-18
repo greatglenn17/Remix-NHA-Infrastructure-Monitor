@@ -1075,6 +1075,8 @@ function drawProject(page) {
   const onHead = document.activeElement?.matches?.('main h1') ? 'h1' : document.activeElement?.matches?.('main .back') ? '.back' : document.activeElement?.matches?.('nav.tabs a') ? `nav.tabs a[href="${CSS.escape(document.activeElement.getAttribute('href'))}"]` : null;
   // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
   const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
+  // A lot on the plan that had focus: the plan, drawn again once its picture loads, takes it back (bindLots).
+  if (document.activeElement?.closest?.('#lot-stage') && page.lots) page.lots.refocus = true;
   const head = `
     ${backLink}
     <header class="card project-head">
@@ -1538,7 +1540,7 @@ function monthlyView({ page, weekly, of, now }) {
 // SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false, setup: false });
-// focus: the lot the arrow keys last moved to; setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
+// focus: the lot on the plan that last had focus (its Tab stop); refocus: the plan had focus before a redraw; setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
 const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
 /** A row that scrolls sideways on a phone, redrawn at its start: scroll only the row (never the page) so its pressed button shows. */
@@ -2213,6 +2215,8 @@ function planBase(site, whole = false) {
 
 async function bindLots(c) {
   const st = lotState(c.page);
+  const refocus = st.refocus; // the plan had focus before this redraw (drawProject)
+  st.refocus = false;
   const site = lotSite(c, st).site;
   const viewer = document.getElementById('lot-plan');
   const count = document.getElementById('lot-count');
@@ -2242,12 +2246,13 @@ async function bindLots(c) {
     const pts = (st.draw || []).map(([x, y]) => d.place(x, y).map(n => n.toFixed(1)));
     return pts.length ? `<${pts.length > 2 ? 'polygon' : 'polyline'} class="draft" points="${pts.join(' ')}"/>${pts.map(([x, y]) => `<path class="draft" d="M${x} ${y}h0.01"/>`).join('')}` : '';
   };
-  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
-  // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
-  // drawn after every lot so a neighbour never covers the ring.
-  // Each lot is an option of one keyboard stop (the plan): the lot last moved to, else the one picked, else the first.
+  // Each lot is an option of one keyboard stop (the plan): the lot that last had focus, else the one picked, else the first.
   const usable = id => id && d.shapes.has(id) && id !== st.draw?.lot;
   const rovingLot = () => [st.focus, st.sel].find(usable) || site.lots.find(l => usable(l.uuid) && L.lotMatches(l, st))?.uuid || site.lots.find(l => usable(l.uuid))?.uuid;
+  // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
+  // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
+  // drawn after every lot (all halos, then all rings) so neither a neighbour nor its halo covers a ring. The lot with
+  // keyboard focus is ringed in blue over everything (focusRing).
   const shapes = () => {
     if (!svg) return;
     const had = svg.contains(document.activeElement) ? document.activeElement.dataset.lot : null; // redrawn, it keeps the focus
@@ -2265,7 +2270,8 @@ async function bindLots(c) {
       return `<polygon data-lot="${esc(l.uuid)}" role="option" aria-selected="${picked}" aria-label="${esc(name)}" tabindex="${l.uuid === roving ? 0 : -1}" class="${L.lotColour(l)}${match ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
         no.has(l.uuid) ? `<text class="renum-no" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>`
         : lotNo ? `<text class="lot-no${match ? '' : ' dim'}" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-c="${lotNo.length}" data-s="${d.spans.get(l.uuid).toFixed(1)}">${esc(lotNo)}</text>` : ''}`;
-    }).join('') + rings.map(pts => `<polygon class="ring halo" aria-hidden="true" points="${pts}"/><polygon class="ring" aria-hidden="true" points="${pts}"/>`).join('') + draft();
+    }).join('') + rings.map(pts => `<polygon class="ring halo" aria-hidden="true" points="${pts}"/>`).join('')
+      + rings.map(pts => `<polygon class="ring" aria-hidden="true" points="${pts}"/>`).join('') + draft();
     fitLabels();
     if (had) svg.querySelector(`[data-lot="${CSS.escape(had)}"]`)?.focus({ preventScroll: true });
   };
@@ -2373,7 +2379,7 @@ async function bindLots(c) {
     st.query = e.target.value;
     // As on the phone: when the search finds one lot, it is selected and centred at 200%.
     const found = st.query.trim() ? site.lots.filter(l => L.lotMatches(l, st)) : [];
-    if (found.length === 1 && d?.centres.has(found[0].uuid)) { st.sel = found[0].uuid; centreOn(d.centres.get(found[0].uuid), 2); }
+    if (found.length === 1 && d?.centres.has(found[0].uuid)) { st.sel = st.focus = found[0].uuid; centreOn(d.centres.get(found[0].uuid), 2); }
     paint();
   };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; document.getElementById('lot-filter-n').textContent = filterLabel(st); paint(); }; });
@@ -2456,14 +2462,7 @@ async function bindLots(c) {
       e.preventDefault();
       const ids = site.lots.filter(l => usable(l.uuid) && L.lotMatches(l, st)).map(l => l.uuid);
       const to = L.nextLot(new Map([at, ...ids].map(id => [id, d.centres.get(id)])), at, dir);
-      const el = to && svg.querySelector(`[data-lot="${CSS.escape(to)}"]`);
-      if (!el) return;
-      st.focus = to;
-      e.target.tabIndex = -1;
-      el.tabIndex = 0;
-      el.focus({ preventScroll: true });
-      const v = view(), [cx, cy] = d.centres.get(to), x = cx * fit * v.s + v.x, y = cy * fit * v.s + v.y;
-      if (x < 0 || y < 0 || x > W || y > H) centreOn([cx, cy], v.s);
+      (to && svg.querySelector(`[data-lot="${CSS.escape(to)}"]`))?.focus({ preventScroll: true });
     } else if ((e.key === 'Enter' || e.key === ' ') && at && !st.draw && !st.frame) {
       e.preventDefault();
       st.focus = at;
@@ -2473,9 +2472,25 @@ async function bindLots(c) {
       pick(null);
     }
   };
+  // Whichever lot gets focus (arrow key, Tab, click, a redraw) becomes the plan's one Tab stop, is brought into view,
+  // and, focused from the keyboard, is ringed blue above every other lot and ring.
+  const focusRing = () => svg.querySelector('polygon.ring.focus')?.remove();
+  svg.addEventListener('focusin', e => {
+    const id = e.target.dataset?.lot;
+    if (!id) return;
+    st.focus = id;
+    svg.querySelectorAll('[data-lot][tabindex="0"]').forEach(x => { if (x !== e.target) x.tabIndex = -1; });
+    e.target.tabIndex = 0;
+    focusRing();
+    if (e.target.matches(':focus-visible')) svg.insertAdjacentHTML('beforeend', `<polygon class="ring focus" aria-hidden="true" points="${d.shapes.get(id)}"/>`);
+    const v = view(), [cx, cy] = d.centres.get(id), x = cx * fit * v.s + v.x, y = cy * fit * v.s + v.y;
+    if (x < 0 || y < 0 || x > W || y > H) centreOn([cx, cy], v.s);
+  });
+  svg.addEventListener('focusout', focusRing);
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
   if (!st.view) reset(); else apply();
   paint();
+  if (refocus && document.activeElement === document.body) svg.querySelector('[data-lot][tabindex="0"]')?.focus({ preventScroll: true });
   // The frame follows the window, and on a big screen the page zoom (style.css): fit the plan again when its size changes.
   const refit = new ResizeObserver(() => {
     if (!viewer.isConnected) { refit.disconnect(); return; }
