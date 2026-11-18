@@ -1089,7 +1089,7 @@ function drawProject(page) {
         <div class="ph-badges">${statusBadge(project)}
           ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
       </div>
-      <div class="ph-bars">${workDone(project, full, full ? `${L.plannedTarget(stored, documents, today()) != null ? 'plan for today' : 'target'} ${pct(project.targetAccomplishment)}` : '')}${billedLine({ billed, cost }, full, true)}</div>
+      <div class="ph-bars">${workDone(project, full, full ? `${L.plannedTarget(stored, documents, today()) != null ? 'bar chart plan today' : 'target'} ${pct(project.targetAccomplishment)}` : '')}${billedLine({ billed, cost }, full, true)}</div>
     </header>
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
@@ -1243,9 +1243,13 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
     <div><span>${icon('receipt_long', 'sm')}Current cost</span><b>${esc(L.formatPhp(cost))}</b></div></div>`);
   const issues = `<span class="badge ${openIssues ? 'lv-watch' : 'lv-ok quiet'}">${openIssues} open ${openIssues === 1 ? 'issue' : 'issues'}</span>`;
+  // The report's target is typed by its writer; when the approved bar chart planned more than 5 points apart on the
+  // day it was filed, that plan is shown under it, so the two numbers on the page are not read as one.
+  const filed = L.latestReportDay(weekly), chartThen = filed && L.plannedTarget(project, documents, filed);
+  const apart = chartThen != null && Math.abs(chartThen - (Number(latest?.targetAccomplishmentPct) || 0)) > 5;
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv('Target that week', pct(latest.targetAccomplishmentPct))}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv('Target in the report', pct(latest.targetAccomplishmentPct))}${apart ? kv(`Bar chart plan on ${L.displayDate(filed)}`, pct(chartThen)) : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const construction = housing ? constructionCard(L.lotSummary(records), payments, now, L.sdpSites(records).length > 1) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
@@ -1483,7 +1487,7 @@ function reportCard(r, all, pid, editable = false) {
         <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
     <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-      <span class="muted">Target that week ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
+      <span class="muted">Target in the report ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
     <details>
       <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
       <div class="rep-body">
@@ -3794,7 +3798,8 @@ const abstractSwitch = monthly => `<div class="chips" role="group" aria-label="S
 function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v));
   return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
-    <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>`;
+    <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target: the approved bar chart's plan on ${esc(L.displayDate(abstract.asOf))}.` : 'Target: the project\'s target; it has no approved bar chart.'}</p>`;
 }
 
 /**
