@@ -1,8 +1,9 @@
 // Run against the emulator only: npm test (firebase emulators:exec with a demo project).
 const test = require("node:test");
 const assert = require("node:assert");
+const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
-const { guardRecordAssignment } = require("./index");
+const { guardRecordAssignment, guardOrderRecord } = require("./index");
 
 const db = () => getFirestore();
 const project = (assignedUids) => db().doc("projects/assign-guard-p").set(assignedUids ? { name: "P", assignedUids } : { name: "P" });
@@ -19,9 +20,16 @@ async function write(data) {
   return (await ref().get()).data();
 }
 
-test.before(() => assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "emulator only"));
-test.beforeEach(async () => { await ref().delete(); await db().doc("projects/assign-guard-p").delete(); });
-test.after(async () => { await ref().delete(); await db().doc("projects/assign-guard-p").delete(); });
+const SA = "assign-guard-sa";
+const clear = async () => { for (const path of ["records/assign-guard-r", "projects/assign-guard-p", "orderGuard/assign-guard-r"]) await db().doc(path).delete(); };
+test.before(async () => {
+  assert.ok(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST, "emulator only");
+  await getAuth().deleteUser(SA).catch(() => {});
+  await getAuth().createUser({ uid: SA });
+  await getAuth().setCustomUserClaims(SA, { role: "SUPER_ADMIN", approved: true, allProjects: true });
+});
+test.beforeEach(clear);
+test.after(async () => { await clear(); await getAuth().deleteUser(SA).catch(() => {}); });
 
 test("a record uploaded with an older copy of the list takes the project's, and nothing else changes", async () => {
   await project(["sa", "ea"]);
@@ -48,4 +56,16 @@ test("left alone: the project's list in another order, an edit that keeps the re
 test("a record whose project is not in the cloud, or with no project, is left alone", async () => {
   assert.deepStrictEqual((await write(record(["sa"]))).assignedUids, ["sa"]);
   assert.deepStrictEqual((await write(record(["fe"], { projectUuid: "" }))).assignedUids, ["fe"]);
+});
+
+test("an order given its project's list is not raised again by the order guard on the same write", async () => {
+  await project([SA, "ea"]);
+  const order = JSON.stringify({ documentName: "Variation Order No. 1 (Additive) - PHP 1,000,000.00", status: "Submitted", remarks: "", isCoreChecklist: 1, fileUrl: "" });
+  const before = await ref().get();
+  await ref().set(record([SA], { type: "pending_documents", updatedByUid: SA, data: order }));
+  const event = { before, after: await ref().get() }, context = { params: { recordId: "assign-guard-r" } };
+  await guardRecordAssignment.run(event, context); // the shorter run usually commits first
+  await guardOrderRecord.run(event, context);
+  const now = (await ref().get()).data();
+  assert.deepStrictEqual([now.assignedUids, now.revision, now.updatedAt, now.updatedByUid], [[SA, "ea"], 4, 40, SA]);
 });

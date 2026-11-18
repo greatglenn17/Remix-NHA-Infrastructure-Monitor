@@ -13,7 +13,7 @@ const { isApproved } = require("./approval");
 const { auditAlert, skipReason } = require("./auditAlert");
 const { GUARD_UID, key: projectKey, isLive, guardAction, isEmptyExtra } = require("./duplicateGuard");
 const { ORDER_GUARD_UID, APPROVERS, LEGACY_MARGIN_MS, approvedDataOf, orderFix } = require("./orderGuard");
-const { assignedKey, assignmentFix } = require("./assignmentGuard");
+const { assignedKey, assignmentFix, sameButAssignment } = require("./assignmentGuard");
 // A phone uploads a new project first and its records right after, so the guard waits this long before it calls a
 // new duplicate empty.
 const GUARD_WAIT_MS = Number(process.env.DUPLICATE_GUARD_WAIT_MS ?? 20000);
@@ -630,8 +630,10 @@ exports.guardOrderRecord = functions.region(REGION).firestore
         if (changed) tx.set(mark, { approvedData, at });
         const writer = now.updatedByUid || "";
         const fix = orderFix({ now, role: await role(writer), approvedData });
-        // The revisions of the states this write shows that are not the record as it is: a phone may hold either.
-        const held = [change.before, change.after].filter((snap) => snap.exists && !snap.updateTime.isEqual(record.updateTime))
+        // The revisions of the states this write shows that are not the record as it is: a phone may hold either. One
+        // that differs only in assignedUids (guardRecordAssignment gave it its project's list) is the record as it is.
+        const held = [change.before, change.after]
+          .filter((snap) => snap.exists && !snap.updateTime.isEqual(record.updateTime) && !sameButAssignment(snap.data(), now))
           .map((snap) => Number(snap.get("revision")) || 0);
         const mine = Number(now.revision) || 0;
         if (!fix && !held.some((revision) => revision >= mine)) return null;

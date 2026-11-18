@@ -17,4 +17,13 @@ function assignmentFix(record, project) {
   return assignedKey(record.assignedUids) === assignedKey(project.assignedUids) ? null : project.assignedUids;
 }
 
-module.exports = { assignedKey, assignmentFix };
+/**
+ * Whether two states of a record differ in nothing but assignedUids: the same version to a phone, since a server write
+ * of the list (this guard's, or the project sync's) keeps revision and updatedAt.
+ */
+function sameButAssignment(a, b) {
+  const rest = (r) => JSON.stringify(Object.keys(r).filter((k) => k !== "assignedUids").sort().map((k) => [k, r[k]]));
+  return rest(a) === rest(b);
+}
+
+module.exports = { assignedKey, assignmentFix, sameButAssignment };
