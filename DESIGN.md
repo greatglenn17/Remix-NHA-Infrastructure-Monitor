@@ -291,6 +291,7 @@ My projects | All projects, for accounts that see every project (not Super Viewe
 - **Error:** a 13px/400 Rose line under the fields, with `role="alert"`.
 
 ### Navigation
+- **Arrival and live updates:** on a new page focus moves to its heading (a section of the same project: to the tab just chosen; a print view or an error page: to its back link), unless the user already moved focus while it loaded, so keyboard and screen-reader users start there. The page itself is not a live region, since every live update redraws it. What must be heard is said through one hidden status line outside the page (loading, saved, the count after a search, filter or scope change) or is an alert (a load error, a page not found). A live redraw keeps the project header and the portfolio banner when they would draw the same, and keeps focus on the heading, a tab, a chip or the back link.
 - **App bar:** a canvas-coloured bar with a bottom hairline, sticky from 600px up. The 40px app logo leads, then the brand title (16px/600) with the office line under it. The logo is also the favicon. On the right: the user line (13px `bar-text-2`; the email hides under 600px), a view-only badge, then Users (Super Admin only), Profile and Sign out as text buttons. A project's pages are its five tabs under the header; Back returns to the dashboard. There is no side menu.
 
 ### Status Badge
