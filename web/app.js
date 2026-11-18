@@ -2640,8 +2640,8 @@ function issueResults(c, st) {
 }
 
 function issueCard(i, now, editable = false) {
-  const overdue = L.isOverdueIssue(i, now), critical = L.isCriticalIssue(i), status = i.status || 'Pending';
-  const level = /resolved/i.test(status) ? 'ok' : /critical/i.test(status) ? 'behind' : 'watch';
+  const overdue = L.isOverdueIssue(i, now), critical = L.isCriticalIssue(i), status = L.issueStatus(i);
+  const level = status === 'Resolved' ? 'ok' : 'watch';
   const block = (label, text, cls = '') => (text?.trim() ? `<h3 class="${cls}">${esc(label)}</h3><p>${esc(text)}</p>` : '');
   return `<li class="card issue-card${critical ? ' critical' : ''}">
     <div class="ic-head"><h2>${icon('event', 'sm')}<span>${esc(L.displayDate(i.date))}${i.targetDate?.trim()
@@ -2683,8 +2683,7 @@ function editIssue(c, issue) {
   d.className = 'help edit-form';
   const isNew = !issue;
   issue ||= { date: today(), description: '', actionTaken: '', actionBy: '', targetDate: '', isCritical: 0, status: 'Pending' };
-  const status = issue.status || 'Pending';
-  const statuses = L.ISSUE_STATUSES.includes(status) ? L.ISSUE_STATUSES : [status, ...L.ISSUE_STATUSES];
+  const status = L.issueStatus(issue), statuses = L.ISSUE_STATUSES;
   const opt = (v, cur, label = v) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   d.innerHTML = `<form novalidate>
     <h2>${isNew ? 'Log issue' : 'Edit issue'}</h2>

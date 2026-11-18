@@ -331,6 +331,12 @@ test('issues: overdue and the search and filter chips read like the phone', () =
   const b = { description: 'Late delivery', actionTaken: 'Wrote the supplier', status: 'Resolved', isCritical: 0, targetDate: '2026-10-01' };
   const c = { description: 'Drainage', remarks: 'Await rain', status: 'Open', isCritical: 0, targetDate: '2026-12-01' };
   assert.deepEqual([a, b, c].map(i => L.isOverdueIssue(i, today)), [true, false, false]);
+  // An issue approved before the statuses were Pending / Resolved is settled: not overdue, filed under Resolved.
+  const old = { description: 'Old', status: 'Approved', targetDate: '2026-10-01' };
+  assert.equal(L.isOverdueIssue(old, today), false);
+  // Any unresolved issue past its target is overdue, not only one saved as Pending (isOverdue on the phone).
+  assert.deepEqual(['Open', '', undefined].map(status => L.isOverdueIssue({ status, targetDate: '2026-11-01' }, today)), [true, true, true]);
+  assert.deepEqual(['Resolved', 'Pending', 'Overdue'].map(f => L.issueMatches(old, '', f, today)), [true, false, false]);
   assert.equal(L.isOverdueIssue({ ...a, targetDate: 'Nov 1' }, today), false); // not a date
   const ids = (q, f) => [a, b, c].filter(i => L.issueMatches(i, q, f, today)).map(i => i.description[0]);
   assert.deepEqual(ids('', 'All'), ['R', 'L', 'D']);

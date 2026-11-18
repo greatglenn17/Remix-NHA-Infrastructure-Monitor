@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.example.data.model.ISSUE_ACTION_BY
+import com.example.data.model.ISSUE_STATUSES
+import com.example.data.model.shownStatus
 import com.example.data.model.ProjectIssue
 import com.example.ui.components.DateField
 import com.example.util.FormValidation
@@ -33,7 +35,7 @@ fun AddIssueDialog(
     var isCritical by remember { mutableStateOf(existingIssue?.isCritical ?: false) }
     var targetDate by remember { mutableStateOf(existingIssue?.targetDate ?: "") }
     var actionBy by remember { mutableStateOf(existingIssue?.actionBy ?: "") }
-    var status by remember { mutableStateOf(existingIssue?.status ?: "Pending") }
+    var status by remember { mutableStateOf(existingIssue?.shownStatus ?: "Pending") }
     var showStatusDropdown by remember { mutableStateOf(false) }
 
     var tried by remember { mutableStateOf(false) }
@@ -103,7 +105,7 @@ fun AddIssueDialog(
                         expanded = showStatusDropdown,
                         onDismissRequest = { showStatusDropdown = false }
                     ) {
-                        listOf("Pending", "Approved", "No Action").forEach { option ->
+                        ISSUE_STATUSES.forEach { option ->
                             DropdownMenuItem(
                                 text = { Text(option) },
                                 onClick = { status = option; showStatusDropdown = false }

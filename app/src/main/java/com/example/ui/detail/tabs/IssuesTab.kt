@@ -25,6 +25,8 @@ import com.example.data.model.ProjectIssue
 import com.example.data.model.UserRole
 import com.example.data.model.hasPermission
 import com.example.data.model.isOverdue
+import com.example.data.model.isResolved
+import com.example.data.model.shownStatus
 import com.example.ui.theme.*
 
 @Composable
@@ -49,8 +51,8 @@ fun IssuesTab(
             val matchesFilter = when (selectedFilter) {
                 "Critical" -> issue.isCritical
                 "Overdue" -> issue.isOverdue()
-                "Resolved" -> issue.status.contains("Resolved", ignoreCase = true) || issue.status.contains("Closed", ignoreCase = true)
-                "Pending" -> issue.status.contains("Pending", ignoreCase = true) || issue.status.contains("Open", ignoreCase = true)
+                "Resolved" -> issue.isResolved
+                "Pending" -> !issue.isResolved
                 else -> true
             }
 
@@ -254,8 +256,7 @@ fun IssueCard(
                     }
 
                     val (statusBg, statusText, statusBorder) = when {
-                        issue.status.contains("Resolved", ignoreCase = true) -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
-                        issue.status.contains("Critical", ignoreCase = true) -> Triple(LocalNHAColors.current.behindContainer, LocalNHAColors.current.behind, LocalNHAColors.current.behind.copy(alpha = 0.4f))
+                        issue.isResolved -> Triple(LocalNHAColors.current.onTrackContainer, LocalNHAColors.current.onTrack, LocalNHAColors.current.onTrack.copy(alpha = 0.4f))
                         else -> Triple(LocalNHAColors.current.watchContainer, LocalNHAColors.current.watch, LocalNHAColors.current.watch.copy(alpha = 0.4f))
                     }
 
@@ -265,7 +266,7 @@ fun IssueCard(
                         border = BorderStroke(1.dp, statusBorder)
                     ) {
                         Text(
-                            text = issue.status.uppercase(),
+                            text = issue.shownStatus.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = statusText,

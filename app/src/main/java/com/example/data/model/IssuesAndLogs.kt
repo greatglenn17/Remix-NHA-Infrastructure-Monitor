@@ -42,9 +42,23 @@ data class ProjectIssue(
 /** The two "Action taken" columns of the monthly report's issues table. */
 val ISSUE_ACTION_BY = listOf("Implementing Office", "Contractor/Developer")
 
-/** Still pending after its target date. */
+/** AddIssueDialog's statuses: an issue is pending until it is resolved. */
+val ISSUE_STATUSES = listOf("Pending", "Resolved")
+
+private val SETTLED = Regex("resolved|closed|approved|no action", RegexOption.IGNORE_CASE)
+
+/**
+ * Settled: the Issues tab's Resolved filter, and out of the open count. Closed, Approved and No Action, saved before
+ * the two statuses, read as Resolved too; the website reads them the same (isResolvedIssue).
+ */
+val ProjectIssue.isResolved: Boolean get() = SETTLED.containsMatchIn(status)
+
+/** The status an issue shows and its dialog offers: Pending until resolved. */
+val ProjectIssue.shownStatus: String get() = if (isResolved) "Resolved" else "Pending"
+
+/** Not resolved after its target date. */
 fun ProjectIssue.isOverdue(today: java.time.LocalDate = java.time.LocalDate.now()): Boolean =
-    status.contains("Pending", ignoreCase = true) &&
+    !isResolved &&
         runCatching { java.time.LocalDate.parse(targetDate.trim()) }.getOrNull()?.isBefore(today) == true
 
 @Entity(
