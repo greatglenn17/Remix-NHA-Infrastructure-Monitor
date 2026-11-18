@@ -2243,7 +2243,7 @@ async function bindLots(c) {
   };
   // The lots as shapes over the plan: colour by band, the rest dimmed by the filters; a block being renumbered shows
   // the number each lot would get. The lots picked keep their band's colour and are ringed white over a dark halo,
-  // drawn after every lot so a neighbour never covers the ring.
+  // drawn after every lot (all halos, then all rings) so neither a neighbour nor its halo covers a ring.
   const shapes = () => {
     if (!svg) return;
     const [lots, numbers] = st.renum ? numbered() : [[], []], no = new Map(lots.map((l, i) => [l.uuid, numbers[i]]));
@@ -2257,7 +2257,7 @@ async function bindLots(c) {
       if (picked) rings.push(pts);
       return `<polygon data-lot="${esc(l.uuid)}" class="${L.lotColour(l)}${L.lotMatches(l, st) ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
         no.has(l.uuid) ? `<text class="renum-no" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>` : ''}`;
-    }).join('') + rings.map(pts => `<polygon class="ring halo" points="${pts}"/><polygon class="ring" points="${pts}"/>`).join('') + draft();
+    }).join('') + rings.map(pts => `<polygon class="ring halo" points="${pts}"/>`).join('') + rings.map(pts => `<polygon class="ring" points="${pts}"/>`).join('') + draft();
   };
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
