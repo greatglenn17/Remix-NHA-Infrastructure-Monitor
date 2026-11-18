@@ -28,7 +28,7 @@
   --primary-container: rgb(59 130 246 / 0.16); --on-primary-container: #93C5FD;
   --accent: #3B82F6; /* Work done bar when on or ahead of plan */
   --billed: #C4B5FD; /* Billed bar: money, kept apart from the work colours; lighter than the blue so the two read apart on a projector */
-  --billed-edge: #8B5CF6; /* the same violet deep enough for a line: over 4:1 on the white plan sheet and on the dark legend */
+  --billed-edge: #6D28D9; /* the same violet deep enough for a line on the plan: 3.8:1 or more on every lot band's fill */
   --ok: #34D399; --watch: #FBBF24; --behind: #FB7185; --neutral: #94A3B8;
   --ok-c: rgb(16 185 129 / 0.14); --watch-c: rgb(245 158 11 / 0.14); --behind-c: rgb(244 63 94 / 0.14); --neutral-c: rgb(148 163 184 / 0.14);
   --ok-line: rgb(16 185 129 / 0.3); --watch-line: rgb(245 158 11 / 0.3); --behind-line: rgb(244 63 94 / 0.3); --primary-line: rgb(59 130 246 / 0.4);
@@ -735,7 +735,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-stage polygon.sel { fill-opacity: 0.65; }
 .lot-stage polygon.ring { fill: none; stroke: #fff; stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
 .lot-stage polygon.ring.halo { stroke: var(--bg); stroke-width: 7; }
-.lot-legend .dot.billed { background: none; border: 2px dashed var(--billed-edge); width: 8px; height: 8px; }
+.lot-legend .dot.billed { background: none; border: 2px dashed var(--billed); /* the light violet: the legend is on the dark panel */ width: 8px; height: 8px; }
 .zoom-bar { width: fit-content; margin: -4px 0 12px auto; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
 .zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; min-height: 40px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }

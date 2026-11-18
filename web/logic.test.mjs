@@ -1780,6 +1780,6 @@ test('web dashboard: a flag built on records that failed to load is left out', (
 });
 
 test('billingText: the billing labels in sentence case, as the lot card and plan say them', () => {
-  assert.deepEqual(['M1 BILLED (80%)', 'M2 BILLED (20%)', 'M1 + M2 BILLED (100%)', 'NOT BILLED', '', undefined].map(L.billingText),
-    ['M1 billed · 80%', 'M2 billed · 20%', 'M1 + M2 billed · 100%', 'Not billed', 'Not billed', 'Not billed']);
+  assert.deepEqual(['M1 BILLED (80%)', 'M2 BILLED (20%)', 'M1 + M2 BILLED (100%)', 'NOT BILLED', '', undefined, 'BILLED'].map(L.billingText),
+    ['M1 billed · 80%', 'M2 billed · 20%', 'M1 + M2 billed · 100%', 'Not billed', 'Not billed', 'Not billed', 'M1 billed · 80%']);
 });
