@@ -704,12 +704,13 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lots-head h2 { margin: 0; font-size: 16px; }
 .lots-head select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
-.plan-tools { margin: -8px 0 8px; }
+.plan-tools { margin: 4px 0 0; }
 .plan-tools .lots-links { display: flex; padding-bottom: 8px; }
 .plan-tools .danger { margin: 0 0 0 auto; }
-.lot-sum { margin: 0; font-size: 14px; }
-.lot-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 16px 0 4px; }
-.lot-filters .grow { flex: 1 1 240px; }
+.lot-sum { margin: 4px 0 0; font-size: 14px; }
+.lot-sites { margin-bottom: 12px; flex-wrap: wrap; max-width: 100%; } /* many sites wrap instead of widening the page */
+.lot-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 0 0 4px; }
+.lot-filters .grow { flex: 1 1 160px; } /* Filters fits beside it on a phone */
 .lot-filters .pill { min-height: 44px; }
 .lot-filters .pill[aria-expanded="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
 .lot-filter-set { flex: 1 1 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
