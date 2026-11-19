@@ -1,8 +1,8 @@
 {
-  "versionCode": 311,
-  "versionName": "2.8.31",
-  "releaseNotes": "v2.8.31: The Summary shows one plan, the one in the header; a weekly report's own target is now called Filed against. Issue cards start with the issue. Billing shares and balances add up on the current contract cost.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.31/NHA_Monitor_v2.8.31_Build311.apk",
-  "apkSha256": "1773857919ac654815e243269c86816a601e51f26f991413a764b93cb3276a7b",
+  "versionCode": 312,
+  "versionName": "2.8.32",
+  "releaseNotes": "v2.8.32: The billing abstract print now shows the abstract's own Target and Actual Accomplishment, the same as Print abstract.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.32/NHA_Monitor_v2.8.32_Build312.apk",
+  "apkSha256": "e38c2e891931d56afd9f23f84cd2a3aa9f2d5de6a2687c22b0c495e0d6a14456",
   "isMandatory": true
 }
