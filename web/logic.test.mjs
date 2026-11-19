@@ -10,6 +10,14 @@ test('variation order: a title and lines, not the stored name', () => {
   // Not approved yet: no "Date approved: -" line; an old name without an amount keeps its title.
   assert.deepEqual(L.variationLines({ documentName: 'Variation Order No. 3', remarks: 'Added culvert' }), ['Reason: Added culvert']);
   assert.equal(L.variationTitle('Variation Order No. 3'), 'Variation Order No. 3');
+  assert.equal(L.orderLabel(vo.documentName), 'Variation Order No. 2');
+  // keepOrderFields puts a dropped date back first, with no "|".
+  assert.deepEqual(L.variationLines({ documentName: vo.documentName, remarks: L.keepOrderFields('Reason: Less fill | Date Approved: 2026-11-05', 'Reason: More fill') }),
+    ['Type: Deductive', 'Amount: ₱1,500,000.50', 'Date approved: Nov 5, 2026', 'Reason: More fill']);
+  // Older names ContractCost also reads: a sign or brackets, no dash.
+  assert.equal(L.variationTitle('Variation Order No. 2 - PHP -20,000'), 'Variation Order No. 2');
+  assert.deepEqual(L.variationLines({ documentName: 'Variation Order No. 4 - PHP (10,000)' }), ['Amount: -₱10,000.00']);
+  assert.equal(L.variationTitle('Variation Order No. 1 PHP 50,000'), 'Variation Order No. 1');
 });
 
 test('nextLot: an arrow key moves to the nearest lot that way, a step sideways counting double', () => {
