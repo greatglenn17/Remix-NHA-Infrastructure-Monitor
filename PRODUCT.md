@@ -21,7 +21,7 @@ Roles come from the app: Super Admin, Engineer Admin, Field Engineer, Viewer, Su
 
 The same live data the NHA Monitor phones sync to Firestore, on a bigger screen. Field engineers record weekly and monthly reports, payments, documents and issues on their phones; the website shows the result to anyone with an account, and lets the people the app lets edit do the desk work there too: weekly reports, billings, abstracts, orders and letters, plans and lots, and the Blue Book prints.
 
-Success: opening the dashboard answers "how is the whole portfolio doing?" in a few seconds. That means project count, total contract cost and how many projects are on-going, completed or late, then which projects need a look. Work done and billed are read per project, never averaged.
+Success: opening the dashboard answers "how is the whole portfolio doing?" in a few seconds. That means project count and how many projects are on-going, completed or late, then which projects need a look. Work done, billed and contract cost are read per project, never averaged or totalled.
 
 ## Positioning
 
