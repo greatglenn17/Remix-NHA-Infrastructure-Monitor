@@ -71,7 +71,8 @@ is read only.
     the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
     leaving the page.
   - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
-    bar chart's plan on the "As of" date, else the project's stored target; its "actual" is what is billed to date.
+    bar chart's plan on the "As of" date, else the project's stored target, and the actual is the abstract's own
+    overall actual, both as on Print abstract (it is not what is billed to date; that is the grand total's TO DATE).
     Prepared, Checked and Approved by are the monthly report's signatories.
 - **Edit** on a billing is the same form with the billing filled in. A changed gross recomputes its share and moves its
   own balance and every later billing's by the difference, as the app's `editedBillings` does, all in one transaction

@@ -217,8 +217,9 @@ const qty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigit
  * The abstract the contractor attaches before a billing, on a landscape sheet laid out as the district's billing
  * format, printed from the uploaded `abstract` (Actual Accomplishment tab): each line's contract quantity, unit cost
  * and amount, what was billed before, in this billing (`period`, the typed figures of L.billingAbstract) and to date
- * (quantity, amount, share of the line). `units` is the project's lots or housing units; "actual" here is what is
- * billed to date. It has neither BALANCE nor equivalent-units columns.
+ * (quantity, amount, share of the line). `units` is the project's lots or housing units. Its target and actual are
+ * the Print abstract's (actualAbstractHtml): the plan on the "As of" date and the abstract's own overall actual, not
+ * what is billed. It has neither BALANCE nor equivalent-units columns.
  */
 export function billingAbstractHtml({ project, docs, payments, abstract, period, units, signatories, banner }) {
   const { parts, targetPct } = L.billingAbstract(project, docs, payments, abstract, period, units), covered = String(period.covered ?? '').trim();
@@ -231,8 +232,8 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
     return `<tr><td class='c'>${l.no}</td><td>${l.name}</td><td class='n'>${qty(units)}</td><td class='c'>${l.unit}</td><td class='n'>${money(unitCost)}</td><td class='n'>${money(l.amount)}</td>${billed(l, unitCost)}</tr>`;
   };
   const total = (label, r) => `<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>${billed(r, 0)}</tr>`;
-  const all = sumOf(parts.flatMap(p => p.lines)), actual = all.amount > 0 ? (all.previous + all.thisPeriod) / all.amount * 100 : 0;
-  return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, actual)}
+  const all = sumOf(parts.flatMap(p => p.lines));
+  return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, Number(abstract.overallPct) || 0)}
     <table class='apa'>
       ${APA_HEAD}
       ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
