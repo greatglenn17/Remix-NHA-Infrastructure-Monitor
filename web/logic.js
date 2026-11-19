@@ -103,7 +103,8 @@ export function daysLeftText(project, today) {
   const now = isoDay(today);
   if (end == null || now == null) return '-';
   const days = Math.round((end - now) / 86400000);
-  return days < 0 ? `Overdue by ${-days} days` : `${days} days`;
+  const n = Math.abs(days), word = n === 1 ? "day" : "days";
+  return days < 0 ? `Overdue by ${n} ${word}` : `${n} ${word}`;
 }
 
 /**
