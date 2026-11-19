@@ -1109,7 +1109,7 @@ function drawProject(page) {
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
     </nav>`;
   const rest = `
-    ${chips ? `<div class="chips scroll-row" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
+    ${chips ? `<div class="chips views scroll-row" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
   const kept = main.firstElementChild;
   if (kept?.classList.contains('ph-keep') && kept.drawn === head) {
@@ -1282,7 +1282,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
-      <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (PHP)</th><th class="num">%</th><th class="num">Balance (PHP)</th></tr></thead>
+      <thead><tr><th>Billing / period covered</th><th>Date</th><th class="num">Net amount (₱)</th><th class="num">%</th><th class="num">Balance (₱)</th></tr></thead>
       <tbody>${L.netBillings(payments, cost).map(p => `<tr>
         <td>${esc(p.name || '-')}${p.periodCovered ? `<br><span class="muted">${esc(p.periodCovered)}</span>` : ''}<span class="pdate"><br>${esc(L.displayDate(p.date))}</span></td>
         <td>${esc(L.displayDate(p.date))}</td>
@@ -2696,7 +2696,7 @@ function weatherView({ page, weekly, project }) {
   }
   const mode = (key, label, ic) => `<button data-wx="mode" value="${key}" aria-pressed="${st.mode === key}">${icon(ic, 'sm')}${label}</button>`;
   return `<section class="card section wx">
-    <div class="chips" role="group" aria-label="Weather view">${mode('week', 'Weekly report range', 'date_range')}${mode('month', 'Monthly view', 'calendar_month')}</div>
+    <div class="chips views" role="group" aria-label="Weather view">${mode('week', 'Weekly report range', 'date_range')}${mode('month', 'Monthly view', 'calendar_month')}</div>
     ${body}
     <p class="wx-legend">${P.WEATHER.map(([, label, hex]) => `<span><i style="background:${hex}"></i>${esc(L.shownWord(label))}</span>`).join('')}</p>
     <p class="muted small">Inner ring 12 AM to 11 AM, outer ring 12 PM to 11 PM. A day with no log stays blank.</p>
@@ -2891,7 +2891,7 @@ function orderFields(c, heading = '<h3>Order requested</h3>') {
       : '<p class="n-behind">No work suspension order is logged yet, so there is nothing to continue. Log the suspension first.</p>')}
     ${group(wr, text('wrNo', 'Resumption No.') + pick('wrType', 'Type of resumption', ['Full', 'Partial']) + date('wrEffectivity', 'Effectivity date') + text('wrRemarks', 'Remarks'))}
     ${group(vo, `${text('voNo', 'VO No.')}${pick('voType', 'Type of variation', ['Additive', 'Deductive'])}
-      <label class="field">Amount (PHP)<input name="voAmount" inputmode="decimal" autocomplete="off"><small class="muted" data-vo-hint></small></label>
+      <label class="field">Amount (₱)<input name="voAmount" inputmode="decimal" autocomplete="off"><small class="muted" data-vo-hint></small></label>
       ${text('voReason', 'Reason')}<label class="field">Date approved<input type="date" name="voDateApproved"><small class="muted">Leave blank if not yet approved</small></label>`)}
     ${group(te, text('teNo', 'Extension No.', 'inputmode="numeric"') + text('teDays', 'No. of days', 'inputmode="numeric"') + text('teReason', 'Reason'))}`;
 }
@@ -3701,8 +3701,8 @@ function billingForm(c, old = null) {
     <label class="field">Period covered<input name="periodCovered" value="${esc(old ? old.periodCovered || '' : L.monthPeriod(today()))}" autocomplete="off"></label>
     ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${types.map(t => opt(t, t, old?.billingType)).join('')}</select></label>` : ''}
     <label class="field" data-by-unit style="display:none">Number of lots<input name="units" value="${esc(Number(old?.units) > 0 ? String(old.units) : '')}" inputmode="numeric" autocomplete="off"></label>
-    <label class="field" data-by-unit style="display:none">Amount per lot (PHP)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
-    <label class="field" data-gross>Gross amount (PHP)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
+    <label class="field" data-by-unit style="display:none">Amount per lot (₱)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
+    <label class="field" data-gross>Gross amount (₱)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
     <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
     <div class="billing-preview" aria-live="polite"></div>
     ${fileField('fileUrl', 'Scanned DV', old?.fileUrl)}
@@ -3721,7 +3721,7 @@ function billingForm(c, old = null) {
     price.style.display = type ? '' : 'none';
     d.querySelector('[data-gross]').style.display = type && !byAmount ? 'none' : '';
     units.firstChild.textContent = `Number of ${unit}s`;
-    price.firstChild.textContent = `Amount per ${unit} (PHP)`;
+    price.firstChild.textContent = `Amount per ${unit} (₱)`;
   };
   const onType = () => {
     showType();
@@ -3839,7 +3839,7 @@ const kept = (c, what) => { try { return localStorage.getItem(keptName(c, what))
 const keep = (c, what, value) => { try { if (value == null) localStorage.removeItem(keptName(c, what)); else localStorage.setItem(keptName(c, what), JSON.stringify(value)); } catch { /* nothing is kept */ } };
 
 /** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. */
-const abstractSwitch = monthly => `<div class="chips" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
+const abstractSwitch = monthly => `<div class="chips views" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
 
 /** An abstract's Target / Actual / +/- table (L.abstractStanding). */
 function standingTable(c, abstract) {

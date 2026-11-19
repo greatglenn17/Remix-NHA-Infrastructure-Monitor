@@ -477,6 +477,12 @@ thead .num { font-family: inherit; }
   .chips.scroll-row button { flex: none; }
 }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
+/* A view switch (a section's Weekly · Monthly · Lots…, the abstracts, the weather) is one segmented control, so it never reads as the filter chips inside a view. */
+.chips.views { width: fit-content; max-width: 100%; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); } /* .seg's look */
+.chips.views button { flex: none; border: 0; border-radius: 6px; background: none; padding: 7px 12px; }
+.chips.views button[aria-pressed="true"] { background: var(--surface-variant); color: var(--text); }
+.chips.views button:focus-visible { outline-offset: -2px; } /* inside the segment: the phone row scrolls, which clips anything outside */
+@media (max-width: 600px) { .chips.views.scroll-row { margin: 8px 0; padding: 3px; } }
 /* What waits under a chip (orders not approved, requests not packaged, open issues): an amber count after its name. */
 .chip-n { display: inline-block; margin-left: 2px; min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--watch-c);
   color: var(--watch-text); font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -593,8 +599,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .entry > span:not(.badge) { color: var(--text-2); overflow-wrap: anywhere; }
 .entry > .badge { justify-self: start; margin-top: 4px; }
 .entry .file, .entry .entry-edit { justify-self: start; }
-.entry-edit { background: var(--primary-container); margin-top: 6px; white-space: nowrap; }
-.entry-edit:hover { filter: brightness(1.25); }
+.entry-edit { margin-top: 6px; white-space: nowrap; }
 .photo-edit { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .photo-edit li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
 .photo-new { display: grid; gap: 14px; }
