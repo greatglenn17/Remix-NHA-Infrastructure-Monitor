@@ -478,9 +478,10 @@ thead .num { font-family: inherit; }
 }
 .chips button[aria-pressed="true"] { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--link); }
 /* A view switch (a section's Weekly · Monthly · Lots…, the abstracts, the weather) is one segmented control, so it never reads as the filter chips inside a view. */
-.chips.views { width: fit-content; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); } /* .seg's look */
+.chips.views { width: fit-content; max-width: 100%; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); } /* .seg's look */
 .chips.views button { flex: none; border: 0; border-radius: 6px; background: none; padding: 7px 12px; }
 .chips.views button[aria-pressed="true"] { background: var(--surface-variant); color: var(--text); }
+.chips.views button:focus-visible { outline-offset: -2px; } /* inside the segment: the phone row scrolls, which clips anything outside */
 @media (max-width: 600px) { .chips.views.scroll-row { margin: 8px 0; padding: 3px; } }
 /* What waits under a chip (orders not approved, requests not packaged, open issues): an amber count after its name. */
 .chip-n { display: inline-block; margin-left: 2px; min-width: 20px; padding: 0 8px; border-radius: 999px; background: var(--watch-c);
