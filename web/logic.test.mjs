@@ -88,6 +88,8 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.daysLeftText(p, '2026-11-07'), '3 days');
   assert.equal(L.daysLeftText({ ...p, completionDateRevised: '2026-11-01' }, '2026-11-07'), 'Overdue by 6 days');
   assert.equal(L.daysLeftText({ ...p, actualAccomplishment: 100 }, '2026-11-07'), 'Completed');
+  assert.equal(L.daysLeftText(p, '2026-11-09'), '1 day');
+  assert.equal(L.daysLeftText(p, '2026-11-11'), 'Overdue by 1 day');
   assert.equal(L.scheduleText(p), '5.50% slipping');
   assert.equal(L.scheduleText({ ...p, actualAccomplishment: 30 }), '15.50% behind');
   // Overdue: 0% done against a 0% plan used to read "on schedule" in green.
