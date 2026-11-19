@@ -589,7 +589,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .month > p { margin-bottom: 12px; }
 
 /* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
-.pay-sum { max-width: 560px; }
+.bill-sum { max-width: 560px; }
+.kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
 .pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
 .pay-card { padding: 12px 16px 14px; min-width: 0; }

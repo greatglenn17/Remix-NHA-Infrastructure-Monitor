@@ -4063,9 +4063,9 @@ const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(pr
 
 function paymentsBody({ project, payments, cost, billed }) {
   const editable = L.canEdit(project, s.user.uid, s.claims);
-  const summary = section('Billing summary', 'payments', `<div class="pay-sum">
+  const summary = section('Billing summary', 'payments', `<div class="bill-sum">
     ${kv('Current contract cost', L.formatPhp(cost))}
-    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
+    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word')}
     ${billed > 0 && cost > 0 ? kv('Billed share', L.billedLabel(billed, cost)) : ''}
     ${kv('Balance', L.formatPhp(cost - billed))}
     </div>${baseNote(project, cost)}
