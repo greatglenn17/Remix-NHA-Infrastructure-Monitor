@@ -117,7 +117,8 @@ class SummaryReportPromptTest {
                 )
             }
         }
-        rule.onNodeWithText("120 units").assertExists()
+        rule.onNodeWithText("120 saleable lots").assertExists()
+        rule.onNodeWithText("% of 120 lots").assertExists()
         rule.onNodeWithText("100% / RFO").assertExists()
         rule.onNodeWithText("Not yet started").assertExists()
         rule.onNodeWithText("40").assertExists()
@@ -128,6 +129,22 @@ class SummaryReportPromptTest {
         rule.onNodeWithText("M1 - Housing unit (80%)").assertExists()
         rule.onNodeWithText("5.00%").assertExists()
         rule.onNodeWithText("M2 - Housing unit (20%)").assertExists()
+    }
+
+    @Test fun billingStatus_sharesOfTheProfileUnits() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                SummarySection(
+                    project.copy(numberOfUnits = "240 units"), emptyList(), emptyList(), null, openIssues = 0, canEditProject = false, onEditProject = {},
+                    currentUserRole = UserRole.ENGINEER_ADMIN, onAddOrder = {}, onUpdateOrderStatus = { _, _, _ -> }, onDeleteOrder = {},
+                    today = today, construction = SdpSummary.Summary(listOf(6, 12, 22, 40, 28, 12), SdpSummary.Totals(120, 6000.0)),
+                    payments = listOf(billing("Land development", 30))
+                )
+            }
+        }
+        // As the Billing abstract: 30 of the profile's 240 units, not of the 120 lots drawn.
+        rule.onNodeWithText("% of 240 units").assertExists()
+        rule.onNodeWithText("12.50%").assertExists()
     }
 
     private fun billing(type: String, units: Int) = com.example.data.model.ProjectPayment(

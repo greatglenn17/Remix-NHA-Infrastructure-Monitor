@@ -91,7 +91,7 @@ fun SummarySection(
     // What the engineer does next comes first; the profile is reference, below.
     val cards = listOfNotNull<@Composable (Modifier) -> Unit>(
         { m -> LatestReportCard(latestReport, openIssues, missingWeek, onAddWeeklyReport, m) },
-        construction?.let { c -> { m -> ConstructionCard(c, payments, today, m) } },
+        construction?.let { c -> { m -> ConstructionCard(c, payments, today, com.example.util.BillingAbstract.units(project, c.saleable.count), m) } },
         { m -> ProfileCard(project, canEditProject, onEditProject, onPrintProfile, m, currentUserRole == UserRole.SUPER_ADMIN) },
         { m -> BarChartCard(project, documents, today, onSaveBarChart?.let { { showBarChart = true } }, m) },
         { m ->
@@ -327,7 +327,7 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek
  * then the Status of Billing: the lots billed so far for each housing billing type, from the billings' unit counts.
  */
 @Composable
-private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<ProjectPayment>, today: LocalDate, modifier: Modifier) {
+private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<ProjectPayment>, today: LocalDate, units: Int, modifier: Modifier) {
     val nha = LocalNHAColors.current
     // The first % of each band picks its colour on the lot map.
     val colors = listOf(0, 1, 26, 51, 76, 100).map { lotProgressFill(it, nha) }
@@ -355,15 +355,16 @@ private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<Project
         // Lined up with the band names and counts above.
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 2.dp).testTag("construction_grand_total")) {
             Text("Grand total", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            Text("${summary.saleable.count} units", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Text("${summary.saleable.count} saleable ${if (summary.saleable.count == 1) "lot" else "lots"}", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
-        BillingStatus(payments, summary.saleable.count)
+        // As the Billing abstract: a share of the profile's No. of units when it has one, else of the lots drawn.
+        BillingStatus(payments, units, if (units == summary.saleable.count) "lot" else "unit")
     }
 }
 
-/** Lots billed per housing billing type, and their share of the [total] saleable units. */
+/** Lots billed per housing billing type, and their share of the [total] (BillingAbstract.units), counted in [what]. */
 @Composable
-private fun BillingStatus(payments: List<ProjectPayment>, total: Int) {
+private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: String) {
     val scheme = MaterialTheme.colorScheme
     @Composable
     fun Cells(values: List<String>, bold: Boolean = false, color: androidx.compose.ui.graphics.Color = scheme.onSurface) {
@@ -382,7 +383,7 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int) {
         "Status of billing", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("summary_billing_status")
     )
-    Cells(listOf("Billed for", "Lots billed", "% of $total"), bold = true, color = scheme.onSurfaceVariant)
+    Cells(listOf("Billed for", "Lots billed", "% of $total $what${if (total == 1) "" else "s"}"), bold = true, color = scheme.onSurfaceVariant)
     HorizontalDivider(color = scheme.outlineVariant)
     HOUSING_BILLING_TYPES.forEach { type ->
         val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }
