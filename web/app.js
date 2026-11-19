@@ -3888,7 +3888,6 @@ function actualBody(c) {
       ${editable ? `<button class="${list.length ? 'text-btn' : 'btn'}" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
       ${editable && list.length ? `<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button>` : ''}
       ${editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : ''}
-      ${editable && shown ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button>` : ''}
     </div>
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
@@ -3899,7 +3898,8 @@ function actualBody(c) {
       ${standingTable(c, shown)}
       ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}
       <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
-        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>`)}
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>
+      ${editable ? `<div class="apa-foot"><button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button></div>` : ''}`)}
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
 
@@ -4002,7 +4002,7 @@ function bindActual(c) {
     drawProject(page);
     if (document.activeElement !== document.body) { announce(text); return; }
     const note = document.getElementById('abstract-note');
-    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
+    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); note.scrollIntoView({ block: 'nearest' }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
   };
   const failed = x => say(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
