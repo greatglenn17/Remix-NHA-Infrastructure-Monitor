@@ -1085,7 +1085,7 @@ function drawProject(page) {
     <header class="card project-head${full ? '' : ' slim'}">
       <div class="ph-top">
         <div class="ph-title"><h1>${esc(project.name)}</h1>
-          ${full ? `<p class="ph-loc">${icon('location_on', 'sm')}${esc(project.location || '-')}</p>` : ''}</div>
+          ${full ? `<p class="ph-loc"><span>${icon('location_on', 'sm')}${esc(project.location || '-')}</span>${timeLeft(project)}</p>` : ''}</div>
         <div class="ph-badges">${statusBadge(project)}
           ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
       </div>
@@ -1141,6 +1141,7 @@ function drawProject(page) {
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
+  main.querySelectorAll('details[data-fold]').forEach(f => { f.ontoggle = () => { page.folds = { ...page.folds, [f.id]: f.open }; }; });
   const moreAlerts = document.getElementById('more-alerts');
   if (moreAlerts) moreAlerts.ontoggle = () => { page.moreAlerts = moreAlerts.open; };
   const chartCurve = document.getElementById('chart-curve');
@@ -1176,6 +1177,17 @@ function drawProject(page) {
 }
 
 /* ---------- Summary (SummarySection) ---------- */
+
+/** The Summary header's time line: the completion date (the revised one, if any) and the days left, red once overdue. */
+function timeLeft(project) {
+  const left = L.daysLeftText(project, today()), end = L.effectiveCompletion(project);
+  if (left === 'Completed' || left === '-' || !ISO.test(end)) return '';
+  const late = left.startsWith('Overdue');
+  return `<span class="ph-time${late ? ' late' : ''}">${icon('event', 'sm')}Completion ${esc(L.displayDate(end))} · ${esc(late ? left : `${left} left`)}</span>`;
+}
+
+/** A Summary fold (reference detail under its card), kept open or shut through a live redraw. */
+const fold = (page, id, title, body) => `<details class="fold" id="${id}" data-fold${page.folds?.[id] ? ' open' : ''}><summary>${icon('expand_more', 'sm')}${title}</summary>${body}</details>`;
 
 function summaryBody({ page, project, records, of, documents, payments, weekly, cost, billed, now }) {
   const latest = weekly[0];
@@ -1213,8 +1225,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
       ${kv('Project type', project.projectType)}
       ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
     </div>
-    ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? `<p class="sub">Scope of works</p>${items.map((x, i) => `
-      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')}` : ''; })()}
+    ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? fold(page, 'fold-scope', `Scope of works (${items.length})`, items.map((x, i) => `
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')) : ''; })()}
     ${L.canAssign(s.claims) ? `<button class="text-btn foot-btn" id="project-drive">${icon('cloud_upload', 'sm')}Copy files to Google Drive</button>` : ''}`,
     '', `${L.canAssign(s.claims) ? `<button class="text-btn" id="project-assign">${icon('person', 'sm')}Assign</button>` : ''}
       ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
@@ -1236,8 +1248,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
     ${kv('Revised duration', revisedDays == null ? '-' : `${revisedDays} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
-    <p class="sub">Time extensions &amp; suspensions</p>
-    ${orders.length ? orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}${orderBadge(d)}</b>${d.remarks ? `<span>${esc(L.remarksText(d.remarks))}</span>` : ''}</div>`).join('')
+    ${orders.length ? fold(page, 'fold-orders', `Time extensions &amp; suspensions (${orders.length})`, orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}${orderBadge(d)}</b>${d.remarks ? `<span>${esc(L.remarksText(d.remarks))}</span>` : ''}</div>`).join(''))
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
@@ -1447,8 +1458,14 @@ function constructionCard(summary, payments, now, multiSite) {
     <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'unit')}</b></div>
     <p class="sub strong">Status of billing</p>
     <p class="muted small">From the billings under Payments, as a share of ${summary.saleable === 1 ? 'the 1 unit' : `all ${summary.saleable} units`}${multiSite ? ' on every site' : ''}.</p>
-    <table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${summary.saleable}</th></tr></thead>
-      <tbody>${L.billingStatus(payments, summary.saleable).map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>`);
+    ${billingRows(L.billingStatus(payments, summary.saleable), summary.saleable)}`);
+}
+
+function billingRows(rows, saleable) {
+  const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
+  const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
+  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${saleable}</th></tr></thead>
+      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */

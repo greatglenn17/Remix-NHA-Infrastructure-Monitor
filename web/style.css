@@ -261,7 +261,9 @@ body.signed-out main { max-width: none; padding: 0; }
 .ph-title { min-width: 0; }
 .ph-top h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; overflow-wrap: anywhere; }
 @media (min-width: 640px) { .ph-top h1 { font-size: 36px; } }
-.ph-loc { display: flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 14px; margin: 6px 0 18px; }
+.ph-loc { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; color: var(--text-2); font-size: 14px; margin: 6px 0 18px; }
+.ph-loc > span { display: inline-flex; align-items: center; gap: 4px; }
+.ph-time.late { color: var(--behind); font-weight: 600; }
 .ph-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
 /* The header's status badge is larger and carries a hairline in its own colour. */
 .ph-badges .badge:not(.view) { font-size: 13px; padding: 4px 11px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
@@ -282,7 +284,8 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .pl-head { flex-wrap: wrap; row-gap: 2px; }
 .pl.big .pl-head small { margin-left: auto; }
 /* On a phone the note always takes its own line under the figure. */
-@media (max-width: 600px) { .pl.big .pl-head { flex-wrap: wrap; } .pl.big .pl-head small { flex-basis: 100%; justify-content: flex-end; } .pl.big .pl-head small .icon { margin-right: 0; } }
+/* There it wraps instead of clipping: a right-aligned flex row that overflows is cut on the left, icon first. */
+@media (max-width: 600px) { .pl.big .pl-head { flex-wrap: wrap; } .pl.big .pl-head small { display: block; flex-basis: 100%; text-align: right; white-space: normal; overflow: visible; text-wrap: balance; } .pl.big .pl-head small .icon { margin-right: 3px; vertical-align: -3px; } }
 /* Header bars: taller, with a tick every 10% so an empty bar still reads as a scale. */
 .pl.big .bar { height: 10px; border-radius: 5px; margin-top: 10px;
   background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--tick) calc(10% - 1px) 10%), var(--track); }
@@ -503,10 +506,11 @@ span.file.gone { text-decoration: none; }
 .rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; }
 .report details, details.curve { margin-top: 10px; border-top: 1px solid var(--border); }
 .more-alerts > .alerts { margin-top: 8px; }
-.report summary, .curve summary, .plan-tools summary, .more-alerts summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
-.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker, .more-alerts summary::-webkit-details-marker { display: none; }
-.report summary .icon, .curve summary .icon, .plan-tools summary .icon, .more-alerts summary .icon { transition: transform 150ms ease-out; }
-.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon, .more-alerts[open] summary .icon { transform: rotate(180deg); }
+.fold { margin-top: 6px; }
+.report summary, .curve summary, .plan-tools summary, .more-alerts summary, .fold summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
+.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker, .more-alerts summary::-webkit-details-marker, .fold summary::-webkit-details-marker { display: none; }
+.report summary .icon, .curve summary .icon, .plan-tools summary .icon, .more-alerts summary .icon, .fold summary .icon { transition: transform 150ms ease-out; }
+.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon, .more-alerts[open] summary .icon, .fold[open] summary .icon { transform: rotate(180deg); }
 .rep-body h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
 .rep-body h4:first-child { margin-top: 2px; }
 .grid-table { font-size: 13px; }
