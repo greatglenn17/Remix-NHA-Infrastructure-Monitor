@@ -63,7 +63,7 @@ const FIGURE_HELP = [
   ['Reported target', "The plan the latest weekly report was filed against, for its week's last day. When today's bar chart plans that day more than 5% differently (a revised chart, or suspensions since), the card says by how much."],
   ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today. Without a bar chart the lines have no target and Overall uses the project's own."],
   ['Billed', "Net billings under Payments in pesos, as a share of the current contract cost. Status of billing counts lots instead, so its % can differ."],
-  ['Lots and units', "Status of construction, Status of billing and the Lots tab count the saleable lots drawn on the plan, which can differ from the profile's No. of units. The Lots tab's billed marks are set lot by lot, so they can differ from the billings under Payments; its average lot progress counts every lot alike and covers the lots only, so it is not Work done."],
+  ['Lots and units', "Status of construction and the Lots tab count the saleable lots drawn on the plan, which can differ from the profile's No. of units. Status of billing is a share of the profile's No. of units when it has one, as the Billing abstract is, else of the lots drawn. The Lots tab's billed marks are set lot by lot, so they can differ from the billings under Payments; its average lot progress counts every lot alike and covers the lots only, so it is not Work done."],
 ];
 const figuresHelp = () => `<button type="button" class="text-btn help-btn" data-figures-help>${icon('info', 'sm')}What these figures mean</button>`;
 
@@ -1463,23 +1463,25 @@ function barChartCard(project, documents, now, curveOpen) {
     <details class="curve" id="chart-curve"${curveOpen ? ' open' : ''}><summary>${icon('expand_more', 'sm')}S-curve · ${plural(L.chartMonths(version).length, 'month')}</summary>${curveTable(version)}</details>`, '', edit);
 }
 
-/** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
+/** ConstructionCard: saleable lots by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
 function constructionCard(summary, payments, now, multiSite, units) {
   if (!summary.saleable) return '';
   return section('Status of construction', 'home_work', `
     <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
     <div class="lot-bar" role="img" aria-label="${esc(L.LOT_BANDS.map((b, i) => `${b}: ${summary.bands[i]}`).join(', '))}">${summary.bands.map((n, i) => (n ? `<i class="lot-${i}" style="flex:${n}"></i>` : '')).join('')}</div>
     ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
-    <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'unit')}</b></div>
+    <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'saleable lot')}</b></div>
     <p class="sub strong">Status of billing</p>
-    <p class="muted small">Lots billed under Payments, as a share of ${summary.saleable === 1 ? 'the 1 saleable lot' : `the ${summary.saleable} saleable lots`} drawn on the plan${multiSite ? ' of every site' : ''}${units !== summary.saleable ? `; the profile lists ${plural(units, 'unit')}` : ''}.</p>
-    ${billingRows(L.billingStatus(payments, summary.saleable), summary.saleable)}`);
+    <p class="muted small">${units === summary.saleable
+      ? `Lots billed under Payments, as a share of the ${plural(summary.saleable, 'saleable lot')} drawn on the plan${multiSite ? ' of every site' : ''}.`
+      : `Lots billed under Payments, as a share of the profile's ${plural(units, 'unit')}, as in the Billing abstract; the plan${multiSite ? 's have' : ' has'} ${plural(summary.saleable, 'saleable lot')}.`}</p>
+    ${billingRows(L.billingStatus(payments, units), plural(units, units === summary.saleable ? 'lot' : 'unit'))}`);
 }
 
-function billingRows(rows, saleable) {
+function billingRows(rows, of) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
-  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${plural(saleable, 'lot')}</th></tr></thead>
+  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${of}</th></tr></thead>
       <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
