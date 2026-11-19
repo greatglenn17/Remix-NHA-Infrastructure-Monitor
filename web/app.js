@@ -1651,11 +1651,11 @@ function lotsView(c) {
     ${site.lots.length || busy ? `<div class="lot-frame"><div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
       <p class="wheel-hint" id="wheel-hint" aria-hidden="true">Hold ${MAC ? '⌘' : 'Ctrl'} and scroll to zoom</p>
-    </div>
+    </div><div class="lot-card" id="lot-card" hidden></div>
     <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
       ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
-      <button data-zoom="reset">Reset</button></div><div class="lot-card" id="lot-card" hidden></div></div>` : emptyLine('No lots drawn on this plan yet.')}
+      <button data-zoom="reset">Reset</button></div></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
     <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on ${k.total === 1 ? 'it' : 'them'} ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}

@@ -781,8 +781,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-card { align-self: end; margin: 0 1px 1px; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 12px 12px 7px 7px; background: var(--surface-variant); }
 /* On a phone the plan comes right after its title, in a frame of the plan's own shape, with its zoom bar; the picked
    lot's card sits under them, not over the plan. The scale, the plan's links, the search and the count follow, moved
-   with order, so Tab still visits them before the plan, as on a wide screen (reading-flow: flex-visual was tried and
-   left the search out of the Tab order in Chromium, under display: contents). */
+   with order, so Tab still visits them before the plan, and the card before the zoom bar, as on a wide screen
+   (reading-flow: flex-visual was tried and left the search out of the Tab order in Chromium, under display: contents). */
 @media (max-width: 600px) {
   .lots { display: flex; flex-direction: column; }
   .lots-head, .lots-head > div, .lot-frame { display: contents; }
@@ -791,7 +791,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .lots-head > div > :not(h2), .lots-head > .lots-links, .lot-filters, .lot-count { order: 2; }
   .lot-legend, .lot-sum, .lots > .plan-tools, #lot-results { order: 3; }
   .lot-viewer { box-sizing: border-box; width: 100%; margin-top: 4px; height: auto; aspect-ratio: var(--plan-ar, 4 / 3); min-height: 240px; max-height: calc(70vh / var(--zoom)); } /* the width is set, so a min-height never widens it */
-  .lot-card { margin: 0 0 12px; border: 1px solid var(--outline); border-radius: 8px; }
+  .lot-card { order: 1; align-self: stretch; margin: 0 0 12px; border: 1px solid var(--outline); border-radius: 8px; }
 }
 .lot-card p { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
 .lot-card .lc-upd { color: var(--link); }
