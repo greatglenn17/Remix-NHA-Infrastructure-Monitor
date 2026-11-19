@@ -383,7 +383,7 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: Stri
         "Status of billing", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("summary_billing_status")
     )
-    Cells(listOf("Billed for", "Lots billed"), bold = true, color = scheme.onSurfaceVariant)
+    Cells(listOf("Billed for", if (what == "unit") "Units billed" else "Lots billed"), bold = true, color = scheme.onSurfaceVariant)
     HorizontalDivider(color = scheme.outlineVariant)
     HOUSING_BILLING_TYPES.forEach { type ->
         val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }

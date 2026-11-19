@@ -1478,7 +1478,7 @@ function constructionCard(summary, payments, now, units) {
 function billingRows(rows, total, word) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
-  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th></tr></thead>
+  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">${word === 'unit' ? 'Units' : 'Lots'} billed</th></tr></thead>
       <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
