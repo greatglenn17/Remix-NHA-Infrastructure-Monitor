@@ -2323,7 +2323,7 @@ async function bindLots(c) {
       const [x, y] = d.centres.get(l.uuid);
       if (picked) rings.push(pts);
       return `<polygon data-lot="${esc(l.uuid)}" role="option" aria-selected="${picked}" aria-label="${esc(name)}" tabindex="${l.uuid === roving ? 0 : -1}" class="${L.lotColour(l)}${match ? (billed ? ' billed' : '') : ' dim'}${picked ? ' sel' : ''}" points="${pts}"><title>${esc(`${L.lotLabel(l)} · ${L.lotProgress(l)}%`)}</title></polygon>${
-        no.has(l.uuid) ? `<text class="renum-no" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(d.spans.get(l.uuid) * 0.45).toFixed(1)}">${no.get(l.uuid)}</text>`
+        no.has(l.uuid) ? `<text class="renum-no" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" style="--f: ${(d.spans.get(l.uuid) * 0.45).toFixed(1)}px">${no.get(l.uuid)}</text>`
         : lotNo ? `<text class="lot-no${match ? '' : ' dim'}" aria-hidden="true" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-c="${lotNo.length}" data-s="${d.spans.get(l.uuid).toFixed(1)}">${esc(lotNo)}</text>` : ''}`;
     }).join('') + rings.map(pts => `<polygon class="ring halo" aria-hidden="true" points="${pts}"/>`).join('')
       + rings.map(pts => `<polygon class="ring" aria-hidden="true" points="${pts}"/>`).join('') + draft();
@@ -2476,12 +2476,12 @@ async function bindLots(c) {
     zoomBar.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
     fitLabels();
   };
-  // Lot numbers stay 11px on screen at any zoom (--k: screen pixels to a plan pixel), shown only where one fits its lot.
+  // Lot numbers stay 12px on screen at any zoom (--k: screen pixels to a plan pixel), shown only where one fits its lot.
   const fitLabels = () => {
     if (!svg || !st.view) return;
     const k = fit * st.view.s;
     svg.style.setProperty('--k', k);
-    svg.querySelectorAll('text.lot-no').forEach(t => t.classList.toggle('hide', Number(t.dataset.c) * 7 + 4 > Number(t.dataset.s) * k));
+    svg.querySelectorAll('text.lot-no').forEach(t => t.classList.toggle('hide', Number(t.dataset.c) * 8 + 4 > Number(t.dataset.s) * k));
   };
   const reset = () => { st.view = { s: 1, x: (W - d.width * fit) / 2, y: (H - d.height * fit) / 2 }; apply(); };
   const zoomAt = (s, px = W / 2, py = H / 2) => {
