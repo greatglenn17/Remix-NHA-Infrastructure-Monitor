@@ -147,6 +147,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 20px 24px 48px; }
 .pl-head span { color: var(--text-2); font-weight: 400; margin-right: auto; white-space: nowrap; }
 /* Card figures carry the card: sized to read from the back of a meeting room. */
 .pl-head b { font-size: clamp(17px, 1.25vw, 20px); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.pl-head b.word, .pl.big .pl-head b.word { font-size: 14px; font-weight: 400; letter-spacing: 0; color: var(--text-2); } /* "No billings yet": quieter than a figure */
 .pl-head small { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .n-ok { color: var(--ok); } .n-watch { color: var(--watch); } .n-behind { color: var(--behind); } .n-muted { color: var(--text-2); }
 .bar { height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; margin-top: 6px; }
@@ -587,6 +588,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .month h2 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
 .month > p { margin-bottom: 12px; }
 
+/* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
+.bill-sum { max-width: 560px; }
+.kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
 .pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
 .pay-card { padding: 12px 16px 14px; min-width: 0; }

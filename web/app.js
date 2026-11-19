@@ -556,7 +556,7 @@ function itemOf(project) {
 /** Label on the left; value and a note (schedule variance, amount) on the right; the bar beneath. A figure (`L.isFigure`) is set in the mono; a value in words is not. */
 function progressLine(label, value, note, noteTone, fraction, tone, big = false) {
   return `<div class="pl${big ? ' big' : ''}">
-    <div class="pl-head"><span>${esc(label)}</span><b${L.isFigure(value) ? ' class="fig"' : ''}>${esc(value)}</b>${note ? `<small class="n-${noteTone}">${note}</small>` : ''}</div>
+    <div class="pl-head"><span>${esc(label)}</span><b class="${L.isFigure(value) ? 'fig' : 'word'}">${esc(value)}</b>${note ? `<small class="n-${noteTone}">${note}</small>` : ''}</div>
     <div class="bar ${tone}" role="img" aria-label="${esc(label)} ${esc(value)}"><i style="width:${(clamp(fraction) * 100).toFixed(1)}%"></i></div>
   </div>`;
 }
@@ -4065,12 +4065,12 @@ const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(pr
 
 function paymentsBody({ project, payments, cost, billed }) {
   const editable = L.canEdit(project, s.user.uid, s.claims);
-  const summary = section('Billing summary', 'payments', `
+  const summary = section('Billing summary', 'payments', `<div class="bill-sum">
     ${kv('Current contract cost', L.formatPhp(cost))}
-    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet')}
+    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word')}
     ${billed > 0 && cost > 0 ? kv('Billed share', L.billedLabel(billed, cost)) : ''}
     ${kv('Balance', L.formatPhp(cost - billed))}
-    ${baseNote(project, cost)}
+    </div>${baseNote(project, cost)}
     ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
   if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
