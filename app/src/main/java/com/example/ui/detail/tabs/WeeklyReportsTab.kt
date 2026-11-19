@@ -230,7 +230,7 @@ private fun WeeklyReportCard(
                 }
                 Text(
                     text = listOfNotNull(
-                        "Target ${"%.2f".format(report.targetAccomplishmentPct)}%",
+                        "Filed against ${"%.2f".format(report.targetAccomplishmentPct)}%",
                         previousActual?.let { "%+.2f%% from previous report".format(report.actualAccomplishmentPct - it) }
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
