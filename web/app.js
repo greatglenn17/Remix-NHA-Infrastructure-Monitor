@@ -2479,7 +2479,7 @@ async function bindLots(c) {
     if (!svg || !st.view) return;
     const k = fit * st.view.s;
     svg.style.setProperty('--k', k);
-    svg.querySelectorAll('text.lot-no').forEach(t => t.classList.toggle('hide', Number(t.dataset.c) * 7 + 4 > Number(t.dataset.s) * k));
+    svg.querySelectorAll('text.lot-no').forEach(t => t.classList.toggle('hide', Number(t.dataset.c) * 8 + 4 > Number(t.dataset.s) * k));
   };
   const reset = () => { st.view = { s: 1, x: (W - d.width * fit) / 2, y: (H - d.height * fit) / 2 }; apply(); };
   const zoomAt = (s, px = W / 2, py = H / 2) => {

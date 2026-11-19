@@ -539,7 +539,7 @@ span.file.gone { text-decoration: none; }
 @container (min-width: 1080px) {
   .apa-items { font-size: max(12px, min(13px, 0.9cqw)); }
   .apa-items th, .apa-items td { padding: 0.55em 0.3em; }
-  .apa-items thead th { font-size: 0.92em; letter-spacing: 0; white-space: normal; }
+  .apa-items thead th { font-size: max(12px, 0.92em); letter-spacing: 0; white-space: normal; } /* never under the 12px floor */
   .apa-items td:nth-child(2) { min-width: 9em; }
 }
 div.apa-part { padding-top: 16px; }
@@ -799,7 +799,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-card .chips { margin: 8px 0 0; }
 .lot-stage polygon.frame { fill: none; stroke: #1D4ED8; stroke-width: 2.5; stroke-dasharray: 12 8; pointer-events: none; }
 /* Lot numbers: 11px on screen at any zoom (app.js fitLabels sets --k), haloed white so they read over the plan's lines. */
-.lot-stage text.lot-no { font: 600 calc(11px / var(--k, 1)) var(--sans); fill: var(--bg); stroke: #fff; stroke-width: calc(3px / var(--k, 1)); stroke-linejoin: round; paint-order: stroke; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.lot-stage text.lot-no { font: 600 calc(12px / var(--k, 1)) var(--sans); fill: var(--bg); stroke: #fff; stroke-width: calc(3px / var(--k, 1)); stroke-linejoin: round; paint-order: stroke; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .lot-stage text.lot-no.dim { opacity: 0.35; }
 .lot-stage text.lot-no.hide { display: none; }
 .lot-stage polygon[data-lot]:focus { outline: none; }
