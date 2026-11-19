@@ -1651,11 +1651,11 @@ function lotsView(c) {
     ${site.lots.length || busy ? `<div class="lot-frame"><div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
       <p class="wheel-hint" id="wheel-hint" aria-hidden="true">Hold ${MAC ? '⌘' : 'Ctrl'} and scroll to zoom</p>
-    </div><div class="lot-card" id="lot-card" hidden></div></div>
+    </div>
     <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
       ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
-      <button data-zoom="reset">Reset</button></div>` : emptyLine('No lots drawn on this plan yet.')}
+      <button data-zoom="reset">Reset</button></div><div class="lot-card" id="lot-card" hidden></div></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
     <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on ${k.total === 1 ? 'it' : 'them'} ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
@@ -2277,6 +2277,8 @@ async function bindLots(c) {
   const card = document.getElementById('lot-card');
   const more = document.getElementById('lot-results');
   let d = null, svg = null, stage = null, traceNote = ''; // traceNote: what the last traced click found, in place of the hint
+  // The card lies over the foot of the plan on a wide screen and under its zoom bar on a phone (style.css).
+  const overlaid = () => card.getBoundingClientRect().top < viewer.getBoundingClientRect().bottom;
 
   // Renumber block: the lots picked and the numbers they would get, from where they sit on the plan as it is turned.
   const numbered = () => {
@@ -2416,7 +2418,7 @@ async function bindLots(c) {
     const close = document.getElementById('lot-close');
     if (close) close.onclick = () => { st.more = false; paint(); };
   };
-  const pick = id => { st.sel = id; st.more = false; paint(); };
+  const pick = id => { st.sel = id; st.more = false; paint(); if (id && !overlaid()) card.scrollIntoView({ block: 'nearest' }); };
   // A lot clicked or picked with the keyboard (none: a click off the lots).
   const choose = id => {
     if (st.renum) {
@@ -2439,7 +2441,10 @@ async function bindLots(c) {
     // As on the phone: when the search finds one lot, it is selected and centred at 200%.
     const found = st.query.trim() ? site.lots.filter(l => L.lotMatches(l, st)) : [];
     if (found.length === 1 && d?.centres.has(found[0].uuid)) { st.sel = st.focus = found[0].uuid; centreOn(d.centres.get(found[0].uuid), 2); }
+    // On a phone the found lot's card opens above the search: the box being typed in keeps its place on the screen.
+    const y = e.target.getBoundingClientRect().top;
     paint();
+    scrollBy(0, e.target.getBoundingClientRect().top - y);
   };
   main.querySelectorAll('[data-lot-filter]').forEach(sel => { sel.onchange = () => { st[sel.dataset.lotFilter] = sel.value; document.getElementById('lot-filter-n').textContent = filterLabel(st); paint(); }; });
   const filterToggle = document.getElementById('lot-filter-toggle');
@@ -2661,6 +2666,8 @@ async function bindLots(c) {
   // The wheel scrolls the page; it zooms only with Ctrl or ⌘ held (a trackpad pinch sends Ctrl too, except in Safari), as on a map.
   const wheelHint = document.getElementById('wheel-hint');
   let hintOff = 0;
+  // Over the card too while it lies over the plan, as when it was inside the viewer.
+  card.onwheel = e => { if (overlaid()) viewer.onwheel(e); };
   viewer.onwheel = e => {
     if (!(e.ctrlKey || e.metaKey)) {
       wheelHint.classList.add('on'); clearTimeout(hintOff); hintOff = setTimeout(() => wheelHint.classList.remove('on'), 1200);

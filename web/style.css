@@ -742,7 +742,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
 /* The plan viewer (SubdivisionPlanTab): the plan moves and zooms inside a fixed frame, with the zoom bar and lot card over it. */
-.lot-frame { position: relative; margin: 4px 0 12px; } /* the viewer and, over its foot, the picked lot's card */
+.lot-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 4px; } /* the viewer with the picked lot's card over its foot, then the zoom bar */
+.lot-viewer, .lot-card { grid-area: 1 / 1; }
 .lot-viewer { position: relative; height: min(calc(70vh / var(--zoom)), 720px); min-height: 360px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; overflow: clip; background: var(--surface-variant); touch-action: none; } /* clip: not a scroll container, so focusing a lot never scrolls the plan away from where clicks are measured */
 .lot-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; cursor: grab; user-select: none; }
 .lot-stage:active { cursor: grabbing; }
@@ -773,13 +774,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-stage polygon.ring { fill: none; stroke: #fff; stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
 .lot-stage polygon.ring.halo { stroke: var(--bg); stroke-width: 7; }
 .lot-legend .dot.billed { background: none; border: 2px dashed var(--billed); /* the light violet: the legend is on the dark panel */ width: 8px; height: 8px; }
-.zoom-bar { width: fit-content; margin: -4px 0 12px auto; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
+.zoom-bar { width: fit-content; margin: 8px 0 12px auto; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; border: 1px solid var(--outline); background: var(--surface-variant); }
 .zoom-bar button { font: 600 12px var(--sans); color: var(--text); background: var(--surface); border: 1px solid var(--outline); border-radius: 6px; padding: 6px 8px; min-width: 30px; min-height: 40px; cursor: pointer; }
 .zoom-bar button[aria-pressed="true"] { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 .zoom-bar b { font-size: 12px; color: var(--link); min-width: 36px; text-align: center; }
-.lot-card { position: absolute; left: 1px; right: 1px; bottom: 1px; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 12px 12px 7px 7px; background: var(--surface-variant); }
+.lot-card { align-self: end; margin: 0 1px 1px; z-index: 2; padding: 12px 14px; border-top: 1px solid var(--outline); border-radius: 12px 12px 7px 7px; background: var(--surface-variant); }
 /* On a phone the plan comes right after its title, in a frame of the plan's own shape, with its zoom bar; the picked
-   lot's card sits under them, not over the plan. The scale, the plan's links, the search and the count follow. */
+   lot's card sits under them, not over the plan. The scale, the plan's links, the search and the count follow, moved
+   with order, so Tab still visits them before the plan, as on a wide screen (reading-flow: flex-visual was tried and
+   left the search out of the Tab order in Chromium, under display: contents). */
 @media (max-width: 600px) {
   .lots { display: flex; flex-direction: column; }
   .lots-head, .lots-head > div, .lot-frame { display: contents; }
@@ -787,8 +790,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .lot-sites, .lots-head > div > :not(h2), .lots-head > .lots-links { align-self: flex-start; }
   .lots-head > div > :not(h2), .lots-head > .lots-links, .lot-filters, .lot-count { order: 2; }
   .lot-legend, .lot-sum, .lots > .plan-tools, #lot-results { order: 3; }
-  .lot-viewer { box-sizing: border-box; width: 100%; margin: 4px 0 12px; height: auto; aspect-ratio: var(--plan-ar, 4 / 3); min-height: 240px; max-height: calc(70vh / var(--zoom)); } /* the width is set, so a min-height never widens it */
-  .lot-card { position: static; order: 1; margin-bottom: 12px; border: 1px solid var(--outline); border-radius: 8px; }
+  .lot-viewer { box-sizing: border-box; width: 100%; margin-top: 4px; height: auto; aspect-ratio: var(--plan-ar, 4 / 3); min-height: 240px; max-height: calc(70vh / var(--zoom)); } /* the width is set, so a min-height never widens it */
+  .lot-card { margin: 0 0 12px; border: 1px solid var(--outline); border-radius: 8px; }
 }
 .lot-card p { margin: 4px 0 0; font-size: 12px; color: var(--text-2); }
 .lot-card .lc-upd { color: var(--link); }
