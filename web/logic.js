@@ -777,6 +777,7 @@ export const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1:
 /** ProjectSchedule.orderLabel: older names read like new ones ("Work Suspension No. 1 (Partial)" -> "Partial Work Suspension Order No. 1"). */
 export function orderLabel(name) {
   const n = (name || '').trim();
+  if (/^variation order/i.test(n)) return variationTitle(n);
   const c = CONTINUANCE.exec(n);
   if (c) {
     const [, no, type, , base] = c;
@@ -840,13 +841,21 @@ export function mergedLetters(letters, docs) {
 export const relatedFiles = docs => docs.filter(d =>
   !isOrderName(d.documentName) && !/^letter to contractor/i.test(d.documentName || ''));
 
-/** VariationOrdersLog: a variation order's type, status, approval date and reason. */
+// The stored name: "Variation Order No. 2 (Deductive) - PHP 1,500,000.50" (newDocumentRecord).
+const VO_AMOUNT = /\s*-?\s*PHP\s*([-−(])?\s*([\d,]*\.?\d*)\)?\s*$/i;
+/** VariationOrdersLog: the order's title, "Variation Order No. 2", without the type and amount its lines give. */
+export const variationTitle = name => (name || '').replace(VO_AMOUNT, '').replace(/\s*\((additive|deductive)\)/i, '').trim();
+
+/** VariationOrdersLog: a variation order's type, amount, approval date (once it has one) and reason. */
 export function variationLines(vo) {
-  const approved = ((/\|\s*Date Approved:\s*([^|]+)/.exec(vo.remarks || '') || [])[1] || '').trim();
-  const clean = (vo.remarks || '').replace(/^Remarks:\s*/i, '').replace(/\|\s*Date Approved:[^|]*/g, '').trim();
+  // After an edit keepOrderFields can put the date first, with no "|" before it.
+  const approved = ((/(?:^|\|)\s*Date Approved:\s*([^|]+)/i.exec(vo.remarks || '') || [])[1] || '').trim();
+  const clean = (vo.remarks || '').replace(/^Remarks:\s*/i, '').replace(/(?:^|\|)\s*Date Approved:[^|]*/gi, '').replace(/^\s*\|\s*/, '').trim();
   const type = /additive/i.test(vo.documentName || '') ? 'Additive' : /deductive/i.test(vo.documentName || '') ? 'Deductive' : '';
-  // The status is a badge after the order's name (app.js orderBadge), not a line.
-  return [type ? `Type: ${type}` : '', `Date Approved: ${displayDate(approved)}`,
+  const m = VO_AMOUNT.exec(vo.documentName || '') || [], amount = (m[1] ? -1 : 1) * parseFloat((m[2] || '').replace(/,/g, ''));
+  // The status is a badge after the order's title (app.js orderBadge), not a line.
+  return [type ? `Type: ${type}` : '', Number.isFinite(amount) ? `Amount: ${formatPhp(amount)}` : '',
+    approved ? `Date approved: ${displayDate(approved)}` : '',
     /^reason:/i.test(clean) ? clean : clean ? `Reason: ${clean}` : ''].filter(Boolean);
 }
 

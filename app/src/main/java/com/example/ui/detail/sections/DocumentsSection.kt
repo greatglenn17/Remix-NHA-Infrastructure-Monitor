@@ -75,7 +75,7 @@ fun OrderStatusDialog(
         title = { Text("Update status") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(com.example.util.ProjectSchedule.orderLabel(doc.documentName), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(dialogLabel(doc.documentName), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("Pending", "Submitted", "Signed", "Notarized", "Approved").forEach { status ->
                         FilterChip(
@@ -441,9 +441,10 @@ fun VariationOrdersLog(
     ) {
         if (voLogs.isEmpty()) EmptyLine("No variation orders recorded.")
         voLogs.forEach { vo ->
-            val dateApproved = Regex("\\|\\s*Date Approved:\\s*([^|]+)").find(vo.remarks)?.groupValues?.get(1)?.trim()
+            // After an edit keepOrderFields can put the date first, with no "|" before it.
+            val dateApproved = Regex("(?:^|\\|)\\s*Date Approved:\\s*([^|]+)", RegexOption.IGNORE_CASE).find(vo.remarks)?.groupValues?.get(1)?.trim()
             val cleanRemarks = vo.remarks.replace("^Remarks:\\s*".toRegex(RegexOption.IGNORE_CASE), "")
-                .replace(Regex("\\|\\s*Date Approved:[^|]*"), "").trim()
+                .replace(Regex("(?:^|\\|)\\s*Date Approved:[^|]*", RegexOption.IGNORE_CASE), "").replace(Regex("^\\s*\\|\\s*"), "").trim()
             val displayText = if (cleanRemarks.startsWith("Reason:", ignoreCase = true)) {
                 cleanRemarks
             } else if (cleanRemarks.isNotBlank()) {
@@ -454,16 +455,31 @@ fun VariationOrdersLog(
                 vo.documentName.contains("Deductive", ignoreCase = true) -> "Deductive"
                 else -> ""
             }
+            // The stored name is "Variation Order No. 2 (Deductive) - PHP 1,500,000.50": its type and amount are lines (as on the website).
+            val amount = VO_AMOUNT.find(vo.documentName)?.groupValues?.let { g -> g[2].replace(",", "").toDoubleOrNull()?.let { if (g[1].isEmpty()) it else -it } }
             LogEntry(
-                vo.documentName,
+                voTitle(vo.documentName),
                 MaterialTheme.colorScheme.onSurface,
-                listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText),
+                listOf(
+                    if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}",
+                    amount?.let { "Amount: ${com.example.utils.CurrencyFormatter.formatPhp(it)}" } ?: "",
+                    dateApproved?.let { "Date approved: ${ProjectSchedule.displayDate(it)}" } ?: "", displayText
+                ),
                 onClick = if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) { { openOrder = vo } } else null
             )
         }
     }
     openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateStatus, onDeleteDocument) { openOrder = null } }
 }
+
+// Any name ContractCost reads: a sign or brackets, a dash or none (older names); new ones are " - PHP 1,500,000.50".
+private val VO_AMOUNT = Regex("\\s*-?\\s*PHP\\s*([-−(])?\\s*([\\d,]*\\.?\\d*)\\)?\\s*$", RegexOption.IGNORE_CASE)
+
+/** "Variation Order No. 2": a variation order's stored name without the type and amount its lines give (as the website). */
+private fun voTitle(name: String) = name.replace(VO_AMOUNT, "").replace(Regex("\\s*\\((additive|deductive)\\)", RegexOption.IGNORE_CASE), "").trim()
+
+/** The order's name in its dialog: a variation order as the list calls it, the others as ProjectSchedule.orderLabel. */
+private fun dialogLabel(name: String) = if (name.startsWith("Variation Order", ignoreCase = true)) voTitle(name) else ProjectSchedule.orderLabel(name)
 
 /** A Continuance of Work Suspension Order: more days on a logged suspension, starting where it ends. */
 @Composable

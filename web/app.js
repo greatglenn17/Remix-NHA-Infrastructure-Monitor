@@ -4110,7 +4110,7 @@ function documentsBody(c, chip) {
   if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d, editable)).join(''), 'No time extensions.', add(te));
   if (chip === 'Variation Orders') {
     const vos = named('variation order');
-    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(d.documentName, L.variationLines(d), orderExtra(d, editable), '', orderBadge(d))).join(''), 'No variation orders recorded.', add(vo));
+    return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(L.variationTitle(d.documentName), L.variationLines(d), orderExtra(d, editable), '', orderBadge(d))).join(''), 'No variation orders recorded.', add(vo));
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
   if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable);
