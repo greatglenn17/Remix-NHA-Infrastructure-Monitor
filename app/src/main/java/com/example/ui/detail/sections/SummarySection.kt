@@ -358,7 +358,7 @@ private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<Project
             Text("${summary.saleable.count} saleable ${if (summary.saleable.count == 1) "lot" else "lots"}", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         }
         // As the Billing abstract: a share of the profile's No. of units when it has one, else of the lots drawn.
-        BillingStatus(payments, units, if (units == summary.saleable.count) "lots" else "units")
+        BillingStatus(payments, units, if (units == summary.saleable.count) "lot" else "unit")
     }
 }
 
@@ -383,7 +383,7 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: Stri
         "Status of billing", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("summary_billing_status")
     )
-    Cells(listOf("Billed for", "Lots billed", "% of $total $what"), bold = true, color = scheme.onSurfaceVariant)
+    Cells(listOf("Billed for", "Lots billed", "% of $total $what${if (total == 1) "" else "s"}"), bold = true, color = scheme.onSurfaceVariant)
     HorizontalDivider(color = scheme.outlineVariant)
     HOUSING_BILLING_TYPES.forEach { type ->
         val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }
