@@ -55,6 +55,16 @@ const TERM_HELP = [
   ['Due in 30 days', 'Unfinished projects whose completion date (the revised one, if any) is 30 days away or less.'],
   ['Bar colours', 'Work done is blue on plan or slipping, amber from 10% behind, red from 15% behind or once overdue, green when finished. Billed is violet.'],
 ];
+// A project's figures, each with the day it is for: the header's plan is today's; a report's and an abstract's are their own day's.
+const FIGURE_HELP = [
+  ['Work done', "The project's actual accomplishment: the latest abstract's overall, or without one the latest weekly report's actual."],
+  ['Bar chart plan today', "What the approved bar chart plans to be done by today, counting suspensions and time extensions. Without a chart it reads \"target\", the project's own."],
+  ['Behind, slipping, ahead', 'Work done minus the plan, in % of the whole project: plan 78.00% and work done 41.25% is 36.75% behind. From 10% behind it is Behind schedule; less reads "slipping".'],
+  ['Reported target', "The plan the latest weekly report was filed against, for its week's last day. When today's bar chart plans that day differently (a revised chart, or suspensions since), the card says by how much."],
+  ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today."],
+  ['Billed', 'Net billings under Payments, as a share of the current contract cost.'],
+];
+const figuresHelp = () => `<button class="text-btn help-btn" data-figures-help>${icon('info', 'sm')}What these figures mean</button>`;
 
 // Big screens and projectors zoom the page (style.css, .zoomable) only where the browser reports the zoom
 // (Element.currentCSSZoom): the plan editor needs it to turn a click into a point on the plan.
@@ -583,7 +593,7 @@ function renderDashboard() {
     </div>
     <ul class="grid" id="grid"></ul>`;
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
-  document.getElementById('help').onclick = showTermHelp;
+  document.getElementById('help').onclick = () => showTermHelp();
   if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = () => projectForm();
   if (s.projects === null || RECORD_TYPES.some(t => !s.loaded[t])) announce('Loading projects…');
   redrawDashboard();
@@ -934,10 +944,10 @@ function redrawDashboard() {
   loadPhotos(grid);
 }
 
-function showTermHelp() {
+function showTermHelp(terms = TERM_HELP) {
   const d = document.createElement('dialog');
   d.className = 'help';
-  d.innerHTML = `<h2>What these mean</h2><dl>${TERM_HELP.map(([t, m]) => `<div><dt>${esc(t)}</dt><dd>${esc(m)}</dd></div>`).join('')}</dl>
+  d.innerHTML = `<h2>What these mean</h2><dl>${terms.map(([t, m]) => `<div><dt>${esc(t)}</dt><dd>${esc(m)}</dd></div>`).join('')}</dl>
     <form method="dialog"><button class="text-btn">Close</button></form>`;
   d.addEventListener('close', () => d.remove());
   document.body.append(named(d));
@@ -1090,6 +1100,7 @@ function drawProject(page) {
           ${L.isViewOnly(project, s.user.uid, s.claims) ? `<span class="badge view">${icon('visibility', 'sm')}View only</span>` : ''}</div>
       </div>
       <div class="ph-bars">${workDone(project, full, full ? `${L.plannedTarget(stored, documents, today()) != null ? 'bar chart plan today' : 'target'} ${pct(project.targetAccomplishment)}` : '')}${billedLine({ billed, cost }, full, true)}</div>
+      ${full ? figuresHelp() : ''}
     </header>
     <nav class="tabs" aria-label="Project sections">${SECTIONS.map(([key, label, ic]) => `
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
@@ -1141,6 +1152,7 @@ function drawProject(page) {
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
+  main.querySelectorAll('[data-figures-help]').forEach(b => { b.onclick = () => showTermHelp(FIGURE_HELP); });
   const moreAlerts = document.getElementById('more-alerts');
   if (moreAlerts) moreAlerts.ontoggle = () => { page.moreAlerts = moreAlerts.open; };
   const chartCurve = document.getElementById('chart-curve');
@@ -1250,7 +1262,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const gap = chartNow == null ? 0 : chartNow - (Number(latest?.targetAccomplishmentPct) || 0);
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">${Math.abs(gap).toFixed(2)} points ${gap > 0 ? 'under' : 'over'} today's bar chart plan for ${esc(L.displayDate(weekEnd))}.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">${Math.abs(gap).toFixed(2)}% ${gap > 0 ? 'under' : 'over'} today's bar chart plan for ${esc(L.displayDate(weekEnd))}.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const construction = housing ? constructionCard(L.lotSummary(records), payments, now, L.sdpSites(records).length > 1) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
@@ -3812,7 +3824,7 @@ function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v));
   return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target: the approved bar chart's plan on ${esc(L.displayDate(abstract.asOf))}.` : 'Target: the project\'s target; it has no approved bar chart.'}</p>`;
+    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target: the approved bar chart's plan on ${esc(L.displayDate(abstract.asOf))}.` : 'Target: the project\'s target; it has no approved bar chart.'} ${figuresHelp()}</p>`;
 }
 
 /**

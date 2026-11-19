@@ -267,6 +267,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .ph-badges .badge:not(.view) { font-size: 13px; padding: 4px 11px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
 /* Side by side while both figures fit, stacked below that. */
 .ph-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+.project-head > .help-btn { margin-top: 8px; }
 .ph-bars .pl { padding: 14px 16px 16px; background: var(--field); border: 1px solid var(--border); border-radius: 8px; }
 /* Every tab but Summary: the name, status and both figures at card size, so the tab's own work starts high. */
 .project-head.slim { padding: 14px 20px 16px; }
