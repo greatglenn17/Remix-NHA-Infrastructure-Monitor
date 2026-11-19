@@ -314,7 +314,6 @@ private fun LatestReportCard(report: WeeklyReport?, openIssues: Int, missingWeek
             EmptyLine("No weekly reports yet")
         } else {
             Text(report.reportingWeek, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            Field("Filed against", "%.2f%%".format(report.targetAccomplishmentPct))
             Field("Actual", "%.2f%%".format(report.actualAccomplishmentPct))
             Field("Submitted by", report.submittedByStaff.ifBlank { "-" })
         }
