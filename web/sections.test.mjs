@@ -159,7 +159,8 @@ test('lots status: six bands, plans in use only, saleable lots only, latest prog
   const s = L.lotSummary(records);
   assert.equal(s.saleable, 4); // l1, l2, l3 and Site B's only (inactive) plan's b1
   assert.deepEqual(s.bands, [1, 0, 1, 0, 1, 1]);
-  assert.deepEqual(L.lotSummary([]), { bands: [0, 0, 0, 0, 0, 0], saleable: 0 });
+  assert.equal(s.sites, 2);
+  assert.deepEqual(L.lotSummary([]), { bands: [0, 0, 0, 0, 0, 0], saleable: 0, sites: 0 });
   const billing = L.billingStatus([{ billingType: 'M1 - Housing unit', units: 3 }, { billingType: 'M1 - Housing unit', units: 1 }], 8);
   assert.deepEqual(billing.map(b => [b.label, b.units, b.share]), [
     ['Land acquisition', 0, '0.00%'], ['Land development', 0, '0.00%'], ['M1 - Housing unit (80%)', 4, '50.00%'], ['M2 - Housing unit (20%)', 0, '0.00%']]);
