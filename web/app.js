@@ -1483,7 +1483,7 @@ function billingRows(rows, total, word) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
   return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">${word === 'unit' ? 'Units' : 'Lots'} billed</th></tr></thead>
-      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
+      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num words">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
@@ -1662,7 +1662,7 @@ function lotsView(c) {
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
       <button data-zoom="reset">Reset</button></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
-    <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on them ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
+    <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on ${k.total === 1 ? 'it' : 'them'} ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
     <div id="lot-results"></div>
   </section>`;
