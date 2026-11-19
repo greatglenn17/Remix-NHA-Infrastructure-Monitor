@@ -305,6 +305,7 @@ body.signed-out main { max-width: none; padding: 0; }
 .kv { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; padding: 3px 0; font-size: 13px; align-items: baseline; }
 .kv span { color: var(--text-2); }
 .kv b { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.rep-gap { margin: 0 0 4px; text-align: right; }
 .kv b.nil { color: var(--text-2); font-weight: 400; opacity: 0.5; }
 .kv b.hl { color: var(--link); }
 .sub { font-size: 12px; font-weight: 400; color: var(--text-2); margin: 10px 0 4px; }
