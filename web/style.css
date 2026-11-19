@@ -534,8 +534,8 @@ span.file.gone { text-decoration: none; }
 .apa-foot .text-btn.danger { margin: 0 -8px 0 0; }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
 .apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
-/* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (about
-   11px at 1366) and the headings wrap. A narrower card (a tablet, a phone) keeps the 13px type and scrolls sideways. */
+/* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (down
+   to the 12px floor) and the headings wrap. A narrower card (a tablet, a phone) keeps the 13px type and scrolls sideways. */
 @container (min-width: 1080px) {
   .apa-items { font-size: max(12px, min(13px, 0.9cqw)); }
   .apa-items th, .apa-items td { padding: 0.55em 0.3em; }
@@ -798,13 +798,14 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lc-group .field { margin: 0; }
 .lot-card .chips { margin: 8px 0 0; }
 .lot-stage polygon.frame { fill: none; stroke: #1D4ED8; stroke-width: 2.5; stroke-dasharray: 12 8; pointer-events: none; }
-/* Lot numbers: 11px on screen at any zoom (app.js fitLabels sets --k), haloed white so they read over the plan's lines. */
+/* Lot numbers: 12px on screen at any zoom (app.js fitLabels sets --k), haloed white so they read over the plan's lines. */
 .lot-stage text.lot-no { font: 600 calc(12px / var(--k, 1)) var(--sans); fill: var(--bg); stroke: #fff; stroke-width: calc(3px / var(--k, 1)); stroke-linejoin: round; paint-order: stroke; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 .lot-stage text.lot-no.dim { opacity: 0.35; }
 .lot-stage text.lot-no.hide { display: none; }
 .lot-stage polygon[data-lot]:focus { outline: none; }
 .lot-stage polygon.ring.focus { stroke: var(--link); stroke-width: 4; } /* the lot with keyboard focus, over every ring (app.js, its focusin) */
-.lot-stage text.renum-no { fill: #111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+/* The number a lot will get while renumbering: 0.45 of the lot's span (--f), never under 12px on screen. */
+.lot-stage text.renum-no { font-size: max(calc(12px / var(--k, 1)), var(--f, 0px)); fill: #111; font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
 
 /* Issues (IssueCard) */
 .issue-q { margin: 16px 0 0; }
@@ -868,7 +869,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx .field { margin-top: 4px; }
 .wx-title { margin: 16px 0 2px; font-size: 14px; color: var(--link); }
 .wx-title .muted { float: right; font-size: 12px; }
-/* Clocks at least 130px wide (two a row on a phone) so the 9.5- and 12-unit labels below draw at 12px+ (the viewBox is 100 units). */
+/* Clocks at least 130px wide (two a row on a phone; a 120px drawing inside the padding) so the 10- and 12-unit labels below draw at 12px+ (the viewBox is 100 units). */
 .wx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(130px, 100%), 1fr)); gap: 8px; margin: 12px 0; padding: 8px; border-radius: 8px; background: var(--surface-variant); }
 .wx-grid.month { gap: 4px; }
 .wx-day { margin: 0; padding: 4px; border-radius: 6px; border: 1px solid var(--outline); background: var(--bg); text-align: center; min-width: 0; }
@@ -878,7 +879,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wx-day svg { display: block; width: 100%; height: auto; }
 .wx-day svg circle[fill='#fff'] { fill: var(--bg); }
 .wx-day svg [stroke='#888'] { stroke: var(--outline); }
-.wx-day svg text { fill: var(--text-2); font-size: 9.5px; } /* viewBox units (0 0 100 100): about 13px on screen at the clock's 135px */
+.wx-day svg text { fill: var(--text-2); font-size: 10px; } /* viewBox units (0 0 100 100): 12px on screen at the narrowest clock's 120px drawing */
 .wx-day svg text[font-weight='bold'] { fill: var(--text); font-size: 12px; font-weight: 600; }
 .wx-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; margin: 8px 0; font-size: 12px; font-weight: 600; }
 .wx-legend span { display: inline-flex; align-items: center; gap: 6px; }
