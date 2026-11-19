@@ -60,7 +60,8 @@ const FIGURE_HELP = [
   ['Work done', "The project's actual accomplishment: the latest abstract's overall, or without one the latest weekly report's actual."],
   ['Bar chart plan today', "What the approved bar chart plans to be done by today: a revised chart from the day it takes effect, with days under approved suspensions not counted. A time extension moves the completion date, not this plan. Without a chart it reads \"target\", the project's own."],
   ['Behind, slipping, ahead', 'Work done minus the plan, in % of the whole project: plan 78.00% and work done 41.25% is 36.75% behind. From 10% behind it is Behind schedule; less reads "slipping".'],
-  ['Weekly report target', "The bar chart's plan for the latest weekly report's last day, the same plan an abstract of that day uses. The report was filed against the chart as it stood then; when today's chart plans that day more than 5% differently (a revised chart, or suspensions since), the card shows today's as the target and the filed one as Filed against."],
+  ['Weekly report target', "The bar chart's plan for the latest weekly report's last day, the same plan an abstract of that day uses; without a chart, the target typed in the report."],
+  ['Filed against', "The target a weekly report states, as the chart stood when it was filed (the Weekly reports tab lists each report's). When today's chart plans that day more than 5% differently (a revised chart, or suspensions since), the Summary shows it under the report's target."],
   ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today, and its +/- can differ from the header's, which is against today's plan. Without a bar chart the lines have no target and Overall uses the project's own."],
   ['Billed', "Net billings under Payments in pesos, as a share of the current contract cost. Status of billing counts lots, not pesos."],
   ['Lots and units', "Status of construction and the Lots tab count the saleable lots drawn on the plan, which can differ from the profile's No. of units. Status of billing counts against the profile's No. of units when it has one, as the Billing abstract does, else against the lots drawn. The Lots tab's billed marks are set lot by lot, so they can differ from the billings under Payments; its average lot progress counts every lot alike and covers the lots only, so it is not Work done."],
@@ -1271,13 +1272,13 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const issues = `<span class="badge ${openIssues ? 'lv-watch' : 'lv-ok quiet'}">${openIssues} open ${openIssues === 1 ? 'issue' : 'issues'}</span>`;
   // The report's target is the bar chart's plan for the week's last day as the chart stood when it was filed (typed
   // only without a chart). When today's chart plans that day more than 5 points apart (revised, or suspensions since),
-  // the card's target is today's chart for that day (as an abstract of that day has it) and the filed one shows as
-  // "Filed against": one plan per day on the page, so the card's actual reads against the same plan as the abstract's.
+  // the filed one shows under it as "Filed against". The card's target is always today's chart for that day (as an
+  // abstract of that day has it): one plan per day on the page, so its actual reads against the same plan.
   const weekEnd = latest && L.weekDays(latest.reportingWeek)[6], chartNow = weekEnd ? L.plannedTarget(project, documents, weekEnd) : null;
   const gap = chartNow == null ? 0 : chartNow - (Number(latest?.targetAccomplishmentPct) || 0);
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv(`Target${weekEnd ? ` for ${L.displayDate(weekEnd)}` : ''}`, pct(Math.abs(gap) > 5 ? chartNow : latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? kv('Filed against', pct(latest.targetAccomplishmentPct)) : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv(`Target${weekEnd ? ` for ${L.displayDate(weekEnd)}` : ''}`, pct(chartNow ?? latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? kv('Filed against', pct(latest.targetAccomplishmentPct)) : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const lots = housing && L.lotSummary(records);
   const construction = housing ? constructionCard(lots, payments, now, L.abstractUnits(project, lots.saleable)) : '';
@@ -1521,7 +1522,7 @@ function reportCard(r, all, pid, editable = false) {
         <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
     <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-      <span class="muted">Reported target ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
+      <span class="muted">Filed against ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
     <details>
       <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
       <div class="rep-body">
