@@ -62,7 +62,8 @@ const FIGURE_HELP = [
   ['Behind, slipping, ahead', 'Work done minus the plan, in % of the whole project: plan 78.00% and work done 41.25% is 36.75% behind. From 10% behind it is Behind schedule; less reads "slipping".'],
   ['Reported target', "The plan the latest weekly report was filed against, for its week's last day. When today's bar chart plans that day more than 5% differently (a revised chart, or suspensions since), the card says by how much."],
   ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today. Without a bar chart the lines have no target and Overall uses the project's own."],
-  ['Billed', 'Net billings under Payments, as a share of the current contract cost.'],
+  ['Billed', "Net billings under Payments in pesos, as a share of the current contract cost. Status of billing counts lots instead, so its % can differ."],
+  ['Lots and units', "Status of construction, Status of billing and the Lots tab count the saleable lots drawn on the plan, which can differ from the profile's No. of units. The Lots tab's billed marks are set lot by lot, so they can differ from the billings under Payments; its average lot progress counts every lot alike and covers the lots only, so it is not Work done."],
 ];
 const figuresHelp = () => `<button type="button" class="text-btn help-btn" data-figures-help>${icon('info', 'sm')}What these figures mean</button>`;
 
@@ -1276,7 +1277,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
     ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">${Math.abs(gap).toFixed(2)}% ${gap > 0 ? 'under' : 'over'} today's bar chart plan for ${esc(L.displayDate(weekEnd))}.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
-  const construction = housing ? constructionCard(L.lotSummary(records), payments, now, L.sdpSites(records).length > 1) : '';
+  const lots = housing && L.lotSummary(records);
+  const construction = housing ? constructionCard(lots, payments, now, L.sdpSites(records).length > 1, L.abstractUnits(project, lots.saleable)) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
@@ -1462,7 +1464,7 @@ function barChartCard(project, documents, now, curveOpen) {
 }
 
 /** ConstructionCard: saleable units by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
-function constructionCard(summary, payments, now, multiSite) {
+function constructionCard(summary, payments, now, multiSite, units) {
   if (!summary.saleable) return '';
   return section('Status of construction', 'home_work', `
     <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
@@ -1470,14 +1472,14 @@ function constructionCard(summary, payments, now, multiSite) {
     ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
     <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'unit')}</b></div>
     <p class="sub strong">Status of billing</p>
-    <p class="muted small">From the billings under Payments, as a share of ${summary.saleable === 1 ? 'the 1 unit' : `all ${summary.saleable} units`}${multiSite ? ' on every site' : ''}.</p>
+    <p class="muted small">Lots billed under Payments, as a share of ${summary.saleable === 1 ? 'the 1 saleable lot' : `the ${summary.saleable} saleable lots`} drawn on the plan${multiSite ? ' of every site' : ''}${units !== summary.saleable ? `; the profile lists ${plural(units, 'unit')}` : ''}.</p>
     ${billingRows(L.billingStatus(payments, summary.saleable), summary.saleable)}`);
 }
 
 function billingRows(rows, saleable) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
-  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${saleable}</th></tr></thead>
+  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${plural(saleable, 'lot')}</th></tr></thead>
       <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
@@ -1657,7 +1659,7 @@ function lotsView(c) {
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
       <button data-zoom="reset">Reset</button></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
-    <p class="muted lot-sum">${sites.length > 1 ? `${esc(site.site || 'Main site')}, as marked on its lots` : 'As marked on the lots'}: ${plural(k.total, 'saleable lot')}, ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average progress ${k.avg.toFixed(2)}%.</p>
+    <p class="muted lot-sum">${sites.length > 1 ? `${esc(site.site || 'Main site')}, as marked on its lots` : 'As marked on the lots'}: ${plural(k.total, 'saleable lot')}, ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average lot progress ${k.avg.toFixed(2)}% (every lot alike; not Work done). ${figuresHelp()}</p>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
     <div id="lot-results"></div>
   </section>`;
