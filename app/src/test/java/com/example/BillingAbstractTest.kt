@@ -200,8 +200,9 @@ class BillingAbstractTest {
         assertTrue(!html.contains("BALANCE")) // the printed billing abstract has no BALANCE columns either
         assertTrue(html.contains(">400,000.00</td><td class='n'>40.00%</td></tr>")) // a line ends at its to date
         assertTrue(html.contains(">710,000.00</td><td class='n'>7.10%</td></tr>")) // and so does the grand total
-        assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>7.10%"))
-        assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-4.90%"))
+        // The actual is the abstract's own, as on Print abstract, not the 7.10% billed to date.
+        assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>10.73%"))
+        assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-1.27%"))
         assertTrue(html.contains("Approved by:"))
     }
 }

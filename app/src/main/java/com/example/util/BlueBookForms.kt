@@ -403,9 +403,9 @@ object BlueBookForms {
      * The Abstract of Physical Accomplishment the contractor attaches before a billing, on a landscape sheet laid out
      * as the district's billing format, printed from [uploaded], an abstract of the Actual Accomplishment tab: each
      * line's contract quantity, unit cost and amount, what was billed before, in this billing ([period], typed) and to
-     * date (quantity, amount, share of the line). [units] is the project's lots or housing units; "actual" here is
-     * what is billed to date. It has neither BALANCE nor equivalent-units columns. web/print.js billingAbstractHtml
-     * prints the same page.
+     * date (quantity, amount, share of the line). [units] is the project's lots or housing units. Its target and
+     * actual are [actualAbstract]'s: the plan on the "As of" date and the abstract's own overall actual, not what is
+     * billed. It has neither BALANCE nor equivalent-units columns. web/print.js billingAbstractHtml prints the same page.
      */
     fun billingAbstract(
         project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, uploaded: ProjectAbstract,
@@ -430,14 +430,13 @@ object BlueBookForms {
         fun total(label: String, r: Row) = "<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>" +
             "${billed(r, 0.0)}</tr>"
         val all = sumOf(abstract.parts.flatMap { it.lines })
-        val actual = if (all.amount > 0) (all.previous + all.thisPeriod) / all.amount * 100 else 0.0
         val rows = abstract.parts.joinToString("") { p ->
             (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='14'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
-            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, actual)}
+            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct)}
             <table class='apa'>
               $APA_HEAD
               $rows

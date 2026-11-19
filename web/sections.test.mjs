@@ -452,7 +452,7 @@ test('project profile: orders listed under their headings, revised cost only aft
 test('billing abstract: each line as quantity, amount and share before, in this billing and to date, with subtotals and the grand total', () => {
   const project = { name: 'P', contractDurationDays: 360, dateStarted: '2025-01-06', completionDateOriginal: '2025-12-31', targetAccomplishment: 12 };
   // The uploaded abstract gives the part amounts; the billing of March 15 is after its As-of date, so it is not in "previous".
-  const abstract = { asOf: '2025-03-14', equivUnits: 100, rowsJson: JSON.stringify([{ kind: 'part', name: 'LAND ACQUISITION COST' }, { kind: 'subtotal', amount: 1000000, equiv: [1, 2, 3] },
+  const abstract = { asOf: '2025-03-14', overallPct: 10.73, equivUnits: 100, rowsJson: JSON.stringify([{ kind: 'part', name: 'LAND ACQUISITION COST' }, { kind: 'subtotal', amount: 1000000, equiv: [1, 2, 3] },
     { kind: 'part', name: 'LAND DEVELOPMENT' }, { kind: 'subtotal', amount: 2000000 }, { kind: 'part', name: 'HOUSING CONSTRUCTION' }, { kind: 'subtotal', amount: 7000000 }]) };
   const payments = [{ uuid: 'a', billingType: 'Land acquisition', grossAmount: 400000, date: '2025-02-01' }, { uuid: 'adv', billingType: '', grossAmount: 1500000, date: '2025-02-02' },
     { uuid: 'late', billingType: 'Land development', grossAmount: 99, date: '2025-03-15' }];
@@ -479,8 +479,9 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.ok(!html.includes('BALANCE')); // the printed billing abstract has no BALANCE columns either
   assert.ok(html.includes(">400,000.00</td><td class='n'>40.00%</td></tr>")); // a line ends at its to date
   assert.ok(html.includes(">710,000.00</td><td class='n'>7.10%</td></tr>")); // and so does the grand total
-  assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>7.10%/);
-  assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-4.90%/);
+  // The actual is the abstract's own, as on Print abstract, not the 7.10% billed to date.
+  assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
+  assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
   assert.match(html, /Approved by:/);
 });
 
