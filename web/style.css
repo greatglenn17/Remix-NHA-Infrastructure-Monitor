@@ -334,11 +334,12 @@ a.alert b { flex: 1 1 14em; min-width: 0; }
 @keyframes pulse { from { box-shadow: 0 0 0 0 rgb(244 63 94 / 0.6); } to { box-shadow: 0 0 0 8px rgb(244 63 94 / 0); } }
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; box-shadow: 0 0 0 3px var(--behind-c); } }
 
-/* SitePhoto: a blueprint placeholder until a photo loads, then 16:9. */
+/* SitePhoto: a 64px blueprint strip until a photo loads, then 16:9. */
 .site-photo { aspect-ratio: 2 / 1; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--blueprint-line); color: var(--text-2);
   background: linear-gradient(var(--blueprint) 1px, transparent 1px) 0 0 / 16px 16px, linear-gradient(90deg, var(--blueprint) 1px, transparent 1px) 0 0 / 16px 16px, var(--blueprint-bg);
   display: grid; place-content: center; justify-items: center; gap: 6px; overflow: hidden; font-size: 12px; }
-.site-photo > .icon { font-size: 32px; color: var(--link); opacity: 0.6; }
+.site-photo:not(.has) { aspect-ratio: auto; height: 64px; grid-auto-flow: column; align-items: center; gap: 8px; }
+.site-photo > .icon { font-size: 24px; color: var(--link); opacity: 0.6; }
 .site-photo.has { aspect-ratio: 16 / 9; display: block; border: 0; }
 .site-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .missing { background: var(--primary-container); color: var(--on-primary-container); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
