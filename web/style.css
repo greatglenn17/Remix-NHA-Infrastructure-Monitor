@@ -930,7 +930,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 
 /* Touch screens: controls are at least 44px tall for a finger, and fields are 16px so iPhone Safari does not zoom in on focus. */
 @media (pointer: coarse) {
-  .btn, .btn.lc-more, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select,
+  .btn, .btn.lc-more, .btn.lc-main, .text-btn, .wx-row legend .text-btn, .pill, .chips button, a.file, .print-opts select, .wx-row legend select,
   .seg button, .zoom-bar button, .icon-btn { min-height: 44px; }
   .zoom-bar button, .icon-btn { min-width: 44px; }
   input, select, textarea { font-size: 16px !important; }

@@ -1667,7 +1667,8 @@ function lotsView(c) {
 
 /**
  * The selected lot's card under the plan (the phone's bottom sheet): Update progress is its one filled action, with
- * Record inspection and History & details beside it; the rarer tools fold under More lot tools (kept open by `tools`).
+ * Record inspection and History & details beside it; the rarer tools fold under More lot tools, open or shut as the
+ * user left it (`tools`), and open until then for a lot still to be named.
  */
 function lotCard(l, editable = false, tools = false) {
   const p = l.progress || {};
@@ -1683,7 +1684,7 @@ function lotCard(l, editable = false, tools = false) {
     <div class="lc-actions">${editable ? `<button class="btn lc-main" id="lot-edit">${icon('edit', 'sm')}Update progress</button>
       <button class="btn lc-more" id="lot-inspect">${icon('assignment', 'sm')}Record inspection</button>` : ''}
       <button class="btn lc-more" id="lot-more">${icon('history', 'sm')}History &amp; details</button></div>
-    ${editable ? `<details class="plan-tools lc-tools" id="lot-tools"${tools ? ' open' : ''}><summary>${icon('expand_more', 'sm')}More lot tools</summary><div class="lc-actions">
+    ${editable ? `<details class="plan-tools lc-tools" id="lot-tools"${tools ?? L.unassigned(l) ? ' open' : ''}><summary>${icon('expand_more', 'sm')}More lot tools</summary><div class="lc-actions">
       <button class="btn lc-more" id="lot-name">${icon('home_work', 'sm')}Name &amp; use</button>
       <button class="btn lc-more" id="lot-group">${icon('add_circle', 'sm')}Select more lots</button>
       <button class="btn lc-more" id="lot-outline">${icon('architecture', 'sm')}Edit outline</button>
@@ -1709,7 +1710,7 @@ function renumCard(r, n, notes) {
         <label class="field">First lot<input id="renum-first" inputmode="numeric" maxlength="4" autocomplete="off" value="${esc(r.first)}"></label></div>
       <div class="chips" role="group" aria-label="Numbering">${chip('odd', 'Odd / even rows', !r.consecutive)}${chip('consecutive', 'Consecutive', r.consecutive)}${chip('otherEnd', 'Start from other end', r.otherEnd)}${chip('otherRow', 'Start on other row', r.otherRow)}</div>
       <p class="lc-upd" id="renum-others"></p><p class="error" role="alert" id="renum-err"></p>
-      <button class="btn lc-more" id="renum-save">Save numbers</button>` : ''}`;
+      <div class="lc-actions"><button class="btn lc-more" id="renum-save">Save numbers</button></div>` : ''}`;
 }
 
 /** LotInfoDialog's current status and inspection history (`inspections`: L.lotInspections), read-only. */
@@ -2153,8 +2154,8 @@ async function findLots(c, site, el) {
 function foundLotsDialog(c, site, areas, page) {
   const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, named = lots.filter(a => a.lotName).length;
   const started = site.lots.filter(l => L.foundLot(l) && l.progress).length;
-  const fix = 'Click a lot and set its block and lot in Name & use, or use Number lots to number a block at once.';
-  const names = named === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block to fix a block.'
+  const fix = 'Click a lot and set its block and lot in Name & use, or use Number lots to number a block at once (both under More lot tools).';
+  const names = named === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block (under More lot tools) to fix a block.'
     : named ? `${plural(named, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - named} come in without them. ${fix}`
       : `The plan's block and lot numbers could not be read, so the lots come in without them. ${fix}`;
   const d = document.createElement('dialog');
