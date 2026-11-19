@@ -58,19 +58,21 @@ const TERM_HELP = [
 // A project's figures, each with the day it is for: the header's plan is today's; a report's and an abstract's are their own day's.
 const FIGURE_HELP = [
   ['Work done', "The project's actual accomplishment: the latest abstract's overall, or without one the latest weekly report's actual."],
-  ['Bar chart plan today', "What the approved bar chart plans to be done by today, counting suspensions and time extensions. Without a chart it reads \"target\", the project's own."],
+  ['Bar chart plan today', "What the approved bar chart plans to be done by today: a revised chart from the day it takes effect, with days under approved suspensions not counted. A time extension moves the completion date, not this plan. Without a chart it reads \"target\", the project's own."],
   ['Behind, slipping, ahead', 'Work done minus the plan, in % of the whole project: plan 78.00% and work done 41.25% is 36.75% behind. From 10% behind it is Behind schedule; less reads "slipping".'],
-  ['Reported target', "The plan the latest weekly report was filed against, for its week's last day. When today's bar chart plans that day differently (a revised chart, or suspensions since), the card says by how much."],
-  ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today."],
+  ['Reported target', "The plan the latest weekly report was filed against, for its week's last day. When today's bar chart plans that day more than 5% differently (a revised chart, or suspensions since), the card says by how much."],
+  ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today. Without a bar chart the lines have no target and Overall uses the project's own."],
   ['Billed', 'Net billings under Payments, as a share of the current contract cost.'],
 ];
-const figuresHelp = () => `<button class="text-btn help-btn" data-figures-help>${icon('info', 'sm')}What these figures mean</button>`;
+const figuresHelp = () => `<button type="button" class="text-btn help-btn" data-figures-help>${icon('info', 'sm')}What these figures mean</button>`;
 
 // Big screens and projectors zoom the page (style.css, .zoomable) only where the browser reports the zoom
 // (Element.currentCSSZoom): the plan editor needs it to turn a click into a point on the plan.
 if ('currentCSSZoom' in Element.prototype) document.documentElement.classList.add('zoomable');
 
 const main = document.getElementById('app');
+// "What these figures mean" (figuresHelp) on any redraw, whole page or one sheet.
+main.addEventListener('click', e => { if (e.target.closest('[data-figures-help]')) showTermHelp(FIGURE_HELP); });
 const who = document.getElementById('who');
 const s = {
   user: null, claims: {}, profile: {}, projects: null, projectsError: null, loaded: {},
@@ -1152,7 +1154,6 @@ function drawProject(page) {
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
   const chartEdit = document.getElementById('chart-edit');
   if (chartEdit) chartEdit.onclick = () => barChartForm(c);
-  main.querySelectorAll('[data-figures-help]').forEach(b => { b.onclick = () => showTermHelp(FIGURE_HELP); });
   const moreAlerts = document.getElementById('more-alerts');
   if (moreAlerts) moreAlerts.ontoggle = () => { page.moreAlerts = moreAlerts.open; };
   const chartCurve = document.getElementById('chart-curve');
