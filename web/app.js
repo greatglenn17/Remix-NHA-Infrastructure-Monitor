@@ -3996,7 +3996,7 @@ function bindActual(c) {
     drawProject(page);
     if (document.activeElement !== document.body) { announce(text); return; }
     const note = document.getElementById('abstract-note');
-    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
+    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); note.scrollIntoView({ block: 'nearest' }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
   };
   const failed = x => say(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });

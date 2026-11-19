@@ -436,18 +436,13 @@ fun ActualAccomplishmentSection(
                 ChipRow(labels, ProjectSchedule.displayDate(shown.asOf), PaddingValues(0.dp)) { label -> chosen = dated[labels.indexOf(label)].asOf; note = "" }
             }
         }
-        if (!inMonthly && (onSave != null || (onDelete != null && shown != null))) block {
+        if (!inMonthly && onSave != null) block {
             // The three do not fit one line of a 360dp phone.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onSave != null) OutlinedButton(onClick = { picker.launch(arrayOf(XLSX)) }, modifier = Modifier.testTag("upload_abstract")) {
                     Text("Upload abstract (Excel)")
                 }
                 if (onSave != null && shown != null) OutlinedButton(onClick = { note = ""; making = true }, modifier = Modifier.testTag("new_abstract")) { Text("New abstract") }
-                if (onDelete != null && shown != null) TextButton(
-                    onClick = { deleting = shown },
-                    colors = ButtonDefaults.textButtonColors(contentColor = scheme.error),
-                    modifier = Modifier.testTag("delete_abstract")
-                ) { Text("Delete") }
             }
         }
         if (note.isNotBlank()) block {
@@ -474,6 +469,17 @@ fun ActualAccomplishmentSection(
                 }
                 OutlinedButton(onClick = { onPrintAbstract(viewed) }, modifier = Modifier.padding(top = 8.dp).testTag("print_abstract")) { Text("Print abstract") }
                 if (!inMonthly) OutlinedButton(onClick = { billing = viewed }, modifier = Modifier.testTag("print_billing_abstract")) { Text("Print billing abstract") }
+                // Delete closes the abstract it deletes, never beside New abstract (as on the website).
+                if (!inMonthly && onDelete != null) {
+                    HorizontalDivider(color = scheme.outlineVariant, modifier = Modifier.padding(top = 8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(
+                            onClick = { deleting = viewed },
+                            colors = ButtonDefaults.textButtonColors(contentColor = scheme.error),
+                            modifier = Modifier.testTag("delete_abstract")
+                        ) { Text("Delete this abstract") }
+                    }
+                }
             }
         }
         var part = -1
