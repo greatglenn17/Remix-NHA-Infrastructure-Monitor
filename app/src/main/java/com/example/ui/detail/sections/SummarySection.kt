@@ -362,7 +362,7 @@ private fun ConstructionCard(summary: SdpSummary.Summary, payments: List<Project
     }
 }
 
-/** Lots billed per housing billing type, and their share of the [total] (BillingAbstract.units), counted in [what]. */
+/** Lots billed per housing billing type, as a count of the [total] (BillingAbstract.units) in [what]: no %, which would read as Billed. */
 @Composable
 private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: String) {
     val scheme = MaterialTheme.colorScheme
@@ -383,13 +383,13 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: Stri
         "Status of billing", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("summary_billing_status")
     )
-    Cells(listOf("Billed for", "Lots billed", "% of $total $what${if (total == 1) "" else "s"}"), bold = true, color = scheme.onSurfaceVariant)
+    Cells(listOf("Billed for", "Lots billed"), bold = true, color = scheme.onSurfaceVariant)
     HorizontalDivider(color = scheme.outlineVariant)
     HOUSING_BILLING_TYPES.forEach { type ->
         val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }
         // M1 bills 80% of a housing unit and M2 the last 20%.
         val label = type + when { type.startsWith("M1") -> " (80%)"; type.startsWith("M2") -> " (20%)"; else -> "" }
-        Cells(listOf(label, "${unitsText(Math.round(units * 100) / 100.0)} of $total", if (total > 0) "%.2f%%".format(units * 100.0 / total) else "-"))
+        Cells(listOf(label, "${unitsText(Math.round(units * 100) / 100.0)} of $total $what${if (total == 1) "" else "s"}"))
         HorizontalDivider(color = scheme.outlineVariant)
     }
 }
