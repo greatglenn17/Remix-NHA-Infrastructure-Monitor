@@ -272,7 +272,8 @@ class ProjectDetailScreenshotTest {
     }
 
     private fun moneyFab(mode: AppThemeMode) = fabAtEnd("money_fab_411_${mode.name.lowercase()}", mode) {
-        Money((1..12).map { payments[it % 4].copy(id = it.toLong(), name = "Progress Billing $it") })
+        // Twelve billings are the four, three times over: a cost three times as large keeps the balances above zero.
+        Money((1..12).map { payments[it % 4].copy(id = it.toLong(), name = "Progress Billing $it") }, cost = 3 * 10_450_000.0)
     }
 
     @Config(qualifiers = "w411dp-h891dp") @Test fun progress_fab_light() = progressFab(AppThemeMode.LIGHT)
