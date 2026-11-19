@@ -125,7 +125,8 @@ is read only.
   app's "Lot Use Changed" and "Lot Renamed" audit entries), and **Remove lot**, which takes the lot off the plan on
   every phone (`L.lotRemoved`, "Lot Deactivated"); its progress and billing history stay in the audit log.
 - **The plan's own tools** (Progress → Lots; put away while a lot is being drawn) are the phone's plan header and
-  plan menu (`bindPlanTools`). The scale sits under the plan's name, Find lots beside Add lot, and the rest fold
+  plan menu (`bindPlanTools`). The scale sits under the plan's name (on a phone, under the plan with the plan's links
+  and the search, so the plan comes first), Find lots beside Add lot, and the rest fold
   under **Plan setup**, which stays open while the page redraws:
   - **Scale**, for the people who can edit the project (`scaleForm`, `L.planScale`): the number printed after
     "SCALE 1:" (10 to 100000). The areas of the lots nobody typed an area for (blank, the add form's 50, or what the
