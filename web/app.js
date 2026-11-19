@@ -1275,7 +1275,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const gap = chartNow == null ? 0 : chartNow - (Number(latest?.targetAccomplishmentPct) || 0);
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">${Math.abs(gap).toFixed(2)}% ${gap > 0 ? 'under' : 'over'} today's bar chart plan for ${esc(L.displayDate(weekEnd))}.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">The bar chart now plans ${pct(chartNow)} for ${esc(L.displayDate(weekEnd))}, ${Math.abs(gap).toFixed(2)}% ${gap > 0 ? 'more' : 'less'} than this report's target.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const lots = housing && L.lotSummary(records);
   const construction = housing ? constructionCard(lots, payments, now, L.sdpSites(records).length > 1, L.abstractUnits(project, lots.saleable)) : '';
@@ -1475,14 +1475,14 @@ function constructionCard(summary, payments, now, multiSite, units) {
     <p class="muted small">${units === summary.saleable
       ? `Lots billed under Payments, as a share of the ${plural(summary.saleable, 'saleable lot')} drawn on the plan${multiSite ? ' of every site' : ''}.`
       : `Lots billed under Payments, as a share of the profile's ${plural(units, 'unit')}, as in the Billing abstract; the plan${multiSite ? 's have' : ' has'} ${plural(summary.saleable, 'saleable lot')}.`}</p>
-    ${billingRows(L.billingStatus(payments, units), plural(units, units === summary.saleable ? 'lot' : 'unit'))}`);
+    ${billingRows(L.billingStatus(payments, units), units, units === summary.saleable ? 'lot' : 'unit')}`);
 }
 
-function billingRows(rows, of) {
+function billingRows(rows, total, word) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
-  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${of}</th></tr></thead>
-      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>` : '') + rest;
+  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">Lots billed</th><th class="num">% of ${plural(total, word)}</th></tr></thead>
+      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units} of ${total}</td><td class="num">${r.share}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
@@ -3846,7 +3846,7 @@ function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v));
   return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target: the approved bar chart's plan on ${esc(L.displayDate(abstract.asOf))}.` : 'Target: the project\'s target; it has no approved bar chart.'} ${figuresHelp()}</p>`;
+    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target and +/- are for ${esc(L.displayDate(abstract.asOf))}, the abstract's day: the approved bar chart's plan then beside the work measured.${L.isCompleted(c.project) || L.daysOverdue(c.project, today()) ? '' : ' Work done in the header is against today\'s plan, so its gap can differ.'}` : 'Target: the project\'s target; it has no approved bar chart.'} ${figuresHelp()}</p>`;
 }
 
 /**
