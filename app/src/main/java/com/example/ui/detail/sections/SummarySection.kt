@@ -389,7 +389,7 @@ private fun BillingStatus(payments: List<ProjectPayment>, total: Int, what: Stri
         val units = payments.filter { it.billingType == type }.sumOf { it.billedUnits }
         // M1 bills 80% of a housing unit and M2 the last 20%.
         val label = type + when { type.startsWith("M1") -> " (80%)"; type.startsWith("M2") -> " (20%)"; else -> "" }
-        Cells(listOf(label, unitsText(Math.round(units * 100) / 100.0), if (total > 0) "%.2f%%".format(units * 100.0 / total) else "-"))
+        Cells(listOf(label, "${unitsText(Math.round(units * 100) / 100.0)} of $total", if (total > 0) "%.2f%%".format(units * 100.0 / total) else "-"))
         HorizontalDivider(color = scheme.outlineVariant)
     }
 }

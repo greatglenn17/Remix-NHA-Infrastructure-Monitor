@@ -124,7 +124,7 @@ class SummaryReportPromptTest {
         rule.onNodeWithText("40").assertExists()
         rule.onNodeWithText("As of Oct 27, 2026", substring = true).assertExists()
         // Billed lots add up per type, against the 120 saleable units.
-        rule.onNodeWithText("30").assertExists()
+        rule.onNodeWithText("30 of 120").assertExists()
         rule.onNodeWithText("25.00%").assertExists()
         rule.onNodeWithText("M1 - Housing unit (80%)").assertExists()
         rule.onNodeWithText("5.00%").assertExists()
@@ -144,6 +144,7 @@ class SummaryReportPromptTest {
         }
         // As the Billing abstract: 30 of the profile's 240 units, not of the 120 lots drawn.
         rule.onNodeWithText("% of 240 units").assertExists()
+        rule.onNodeWithText("30 of 240").assertExists()
         rule.onNodeWithText("12.50%").assertExists()
     }
 
