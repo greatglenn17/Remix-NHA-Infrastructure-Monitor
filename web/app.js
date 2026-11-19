@@ -1670,7 +1670,7 @@ function lotsView(c) {
  * Record inspection and History & details beside it; the rarer tools fold under More lot tools, open or shut as the
  * user left it (`tools`), and open until then for a lot still to be named.
  */
-function lotCard(l, editable = false, tools = false) {
+function lotCard(l, editable = false, tools) {
   const p = l.progress || {};
   const pct = L.lotProgress(l), billing = L.lotBillingLabel(l.progress), billed = billing !== 'NOT BILLED';
   const road = L.lotUse(l) === 'Road Lot';
@@ -2408,7 +2408,7 @@ async function bindLots(c) {
         if (name) name.onclick = () => lotForm(c, site, sel);
         document.getElementById('lot-card-close').onclick = () => { st.sel = null; st.more = false; paint(); };
         const tools = document.getElementById('lot-tools');
-        if (tools) tools.ontoggle = () => { st.tools = tools.open; };
+        if (tools) tools.ontoggle = () => { if (tools.open !== (st.tools ?? L.unassigned(sel))) st.tools = tools.open; };
         document.getElementById('lot-more').onclick = () => { st.more = !st.more; paint(); if (st.more) document.getElementById('lot-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
       }
     }
