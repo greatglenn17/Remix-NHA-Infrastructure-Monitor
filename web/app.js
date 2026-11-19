@@ -1482,7 +1482,7 @@ function billingRows(rows, total, word) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
   return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">${word === 'unit' ? 'Units' : 'Lots'} billed</th></tr></thead>
-      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
+      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num words">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
@@ -1595,7 +1595,7 @@ function monthlyView({ page, weekly, of, now }) {
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false, setup: false });
 // focus: the lot on the plan that last had focus (its Tab stop); refocus: the plan had focus before a redraw; setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
 const lotSite = (c, st) => { const sites = L.sdpSites(c.records); return { sites, site: sites.find(x => x.site === st.site) || sites[0] }; };
-const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [1, '100%'], [2.5, '250%']];
+const ZOOMS = [[0.25, '25%'], [0.5, '50%'], [2.5, '250%']];
 /** A row that scrolls sideways on a phone, redrawn at its start: scroll only the row (never the page) so its pressed button shows. */
 function keepInView(rowEl) {
   const on = rowEl?.querySelector('[aria-pressed="true"]');
@@ -2792,10 +2792,10 @@ function issueCard(i, now, editable = false) {
   const level = status === 'Resolved' ? 'ok' : 'watch';
   const block = (label, text, cls = '') => (text?.trim() ? `<h3 class="${cls}">${esc(label)}</h3><p>${esc(text)}</p>` : '');
   return `<li class="card issue-card${critical ? ' critical' : ''}">
-    <div class="ic-head"><h2>${icon('event', 'sm')}<span>${esc(L.displayDate(i.date))}${i.targetDate?.trim()
-      ? `<span class="${overdue ? 'behind' : 'muted'}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (overdue)' : ''}</span>` : ''}</span></h2>
-      <div class="ic-badges">${critical ? '<span class="badge lv-behind">Critical</span>' : ''}<span class="badge lv-${level}">${esc(L.shownWord(status))}</span></div></div>
-    ${block('Issue description', i.description || '-')}
+    <div class="ic-head"><h2>${esc(i.description?.trim() || 'No description')}</h2>
+      <div class="ic-badges">${critical ? '<span class="badge lv-behind">Critical</span>' : ''}<span class="badge lv-${level}">${esc(L.shownWord(status))}</span></div>
+      <p class="ic-when muted">${icon('event', 'sm')}<span>Logged ${esc(L.displayDate(i.date))}${i.targetDate?.trim()
+      ? `<span class="${overdue ? 'behind' : ''}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (overdue)' : ''}</span>` : ''}</span></p></div>
     ${block(`Action taken${i.actionBy?.trim() ? ` by ${i.actionBy.trim()}` : ''}`, i.actionTaken, 'link')}
     ${block('Remarks / notes', i.remarks)}
     ${i.loggedBy?.trim() ? `<p class="muted small logged">Logged by: ${esc(i.loggedBy)}</p>` : ''}
