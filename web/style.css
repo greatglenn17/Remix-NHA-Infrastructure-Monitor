@@ -727,6 +727,11 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-stage:active { cursor: grabbing; }
 .lot-stage img, .lot-stage svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .lot-wait { position: absolute; left: 16px; top: 12px; white-space: nowrap; }
+/* Shown while the wheel scrolls past the plan: it zooms only with Ctrl or ⌘ held. */
+.wheel-hint { position: absolute; left: 50%; top: 12px; z-index: 3; transform: translateX(-50%); margin: 0; padding: 6px 12px; border-radius: 6px; font: 600 13px var(--sans); color: var(--text); background: rgb(11 15 23 / 0.85); border: 1px solid var(--outline); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 150ms ease-out; }
+.wheel-hint.on { opacity: 1; }
+@media (pointer: coarse) { .wheel-hint { display: none; } }
+@media (prefers-reduced-motion: reduce) { .wheel-hint { transition: none; } }
 .lot-note { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 2; margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--surface); }
 .lot-stage polygon { fill-opacity: 0.4; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .lot-stage polygon.lot-0 { fill: #E2E8F0; stroke: #64748B; } .lot-stage polygon.lot-1 { fill: #DB2777; stroke: #DB2777; }

@@ -1620,6 +1620,7 @@ function lotsView(c) {
     ${site.lots.length || busy ? `<div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
       <div class="lot-card" id="lot-card" hidden></div>
+      <p class="wheel-hint" id="wheel-hint" aria-hidden="true">Hold ${MAC ? '⌘' : 'Ctrl'} and scroll to zoom</p>
     </div>
     <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
       ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
@@ -2612,7 +2613,17 @@ async function bindLots(c) {
     choose(document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot)?.dataset.lot);
   };
   stage.ondblclick = e => { if (st.draw || st.frame) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
-  viewer.onwheel = e => { e.preventDefault(); const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py); };
+  // The wheel scrolls the page; it zooms only with Ctrl or ⌘ held (a trackpad pinch sends that too), as on a map.
+  const wheelHint = document.getElementById('wheel-hint');
+  let hintOff = 0;
+  viewer.onwheel = e => {
+    if (!(e.ctrlKey || e.metaKey)) {
+      wheelHint.classList.add('on'); clearTimeout(hintOff); hintOff = setTimeout(() => wheelHint.classList.remove('on'), 1200);
+      return;
+    }
+    e.preventDefault(); wheelHint.classList.remove('on');
+    const [px, py] = local(e); zoomAt(view().s * Math.exp(-e.deltaY * 0.0015), px, py);
+  };
 }
 
 /* ---------- Weather (WeatherChartTab); writers edit a weekly report's 24-hour weather (AddWeeklyReportDialog) ---------- */
