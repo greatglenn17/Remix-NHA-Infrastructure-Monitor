@@ -559,6 +559,8 @@ div.apa-part { padding-top: 16px; }
 /* The tab's target / actual / advance or slippage table, and the boxes typed above the printed billing abstract. */
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
+.apa-standing thead th { white-space: normal; } /* "Plan on" over its date */
+@media (max-width: 480px) { .apa-standing th, .apa-standing td { padding-left: 6px; padding-right: 6px; } } /* all four columns fit a 375px phone */
 .apa-standing tbody th { text-align: left; font-weight: 400; }
 .apa-next td:nth-child(2) { min-width: 200px; }
 .apa-next input { width: 110px; text-align: right; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }

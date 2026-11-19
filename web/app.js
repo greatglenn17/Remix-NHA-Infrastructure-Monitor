@@ -3852,10 +3852,10 @@ const keep = (c, what, value) => { try { if (value == null) localStorage.removeI
 /** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. */
 const abstractSwitch = monthly => `<div class="chips views" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
 
-/** An abstract's Target / Actual / +/- table (L.abstractStanding). */
+/** An abstract's Target / Actual / +/- table (L.abstractStanding). With a bar chart the target is headed as the plan of the abstract's day, so it is not read as the header's plan for today. */
 function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v)), planned = L.plannedTarget(c.project, c.documents, abstract.asOf) != null;
-  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">${planned ? `Plan on ${esc(L.displayDate(abstract.asOf)).replace(/ /g, '&nbsp;')}` : 'Target'}</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted small">${planned ? '' : 'Target: the project\'s target; it has no approved bar chart. '}${figuresHelp()}</p>`;
 }
