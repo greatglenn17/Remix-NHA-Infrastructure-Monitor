@@ -272,7 +272,7 @@ Flat, with tonal layering. Depth comes from dark translucent panels over the dot
 ### Buttons
 - **Shape:** gently rounded (6px), at least 40px tall. On touch screens (`pointer: coarse`) buttons, text buttons, chips, pills, file links, the segmented control and the plan's zoom buttons are at least 44px tall, and field text is 16px so iPhone Safari does not zoom in on focus.
 - **Primary:** Action Blue fill, `on-primary` text, 600 14px, 10px 18px padding. Used once per view at most (Sign in).
-- **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px Link Blue outline with a 2px offset. Disabled is 0.6 opacity.
+- **Hover / Focus:** hover brightens the fill (`filter: brightness(1.1)`). Focus is a 2px Link Blue outline with a 2px offset; inside a row that scrolls sideways (the project tabs, the segmented control) the offset is -2px (-3px on the tabs, whose last pixel sits on the row's border), so the ring is never clipped. Disabled is 0.6 opacity.
 - **Text button:** blue 600 14px, 8px padding, Blue Haze background on hover. Every Edit (project, chart, report, issue, billing, order, letter) is this button with the edit icon, never tonal; money labels say ₱, as the amounts do, never "PHP". Used for Sign out, Back, Forgot password, and "What these mean" (always labelled; it opens the help that explains every status word and its threshold). An icon leads the label.
 
 ### Filter Pills and Priority Callout

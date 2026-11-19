@@ -458,6 +458,7 @@ thead .num { font-family: inherit; }
 .tabs a:hover { color: var(--text); }
 .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
 .tabs a[aria-current="page"] .icon { color: var(--link); }
+.tabs a:focus-visible { outline-offset: -3px; } /* inside the tab: the row scrolls sideways and clips anything outside, and the tab's last pixel sits on the row's border */
 /* The five labels share the row so Documents never hides off the edge: "Actual" alone and no icons where the row is short, tighter still on a phone. */
 @media (max-width: 900px) { .tabs .tab-long { display: none; } }
 @media (max-width: 720px) { .tabs a .icon { display: none; } }
