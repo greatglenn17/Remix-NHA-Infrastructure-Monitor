@@ -1637,7 +1637,7 @@ function lotsView(c) {
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}</span></div>
     <div class="lot-filters">
-      <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot or unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
+      <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot, unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       <button class="pill" id="lot-filter-toggle" aria-expanded="${Boolean(st.filters)}" aria-controls="lot-filter-set">${icon('filter_list', 'sm')}<span id="lot-filter-n">${filterLabel(st)}</span></button>
       <div class="lot-filter-set" id="lot-filter-set"${st.filters ? '' : ' hidden'}>${select('band', 'Progress')}${select('billing', 'Billing')}${select('completion', 'Status')}</div>
     </div>
@@ -1648,11 +1648,10 @@ function lotsView(c) {
       <button class="text-btn" id="draw-undo">Undo corner</button><button class="btn" id="draw-save">${st.draw.lot ? 'Save outline' : 'Save lot'}</button><button class="text-btn" id="draw-done">Done</button></div>` : ''}
     ${st.frame ? `<div class="lot-draw" role="group" aria-label="Plan area for printing"><p class="muted small" id="frame-hint" aria-live="polite"></p>
       <button class="text-btn" id="frame-close">Close</button><button class="text-btn" id="frame-page">Whole page</button><button class="text-btn" id="frame-fit">Fit to lots</button></div>` : ''}
-    ${site.lots.length || busy ? `<div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
+    ${site.lots.length || busy ? `<div class="lot-frame"><div class="lot-viewer${busy ? ' drawing' : ''}" id="lot-plan">
       <div class="lot-stage" id="lot-stage"><p class="muted lot-wait">Drawing the plan…</p></div>
-      <div class="lot-card" id="lot-card" hidden></div>
       <p class="wheel-hint" id="wheel-hint" aria-hidden="true">Hold ${MAC ? '⌘' : 'Ctrl'} and scroll to zoom</p>
-    </div>
+    </div><div class="lot-card" id="lot-card" hidden></div></div>
     <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
       ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
@@ -2512,6 +2511,7 @@ async function bindLots(c) {
     d.shapes.set(l.uuid, pts.map(q => q.map(n => n.toFixed(1)).join(',')).join(' '));
     d.centres.set(l.uuid, [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length]);
   }
+  viewer.style.setProperty('--plan-ar', d.width / d.height); // on a phone the frame takes the plan's shape (style.css)
   W = viewer.clientWidth; H = viewer.clientHeight;
   fit = Math.min(W / d.width, H / d.height);
   stage = document.getElementById('lot-stage');
