@@ -2470,6 +2470,7 @@ async function bindLots(c) {
   const view = () => st.view;
   const apply = () => {
     const v = view();
+    Object.assign(v, { W, H, fit }); // the viewer it was taken in, so a redraw at another size can carry it over
     stage.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
     document.getElementById('zoom-pct').textContent = `${Math.round(v.s * 100)}%`;
     zoomBar.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
@@ -2546,7 +2547,12 @@ async function bindLots(c) {
   });
   svg.addEventListener('focusout', focusRing);
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
-  if (!st.view) reset(); else apply();
+  // A view kept from a viewer of another size (the window or the phone turned, or the page left and opened again)
+  // keeps its zoom and the plan point at its centre, instead of its offsets, which would leave the plan off-centre.
+  const keptView = st.view;
+  if (!keptView) reset();
+  else if (keptView.fit > 0 && fit > 0 && (keptView.W !== W || keptView.H !== H)) centreOn([(keptView.W / 2 - keptView.x) / (keptView.fit * keptView.s), (keptView.H / 2 - keptView.y) / (keptView.fit * keptView.s)], keptView.s);
+  else apply();
   paint();
   // The plan had focus before this redraw (drawProject): it takes it back, read only once the plan is on screen, so a
   // second redraw while the picture loads still finds the flag.
