@@ -1469,16 +1469,17 @@ function constructionCard(summary, payments, now, units) {
     <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
     <div class="lot-bar" role="img" aria-label="${esc(L.LOT_BANDS.map((b, i) => `${b}: ${summary.bands[i]}`).join(', '))}">${summary.bands.map((n, i) => (n ? `<i class="lot-${i}" style="flex:${n}"></i>` : '')).join('')}</div>
     ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
-    <div class="band total"><b>Grand total</b><b class="num">${plural(summary.saleable, 'saleable lot')}</b></div>
+    <div class="band total"><b>Grand total${summary.sites > 1 ? `, all ${summary.sites} sites` : ''}</b><b class="num words">${plural(summary.saleable, 'saleable lot')}</b></div>
     <p class="sub strong">Status of billing</p>
-    ${billingRows(L.billingStatus(payments, units), units, units === summary.saleable ? 'lot' : 'unit')}`);
+    ${billingRows(L.billingStatus(payments, units), units, units === summary.saleable ? 'lot' : 'unit')}
+    ${units === summary.saleable ? '' : `<p class="muted small">Counted against the profile's ${plural(units, 'unit')}, not the ${plural(summary.saleable, 'saleable lot')} drawn.</p>`}`);
 }
 
 function billingRows(rows, total, word) {
   const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
   const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
   return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">${word === 'unit' ? 'Units' : 'Lots'} billed</th></tr></thead>
-      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
+      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num words">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
@@ -1657,7 +1658,7 @@ function lotsView(c) {
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
       <button data-zoom="reset">Reset</button></div>` : emptyLine('No lots drawn on this plan yet.')}
     <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
-    <p class="muted lot-sum">${sites.length > 1 ? `${esc(site.site || 'Main site')}, as marked on its lots` : 'As marked on the lots'}: ${plural(k.total, 'saleable lot')}, ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed, average lot progress ${k.avg.toFixed(2)}% (every lot alike; not Work done). ${figuresHelp()}</p>
+    <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on ${k.total === 1 ? 'it' : 'them'} ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
     ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
     <div id="lot-results"></div>
   </section>`;
@@ -2333,7 +2334,8 @@ async function bindLots(c) {
   };
   const paint = () => {
     const n = site.lots.filter(l => L.lotMatches(l, st)).length;
-    count.textContent = n === site.lots.length ? plural(n, 'lot') : `${n} of ${plural(site.lots.length, 'lot')} match`;
+    const all = site.lots.length, sale = site.lots.filter(l => L.lotUse(l) === 'Saleable').length;
+    count.textContent = n === all ? `${plural(all, 'lot')} drawn on this plan, ${sale} saleable` : `${n} of the ${plural(all, 'lot')} drawn on this plan match`;
     shapes();
     const frameHint = document.getElementById('frame-hint');
     if (frameHint) frameHint.textContent = st.frame.length ? 'Now click the opposite corner.' : 'The dashed box is what prints. Click one corner of the plan area, then the opposite corner.';

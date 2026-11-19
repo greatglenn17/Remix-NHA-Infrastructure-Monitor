@@ -981,12 +981,12 @@ export function sdpSites(records) {
   });
 }
 
-/** Saleable lots per band over every site's plan in use, from a project's records. A lot without progress is at 0%. */
+/** Saleable lots per band over every site's plan in use, from a project's records, and how many sites. A lot without progress is at 0%. */
 export function lotSummary(records) {
-  const saleable = sdpSites(records).flatMap(s => s.lots).filter(l => lotUse(l) === 'Saleable');
+  const sites = sdpSites(records), saleable = sites.flatMap(s => s.lots).filter(l => lotUse(l) === 'Saleable');
   const bands = LOT_BANDS.map(() => 0);
   for (const l of saleable) bands[lotBand(lotProgress(l))]++;
-  return { bands, saleable: saleable.length };
+  return { bands, saleable: saleable.length, sites: sites.length };
 }
 
 /** LotStats: the Lots KPIs, over saleable lots only (open spaces, road lots and the like are not housing units). */

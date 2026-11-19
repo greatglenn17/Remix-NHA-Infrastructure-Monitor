@@ -394,6 +394,7 @@ tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
 /* Tabular figures only where numbers line up (Type.kt TabularNumbers), so words keep normal hyphens. */
 /* Measured figures (table numbers, work done and billed, counts) are set in the mono, as instrument readouts. */
 .num, .fig, .pill b { font-family: var(--mono); }
+.num.words { font-family: var(--sans); font-variant-numeric: tabular-nums; } /* a count in words ("20 saleable lots"), right-aligned but not a figure */
 thead .num { font-family: inherit; }
 .pay .pdate { display: none; }
 
