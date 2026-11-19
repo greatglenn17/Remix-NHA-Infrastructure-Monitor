@@ -3,6 +3,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from './logic.js';
 
+test('variation order: a title and lines, not the stored name', () => {
+  const vo = { documentName: 'Variation Order No. 2 (Deductive) - PHP 1,500,000.50', remarks: 'Reason: Less fill | Date Approved: 2026-11-05' };
+  assert.equal(L.variationTitle(vo.documentName), 'Variation Order No. 2');
+  assert.deepEqual(L.variationLines(vo), ['Type: Deductive', 'Amount: ₱1,500,000.50', 'Date approved: Nov 5, 2026', 'Reason: Less fill']);
+  // Not approved yet: no "Date approved: -" line; an old name without an amount keeps its title.
+  assert.deepEqual(L.variationLines({ documentName: 'Variation Order No. 3', remarks: 'Added culvert' }), ['Reason: Added culvert']);
+  assert.equal(L.variationTitle('Variation Order No. 3'), 'Variation Order No. 3');
+});
+
 test('nextLot: an arrow key moves to the nearest lot that way, a step sideways counting double', () => {
   // A 3 x 2 grid of lots, a, b, c over d, e, f, 10 apart; g sits low and to the right of c.
   const c = new Map([['a', [0, 0]], ['b', [10, 0]], ['c', [20, 0]], ['d', [0, 10]], ['e', [10, 10]], ['f', [20, 10]], ['g', [26, 4]]]);

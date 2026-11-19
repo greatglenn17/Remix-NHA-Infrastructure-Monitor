@@ -454,16 +454,24 @@ fun VariationOrdersLog(
                 vo.documentName.contains("Deductive", ignoreCase = true) -> "Deductive"
                 else -> ""
             }
+            // The stored name is "Variation Order No. 2 (Deductive) - PHP 1,500,000.50": its type and amount are lines (as on the website).
+            val amount = VO_AMOUNT.find(vo.documentName)?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull()
             LogEntry(
-                vo.documentName,
+                vo.documentName.replace(VO_AMOUNT, "").replace(Regex("\\s*\\((additive|deductive)\\)", RegexOption.IGNORE_CASE), "").trim(),
                 MaterialTheme.colorScheme.onSurface,
-                listOf(if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}", "Date Approved: ${dateApproved ?: "-"}", displayText),
+                listOf(
+                    if (type.isNotEmpty()) "Type: $type" else "", "Status: ${vo.status}",
+                    amount?.let { "Amount: ${com.example.utils.CurrencyFormatter.formatPhp(it)}" } ?: "",
+                    dateApproved?.let { "Date approved: ${ProjectSchedule.displayDate(it)}" } ?: "", displayText
+                ),
                 onClick = if (currentUserRole.hasPermission(Permission.UPLOAD_DOCUMENT)) { { openOrder = vo } } else null
             )
         }
     }
     openOrder?.let { OrderStatusDialog(it, currentUserRole, onUpdateStatus, onDeleteDocument) { openOrder = null } }
 }
+
+private val VO_AMOUNT = Regex("\\s*-\\s*PHP\\s*([\\d,]*\\.?\\d*)\\s*$", RegexOption.IGNORE_CASE)
 
 /** A Continuance of Work Suspension Order: more days on a logged suspension, starting where it ends. */
 @Composable
