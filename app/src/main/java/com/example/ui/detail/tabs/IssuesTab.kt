@@ -193,45 +193,22 @@ fun IssueCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
-            // Header Row: Date & Badges
+            // Header row: the issue itself, then its badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Row(
-                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Event,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = issue.date,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (issue.targetDate.isNotBlank()) {
-                        val overdue = issue.isOverdue()
-                        Text(
-                            text = "  ·  Target ${issue.targetDate}" + if (overdue) " (OVERDUE)" else "",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (overdue) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (overdue) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                Text(
+                    text = issue.description.ifBlank { "No description" },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 20.sp
+                    ),
+                    softWrap = true,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                )
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -279,30 +256,33 @@ fun IssueCard(
             }
             com.example.ui.components.PendingUploadMark(issue.uuid, Modifier.padding(top = 6.dp))
 
+            // Its dates, under the issue
+            Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Event,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Logged ${issue.date}",
+                    style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+                if (issue.targetDate.isNotBlank()) {
+                    val overdue = issue.isOverdue()
+                    Text(
+                        text = "  ·  Target ${issue.targetDate}" + if (overdue) " (overdue)" else "",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (overdue) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (overdue) LocalNHAColors.current.behind else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Issue Description (Full multiline wrapping)
-            Text(
-                text = "ISSUE DESCRIPTION",
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = issue.description,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 20.sp
-                ),
-                softWrap = true,
-                overflow = TextOverflow.Clip,
-                modifier = Modifier.fillMaxWidth()
-            )
 
             // Action Taken Section (Full multiline wrapping)
             if (issue.actionTaken.isNotBlank()) {
