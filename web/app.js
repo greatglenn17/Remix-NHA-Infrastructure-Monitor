@@ -1556,7 +1556,7 @@ function monthlyView({ page, weekly, of, now }) {
 
 /* ---------- Lots (SubdivisionPlanTab) ---------- */
 
-// SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, wheel or pinch to zoom,
+// SubdivisionPlanTab in monitoring mode: the plan with each lot coloured over it. Drag to move, Ctrl/⌘ + wheel or pinch to zoom,
 // double-click for 250%; click a lot for its card, and "History & details" for LotInfoDialog.
 const lotState = page => (page.lots ||= { site: null, query: '', band: 'ALL', billing: 'ALL', completion: 'ALL', sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null, trace: false, setup: false });
 // focus: the lot on the plan that last had focus (its Tab stop); refocus: the plan had focus before a redraw; setup: the Plan setup section is open; draw: the corners of a lot being added, or (draw.lot: its uuid) of a lot whose outline is being edited; trace: a click traces the lot around it instead of adding a corner; group: the lots picked for one update; frame: the print area being marked (its first corner); renum: the block being renumbered
@@ -2304,8 +2304,8 @@ async function bindLots(c) {
     if (frameHint) frameHint.textContent = st.frame.length ? 'Now click the opposite corner.' : 'The dashed box is what prints. Click one corner of the plan area, then the opposite corner.';
     const hint = document.getElementById('draw-hint');
     if (hint) {
-      hint.textContent = traceNote || (st.trace && !st.draw.lot ? 'Click inside a lot on the plan: its outline is traced from the plan\'s lines, and its form opens. Dragging moves the plan and the wheel zooms it.' : '') || `${st.draw.lot ? 'Drag a corner of the lot to move it; a click adds a corner after the last' : 'Click each corner of the lot on the plan, in order; drag a corner to move it'} (${
-        plural(st.draw.length, 'corner')} so far). Dragging elsewhere moves the plan and the wheel zooms it.`;
+      hint.textContent = traceNote || (st.trace && !st.draw.lot ? 'Click inside a lot on the plan: its outline is traced from the plan\'s lines, and its form opens. Dragging moves the plan and ' + (MAC ? '⌘' : 'Ctrl') + ' with the wheel zooms it.' : '') || `${st.draw.lot ? 'Drag a corner of the lot to move it; a click adds a corner after the last' : 'Click each corner of the lot on the plan, in order; drag a corner to move it'} (${
+        plural(st.draw.length, 'corner')} so far). Dragging elsewhere moves the plan and ${MAC ? '⌘' : 'Ctrl'} with the wheel zooms it.`;
       document.getElementById('draw-save').disabled = st.draw.length < 3;
       document.getElementById('draw-undo').disabled = !st.draw.length;
     }
@@ -2613,7 +2613,7 @@ async function bindLots(c) {
     choose(document.elementsFromPoint(e.clientX, e.clientY).find(el => el.dataset?.lot)?.dataset.lot);
   };
   stage.ondblclick = e => { if (st.draw || st.frame) return; const [px, py] = local(e); view().s > 1.2 ? reset() : zoomAt(2.5, px, py); };
-  // The wheel scrolls the page; it zooms only with Ctrl or ⌘ held (a trackpad pinch sends that too), as on a map.
+  // The wheel scrolls the page; it zooms only with Ctrl or ⌘ held (a trackpad pinch sends Ctrl too, except in Safari), as on a map.
   const wheelHint = document.getElementById('wheel-hint');
   let hintOff = 0;
   viewer.onwheel = e => {

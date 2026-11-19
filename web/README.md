@@ -407,7 +407,7 @@ is read only.
     `SdpSummary` bands) for housing projects.
   - **Progress**: weekly reports (all sections and photos), monthly reports by month, every
     photo, and for housing projects the **Lots** of each site's plan in use: one line with the phone's figures (saleable lots, M1 and M2 billed, not billed, completed, average
-    progress), its search and filters, and the plan PDF with each lot coloured over it, as on the phone (drag to move, wheel
+    progress), its search and filters, and the plan PDF with each lot coloured over it, as on the phone (drag to move, Ctrl/⌘ + wheel
     or pinch to zoom, the zoom bar, double-click for 250%). Click a lot for its card, and "History & details" for its
     status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
