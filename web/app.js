@@ -2470,6 +2470,7 @@ async function bindLots(c) {
   const view = () => st.view;
   const apply = () => {
     const v = view();
+    Object.assign(v, { W, H, fit }); // the viewer it was taken in, so a redraw at another size can carry it over
     stage.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
     document.getElementById('zoom-pct').textContent = `${Math.round(v.s * 100)}%`;
     zoomBar.querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.zoom) - v.s) < 0.08));
@@ -2489,6 +2490,11 @@ async function bindLots(c) {
     apply();
   };
   const centreOn = ([cx, cy], s) => { st.view = { s, x: W / 2 - cx * fit * s, y: H / 2 - cy * fit * s }; apply(); };
+  // A view taken in a viewer of another size (the window or the phone turned, or the page opened again) keeps its zoom
+  // and the plan point at its centre, not its offsets, which would leave the plan off-centre; none, or one taken while
+  // the viewer had no size, fits the plan.
+  const carry = k => (!(k?.fit > 0) || !(fit > 0) ? reset()
+    : k.W !== W || k.H !== H ? centreOn([(k.W / 2 - k.x) / (k.fit * k.s), (k.H / 2 - k.y) / (k.fit * k.s)], k.s) : apply());
 
   d = await planBase(site, Boolean(st.draw || st.frame));
   if (!viewer.isConnected) return;
@@ -2546,7 +2552,7 @@ async function bindLots(c) {
   });
   svg.addEventListener('focusout', focusRing);
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
-  if (!st.view) reset(); else apply();
+  carry(st.view);
   paint();
   // The plan had focus before this redraw (drawProject): it takes it back, read only once the plan is on screen, so a
   // second redraw while the picture loads still finds the flag.
@@ -2560,7 +2566,7 @@ async function bindLots(c) {
     fit = Math.min(W / d.width, H / d.height);
     stage.style.width = `${d.width * fit}px`;
     stage.style.height = `${d.height * fit}px`;
-    reset();
+    carry(st.view);
   });
   refit.observe(viewer);
 
