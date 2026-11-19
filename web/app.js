@@ -1125,7 +1125,8 @@ function drawProject(page) {
     drawProject(page);
   }; });
   if (focused) main.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
-  const back = onHead && document.activeElement === document.body && main.querySelector(onHead);
+  // On the way to another tab or page (Back, Forward, a link) land() focuses where it arrived, not the tab just left.
+  const back = !s.land && onHead && document.activeElement === document.body && main.querySelector(onHead);
   if (back) { if (back.tagName === 'H1') back.tabIndex = -1; back.focus({ preventScroll: true }); }
   keepInView(main.querySelector('.chips.scroll-row'));
   land();
