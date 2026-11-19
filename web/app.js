@@ -3846,7 +3846,7 @@ function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v));
   return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">Target</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target and +/- are for ${esc(L.displayDate(abstract.asOf))}, the abstract's day: the approved bar chart's plan then beside the work measured. The header's "behind" is Work done against today's plan, so it can differ.` : 'Target: the project\'s target; it has no approved bar chart.'} ${figuresHelp()}</p>`;
+    <p class="muted small">${L.plannedTarget(c.project, c.documents, abstract.asOf) != null ? `Target and +/- are for ${esc(L.displayDate(abstract.asOf))}, the abstract's day: the approved bar chart's plan then beside the work measured.${L.daysOverdue(c.project, today()) ? '' : ' Work done in the header is against today\'s plan, so its gap can differ.'}` : 'Target: the project\'s target; it has no approved bar chart.'} ${figuresHelp()}</p>`;
 }
 
 /**
