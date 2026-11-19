@@ -2490,6 +2490,11 @@ async function bindLots(c) {
     apply();
   };
   const centreOn = ([cx, cy], s) => { st.view = { s, x: W / 2 - cx * fit * s, y: H / 2 - cy * fit * s }; apply(); };
+  // A view taken in a viewer of another size (the window or the phone turned, or the page opened again) keeps its zoom
+  // and the plan point at its centre, not its offsets, which would leave the plan off-centre; none, or one taken while
+  // the viewer had no size, fits the plan.
+  const carry = k => (!(k?.fit > 0) || !(fit > 0) ? reset()
+    : k.W !== W || k.H !== H ? centreOn([(k.W / 2 - k.x) / (k.fit * k.s), (k.H / 2 - k.y) / (k.fit * k.s)], k.s) : apply());
 
   d = await planBase(site, Boolean(st.draw || st.frame));
   if (!viewer.isConnected) return;
@@ -2547,12 +2552,7 @@ async function bindLots(c) {
   });
   svg.addEventListener('focusout', focusRing);
   if (d.problem) viewer.insertAdjacentHTML('afterbegin', `<p class="error lot-note">The plan PDF could not be loaded in this browser (${esc(d.problem)}), so the lots are drawn without it.</p>`);
-  // A view kept from a viewer of another size (the window or the phone turned, or the page left and opened again)
-  // keeps its zoom and the plan point at its centre, instead of its offsets, which would leave the plan off-centre.
-  const keptView = st.view;
-  if (!keptView) reset();
-  else if (keptView.fit > 0 && fit > 0 && (keptView.W !== W || keptView.H !== H)) centreOn([(keptView.W / 2 - keptView.x) / (keptView.fit * keptView.s), (keptView.H / 2 - keptView.y) / (keptView.fit * keptView.s)], keptView.s);
-  else apply();
+  carry(st.view);
   paint();
   // The plan had focus before this redraw (drawProject): it takes it back, read only once the plan is on screen, so a
   // second redraw while the picture loads still finds the flag.
@@ -2566,7 +2566,7 @@ async function bindLots(c) {
     fit = Math.min(W / d.width, H / d.height);
     stage.style.width = `${d.width * fit}px`;
     stage.style.height = `${d.height * fit}px`;
-    reset();
+    carry(st.view);
   });
   refit.observe(viewer);
 
