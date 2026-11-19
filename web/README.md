@@ -264,7 +264,7 @@ is read only.
     folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at TO DATE, as the
     printed abstracts do: the BALANCE and equivalent-units columns are read and kept on the record but not shown
     (the phone's table ends at TO DATE too). On a laptop or wider (a window of about 1,180px or more) the 15 columns
-    fit the page with nothing to scroll: the type follows the card's width (about 11px at 1366) and the headings
+    fit the page with nothing to scroll: the type follows the card's width (down to a 12px floor) and the headings
     wrap. On a narrower window (a tablet, a phone) the table keeps its 13px type and scrolls sideways inside its card.
   - **Weekly | Monthly**, a switch at the top of the tab once the project has an abstract. Weekly is the tab as
     described here. **Monthly** (`#/p/<id>/actual/monthly[/<date>]`) is the abstract of a month, computed from the
