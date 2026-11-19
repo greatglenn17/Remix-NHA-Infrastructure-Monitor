@@ -528,7 +528,9 @@ span.file.gone { text-decoration: none; }
 .raw { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Actual Accomplishment: each part of the uploaded abstract folds; its pay items keep the sheet's columns up to TO DATE. */
 .apa-tools { align-items: end; margin-bottom: 6px; }
-.apa-tools .text-btn.danger { margin: 0 0 0 auto; }
+/* Delete sits at the foot of the abstract it deletes, under a hairline, never on the New abstract row. */
+.apa-foot { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.apa-foot .text-btn.danger { margin: 0 -8px 0 0; }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
 .apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
 /* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (about
