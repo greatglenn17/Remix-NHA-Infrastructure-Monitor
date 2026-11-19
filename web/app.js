@@ -1245,12 +1245,12 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
   const issues = `<span class="badge ${openIssues ? 'lv-watch' : 'lv-ok quiet'}">${openIssues} open ${openIssues === 1 ? 'issue' : 'issues'}</span>`;
   // The report's target is the bar chart's plan for the week's last day as the chart stood when it was filed (typed
   // only without a chart). When today's chart plans that day more than 5 points apart (revised, or suspensions since),
-  // today's figure is shown under it, so the two numbers on the page are not read as one.
+  // the gap is said in one line under it rather than as a second target, so the header's plan stays the page's one plan.
   const weekEnd = latest && L.weekDays(latest.reportingWeek)[6], chartNow = weekEnd ? L.plannedTarget(project, documents, weekEnd) : null;
-  const apart = chartNow != null && Math.abs(chartNow - (Number(latest?.targetAccomplishmentPct) || 0)) > 5;
+  const gap = chartNow == null ? 0 : chartNow - (Number(latest?.targetAccomplishmentPct) || 0);
   const report = section('Latest weekly report', 'assignment', latest ? `
     <div class="rep-top"><p>${esc(latest.reportingWeek)}</p>${issues}</div>
-    ${kv('Target in the report', pct(latest.targetAccomplishmentPct))}${apart ? kv(`Plan for ${L.displayDate(weekEnd)} on today's bar chart`, pct(chartNow)) : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
+    ${kv('Reported target', pct(latest.targetAccomplishmentPct))}${Math.abs(gap) > 5 ? `<p class="muted small rep-gap">${Math.abs(gap).toFixed(2)} points ${gap > 0 ? 'under' : 'over'} today's bar chart plan for ${esc(L.displayDate(weekEnd))}.</p>` : ''}${kv('Actual', pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const construction = housing ? constructionCard(L.lotSummary(records), payments, now, L.sdpSites(records).length > 1) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
@@ -1488,7 +1488,7 @@ function reportCard(r, all, pid, editable = false) {
         <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
     <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-      <span class="muted">Target in the report ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
+      <span class="muted">Reported target ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
     <details>
       <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
       <div class="rep-body">
