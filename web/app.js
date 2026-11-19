@@ -61,7 +61,7 @@ const FIGURE_HELP = [
   ['Bar chart plan today', "What the approved bar chart plans to be done by today: a revised chart from the day it takes effect, with days under approved suspensions not counted. A time extension moves the completion date, not this plan. Without a chart it reads \"target\", the project's own."],
   ['Behind, slipping, ahead', 'Work done minus the plan, in % of the whole project: plan 78.00% and work done 41.25% is 36.75% behind. From 10% behind it is Behind schedule; less reads "slipping".'],
   ['Filed against', "The target a weekly report states, as the bar chart stood when it was filed: Filed against on the Weekly reports tab, Target % on the Monthly tab, and Target Accomplishment in the report prints. The Summary leaves it out and keeps one plan, the header's; its weekly card shows the report's actual for the week's last day."],
-  ['Abstract Target and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today, and its +/- can differ from the header's, which is against today's plan. Without a bar chart the lines have no target and Overall uses the project's own."],
+  ['Abstract plan (Target) and +/-', "An abstract sets the bar chart's plan on its \"As of\" date beside the work it measured, so its figures are for that day, not today, and its +/- can differ from the header's, which is against today's plan. Without a bar chart the lines have no target and Overall uses the project's own."],
   ['Billed', "Net billings under Payments in pesos, as a share of the current contract cost. Status of billing counts lots, not pesos."],
   ['Lots and units', "Status of construction and the Lots tab count the saleable lots drawn on the plan, which can differ from the profile's No. of units. Status of billing counts against the profile's No. of units when it has one, as the Billing abstract does, else against the lots drawn. The Lots tab's billed marks are set lot by lot, so they can differ from the billings under Payments; its average lot progress counts every lot alike and covers the lots only, so it is not Work done."],
 ];
@@ -3855,7 +3855,7 @@ const abstractSwitch = monthly => `<div class="chips views" role="group" aria-la
 /** An abstract's Target / Actual / +/- table (L.abstractStanding). With a bar chart the target is headed as the plan of the abstract's day, so it is not read as the header's plan for today. */
 function standingTable(c, abstract) {
   const figure = v => (v == null ? '-' : pct(v)), planned = L.plannedTarget(c.project, c.documents, abstract.asOf) != null;
-  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">${planned ? `Plan on ${esc(L.displayDate(abstract.asOf)).replace(/ /g, '&nbsp;')}` : 'Target'}</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">${planned ? `Plan on ${esc(L.displayDate(abstract.asOf)).replace(' ', '&nbsp;')}` : 'Target'}</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted small">${planned ? '' : 'Target: the project\'s target; it has no approved bar chart. '}${figuresHelp()}</p>`;
 }
