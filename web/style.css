@@ -188,6 +188,8 @@ body.signed-out main { max-width: none; padding: 0; }
 .check.role span { display: grid; gap: 2px; }
 .error { color: var(--behind); font-size: 13px; font-weight: 400; min-height: 1.2em; }
 .note { color: var(--ok); font-size: 13px; font-weight: 400; }
+/* After a save: one quiet line at the foot of the window until the next key or click (app.js savedNote). It never takes a click. */
+.saved { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; width: max-content; max-width: calc(100% - 32px); margin: 0; padding: 8px 14px; border-radius: 8px; font-size: 13px; color: var(--ok); background: var(--surface-solid); border: 1px solid var(--outline); pointer-events: none; }
 
 /* Dashboard: District Portfolio Command Banner */
 .portfolio { padding: 20px 24px; display: grid; grid-template-columns: auto 1fr; gap: 16px 32px; align-items: center; }
