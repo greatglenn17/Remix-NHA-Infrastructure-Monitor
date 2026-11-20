@@ -127,6 +127,8 @@ class RecordSync(private val db: AppDatabase) {
             if (byUuid != null) writeRemote { it.delete("`$table`", "id = ?", arrayOf(byUuid.first)) }
             return true
         }
+        // Already here at this version (every record comes again after each start): nothing to read.
+        if (byUuid != null && !RemoteVersion.isNewer(byUuid.second, byUuid.third, revision, remoteUpdatedAt)) return true
 
         val data = JSONObject(doc["data"] as? String ?: "{}")
         val parentIds = mutableMapOf<String, Long>()
@@ -134,7 +136,16 @@ class RecordSync(private val db: AppDatabase) {
             // Waits, like a record whose project hasn't arrived, until the parent row is here.
             parentIds[column] = idOf(parent, data.optString("_ref_$column")) ?: return false
         }
-        val local = byUuid ?: sameLotProgress(table, parentIds)
+        val local = byUuid ?: sameLotProgress(table, parentIds)?.also { mine ->
+            // This phone's own progress for the lot is not sent yet: it keeps its data and takes the cloud's uuid one
+            // revision above, so its edit replaces the cloud copy instead of being overwritten by it.
+            if (sql.query("SELECT EXISTS(SELECT 1 FROM sync_outbox o JOIN `$table` t ON t.uuid = o.entityUuid " +
+                    "WHERE t.id = ? AND o.state IN ('PENDING', 'FAILED'))", arrayOf(mine.first)).use { it.moveToFirst() && it.getInt(0) == 1 }) {
+                writeRemote { it.execSQL("UPDATE `$table` SET uuid = ?, revision = ? WHERE id = ?", arrayOf<Any>(uuid, revision, mine.first)) }
+                keepLocalAbove(doc)
+                return true
+            }
+        }
         // A cached snapshot from before this phone's own delete must not bring the record back.
         if (local == null && deletedHereAt(uuid) >= revision) return true
         if (local != null && !RemoteVersion.isNewer(local.second, local.third, revision, remoteUpdatedAt)) return true

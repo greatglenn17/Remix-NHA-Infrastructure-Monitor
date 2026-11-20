@@ -374,6 +374,38 @@ class WebEditSyncTest {
         assertEquals("2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e", merged.uuid)
     }
 
+    /** Both started the lot's progress offline: the phone's unsent row keeps its edit and replaces the cloud copy. */
+    @Test
+    fun lotProgress_thePhonesUnsentRowKeepsItsEdit() = runBlocking {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "S",
+            contractCostOriginal = 1.0, contractCostRevised = 0.0, contractDurationDays = 1,
+            dateStarted = "2026-08-01", completionDateOriginal = "2026-12-31", completionDateRevised = "2026-12-31",
+            assignedUids = "[\"web\"]"
+        )
+        val dao = db.projectDao()
+        val projectId = dao.insertProject(project)
+        val plan = com.example.data.model.SdpPlan(projectId = projectId, planName = "SDP", pdfFileUrl = "", uploadedDate = "2026-11-09", uploadedBy = "x")
+        val planId = dao.insertSdpPlan(plan)
+        val lot = com.example.data.model.SdpLot(projectId = projectId, sdpPlanId = planId, blockNumber = "3", lotNumber = "12", polygonNormalizedJson = "[]")
+        val lotId = dao.insertSdpLot(lot)
+        dao.insertOrUpdateLotProgress(com.example.data.model.SdpLotProgress(projectId = projectId, sdpPlanId = planId, sdpLotId = lotId, physicalProgress = 25, billingStatus = "BILLED"))
+        val cloudUuid = "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f"
+
+        recordSync.applyRemote(listOf(mapOf(
+            "uuid" to cloudUuid, "type" to "sdp_lot_progress", "projectUuid" to project.projectUuid, "assignedUids" to listOf("web"),
+            "revision" to 3L, "updatedAt" to 4_102_444_800_003L, "updatedByUid" to "web", "isDeleted" to false,
+            "data" to """{"physicalProgress":40,"billingStatus":"NOT BILLED","_ref_sdpPlanId":"${plan.uuid}","_ref_sdpLotId":"${lot.uuid}"}"""
+        )))
+
+        val row = dao.getLotProgressForPlan(planId).first().single()
+        assertEquals("BILLED", row.billingStatus)
+        assertEquals(25, row.physicalProgress)
+        assertEquals(cloudUuid, row.uuid)
+        assertEquals(4L, row.revision)
+        assertEquals("its upload is queued", 1L, long("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", cloudUuid))
+    }
+
     /** web/logic.js newWeeklyReport: a weekly report added on the website, which has no weather log yet. */
     @Test
     fun websiteNewWeeklyReport_isAddedToTheProject_withNoWeather() = runBlocking {

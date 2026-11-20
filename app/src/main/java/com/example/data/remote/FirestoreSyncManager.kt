@@ -2,6 +2,7 @@ package com.example.data.remote
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.ProjectDuplicateMerger
@@ -51,7 +52,16 @@ class FirestoreSyncManager(
     private val scope: CoroutineScope
 ) {
     private val tag = "FirestoreSyncManager"
-    private companion object { const val LAST_SYNCED_AT = "last_synced_at" }
+    private companion object {
+        const val LAST_SYNCED_AT = "last_synced_at"
+        /** Firestore's most writes in one batch. */
+        const val RECORD_BATCH = 500
+        /**
+         * Reads record snapshots off the main thread, one at a time so they stay in order: the first one after a start
+         * lists every record. Shared and never shut down, so a listener still delivering after close() cannot crash.
+         */
+        val recordReader: java.util.concurrent.Executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
@@ -122,6 +132,13 @@ class FirestoreSyncManager(
         }
     }
 
+    /** Stops everything this manager listens to, for its owner going away; a new manager starts its own. */
+    fun close() {
+        authStateListener?.let { auth.removeAuthStateListener(it) }
+        authStateListener = null
+        stopRealtimeSync()
+    }
+
     /** Reads the role, retrying until the token is available, then attaches the listeners unless stopped meanwhile. */
     private suspend fun CoroutineScope.listenFor(currentUser: FirebaseUser) {
         var wait = 2_000L
@@ -183,7 +200,7 @@ class FirestoreSyncManager(
 
         // Reports, documents, issues and payments: only changed documents are applied.
         recordListener = scoped("records")
-            .addSnapshotListener { snapshots, e ->
+            .addSnapshotListener(recordReader) { snapshots, e ->
                 if (e != null) {
                     Log.w(tag, "Firestore records listen failed.", e)
                     return@addSnapshotListener
@@ -341,43 +358,10 @@ class FirestoreSyncManager(
                     (revision > localProject.revision || !db.syncOutboxDao().hasPendingFor(projectUuid))
                 ) {
                     // Remote version is newer — update local Room entity
-                    val updatedProj = localProject.copy(
-                        name = name,
-                        location = doc.getString("location") ?: localProject.location,
-                        implementingOffice = doc.getString("implementingOffice") ?: localProject.implementingOffice,
-                        contractor = doc.getString("contractor") ?: localProject.contractor,
-                        scopeOfWork = doc.getString("scopeOfWork") ?: localProject.scopeOfWork,
-                        projectedBeneficiaries = doc.getString("projectedBeneficiaries") ?: localProject.projectedBeneficiaries,
-                        boardResolution = doc.getString("boardResolution") ?: localProject.boardResolution,
-                        noticeOfAward = doc.getString("noticeOfAward") ?: localProject.noticeOfAward,
-                        noticeToProceed = doc.getString("noticeToProceed") ?: localProject.noticeToProceed,
-                        preparedByName = doc.getString("preparedByName") ?: localProject.preparedByName,
-                        preparedByPosition = doc.getString("preparedByPosition") ?: localProject.preparedByPosition,
-                        checkedByName = doc.getString("checkedByName") ?: localProject.checkedByName,
-                        checkedByPosition = doc.getString("checkedByPosition") ?: localProject.checkedByPosition,
-                        notedByName = doc.getString("notedByName") ?: localProject.notedByName,
-                        notedByPosition = doc.getString("notedByPosition") ?: localProject.notedByPosition,
-                        weeklyCheckedByName = doc.getString("weeklyCheckedByName") ?: localProject.weeklyCheckedByName,
-                        weeklyCheckedByPosition = doc.getString("weeklyCheckedByPosition") ?: localProject.weeklyCheckedByPosition,
-                        weeklyNotedByName = doc.getString("weeklyNotedByName") ?: localProject.weeklyNotedByName,
-                        weeklyNotedByPosition = doc.getString("weeklyNotedByPosition") ?: localProject.weeklyNotedByPosition,
-                        preparedByOffice = doc.getString("preparedByOffice") ?: localProject.preparedByOffice,
-                        checkedByOffice = doc.getString("checkedByOffice") ?: localProject.checkedByOffice,
-                        notedByOffice = doc.getString("notedByOffice") ?: localProject.notedByOffice,
-                        weeklyCheckedByOffice = doc.getString("weeklyCheckedByOffice") ?: localProject.weeklyCheckedByOffice,
-                        weeklyNotedByOffice = doc.getString("weeklyNotedByOffice") ?: localProject.weeklyNotedByOffice,
-                        barChartJson = doc.getString("barChartJson") ?: localProject.barChartJson,
-                        contractCostRevised = doc.getDouble("contractCostRevised") ?: localProject.contractCostRevised,
-                        status = doc.getString("status") ?: localProject.status,
-                        targetAccomplishment = doc.getDouble("targetAccomplishment") ?: localProject.targetAccomplishment,
-                        actualAccomplishment = doc.getDouble("actualAccomplishment") ?: localProject.actualAccomplishment,
-                        assignedStaff = doc.getString("assignedStaff") ?: localProject.assignedStaff,
-                        latestUpdatePhotoUrl = doc.getString("latestUpdatePhotoUrl") ?: localProject.latestUpdatePhotoUrl,
+                    val updatedProj = localProject.withRemote(doc.data.orEmpty()).copy(
                         revision = revision,
                         updatedAt = updatedAt,
-                        updatedByUid = doc.getString("updatedByUid") ?: localProject.updatedByUid,
-                        assignedUids = remoteAssignedUids(doc) ?: localProject.assignedUids,
-                        isDeleted = false
+                        assignedUids = remoteAssignedUids(doc) ?: localProject.assignedUids
                     )
                     projectDao.updateProject(updatedProj)
                     Log.d(tag, "Updated local project from remote revision $revision: $name")
@@ -583,6 +567,9 @@ class FirestoreSyncManager(
         val uploadedRecords = mutableSetOf<String>()
         /** Records whose project has no assigned accounts on this phone yet; they wait for the next flush. */
         val waitingRecords = mutableSetOf<String>()
+        /** Record writes going up together (see [sendRecords]): uuid -> document and whether it merges, and the events each settles. */
+        val recordDocs = linkedMapOf<String, Pair<Map<String, Any>, Boolean>>()
+        val recordEvents = mutableMapOf<String, MutableList<String>>()
 
         for (event in pending) {
             try {
@@ -595,53 +582,18 @@ class FirestoreSyncManager(
                 if (event.entityType == "project") {
                     val project = db.projectDao().getProjectByUuid(event.entityUuid)
                     if (project != null) {
-                        val data = hashMapOf<String, Any>(
-                            "projectUuid" to project.projectUuid,
-                            "name" to project.name,
-                            "location" to project.location,
-                            "implementingOffice" to project.implementingOffice,
-                            "contractor" to project.contractor,
-                            "scopeOfWork" to project.scopeOfWork,
-                            "projectType" to project.projectType,
-                            "landArea" to project.landArea,
-                            "numberOfUnits" to project.numberOfUnits,
-                            "projectedBeneficiaries" to project.projectedBeneficiaries,
-                            "boardResolution" to project.boardResolution,
-                            "noticeOfAward" to project.noticeOfAward,
-                            "noticeToProceed" to project.noticeToProceed,
-                            "preparedByName" to project.preparedByName,
-                            "preparedByPosition" to project.preparedByPosition,
-                            "checkedByName" to project.checkedByName,
-                            "checkedByPosition" to project.checkedByPosition,
-                            "notedByName" to project.notedByName,
-                            "notedByPosition" to project.notedByPosition,
-                            "weeklyCheckedByName" to project.weeklyCheckedByName,
-                            "weeklyCheckedByPosition" to project.weeklyCheckedByPosition,
-                            "weeklyNotedByName" to project.weeklyNotedByName,
-                            "weeklyNotedByPosition" to project.weeklyNotedByPosition,
-                            "preparedByOffice" to project.preparedByOffice,
-                            "checkedByOffice" to project.checkedByOffice,
-                            "notedByOffice" to project.notedByOffice,
-                            "weeklyCheckedByOffice" to project.weeklyCheckedByOffice,
-                            "weeklyNotedByOffice" to project.weeklyNotedByOffice,
-                            "contractCostOriginal" to project.contractCostOriginal,
-                            "contractCostRevised" to project.contractCostRevised,
-                            "contractDurationDays" to project.contractDurationDays,
-                            "dateStarted" to project.dateStarted,
-                            "completionDateOriginal" to project.completionDateOriginal,
-                            "completionDateRevised" to project.completionDateRevised,
-                            "status" to project.status,
-                            "targetAccomplishment" to project.targetAccomplishment,
-                            "actualAccomplishment" to project.actualAccomplishment,
-                            "assignedStaff" to project.assignedStaff,
-                            "latestUpdatePhotoUrl" to project.latestUpdatePhotoUrl,
-                            "revision" to project.revision,
-                            "createdAt" to project.createdAt,
-                            "updatedAt" to project.updatedAt,
-                            "createdByUid" to (project.createdByUid.ifBlank { currentUser.uid }),
-                            "updatedByUid" to currentUser.uid,
-                            "isDeleted" to (event.operation == "DELETE" || project.isDeleted)
-                        )
+                        val full = hashMapOf<String, Any>("projectUuid" to project.projectUuid).apply {
+                            putAll(projectFields(project))
+                            put("createdAt", project.createdAt)
+                            put("createdByUid", project.createdByUid.ifBlank { currentUser.uid })
+                            put("revision", project.revision)
+                            put("updatedAt", project.updatedAt)
+                            put("updatedByUid", currentUser.uid)
+                            put("isDeleted", event.operation == "DELETE" || project.isDeleted)
+                        }
+                        // An edit sends what it changed and the version, so it can't put back another phone's newer fields.
+                        val fields = fieldsToSend(event.operation, event.payloadJson)?.plus(listOf("revision", "updatedAt", "updatedByUid", "isDeleted"))
+                        val data = HashMap(if (fields == null) full else full.filterKeys { it in fields })
 
                         // Only the chart's editors send it (firestore.rules refuses anyone else's change), so a stale copy on a
                         // Field Engineer's phone never blocks their project updates. And only with this phone's own chart change
@@ -649,9 +601,12 @@ class FirestoreSyncManager(
                         if ((superAdmin || role == "ENGINEER_ADMIN") &&
                             (event.operation == "CREATE" || db.syncOutboxDao().hasPendingBarChartFor(project.projectUuid))
                         ) data["barChartJson"] = project.barChartJson
-                        uploadProject(project, data, superAdmin, currentUser.uid)
+                        uploadProject(project, data, full, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)
+                        // After markSynced, so a snapshot reconcile skipped meanwhile is in this read. Not while another
+                        // edit of the project still waits: the cloud lacks it, and taking the cloud copy would undo it.
+                        if (fields != null && !db.syncOutboxDao().hasPendingFor(project.projectUuid)) adoptCloudCopy(project)
                         syncedCount++
                     } else if (event.operation == "DELETE") {
                         // Mark as deleted in remote
@@ -683,40 +638,41 @@ class FirestoreSyncManager(
                     }
                 } else if (event.entityType.startsWith(RecordSyncSchema.ENTITY_PREFIX)) {
                     // Every event uploads the row as it is now, so one upload per record covers the rest.
-                    if (event.entityUuid in waitingRecords) continue
-                    if (event.entityUuid !in uploadedRecords) {
-                        val table = event.entityType.removePrefix(RecordSyncSchema.ENTITY_PREFIX)
-                        val doc = recordSync.buildDocument(table, event.entityUuid, currentUser.uid)
-                        val record = firestore.collection("records").document(event.entityUuid)
-                        if (doc != null) {
-                            if ("assignedUids" !in doc) {
-                                // The project's list hasn't reached this phone yet (any role): wait for it.
-                                waitingRecords.add(event.entityUuid)
-                                continue
-                            }
-                            record.set(doc).await()
-                            uploadedRecords.add(event.entityUuid)
-                        } else if (event.operation == "DELETE") {
-                            val projectUuid = org.json.JSONObject(event.payloadJson).optString("projectUuid")
-                            val tombstone = hashMapOf<String, Any>(
-                                "uuid" to event.entityUuid,
-                                "type" to table,
-                                "projectUuid" to projectUuid,
-                                "revision" to event.revision,
-                                "isDeleted" to true,
-                                "updatedAt" to System.currentTimeMillis(),
-                                "updatedByUid" to currentUser.uid
-                            )
-                            // Merged, so without a local list the stored record keeps its own.
-                            recordSync.assignedUidsOf(projectUuid)?.takeIf { it.isNotBlank() }?.let {
-                                tombstone["assignedUids"] = AssignedUids.parse(it)
-                            }
-                            record.set(tombstone, SetOptions.merge()).await()
-                            uploadedRecords.add(event.entityUuid)
+                    val uuid = event.entityUuid
+                    if (uuid in waitingRecords) continue
+                    if (uuid in uploadedRecords) { db.syncOutboxDao().markSynced(event.eventId); continue }
+                    val queued = recordEvents[uuid]
+                    if (queued != null) { queued.add(event.eventId); continue }
+                    val table = event.entityType.removePrefix(RecordSyncSchema.ENTITY_PREFIX)
+                    val doc = recordSync.buildDocument(table, uuid, currentUser.uid)
+                    val write = if (doc != null) {
+                        if ("assignedUids" !in doc) {
+                            // The project's list hasn't reached this phone yet (any role): wait for it.
+                            waitingRecords.add(uuid)
+                            continue
                         }
-                        syncedCount++
-                    }
-                    db.syncOutboxDao().markSynced(event.eventId)
+                        doc to false
+                    } else if (event.operation == "DELETE") {
+                        val projectUuid = org.json.JSONObject(event.payloadJson).optString("projectUuid")
+                        val tombstone = hashMapOf<String, Any>(
+                            "uuid" to uuid,
+                            "type" to table,
+                            "projectUuid" to projectUuid,
+                            "revision" to event.revision,
+                            "isDeleted" to true,
+                            "updatedAt" to System.currentTimeMillis(),
+                            "updatedByUid" to currentUser.uid
+                        )
+                        // Merged, so without a local list the stored record keeps its own.
+                        recordSync.assignedUidsOf(projectUuid)?.takeIf { it.isNotBlank() }?.let {
+                            tombstone["assignedUids"] = AssignedUids.parse(it)
+                        }
+                        tombstone to true
+                    } else null
+                    if (write == null) { db.syncOutboxDao().markSynced(event.eventId); continue }
+                    recordDocs[uuid] = write
+                    recordEvents[uuid] = mutableListOf(event.eventId)
+                    if (recordDocs.size == RECORD_BATCH) syncedCount += sendRecords(recordDocs, recordEvents, uploadedRecords)
                 } else if (event.entityType == Attachments.ENTITY_TYPE) {
                     Attachments.upload(context, event)
                     db.syncOutboxDao().markSynced(event.eventId)
@@ -728,10 +684,76 @@ class FirestoreSyncManager(
             }
         }
 
+        syncedCount += sendRecords(recordDocs, recordEvents, uploadedRecords)
         _syncStatus.value = FirestoreSyncStatus.Synced()
         if (db.syncOutboxDao().pendingEventsList().isEmpty()) markAllSent()
         Result.success(syncedCount)
     }
+    }
+
+    /**
+     * Takes the cloud copy of a project this phone just sent only some fields of. Another device may have changed other
+     * fields at the same revision, and reconcile skips that version while this phone's edit waits, and again once it
+     * matches this phone's own. Left alone when this phone changed the project again meanwhile.
+     */
+    private suspend fun adoptCloudCopy(sent: Project) {
+        try {
+            val doc = firestore.collection("projects").document(sent.projectUuid).get(Source.SERVER).await()
+            if (!doc.exists() || doc.getBoolean("isDeleted") == true || doc.getString("name") == null) return
+            // One transaction, so an edit saved meanwhile is never overwritten.
+            db.withTransaction {
+                val local = db.projectDao().getProjectByUuid(sent.projectUuid) ?: return@withTransaction
+                if (local.revision != sent.revision || local.updatedAt != sent.updatedAt) return@withTransaction
+                db.projectDao().updateProject(local.withRemote(doc.data.orEmpty()).copy(
+                    revision = doc.getLong("revision") ?: local.revision,
+                    updatedAt = doc.getLong("updatedAt") ?: local.updatedAt
+                ))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(tag, "Could not read back project ${sent.projectUuid}; it is taken at its next change", e)
+        }
+    }
+
+    /**
+     * Sends [docs] (record uuid -> document and whether it merges) in one batch and settles their [events]; one at a
+     * time took a round trip each. One refused write fails the whole batch, so then they go one by one and only the
+     * refused ones stay queued. Empties both maps; returns how many were sent.
+     */
+    private suspend fun sendRecords(
+        docs: MutableMap<String, Pair<Map<String, Any>, Boolean>>, events: MutableMap<String, MutableList<String>>, sent: MutableSet<String>
+    ): Int {
+        if (docs.isEmpty()) return 0
+        val ok = mutableListOf<String>()
+        try {
+            val batch = firestore.batch()
+            for ((uuid, w) in docs) {
+                val ref = firestore.collection("records").document(uuid)
+                if (w.second) batch.set(ref, w.first, SetOptions.merge()) else batch.set(ref, w.first)
+            }
+            batch.commit().await()
+            ok += docs.keys
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(tag, "A batch of ${docs.size} records was refused; sending them one by one", e)
+            for ((uuid, w) in docs) {
+                try {
+                    val ref = firestore.collection("records").document(uuid)
+                    (if (w.second) ref.set(w.first, SetOptions.merge()) else ref.set(w.first)).await()
+                    ok += uuid
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Log.w(tag, "Failed to sync record $uuid", e)
+                    events[uuid].orEmpty().forEach { db.syncOutboxDao().updateAttempt(it, "FAILED", e.localizedMessage.orEmpty()) }
+                }
+            }
+        }
+        for (uuid in ok) events[uuid].orEmpty().forEach { db.syncOutboxDao().markSynced(it) }
+        sent += ok
+        docs.clear()
+        events.clear()
+        return ok.size
     }
 
     private fun markAllSent() {
@@ -747,11 +769,19 @@ class FirestoreSyncManager(
      * document as PERMISSION_DENIED (the update rule reads the stored list), so that also
      * falls back to the create, which they only allow for a missing document anyway.
      */
-    private suspend fun uploadProject(project: Project, data: Map<String, Any>, superAdmin: Boolean, uid: String) {
+    private suspend fun uploadProject(project: Project, data: Map<String, Any>, full: Map<String, Any>, superAdmin: Boolean, uid: String) {
         val ref: DocumentReference = firestore.collection("projects").document(project.projectUuid)
         if (superAdmin) {
             val list = AssignmentPolicy.projectUploadFields(true, exists = true, myUid = uid, localAssignedUids = project.assignedUids)
-            ref.set(if (list == null) data else data + ("assignedUids" to list), SetOptions.merge()).await()
+            fun withList(m: Map<String, Any>) = if (list == null) m else m + ("assignedUids" to list)
+            try {
+                // Only an edit's fields; a merge would make a document of just those when it isn't in the cloud yet.
+                if (data.size < full.size) ref.update(withList(data)).await() else ref.set(withList(data), SetOptions.merge()).await()
+            } catch (e: FirebaseFirestoreException) {
+                if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw e
+                // full + data: data may carry the bar chart, which full leaves out.
+                ref.set(withList(full + data), SetOptions.merge()).await()
+            }
             return
         }
         try {
@@ -759,7 +789,7 @@ class FirestoreSyncManager(
         } catch (e: FirebaseFirestoreException) {
             if (e.code != FirebaseFirestoreException.Code.NOT_FOUND && e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
             val list = AssignmentPolicy.projectUploadFields(false, exists = false, myUid = uid, localAssignedUids = project.assignedUids)!!
-            ref.set(data + ("assignedUids" to list)).await()
+            ref.set(full + data + ("assignedUids" to list)).await()
             // The records uploaded next must carry the same list as the project.
             recordSync.setAssignedUidsLocally(project.projectUuid, AssignedUids.toJson(list))
         }

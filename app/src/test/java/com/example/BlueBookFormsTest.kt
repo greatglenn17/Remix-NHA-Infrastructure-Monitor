@@ -99,6 +99,22 @@ class BlueBookFormsTest {
         assertEquals(LocalDate.of(2026, 7, 20), BlueBookForms.weekStart("Week 30: July 20 - July 26, 2026"))
     }
 
+    // "Dec 28, 2026 - Jan 3, 2027" names "Jan" and "2026", so the old name match put it in January 2026.
+    @Test
+    fun weekOverNewYear_isInDecemberAndTheNextJanuary() {
+        assertEquals(listOf("December 2026", "January 2027"), BlueBookForms.weekMonths("Dec 28, 2026 - Jan 3, 2027"))
+        assertEquals(listOf("December 2026", "January 2027"), BlueBookForms.weekMonths("Week 52: Dec 26 - Jan 1, 2027"))
+        assertEquals(listOf("October 2026"), BlueBookForms.weekMonths("Oct 24, 2026 - Oct 30, 2026"))
+        assertEquals(null, BlueBookForms.weekMonths("This week"))
+        assertFalse(BlueBookForms.weekInMonth("Dec 28, 2026 - Jan 3, 2027", "January 2026"))
+        assertTrue(BlueBookForms.weekInMonth("Dec 28, 2026 - Jan 3, 2027", "January 2027"))
+        assertTrue(BlueBookForms.weekInMonth("Dec 28, 2026 - Jan 3, 2027", "December 2026"))
+        assertTrue("a label that does not read as dates still goes by its words", BlueBookForms.weekInMonth("Week 41: October 2026", "October 2026"))
+        assertTrue("a short month name still finds its weeks", BlueBookForms.weekInMonth("Oct 24, 2026 - Oct 30, 2026", "Oct 2026"))
+        assertFalse("a short or lowercase month goes by dates too", BlueBookForms.weekInMonth("Dec 28, 2026 - Jan 3, 2027", "jan 2026"))
+        assertTrue(BlueBookForms.weekInMonth("Dec 28, 2026 - Jan 3, 2027", "jan 2027"))
+    }
+
     @Test
     fun monthly_listsLoggedMonthsWithTotals_andPutsActionsUnderWhoTookThem() {
         fun issue(text: String, by: String) = com.example.data.model.ProjectIssue(

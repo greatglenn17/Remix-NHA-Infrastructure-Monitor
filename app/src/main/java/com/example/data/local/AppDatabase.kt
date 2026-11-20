@@ -10,10 +10,7 @@ import com.example.data.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.File
 
-import androidx.security.crypto.EncryptedFile
-import androidx.security.crypto.MasterKey
 
 @Database(
     entities = [
@@ -448,8 +445,9 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                performPreMigrationBackup(context.applicationContext, "nha_construction_db_10")
-                
+                // Older versions copied the whole database here on every start, and nothing ever read the copy.
+                context.applicationContext.getDatabasePath("nha_construction_db_10_pre_migration_backup.db.enc").delete()
+
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
@@ -460,34 +458,6 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
                 INSTANCE = instance
                 instance
-            }
-        }
-
-        private fun performPreMigrationBackup(context: Context, dbName: String) {
-            try {
-                val currentDbFile = context.getDatabasePath(dbName)
-                if (currentDbFile.exists()) {
-                    val backupFile = File(currentDbFile.parentFile, "${dbName}_pre_migration_backup.db.enc")
-                    if (backupFile.exists()) backupFile.delete()
-
-                    val masterKey = MasterKey.Builder(context)
-                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                        .build()
-
-                    val encryptedBackup = EncryptedFile.Builder(
-                        context,
-                        backupFile,
-                        masterKey,
-                        EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB
-                    ).build()
-
-                    val bytes = currentDbFile.readBytes()
-                    encryptedBackup.openFileOutput().use { output ->
-                        output.write(bytes)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
 

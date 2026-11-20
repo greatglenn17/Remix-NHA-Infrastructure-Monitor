@@ -80,6 +80,11 @@ object RecordSyncSchema {
         db.execSQL("INSERT OR IGNORE INTO sync_state (id, applyingRemote) VALUES (1, 0)")
         // A crash can't leave it on (the apply runs in a transaction), but never trust it across opens.
         db.execSQL("UPDATE sync_state SET applyingRemote = 0")
+        // Record tombstones an older version queued when a project was deleted: without the project they can never be sent.
+        db.execSQL(
+            "DELETE FROM sync_outbox WHERE entityType LIKE '$ENTITY_PREFIX%' AND operation = 'DELETE' " +
+                "AND payloadJson = '{\"projectUuid\":\"\"}' AND state != 'SYNCED'"
+        )
 
         for (table in TABLES) {
             for (op in listOf("insert", "update", "delete")) db.execSQL("DROP TRIGGER IF EXISTS `sync_${table}_$op`")
@@ -95,9 +100,12 @@ object RecordSyncSchema {
                     "$enqueue ($NEW_EVENT_ID, '$ENTITY_PREFIX$table', CASE WHEN OLD.uuid = '' THEN NEW.uuid ELSE OLD.uuid END, " +
                     "'UPSERT', MAX(OLD.revision, NEW.revision) + 1, '{}', $NOW_MS, 0, 'PENDING', ''); END"
             )
-            // The payload keeps what the upload needs once the row is gone.
+            // The payload keeps what the upload needs once the row is gone. A row that goes with its project (the
+            // foreign keys' cascade runs after the project row is gone) queues nothing: the project's own tombstone
+            // takes its records off every phone, and a record tombstone without its project is one the rules refuse.
             db.execSQL(
-                "CREATE TRIGGER `sync_${table}_delete` AFTER DELETE ON `$table` WHEN $LOCAL_WRITE BEGIN " +
+                "CREATE TRIGGER `sync_${table}_delete` AFTER DELETE ON `$table` " +
+                    "WHEN $LOCAL_WRITE AND EXISTS (SELECT 1 FROM projects WHERE id = OLD.projectId) BEGIN " +
                     "$enqueue ($NEW_EVENT_ID, '$ENTITY_PREFIX$table', OLD.uuid, 'DELETE', OLD.revision + 1, " +
                     "'{\"projectUuid\":\"' || IFNULL((SELECT projectUuid FROM projects WHERE id = OLD.projectId), '') || '\"}', " +
                     "$NOW_MS, 0, 'PENDING', ''); END"

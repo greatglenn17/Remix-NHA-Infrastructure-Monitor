@@ -40,15 +40,9 @@ fun AddMonthlyReportDialog(
     var reportingMonth by remember { mutableStateOf(existingReport?.reportingMonth ?: "August 2026") }
     
     // Auto-calculate from Weekly Reports
-    val monthStr = reportingMonth.split(" ").firstOrNull() ?: ""
-    val yearStr = reportingMonth.split(" ").lastOrNull() ?: ""
-
     val monthWeeklyReports = remember(reportingMonth, weeklyReports) {
-        val shortMonth = if (monthStr.length >= 3) monthStr.take(3) else monthStr
-        weeklyReports.filter { 
-            (it.reportingWeek.contains(monthStr, ignoreCase = true) || it.reportingWeek.contains(shortMonth, ignoreCase = true)) && 
-            it.reportingWeek.contains(yearStr, ignoreCase = true)
-        }.sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
+        weeklyReports.filter { com.example.util.BlueBookForms.weekInMonth(it.reportingWeek, reportingMonth) }
+            .sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
     }
 
     // Weekly figures are cumulative (as of the week), so the month stands at its last week, not their sum.

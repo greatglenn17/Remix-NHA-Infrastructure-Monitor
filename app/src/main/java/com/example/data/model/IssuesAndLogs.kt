@@ -134,14 +134,15 @@ val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 1
  * the saved one plus the retention held so far.
  * Given [cost] (the current contract cost), every share and balance is on it instead, so the rows add up to the total
  * under them even after a variation order changed the cost; the website shows the same. Each share is the step in the
- * running total rounded as it is shown, so the shown shares add up to the shown total.
+ * running total rounded as it is shown, so the shown shares add up to the shown total. These run in billing-date order,
+ * as on the website, so a billing entered late still lands in its own month.
  */
 fun netBillings(payments: List<ProjectPayment>, cost: Double = 0.0): List<ProjectPayment> {
     if (cost > 0) {
         fun r2(x: Double) = String.format(java.util.Locale.US, "%.2f", x).toDouble()
         var paid = 0.0
         var shown = 0.0
-        val byId = payments.sortedBy { it.id }.associate { p ->
+        val byId = payments.sortedWith(compareBy({ it.date }, { it.updatedAt })).associate { p ->
             paid += p.netAmount
             val upTo = r2(paid / cost * 100)
             val share = r2(upTo - shown)

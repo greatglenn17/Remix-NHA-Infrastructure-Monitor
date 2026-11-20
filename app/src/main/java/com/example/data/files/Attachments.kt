@@ -279,23 +279,17 @@ object Attachments {
         return runCatching { context.startActivity(intent) }.isSuccess
     }
 
-    /** Uploads or deletes the cloud copy for one `file` outbox event. */
+    /**
+     * Uploads the cloud copy for one `file` outbox event. A delete, which only older versions' clean-up queued, does
+     * nothing: cloud copies stay (see [collectGarbage]), and that clean-up also took lot photos still in use.
+     */
     suspend fun upload(context: Context, event: SyncOutboxEvent) {
+        if (event.operation == "DELETE") return
         val (project, name) = split("$SCHEME:${event.entityUuid}") ?: return
         val cloud = FirebaseStorage.getInstance().reference.child(storagePath(project, name))
-        if (event.operation == "DELETE") {
-            try {
-                cloud.delete().await()
-            } catch (e: StorageException) {
-                // Gone already, or not this account's to delete (another project, or the legacy
-                // path only the Super Admin may touch): a retry could never succeed.
-                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
-            }
-        } else {
-            val file = File(dir(context), name)
-            if (!file.exists() && !fetchMovedCopy(event, name, file)) return
-            cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
-        }
+        val file = File(dir(context), name)
+        if (!file.exists() && !fetchMovedCopy(event, name, file)) return
+        cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
     }
 
     /**
@@ -320,6 +314,7 @@ object Attachments {
     /** Columns that hold attachment references. */
     val referencingColumns = listOf(
         "weekly_reports" to "attachedPhotoUrlsJson",
+        "sdp_lot_progress" to "photosJson",
         "pending_documents" to "fileUrl",
         "project_payments" to "fileUrl",
         "projects" to "latestUpdatePhotoUrl",
@@ -384,8 +379,10 @@ object Attachments {
     }
 
     /**
-     * Deletes local files, and their cloud copies, that no record refers to any more,
-     * e.g. after a report was deleted or a photo removed from it.
+     * Deletes local files that no record on this phone refers to any more, e.g. after a report
+     * was deleted or a photo removed from it. Their cloud copies stay: a record deleted here can
+     * come back from the cloud (the server puts back an approved order a Field Engineer deleted),
+     * and it must still find its file there.
      */
     suspend fun collectGarbage(context: Context, db: AppDatabase) = withContext(Dispatchers.IO) {
         val sql = db.openHelper.writableDatabase
@@ -401,12 +398,6 @@ object Attachments {
             if (file.name.endsWith(".part")) { file.delete(); return@forEach }
             if (!validName.matches(file.name) || file.name in referenced) return@forEach
             file.delete()
-            // Only a file this phone uploaded has a cloud copy whose path it knows; a downloaded
-            // one is left to the phone that added it (a guessed path would fail on every retry).
-            val entity = db.syncOutboxDao().fileEntityFor(file.name) ?: return@forEach
-            db.syncOutboxDao().enqueue(
-                SyncOutboxEvent(entityType = ENTITY_TYPE, entityUuid = entity, operation = "DELETE", revision = 1, payloadJson = "{}")
-            )
         }
     }
 

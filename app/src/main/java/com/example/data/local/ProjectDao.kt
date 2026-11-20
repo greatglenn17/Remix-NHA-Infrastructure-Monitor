@@ -135,7 +135,8 @@ interface ProjectDao {
     @Query("DELETE FROM project_abstracts WHERE id = :id")
     suspend fun deleteProjectAbstract(id: Long)
 
-    @Query("SELECT * FROM project_payments WHERE projectId = :projectId ORDER BY id ASC")
+    // By billing date, as the website lists them and as netBillings works out balances, so the balances run down the list.
+    @Query("SELECT * FROM project_payments WHERE projectId = :projectId ORDER BY date ASC, updatedAt ASC")
     fun getProjectPaymentsForProject(projectId: Long): Flow<List<ProjectPayment>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
