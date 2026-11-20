@@ -1,8 +1,8 @@
 {
-  "versionCode": 313,
-  "versionName": "2.8.33",
-  "releaseNotes": "v2.8.33: Fixes from a full review: lot photos kept, project edits from other devices reach the phone, billings in date order with correct balances, New Year weeks in both months, and faster sync.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.33/NHA_Monitor_v2.8.33_Build313.apk",
-  "apkSha256": "c78db07a3e1d674bb5b4f280df1508ec539e5f86ed48686fc19a51499ba97e3e",
+  "versionCode": 314,
+  "versionName": "2.8.34",
+  "releaseNotes": "v2.8.34: Billings on the same date keep their place when one is edited, on the phone and the website.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.34/NHA_Monitor_v2.8.34_Build314.apk",
+  "apkSha256": "83349be5b5513e1a87d870e6e6038d00f0bfd3f5e4f22e1da6c96a854c4447f7",
   "isMandatory": true
 }
