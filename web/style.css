@@ -282,12 +282,14 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .pl-head b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 /* The mono's full-width point and percent sign are drawn in a little at this size. */
 .pl.big .pl-head .fig { letter-spacing: -0.04em; }
-/* A note too long for the figure's line ("36.56% behind · plan for today 77.81%") moves under it, right-aligned, instead of being cut. */
+/* The label takes its own line, so both figures start at their box's left edge, with the note after the figure. */
+/* A note too long for the figure's line ("36.56% behind · bar chart plan today 77.81%") moves under it, and wraps there if the box is narrower still: it is never cut. */
 .pl.big .pl-head { flex-wrap: wrap; row-gap: 2px; }
-.pl.big .pl-head small { margin-left: auto; }
+.pl.big .pl-head > span { flex-basis: 100%; }
+.pl.big .pl-head small { display: block; white-space: normal; overflow: visible; text-wrap: balance; }
+.pl.big .pl-head small .icon { margin-right: 3px; vertical-align: -3px; }
 /* On a phone the note always takes its own line under the figure. */
-/* There it wraps instead of clipping: a right-aligned flex row that overflows is cut on the left, icon first. */
-@media (max-width: 600px) { .pl.big .pl-head { flex-wrap: wrap; } .pl.big .pl-head small { display: block; flex-basis: 100%; text-align: right; white-space: normal; overflow: visible; text-wrap: balance; } .pl.big .pl-head small .icon { margin-right: 3px; vertical-align: -3px; } }
+@media (max-width: 600px) { .pl.big .pl-head small { flex-basis: 100%; } }
 /* Header bars: taller, with a tick every 10% so an empty bar still reads as a scale. */
 .pl.big .bar { height: 10px; border-radius: 5px; margin-top: 10px;
   background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--tick) calc(10% - 1px) 10%), var(--track); }
