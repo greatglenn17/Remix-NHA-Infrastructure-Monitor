@@ -717,7 +717,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 @page { size: A4; margin: 6mm; }  /* narrow, as the phone's full-page prints (BlueBookForms fullPage) */
 @media print {
   html, body { background: #fff; }
-  .appbar, .no-print { display: none !important; }
+  .appbar, .no-print, .saved { display: none !important; }
   main { padding: 0; max-width: none; }
   .bb-scroll { overflow: visible; padding: 0; }
   .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }

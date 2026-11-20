@@ -261,6 +261,9 @@ function route() {
   window.scrollTo(0, 0);
   s.land = m && s.page?.id === m[1] ? 'tab' : 'page';
   s.landFrom = document.activeElement;
+  // The Saved line belongs to the page it was said on; only a save that opens a page itself (New project) carries it over.
+  if (!savedNote.keep) document.getElementById('saved').hidden = true;
+  savedNote.keep = false;
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
@@ -741,6 +744,7 @@ function projectForm(c = null) {
     const entry = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: uuid, assignedUids: [uid], uid, now, user, ...audit });
     await setDoc(doc(db, 'records', entry.uuid), entry).catch(x => console.warn('The project was saved; its audit entry was not.', x));
     done(); savedNote();
+    savedNote.keep = true;
     location.hash = `#/p/${uuid}`;
   };
   // deleteProject: the phone's own audit entry names no project, so it never reaches the cloud; the tombstone keeps who and when.
@@ -1834,10 +1838,9 @@ function editLot(c, lot) {
       }
       for (const blob of blobs) f.photos.push(await uploadFile(c, blob));
       const saved = L.lotSave(lot, f, { user: s.profile.name || s.user.email, at: `${today()} ${new Date().toTimeString().slice(0, 5)}`, contractor: c.project.contractor || '' });
-      if (saved) {
-        await (lot.progress ? saveEdits(c, [[lot.progress, saved.changes, saved.audits]], 'lot')
-          : addRecords(c, [[ids => L.newLotProgressRecord(ids, lot, saved.changes), saved.audits]]));
-      }
+      if (!saved) { done(); return; }
+      await (lot.progress ? saveEdits(c, [[lot.progress, saved.changes, saved.audits]], 'lot')
+        : addRecords(c, [[ids => L.newLotProgressRecord(ids, lot, saved.changes), saved.audits]]));
       done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
@@ -1883,9 +1886,10 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     button.disabled = true; err.textContent = '';
     try {
-      await save({ progress: picked(), constructionStatus: el.constructionStatus.value, currentActivity: el.currentActivity.value, remarks: el.remarks.value,
+      const wrote = await save({ progress: picked(), constructionStatus: el.constructionStatus.value, currentActivity: el.currentActivity.value, remarks: el.remarks.value,
         ...(contractor == null ? {} : { contractor: el.contractor.value }) });
-      done(); savedNote();
+      done();
+      if (wrote !== false) savedNote(); // false: every lot picked already had these values, so nothing was written
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       button.disabled = false;
@@ -1926,7 +1930,7 @@ function groupProgress(c, lots, done) {
   progressDialog({
     title: `Update ${plural(lots.length, 'lot')}`, saveLabel: `Save to ${plural(lots.length, 'lot')}`,
     note: 'Every lot picked gets this progress, status, activity and remarks. Each keeps its own dates, contractor, photos and billing.',
-  }, async f => { await saveLots(c, L.lotsProgressSave(lots, f, lotWho(c))); done(); });
+  }, async f => { const saves = L.lotsProgressSave(lots, f, lotWho(c)); await saveLots(c, saves); done(); return saves.length > 0; });
 }
 
 /** Set use for the lots picked with group select, after a confirmation; a failure is an alert, as there is no form. */
@@ -2166,11 +2170,11 @@ async function findLots(c, site, el) {
 
 /** The phone's "Lots found in the plan" review (or "No lots found"): what Find lots found, and what adding it replaces. */
 function foundLotsDialog(c, site, areas, page) {
-  const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, named = lots.filter(a => a.lotName).length;
+  const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, withNames = lots.filter(a => a.lotName).length;
   const started = site.lots.filter(l => L.foundLot(l) && l.progress).length;
   const fix = 'Click a lot and set its block and lot in Name & use, or use Number lots to number a block at once (both under More lot tools).';
-  const names = named === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block (under More lot tools) to fix a block.'
-    : named ? `${plural(named, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - named} come in without them. ${fix}`
+  const names = withNames === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block (under More lot tools) to fix a block.'
+    : withNames ? `${plural(withNames, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - withNames} come in without them. ${fix}`
       : `The plan's block and lot numbers could not be read, so the lots come in without them. ${fix}`;
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
@@ -2212,12 +2216,12 @@ function foundLotsDialog(c, site, areas, page) {
 }
 
 // One click on the plan's tools with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
-async function planAct(c, el, run) {
+async function planAct(c, el, run, note = true) {
   if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then try again.'); drawProject(c.page); return; }
   if (el) el.disabled = true;
   try {
     await run();
-    savedNote();
+    if (note) savedNote(); // not after a delete: the plan or the lots going is the answer
     Object.assign(lotState(c.page), { sel: null, more: false, view: null, frame: null, renum: null });
   } catch (x) {
     tell('Not saved', L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.'));
@@ -2246,7 +2250,7 @@ async function deletePlan(c, plan) {
 function bindPlanTools(c) {
   const st = lotState(c.page), { sites, site } = lotSite(c, st);
   const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
-  const act = (el, run) => planAct(c, el, run);
+  const act = (el, run, note) => planAct(c, el, run, note);
   bind('plan-setup', 'ontoggle', el => { st.setup = el.open; });
   bind('plan-scale', 'onclick', () => scaleForm(c, site));
   bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
@@ -2261,14 +2265,14 @@ function bindPlanTools(c) {
     const found = site.lots.filter(L.foundLot), n = found.filter(l => !l.progress).length, kept = found.length - n;
     if (await askDanger(`Remove ${plural(n, 'found lot')}? Lots Find lots added that have no progress yet are taken off the plan on every phone and the website. Lots you added yourself or renumbered stay${
       kept ? `, and so ${kept === 1 ? 'does' : 'do'} the ${plural(kept, 'found lot')} that already ${kept === 1 ? 'has' : 'have'} progress` : ''}. Find lots can add them again.`, `Remove ${plural(n, 'lot')}`)) {
-      act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); });
+      act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); }, false);
     }
   });
   bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
   bind('plan-delete', 'onclick', async el => {
     const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
     if (await askDanger(`Delete SDP v${site.plan.version ?? 1}${of}? This removes the plan and its ${plural(site.lots.length, 'lot')}, with their progress, billing and inspection records, from every phone and the website. This cannot be undone.`, `Delete SDP v${site.plan.version ?? 1}`)) {
-      act(el, () => deletePlan(c, site.plan));
+      act(el, () => deletePlan(c, site.plan), false);
     }
   });
 }
