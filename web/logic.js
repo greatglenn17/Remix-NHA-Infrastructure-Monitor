@@ -1229,6 +1229,14 @@ export function editedRecord(stored, changes, { uid, now, assignedUids }) {
   return { revision: (Number(stored.revision) || 1) + 1, updatedAt: now, updatedByUid: uid, assignedUids, data: JSON.stringify({ ...data, ...changes }) };
 }
 
+/**
+ * RecordSyncSchema.TABLES without audit_logs: what a project page loads at once. The audit log loads only on its
+ * tab, so an old project's history is not read on every visit (sections.test.mjs keeps this in step with the phone).
+ */
+export const PAGE_TYPES = ['weekly_reports', 'monthly_reports', 'pending_documents', 'project_issues', 'project_payments',
+  'sdp_plans', 'sdp_lots', 'sdp_roads', 'sdp_lot_progress', 'sdp_lot_inspections', 'developer_requests', 'contractor_letters',
+  'project_abstracts'];
+
 /** A new audit_logs record (AuditLog synced by RecordSync), with "Website" as the device. */
 export function auditRecord({ uuid, projectUuid, assignedUids, uid, now, user, actionType, details, oldValue = '', newValue = '' }) {
   return {
@@ -1608,6 +1616,13 @@ export const deletedPaymentAudit = p => ({
 export const editedPaymentAudit = p => ({
   actionType: 'Payment Creation', details: `Updated billing: ${p.name}`, oldValue: 'Previous payment info', newValue: `DV: ${p.dvNo}, Gross: ₱${p.grossAmount}`,
 });
+
+/**
+ * Billings by billing date, then by uuid (ProjectDao.getProjectPaymentsForProject, netBillings): an edit never moves
+ * a billing past another of the same date, and the phone lists them in the same order.
+ */
+export const byBillingDate = payments => [...payments].sort((a, b) => String(a.date).localeCompare(String(b.date))
+  || (a.uuid < b.uuid ? -1 : a.uuid > b.uuid ? 1 : 0));
 
 /**
  * A new project_payments record as RecordSync uploads one: the ProjectPayment row without its local ids. Share and

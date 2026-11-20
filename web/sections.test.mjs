@@ -66,6 +66,21 @@ test('billings on the net: the total, and each share and balance after retention
   assert.equal(half[0].percentage.toFixed(2), (1809000 / 20e6 * 100).toFixed(2));
 });
 
+test('billings by date, and two of one date keep their order when one is edited, as on the phone', () => {
+  const a = { uuid: 'b1', date: '2026-10-05', updatedAt: 1 }, b = { uuid: 'a9', date: '2026-10-05', updatedAt: 2 }, early = { uuid: 'z', date: '2026-09-30', updatedAt: 3 };
+  assert.deepEqual(L.byBillingDate([a, b, early]).map(p => p.uuid), ['z', 'a9', 'b1']);
+  assert.deepEqual(L.byBillingDate([{ ...b, updatedAt: 99 }, a, early]).map(p => p.uuid), ['z', 'a9', 'b1']);
+});
+
+test('a project page loads every synced record type but the audit log (RecordSyncSchema.TABLES)', () => {
+  const kt = readFileSync(new URL('../app/src/main/java/com/example/data/local/RecordSyncSchema.kt', import.meta.url), 'utf8');
+  const lists = Object.fromEntries([...kt.matchAll(/val (\w+_TABLES) = listOf\(([^)]*)\)/g)].map(([, name, body]) => [name, [...body.matchAll(/"(\w+)"/g)].map(m => m[1])]));
+  const tables = /val TABLES = ([\w +]+)\r?\n/.exec(kt)[1].split('+').flatMap(n => lists[n.trim()]);
+  assert.ok(tables.includes('audit_logs'));
+  assert.deepEqual([...L.PAGE_TYPES].sort(), tables.filter(t => t !== 'audit_logs').sort());
+  assert.ok(L.PAGE_TYPES.length <= 30); // Firestore's limit for an 'in' filter
+});
+
 test('photo lists in every shape older versions saved, and their titles', () => {
   const a = 'nhafile:11111111-1111-4111-8111-111111111111/aaaaaaaa-0000-4000-8000-000000000001.jpg';
   assert.deepEqual(L.attachmentList(JSON.stringify([a, 'x.pdf'])), [a, 'x.pdf']);
