@@ -279,23 +279,17 @@ object Attachments {
         return runCatching { context.startActivity(intent) }.isSuccess
     }
 
-    /** Uploads or deletes the cloud copy for one `file` outbox event. */
+    /**
+     * Uploads the cloud copy for one `file` outbox event. A delete, which only older versions' clean-up queued, does
+     * nothing: cloud copies stay (see [collectGarbage]), and that clean-up also took lot photos still in use.
+     */
     suspend fun upload(context: Context, event: SyncOutboxEvent) {
+        if (event.operation == "DELETE") return
         val (project, name) = split("$SCHEME:${event.entityUuid}") ?: return
         val cloud = FirebaseStorage.getInstance().reference.child(storagePath(project, name))
-        if (event.operation == "DELETE") {
-            try {
-                cloud.delete().await()
-            } catch (e: StorageException) {
-                // Gone already, or not this account's to delete (another project, or the legacy
-                // path only the Super Admin may touch): a retry could never succeed.
-                if (e.errorCode != StorageException.ERROR_OBJECT_NOT_FOUND && e.errorCode != StorageException.ERROR_NOT_AUTHORIZED) throw e
-            }
-        } else {
-            val file = File(dir(context), name)
-            if (!file.exists() && !fetchMovedCopy(event, name, file)) return
-            cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
-        }
+        val file = File(dir(context), name)
+        if (!file.exists() && !fetchMovedCopy(event, name, file)) return
+        cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()
     }
 
     /**

@@ -106,6 +106,9 @@ test('monthly view: a week over New Year counts in December and the next January
   assert.deepEqual(L.monthReports(weeks, 'January 2026').map(r => r.reportingWeek), ['Jan 10, 2026 - Jan 16, 2026']);
   assert.equal(L.monthReports(weeks, 'January 2027').length, 2);
   assert.equal(L.monthReports(weeks, 'December 2026').length, 2);
+  assert.equal(L.monthReports([{ reportingWeek: 'Oct 24, 2026 - Oct 30, 2026' }], 'Oct 2026').length, 1, 'a short month name still finds its weeks');
+  assert.equal(L.monthReports(weeks, 'jan 2027').length, 2, 'a short or lowercase month goes by dates too');
+  assert.equal(L.monthReports(weeks, 'Jan 2026').length, 1);
   assert.deepEqual(L.reportMonths(weeks, [], '2027-01-05'), ['January 2026', 'December 2026']);
 });
 

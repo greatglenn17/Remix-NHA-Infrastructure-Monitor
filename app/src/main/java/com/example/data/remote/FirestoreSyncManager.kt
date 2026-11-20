@@ -2,6 +2,7 @@ package com.example.data.remote
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import com.example.data.files.Attachments
 import com.example.data.local.AppDatabase
 import com.example.data.local.ProjectDuplicateMerger
@@ -55,6 +56,11 @@ class FirestoreSyncManager(
         const val LAST_SYNCED_AT = "last_synced_at"
         /** Firestore's most writes in one batch. */
         const val RECORD_BATCH = 500
+        /**
+         * Reads record snapshots off the main thread, one at a time so they stay in order: the first one after a start
+         * lists every record. Shared and never shut down, so a listener still delivering after close() cannot crash.
+         */
+        val recordReader: java.util.concurrent.Executor = java.util.concurrent.Executors.newSingleThreadExecutor()
     }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
@@ -66,8 +72,6 @@ class FirestoreSyncManager(
     val lastSyncedAt: StateFlow<Long?> = _lastSyncedAt.asStateFlow()
     private var projectListener: ListenerRegistration? = null
     private var recordListener: ListenerRegistration? = null
-    /** Reads record snapshots off the main thread, one at a time so they stay in order: the first one after a start lists every record. */
-    private val recordReader = java.util.concurrent.Executors.newSingleThreadExecutor()
     /** Reads the role, then attaches the listeners; replaced on every start. */
     private var listenerJob: Job? = null
     private val listenerLock = Any()
@@ -133,7 +137,6 @@ class FirestoreSyncManager(
         authStateListener?.let { auth.removeAuthStateListener(it) }
         authStateListener = null
         stopRealtimeSync()
-        recordReader.shutdown()
     }
 
     /** Reads the role, retrying until the token is available, then attaches the listeners unless stopped meanwhile. */
@@ -601,6 +604,9 @@ class FirestoreSyncManager(
                         uploadProject(project, data, full, superAdmin, currentUser.uid)
 
                         db.syncOutboxDao().markSynced(event.eventId)
+                        // After markSynced, so a snapshot reconcile skipped meanwhile is in this read. Not while another
+                        // edit of the project still waits: the cloud lacks it, and taking the cloud copy would undo it.
+                        if (fields != null && !db.syncOutboxDao().hasPendingFor(project.projectUuid)) adoptCloudCopy(project)
                         syncedCount++
                     } else if (event.operation == "DELETE") {
                         // Mark as deleted in remote
@@ -686,6 +692,31 @@ class FirestoreSyncManager(
     }
 
     /**
+     * Takes the cloud copy of a project this phone just sent only some fields of. Another device may have changed other
+     * fields at the same revision, and reconcile skips that version while this phone's edit waits, and again once it
+     * matches this phone's own. Left alone when this phone changed the project again meanwhile.
+     */
+    private suspend fun adoptCloudCopy(sent: Project) {
+        try {
+            val doc = firestore.collection("projects").document(sent.projectUuid).get(Source.SERVER).await()
+            if (!doc.exists() || doc.getBoolean("isDeleted") == true || doc.getString("name") == null) return
+            // One transaction, so an edit saved meanwhile is never overwritten.
+            db.withTransaction {
+                val local = db.projectDao().getProjectByUuid(sent.projectUuid) ?: return@withTransaction
+                if (local.revision != sent.revision || local.updatedAt != sent.updatedAt) return@withTransaction
+                db.projectDao().updateProject(local.withRemote(doc.data.orEmpty()).copy(
+                    revision = doc.getLong("revision") ?: local.revision,
+                    updatedAt = doc.getLong("updatedAt") ?: local.updatedAt
+                ))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(tag, "Could not read back project ${sent.projectUuid}; it is taken at its next change", e)
+        }
+    }
+
+    /**
      * Sends [docs] (record uuid -> document and whether it merges) in one batch and settles their [events]; one at a
      * time took a round trip each. One refused write fails the whole batch, so then they go one by one and only the
      * refused ones stay queued. Empties both maps; returns how many were sent.
@@ -748,7 +779,8 @@ class FirestoreSyncManager(
                 if (data.size < full.size) ref.update(withList(data)).await() else ref.set(withList(data), SetOptions.merge()).await()
             } catch (e: FirebaseFirestoreException) {
                 if (e.code != FirebaseFirestoreException.Code.NOT_FOUND) throw e
-                ref.set(withList(full), SetOptions.merge()).await()
+                // full + data: data may carry the bar chart, which full leaves out.
+                ref.set(withList(full + data), SetOptions.merge()).await()
             }
             return
         }
@@ -757,7 +789,7 @@ class FirestoreSyncManager(
         } catch (e: FirebaseFirestoreException) {
             if (e.code != FirebaseFirestoreException.Code.NOT_FOUND && e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
             val list = AssignmentPolicy.projectUploadFields(false, exists = false, myUid = uid, localAssignedUids = project.assignedUids)!!
-            ref.set(full + ("assignedUids" to list)).await()
+            ref.set(full + data + ("assignedUids" to list)).await()
             // The records uploaded next must carry the same list as the project.
             recordSync.setAssignedUidsLocally(project.projectUuid, AssignedUids.toJson(list))
         }

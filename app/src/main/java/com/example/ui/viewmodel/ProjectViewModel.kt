@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import com.example.data.auth.AuthManager
+import androidx.room.withTransaction
 import com.example.data.local.AppDatabase
 import com.example.data.local.WeeklyReportWeatherWriter
 import com.example.data.model.*
@@ -2123,6 +2124,14 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                         payloadJson = "{\"projectUuid\":\"${projectToDelete.projectUuid}\",\"isDeleted\":true}"
                     )
                 )
+                // The Super Admin's delete also clears the project's records in the cloud: removed first, while the
+                // project is still here, their triggers queue the tombstones. Other roles keep what they had before:
+                // the project's tombstone takes the records off every phone, and the cloud copies stay.
+                if (currentUserAccount.value.role == UserRole.SUPER_ADMIN) database.withTransaction {
+                    for (table in com.example.data.local.RecordSyncSchema.TABLES.reversed()) {
+                        database.openHelper.writableDatabase.execSQL("DELETE FROM `$table` WHERE projectId = ?", arrayOf(projectId))
+                    }
+                }
             }
             repository.deleteProjectById(projectId, currentUserAccount.value.role)
             if (_selectedProjectId.value == projectId) {

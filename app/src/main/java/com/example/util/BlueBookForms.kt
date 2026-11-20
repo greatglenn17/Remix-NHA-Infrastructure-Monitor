@@ -652,7 +652,9 @@ object BlueBookForms {
      * names the month (or its first 3 letters) and its year.
      */
     fun weekInMonth(reportingWeek: String, month: String): Boolean {
-        weekMonths(reportingWeek)?.let { months -> return months.any { it.equals(month.trim(), ignoreCase = true) } }
+        // A month that reads ("October 2026", "oct 2026") is compared by dates; anything else goes by its words, as before.
+        val full = runCatching { YearMonth.parse(month.trim(), TYPED_MONTH) }.getOrNull()?.format(MONTH)
+        if (full != null) weekMonths(reportingWeek)?.let { months -> return full in months }
         val name = month.split(" ").firstOrNull().orEmpty()
         val year = month.split(" ").lastOrNull().orEmpty()
         return (reportingWeek.contains(name, ignoreCase = true) || reportingWeek.contains(name.take(3), ignoreCase = true)) &&
@@ -692,6 +694,9 @@ object BlueBookForms {
 
     private val LONG_DATE = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH)
     private val MONTH = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+    /** A month as typed on the monthly form: full or short name, any case. */
+    private val TYPED_MONTH = java.time.format.DateTimeFormatterBuilder().parseCaseInsensitive()
+        .appendPattern("[MMMM][MMM] yyyy").toFormatter(Locale.ENGLISH)
     private val WEEK_FORMATS = listOf("MMM d, yyyy", "MMMM d, yyyy").map { DateTimeFormatter.ofPattern(it, Locale.ENGLISH) }
     // The reporting week runs Saturday to Friday.
     private val WEEK_DAYS = listOf("Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday")

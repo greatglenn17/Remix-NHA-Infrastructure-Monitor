@@ -1904,42 +1904,49 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
  * shortcut: 100 lots a write (Firestore takes 500 changes in one), so a save that stops partway leaves the earlier lots
  * saved; saving again skips those and finishes the rest, as long as the saves are built from freshLots.
  */
-async function saveLots(c, saves) {
-  const edits = saves.filter(([lot]) => lot.progress).map(([lot, x]) => [lot.progress, x.changes, x.audits]);
+async function saveLots(c, saves, saved) {
+  const lotEdits = saves.filter(([lot]) => lot.progress);
   const adds = saves.filter(([lot]) => !lot.progress).map(([lot, x]) => [ids => L.newLotProgressRecord(ids, lot, x.changes), x.audits]);
-  for (let i = 0; i < edits.length; i += 100) await saveEdits(c, edits.slice(i, i + 100), 'lot');
+  for (let i = 0; i < lotEdits.length; i += 100) {
+    const batch = lotEdits.slice(i, i + 100);
+    await saveEdits(c, batch.map(([lot, x]) => [lot.progress, x.changes, x.audits]), 'lot');
+    batch.forEach(([lot]) => saved.add(lot.uuid));
+  }
   for (let i = 0; i < adds.length; i += 100) await addRecords(c, adds.slice(i, i + 100));
 }
 
 /**
- * `lots` as the project's records have them now. A form keeps the lots it opened with, so after a save that stopped
- * partway they would still read as having no progress record, and saving again would add a second one.
+ * `lots` with the progress record each has now, for the ones that had none when the form opened (after a save that
+ * stopped partway they would still read as having none, and saving again would add a second one) and the ones this
+ * form already saved (`saved`, lot uuids, kept across its retries). Any other lot keeps its record as opened, so
+ * saveEdits still refuses a form opened before another device changed it.
  */
-function freshLots(c, lots) {
+function freshLots(c, lots, saved) {
   const now = new Map(L.sdpSites(c.page.records || []).flatMap(x => x.lots).map(l => [l.uuid, l]));
-  return lots.map(l => now.get(l.uuid) || l);
+  return lots.map(l => (l.progress && !saved.has(l.uuid) ? l : now.get(l.uuid) || l));
 }
 
 /** Record inspection on a lot's card: the snapshot joins the lot's inspection history, and the lot's progress is set to match it. */
 function inspectLot(c, lot) {
-  const p = lot.progress || {};
+  const p = lot.progress || {}, saved = new Set();
   progressDialog({
     title: `Record inspection: ${L.lotLabel(lot)}`, note: 'This keeps a snapshot of the lot as inspected, for its inspection history, and sets the lot\'s progress to match.',
     pct: L.lotProgress(lot), road: L.lotUse(lot) === 'Road Lot', status: p.constructionStatus ?? 'Not Started', activity: p.currentActivity || '',
     contractor: p.contractor || c.project.contractor || '', remarksLabel: 'Inspection field remarks', saveLabel: 'Record inspection',
   }, async f => {
-    const [now] = freshLots(c, [lot]), x = L.lotInspection(now, f, lotWho(c));
-    if (x.progress) await saveLots(c, [[now, x.progress]]);
+    const [now] = freshLots(c, [lot], saved), x = L.lotInspection(now, f, lotWho(c));
+    if (x.progress) await saveLots(c, [[now, x.progress]], saved);
     await addRecords(c, [[x.build, x.audit]]);
   });
 }
 
 /** Update progress for the lots picked with group select: one progress, status, activity and remarks for all of them. */
 function groupProgress(c, lots, done) {
+  const saved = new Set();
   progressDialog({
     title: `Update ${plural(lots.length, 'lot')}`, saveLabel: `Save to ${plural(lots.length, 'lot')}`,
     note: 'Every lot picked gets this progress, status, activity and remarks. Each keeps its own dates, contractor, photos and billing.',
-  }, async f => { const saves = L.lotsProgressSave(freshLots(c, lots), f, lotWho(c)); await saveLots(c, saves); done(); return saves.length > 0; });
+  }, async f => { const saves = L.lotsProgressSave(freshLots(c, lots, saved), f, lotWho(c)); await saveLots(c, saves, saved); done(); return saves.length > 0; });
 }
 
 /** Set use for the lots picked with group select, after a confirmation; a failure is an alert, as there is no form. */

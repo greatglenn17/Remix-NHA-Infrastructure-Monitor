@@ -747,9 +747,13 @@ export function reportMonths(weekly, monthly, today) {
 export function monthReports(weekly, month) {
   const parts = month.split(' ');
   const name = (parts[0] || '').toLowerCase(), year = (parts[parts.length - 1] || '').toLowerCase();
+  // A month that reads ("October 2026", "oct 2026") is compared by dates; anything else goes by its words, as before.
+  const m = /^([A-Za-z]+)\.? (\d{4})$/.exec(month.trim());
+  const i = m ? MONTHS.findIndex(x => x.toLowerCase() === m[1].toLowerCase() || x.slice(0, 3).toLowerCase() === m[1].toLowerCase()) : -1;
+  const full = i < 0 ? null : `${MONTHS[i]} ${m[2]}`;
   return weekly.filter(r => {
-    const read = weekMonths(r.reportingWeek);
-    if (read) return read.some(x => x.toLowerCase() === month.toLowerCase());
+    const read = full && weekMonths(r.reportingWeek);
+    if (read) return read.includes(full);
     const w = (r.reportingWeek || '').toLowerCase();
     return (w.includes(name) || w.includes(name.slice(0, 3))) && w.includes(year);
   }).sort(byWeek);
