@@ -82,6 +82,15 @@ describe('outsider', () => {
   it('cannot read file of a missing project', () => assertFails(getBytes(ref(asOther().storage(), 'attachments/NOPE/f.jpg'))));
 });
 
+describe('website project page, assigned engineer', () => {
+  const page = (...f) => getDocs(query(collection(asEng().firestore(), 'records'), where('projectUuid', '==', 'P'), ...f, where('assignedUids', 'array-contains', 'eng')));
+  it('lists the records by type (no audit log)', async () => {
+    const snap = await assertSucceeds(page(where('type', 'in', ['project_payments', 'weekly_reports'])));
+    if (snap.size !== 0) throw new Error('record R has no type, so it is not listed');
+  });
+  it('lists the audit log on its own', () => assertSucceeds(page(where('type', '==', 'audit_logs'))));
+});
+
 for (const [name, ctx, uid] of [['super viewer', asSuperViewer, 'boss'], ['see-all engineer', asSeesAll, 'other']]) {
   describe(`${name}, not assigned`, () => {
     it('gets the project', () => assertSucceeds(getDoc(doc(ctx().firestore(), 'projects/P'))));

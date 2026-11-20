@@ -112,4 +112,14 @@ class BillingEditTest {
         assertEquals(9000.0, net.getValue(9L).balanceAmount, 1e-9)
         assertEquals(7000.0, net.getValue(2L).balanceAmount, 1e-9)
     }
+    // Two billings of one date keep their order when one is edited (a later updatedAt), as on the website.
+    @Test
+    fun netBillings_sameDateKeepTheirOrderAfterAnEdit() {
+        val a = first.copy(uuid = "a", date = "2026-10-05")
+        val b = second.copy(uuid = "b", date = "2026-10-05")
+        val before = netBillings(listOf(a, b), 10_000.0).associateBy { it.id }
+        val after = netBillings(listOf(b, a.copy(updatedAt = Long.MAX_VALUE)), 10_000.0).associateBy { it.id }
+        assertEquals(9000.0, before.getValue(1L).balanceAmount, 1e-9)
+        assertEquals(listOf(9000.0, 7000.0), listOf(1L, 2L).map { after.getValue(it).balanceAmount })
+    }
 }

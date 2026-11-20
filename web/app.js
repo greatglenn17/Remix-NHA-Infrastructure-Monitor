@@ -1017,7 +1017,7 @@ function tile(it) {
 /* ---------- Project page (ProjectHeader, the five ProjectSection tabs) ---------- */
 
 function renderProject(projectUuid, section, sub) {
-  const page = s.page = { id: projectUuid, project: undefined, records: null, error: null, section, sub, chips: {}, month: null };
+  const page = s.page = { id: projectUuid, project: undefined, records: null, audits: null, error: null, section, sub, chips: {}, month: null };
   main.innerHTML = '<p class="muted">Loading project…</p>';
   announce('Loading project…');
   freshScreen();
@@ -1026,7 +1026,7 @@ function renderProject(projectUuid, section, sub) {
     page.project = d.exists() && d.data().isDeleted !== true ? { ...d.data(), projectUuid: d.id } : null;
     draw();
   }, e => { console.warn('project:', e.code || e); page.error = L.errorText(e, 'This account cannot open this project. Ask the Super Admin to assign it to you.', 'Could not load this project. Reload the page to try again.'); draw(); }));
-  s.unsubPage.push(onSnapshot(scoped('records', where('projectUuid', '==', projectUuid)), snap => {
+  s.unsubPage.push(onSnapshot(scoped('records', where('projectUuid', '==', projectUuid), where('type', 'in', L.PAGE_TYPES)), snap => {
     page.records = snap.docs.map(d => L.parseRecord({ ...d.data(), uuid: d.id })).filter(r => !r.isDeleted);
     draw();
   }, e => { console.warn('project records:', e.code || e); page.error = `Could not load this project's records. ${L.errorText(e, 'This account cannot read them.', 'Reload the page to try again.')}`; draw(); }));
@@ -1070,11 +1070,10 @@ function drawProject(page) {
   // Until both the project and its records have answered: an empty records list would read as "none yet".
   if (stored === undefined || (stored && records === null)) return;
   if (stored === null) { drawOnce(main, `${backLink}<p class="muted" role="alert">This project was deleted or does not exist.</p>`); settle(); return; }
-  const of = type => records.filter(r => r.type === type);
+  const of = type => (type === 'audit_logs' ? page.audits || [] : records.filter(r => r.type === type));
   const documents = of('pending_documents');
   const project = L.withSchedule(stored, documents, today());
-  // Room lists billings by local id (creation order); the cloud has no id, so date then last edit.
-  const payments = of('project_payments').sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.updatedAt - b.updatedAt);
+  const payments = L.byBillingDate(of('project_payments'));
   // The phone lists weekly reports newest added first.
   const weekly = of('weekly_reports').sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0));
   const cost = L.currentCost(project, documents);
@@ -2763,7 +2762,19 @@ function weatherView({ page, weekly, project }) {
 
 const auditState = page => (page.audit ||= { query: '', filter: 'All' });
 
+/** The project's audit log, read the first time its tab opens and live after that (renderProject leaves it out). */
+function listenAudits(page) {
+  page.audits = undefined;
+  s.unsubPage.push(onSnapshot(scoped('records', where('projectUuid', '==', page.id), where('type', '==', 'audit_logs')), snap => {
+    page.audits = snap.docs.map(d => L.parseRecord({ ...d.data(), uuid: d.id })).filter(r => !r.isDeleted);
+    if (page === s.page) drawProject(page);
+  }, e => { console.warn('audit log:', e.code || e); page.audits = []; page.auditError = L.errorText(e, 'This account cannot read the audit log.', 'Could not load the audit log. Reload the page to try again.'); if (page === s.page) drawProject(page); }));
+}
+
 function auditView(c) {
+  if (c.page.audits === null) listenAudits(c.page);
+  if (c.page.auditError) return `<p class="error" role="alert">${esc(c.page.auditError)}</p>`;
+  if (c.page.audits === undefined) return '<p class="muted">Loading audit log…</p>';
   const st = auditState(c.page);
   return `<label class="field issue-q">Search<input type="search" id="audit-q" placeholder="Search audit logs (user, action, details, device)..." value="${esc(st.query)}" autocomplete="off"></label>
     <div class="chips" role="group" aria-label="Filter audit log">${L.AUDIT_FILTERS.map(f => `<button data-audit-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div>
