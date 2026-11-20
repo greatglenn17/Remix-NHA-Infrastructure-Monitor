@@ -1,8 +1,8 @@
 {
-  "versionCode": 312,
-  "versionName": "2.8.32",
-  "releaseNotes": "v2.8.32: The billing abstract print now shows the abstract's own Target and Actual Accomplishment, the same as Print abstract.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.32/NHA_Monitor_v2.8.32_Build312.apk",
-  "apkSha256": "e38c2e891931d56afd9f23f84cd2a3aa9f2d5de6a2687c22b0c495e0d6a14456",
+  "versionCode": 313,
+  "versionName": "2.8.33",
+  "releaseNotes": "v2.8.33: Fixes from a full review: lot photos kept, project edits from other devices reach the phone, billings in date order with correct balances, New Year weeks in both months, and faster sync.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.33/NHA_Monitor_v2.8.33_Build313.apk",
+  "apkSha256": "c78db07a3e1d674bb5b4f280df1508ec539e5f86ed48686fc19a51499ba97e3e",
   "isMandatory": true
 }
