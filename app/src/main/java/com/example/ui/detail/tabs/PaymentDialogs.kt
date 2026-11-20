@@ -80,7 +80,8 @@ fun AddPaymentDialog(
     val unitsErr = if (!byUnit) null else if (unitsStr.isBlank()) "Required" else if (units == null) "Enter a whole number" else null
     val priceErr = if (typed) FormValidation.amountError(priceStr, true) else null
     var ahead by remember(type, amountStr, unitsStr, priceStr, date) { mutableStateOf("") }
-    val gross = if (byUnit) (units ?: 0) * (FormValidation.parseAmount(priceStr) ?: 0.0) else FormValidation.parseAmount(amountStr) ?: 0.0
+    // Rounded to the centavo, as on the website (logic.js billingGross).
+    val gross = if (byUnit) Math.round((units ?: 0) * (FormValidation.parseAmount(priceStr) ?: 0.0) * 100) / 100.0 else FormValidation.parseAmount(amountStr) ?: 0.0
     val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)

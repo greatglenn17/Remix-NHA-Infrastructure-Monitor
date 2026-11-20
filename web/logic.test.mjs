@@ -345,6 +345,7 @@ test('website edits: a new billing is the record the app uploads, with share and
   // A housing billing: units × amount per unit, named after its type when the name is blank.
   const unit = { ...f, name: '', billingType: 'M1 - Housing unit', units: '5', unitPrice: '800,000.00', grossAmount: '' };
   assert.equal(L.billingGross(unit), 4000000);
+  assert.equal(L.billingGross({ ...unit, units: '3', unitPrice: '123,456.78' }), 370370.34, 'saved to the centavo');
   assert.deepEqual(L.billingErrors(unit), []);
   const d = JSON.parse(L.newPaymentRecord(ctx, unit, [], 0).data);
   assert.deepEqual([d.name, d.units, d.unitPrice, d.percentage, d.balanceAmount, d.balancePercentage], ['M1 - Housing unit', 5, 800000, 0, -4000000, 0]);
@@ -866,10 +867,12 @@ test('new project: who may add one, what stops the form, the document a phone wo
     newValue: 'Title: Pandi Heights, Location: Pandi, Bulacan, Cost: ₱4000000.5, Duration: 365 days' });
   assert.equal(L.isCompleted(project), false);
 
-  // The same fields a phone uploads for a project (FirestoreSyncManager), plus the two it adds for a new one.
-  const kt = (await import('node:fs')).readFileSync(new URL('../app/src/main/java/com/example/data/remote/FirestoreSyncManager.kt', import.meta.url), 'utf8');
-  const upload = kt.slice(kt.indexOf('"projectUuid" to project.projectUuid'), kt.indexOf('"isDeleted" to (event.operation'));
-  assert.deepEqual(Object.keys(project).sort(), [...[...upload.matchAll(/"(\w+)" to/g)].map(m => m[1]), 'isDeleted', 'assignedUids', 'barChartJson'].sort());
+  // The same fields a phone uploads for a project (ProjectDocument.projectFields and FirestoreSyncManager's sync fields), plus the two it adds for a new one.
+  const { readFileSync } = await import('node:fs');
+  const read = name => readFileSync(new URL(`../app/src/main/java/com/example/data/remote/${name}`, import.meta.url), 'utf8');
+  const doc = read('ProjectDocument.kt'), kt = read('FirestoreSyncManager.kt');
+  const upload = doc.slice(doc.indexOf('fun projectFields'), doc.indexOf('/** The fields of')) + kt.slice(kt.indexOf('val full = hashMapOf'), kt.indexOf('// An edit sends'));
+  assert.deepEqual(Object.keys(project).sort(), [...upload.matchAll(/"(\w+)" to|put\("(\w+)"/g)].map(m => m[1] || m[2]).concat('assignedUids', 'barChartJson').sort());
 
   // Finished before the app: saved at the final accomplishment on the actual date; no scope leaves the cost at 0.
   const old = L.newProject({ ...done, completedOn: '2026-06-30', final: '98.5', scope: [], projectType: ' ', landArea: '', assignedStaff: 'Engr. Reyes', days: '180' }, { uuid: 'p8', uid: 'u1', now: 1, user: 'Engr. Cruz' });

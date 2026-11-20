@@ -3825,17 +3825,24 @@ function billingForm(c, old = null) {
   d.showModal();
 }
 
-/** ProjectViewModel.addProjectPayment: the billing and its audit entry in one batch, against the billings shown now. */
+/**
+ * ProjectViewModel.addProjectPayment: the billing and its audit entry, against the billings shown now. The project's
+ * billingStamp names the last billing added here; when another one was added since this page read the project, the
+ * check above it and the saved balance would leave that one out, so the save is refused.
+ */
 async function addBilling(c, f) {
-  const uid = s.user.uid, now = Date.now();
-  const project = await getDoc(doc(db, 'projects', c.page.id));
-  const assignedUids = project.get('assignedUids') ?? [];
-  const payment = L.newPaymentRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now }, f, c.payments, c.cost);
-  const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...L.newPaymentAudit(payment) });
-  const batch = writeBatch(db);
-  batch.set(doc(db, 'records', payment.uuid), payment);
-  batch.set(doc(db, 'records', audit.uuid), audit);
-  await batch.commit();
+  const uid = s.user.uid;
+  await runTransaction(db, async t => {
+    const project = await t.get(doc(db, 'projects', c.page.id)), now = Date.now();
+    if ((project.get('billingStamp') ?? '') !== (c.project.billingStamp ?? '')) throw new Error('Another billing was just added. Close this form and add this one again.');
+    const assignedUids = project.get('assignedUids') ?? [];
+    const payment = L.newPaymentRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now }, f, c.payments, c.cost);
+    const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...L.newPaymentAudit(payment) });
+    t.set(doc(db, 'records', payment.uuid), payment);
+    t.set(doc(db, 'records', audit.uuid), audit);
+    // updatedByUid too: the rules refuse a project write still carrying the duplicate guard's.
+    t.update(project.ref, { billingStamp: payment.uuid, updatedByUid: uid });
+  });
 }
 
 /** PhotoGalleryTab: one album per reporting week, in report order. */

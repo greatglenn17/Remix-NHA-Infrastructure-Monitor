@@ -49,3 +49,6 @@ rules-tests/*-debug.log
 
 # design-taste-frontend working files
 .taste-skill/
+
+# Antigravity agent transcripts (hold email addresses)
+.antigravity/

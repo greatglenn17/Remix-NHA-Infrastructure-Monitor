@@ -104,4 +104,12 @@ class BillingEditTest {
         assertEquals(listOf(91.67, 76.67, 51.67), listOf(1L, 2L, 3L).map { net.getValue(it).balancePercentage })
         assertEquals("%.2f".format(java.util.Locale.US, 5800.0 / 12000 * 100), "%.2f".format(java.util.Locale.US, net.values.sumOf { it.percentage }))
     }
+    // A billing entered after a later-dated one still counts in its own date's place, as on the website.
+    @Test
+    fun netBillings_onTheCurrentCostGoByDate() {
+        val late = first.copy(id = 9, date = "2026-09-30")
+        val net = netBillings(listOf(second, late), 10_000.0).associateBy { it.id }
+        assertEquals(9000.0, net.getValue(9L).balanceAmount, 1e-9)
+        assertEquals(7000.0, net.getValue(2L).balanceAmount, 1e-9)
+    }
 }

@@ -9,7 +9,6 @@ import java.time.format.DateTimeFormatter
 import com.example.data.auth.AuthManager
 import com.example.data.local.AppDatabase
 import com.example.data.local.WeeklyReportWeatherWriter
-import com.example.data.local.barChartPayload
 import com.example.data.model.*
 import kotlinx.coroutines.tasks.await
 import com.example.data.remote.AssignmentPolicy
@@ -303,6 +302,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     private val notificationDao: com.example.data.local.NotificationDao
     val notifications: StateFlow<List<AppNotification>>
     val unreadNotificationCount: StateFlow<Int>
+
+    // Backing out of the app and opening it again makes a new ViewModel; this one's listeners must not stay behind.
+    override fun onCleared() {
+        firestoreSyncManager.close()
+        super.onCleared()
+    }
 
     init {
         database = AppDatabase.getDatabase(application, viewModelScope)
@@ -1876,7 +1881,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                     entityUuid = updatedProject.projectUuid,
                     operation = "UPDATE",
                     revision = updatedProject.revision,
-                    payloadJson = "{\"projectUuid\":\"${updatedProject.projectUuid}\",\"name\":\"${updatedProject.name.replace("\"", "\\\"")}\"}"
+                    payloadJson = com.example.data.remote.projectEditPayload(updatedProject.projectUuid, com.example.data.remote.changedProjectFields(current, updatedProject))
                 )
             )
             logAuditAction(
@@ -2035,7 +2040,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(missingProjectGuard) {
             selectedProject.value?.let { current ->
                 if (current.id == projectId) {
-                    val updated = keepStoredCompletion(current, projectDao.getProjectByIdOnce(projectId)).copy(
+                    val stored = projectDao.getProjectByIdOnce(projectId)
+                    val updated = keepStoredCompletion(current, stored).copy(
                         status = newStatus,
                         revision = current.revision + 1,
                         updatedAt = System.currentTimeMillis(),
@@ -2048,7 +2054,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                             entityUuid = updated.projectUuid,
                             operation = "UPDATE",
                             revision = updated.revision,
-                            payloadJson = "{\"projectUuid\":\"${updated.projectUuid}\",\"status\":\"$newStatus\"}"
+                            payloadJson = com.example.data.remote.projectEditPayload(updated.projectUuid, com.example.data.remote.changedProjectFields(stored, updated))
                         )
                     )
                     logAuditAction(
@@ -2076,7 +2082,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
      * the DAO directly skips the revision bump and the outbox, so other phones never see it.
      */
     private suspend fun saveProjectChange(updated: Project, barChart: Boolean = false, newCompletion: Boolean = false) {
-        val kept = if (newCompletion) updated else keepStoredCompletion(updated, projectDao.getProjectByIdOnce(updated.id))
+        val stored = projectDao.getProjectByIdOnce(updated.id)
+        val kept = if (newCompletion) updated else keepStoredCompletion(updated, stored)
         val versioned = kept.copy(
             revision = updated.revision + 1,
             updatedAt = System.currentTimeMillis(),
@@ -2089,8 +2096,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
                 entityUuid = versioned.projectUuid,
                 operation = "UPDATE",
                 revision = versioned.revision,
-                // Only a bar chart save uploads the chart (see barChartPayload).
-                payloadJson = if (barChart) barChartPayload(versioned.projectUuid) else "{\"projectUuid\":\"${versioned.projectUuid}\"}"
+                // Only a bar chart save uploads the chart.
+                payloadJson = com.example.data.remote.projectEditPayload(versioned.projectUuid, com.example.data.remote.changedProjectFields(stored, versioned), barChart)
             )
         )
     }

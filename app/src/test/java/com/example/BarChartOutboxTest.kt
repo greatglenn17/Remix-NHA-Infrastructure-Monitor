@@ -3,8 +3,8 @@ package com.example
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.AppDatabase
-import com.example.data.local.barChartPayload
 import com.example.data.model.SyncOutboxEvent
+import com.example.data.remote.projectEditPayload
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -29,10 +29,10 @@ class BarChartOutboxTest {
     @Test
     fun onlyAPendingChartSaveCounts() = runBlocking {
         val dao = database.syncOutboxDao()
-        dao.enqueue(event("p1", "{\"projectUuid\":\"p1\"}"))
+        dao.enqueue(event("p1", projectEditPayload("p1", listOf("name"))))
         assertFalse("an ordinary project save", dao.hasPendingBarChartFor("p1"))
 
-        val chart = event("p1", barChartPayload("p1"))
+        val chart = event("p1", projectEditPayload("p1", listOf("name"), barChart = true))
         dao.enqueue(chart)
         assertTrue(dao.hasPendingBarChartFor("p1"))
         assertFalse("another project", dao.hasPendingBarChartFor("p2"))

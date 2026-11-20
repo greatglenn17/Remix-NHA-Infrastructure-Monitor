@@ -1469,7 +1469,8 @@ export function monthPeriod(day) {
 
 const billedByUnit = f => Boolean(f.billingType) && !billedByAmount(f.billingType);
 /** AddPaymentDialog's gross: units × amount per lot or unit for a housing billing type counted in whole ones, else the gross typed. */
-export const billingGross = f => (billedByUnit(f) ? (Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) : parseAmount(f.grossAmount) ?? 0);
+// Rounded to the centavo: 3 × 123,456.78 would otherwise save as 370370.33999999997.
+export const billingGross = f => (billedByUnit(f) ? Math.round((Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) * 100) / 100 : parseAmount(f.grossAmount) ?? 0);
 
 /** AddPaymentDialog's checks (FormValidation.amountError), plus a valid date. */
 export function billingErrors(f) {
