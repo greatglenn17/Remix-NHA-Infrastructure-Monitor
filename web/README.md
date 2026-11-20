@@ -398,7 +398,13 @@ is read only.
   changed are rewritten; the other stored days stay exactly as they were.
 - **Users** (Super Admin only, in the header) is the app's "Manage users & roles": approve a new account, give one of
   Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
-  `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access.
+  `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access. A role change asks
+  first ("Change Maria Santos to Viewer?"); Approve and "See all projects" apply at once.
+- **Saved line** (`savedNote`): once a save has gone through, "Saved. Phones get it on their next sync." shows at the
+  foot of the window until the next key or click or until another page opens, and is said to screen readers through the
+  status line. It is not printed. Every form's
+  Save calls it, and so do the saves without a form (the plan tools, renumbering a block, a redrawn lot outline). A
+  failed save shows its error instead. Deletes show no line, and the Users screen and the abstracts keep their own.
 - Roles come from the same custom claims. The Super Admin, Super Viewers and accounts with
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).

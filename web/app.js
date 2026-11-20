@@ -143,7 +143,8 @@ function land() {
   const to = (s.land === 'tab' && main.querySelector('nav.tabs [aria-current="page"]')) || main.querySelector('.print-bar .back') || main.querySelector('h1') || main.querySelector('.back');
   if (!to) return; // still loading: the next draw lands
   s.land = null;
-  announce('');
+  const note = document.getElementById('saved');
+  announce(note.hidden ? '' : note.textContent); // a save that opened this page (New project) is still said
   // The user already moved on while it loaded (typing in search, a header link): focus stays where they put it.
   const at = document.activeElement;
   if (at && at !== document.body && at !== s.landFrom && at.isConnected) return;
@@ -166,6 +167,17 @@ function announce(text, wait = 100) {
   // Emptied first and filled a moment later, so the same words twice are read twice.
   if (text) announce.t = setTimeout(() => { say.textContent = text; }, wait);
 }
+
+/**
+ * After a save: one quiet line at the foot of the window, there until the next key or click, and the same words for
+ * screen readers. Only called once the write has gone through.
+ */
+function savedNote(text = 'Saved. Phones get it on their next sync.') {
+  const note = document.getElementById('saved');
+  note.textContent = text; note.hidden = false;
+  announce(text);
+}
+for (const type of ['keydown', 'pointerdown']) document.addEventListener(type, e => { if (!e.repeat) document.getElementById('saved').hidden = true; }, true);
 
 /** Every bar on a freshly opened screen fills in once; later redraws (typing in search) stay still. */
 function freshScreen() {
@@ -249,6 +261,9 @@ function route() {
   window.scrollTo(0, 0);
   s.land = m && s.page?.id === m[1] ? 'tab' : 'page';
   s.landFrom = document.activeElement;
+  // The Saved line belongs to the page it was said on; only a save that opens a page itself (New project) carries it over.
+  if (!savedNote.keep) document.getElementById('saved').hidden = true;
+  savedNote.keep = false;
   document.title = 'NHA Monitor';
   // Another section of the open project: keep its listeners and redraw.
   if (m && s.page?.id === m[1]) {
@@ -443,7 +458,7 @@ async function editProfile() {
       // syncUserProfile's fields; role, approval and "See all projects" stay as they are.
       await updateDoc(doc(db, 'users', s.user.uid), { displayName: f.name, position: f.position, office: f.office, updatedAt: Date.now() });
       s.profile = { name: f.name, title: f.position, office: f.office };
-      done();
+      done(); savedNote('Profile saved.');
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot change its profile.', 'Could not save. Try again.');
       save.disabled = false;
@@ -476,12 +491,16 @@ function renderUsers() {
     list.innerHTML = users.length ? users.map(userCard).join('') : '<li class="empty">No other users have registered yet.</li>';
     if (again) list.querySelector(again)?.focus();
   }, e => { list.innerHTML = `<li class="empty error"><span role="alert">Could not load users. ${esc(L.errorText(e, 'This account cannot read the user list.', 'Reload the page to try again.'))}</span></li>`; }));
-  list.onclick = e => {
+  list.onclick = async e => {
     const b = e.target.closest('button[data-uid]');
     const user = b && users.find(u => u.uid === b.dataset.uid);
     if (!user || b.getAttribute('aria-pressed') === 'true') return;
     if (b.dataset.approve !== undefined) setUser(user, { approved: true }, `${user.name} is approved. It applies the next time they open the app.`, say);
-    else setUser(user, { role: b.dataset.role }, `${user.name} is now ${ROLE_LABELS[b.dataset.role]}. It applies the next time they open the app.`, say);
+    // One click on the wrong segment would change what a person can open, so a role change asks first.
+    else if (await ask(`Change ${user.name} to ${ROLE_LABELS[b.dataset.role]}?`, { action: 'Change role',
+      detail: `They are ${ROLE_LABELS[user.role || 'FIELD_ENGINEER']} now. The new role applies the next time they open the app or this website.` })) {
+      setUser(user, { role: b.dataset.role }, `${user.name} is now ${ROLE_LABELS[b.dataset.role]}. It applies the next time they open the app.`, say);
+    }
   };
   list.onchange = e => {
     const user = users.find(u => u.uid === e.target.dataset.seesAll);
@@ -706,7 +725,7 @@ function projectForm(c = null) {
     if (edit) {
       try {
         await addRecords(c, [[ids => L.auditRecord({ ...ids, user, ...edit.audit }), []]], edit.fields);
-        done();
+        done(); savedNote();
       } catch (x) {
         err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
         save.disabled = false;
@@ -724,7 +743,8 @@ function projectForm(c = null) {
     // firestore.rules reads the saved project before it lets a record in, so the audit entry goes second; the project stands without it.
     const entry = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: uuid, assignedUids: [uid], uid, now, user, ...audit });
     await setDoc(doc(db, 'records', entry.uuid), entry).catch(x => console.warn('The project was saved; its audit entry was not.', x));
-    done();
+    done(); savedNote();
+    savedNote.keep = true;
     location.hash = `#/p/${uuid}`;
   };
   // deleteProject: the phone's own audit entry names no project, so it never reaches the cloud; the tombstone keeps who and when.
@@ -784,7 +804,7 @@ async function assignForm(c) {
     try {
       // The audit entry carries the new list, like every record of the project once the function has run.
       await addRecords(c, [[ids => L.auditRecord({ ...ids, assignedUids: fields.assignedUids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot assign people to this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -1437,7 +1457,7 @@ function barChartForm(c) {
     save.disabled = true; err.textContent = '';
     try {
       await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.chartAudit(json) }), []]], { barChartJson: json });
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot change this project\'s bar chart.', 'Could not save. Try again.');
       save.disabled = false;
@@ -1818,11 +1838,10 @@ function editLot(c, lot) {
       }
       for (const blob of blobs) f.photos.push(await uploadFile(c, blob));
       const saved = L.lotSave(lot, f, { user: s.profile.name || s.user.email, at: `${today()} ${new Date().toTimeString().slice(0, 5)}`, contractor: c.project.contractor || '' });
-      if (saved) {
-        await (lot.progress ? saveEdits(c, [[lot.progress, saved.changes, saved.audits]], 'lot')
-          : addRecords(c, [[ids => L.newLotProgressRecord(ids, lot, saved.changes), saved.audits]]));
-      }
-      done();
+      if (!saved) { done(); return; }
+      await (lot.progress ? saveEdits(c, [[lot.progress, saved.changes, saved.audits]], 'lot')
+        : addRecords(c, [[ids => L.newLotProgressRecord(ids, lot, saved.changes), saved.audits]]));
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -1867,9 +1886,10 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     button.disabled = true; err.textContent = '';
     try {
-      await save({ progress: picked(), constructionStatus: el.constructionStatus.value, currentActivity: el.currentActivity.value, remarks: el.remarks.value,
+      const wrote = await save({ progress: picked(), constructionStatus: el.constructionStatus.value, currentActivity: el.currentActivity.value, remarks: el.remarks.value,
         ...(contractor == null ? {} : { contractor: el.contractor.value }) });
       done();
+      if (wrote !== false) savedNote(); // false: every lot picked already had these values, so nothing was written
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       button.disabled = false;
@@ -1910,7 +1930,7 @@ function groupProgress(c, lots, done) {
   progressDialog({
     title: `Update ${plural(lots.length, 'lot')}`, saveLabel: `Save to ${plural(lots.length, 'lot')}`,
     note: 'Every lot picked gets this progress, status, activity and remarks. Each keeps its own dates, contractor, photos and billing.',
-  }, async f => { await saveLots(c, L.lotsProgressSave(lots, f, lotWho(c))); done(); });
+  }, async f => { const saves = L.lotsProgressSave(lots, f, lotWho(c)); await saveLots(c, saves); done(); return saves.length > 0; });
 }
 
 /** Set use for the lots picked with group select, after a confirmation; a failure is an alert, as there is no form. */
@@ -1922,7 +1942,7 @@ async function groupUse(c, lots, select, done) {
   if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then try again.'); return; }
   try {
     for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot');
-    done();
+    done(); savedNote();
   } catch (x) {
     tell('Not saved', L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
     drawProject(c.page);
@@ -1982,7 +2002,7 @@ function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
     save.disabled = true; err.textContent = '';
     try {
       await (lot ? saveEdit(c, lot, saved.changes, 'lot', saved.audits) : addRecords(c, [[saved.build, saved.audit]]));
-      done();
+      done(); savedNote();
       onSaved();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
@@ -2043,7 +2063,7 @@ function planForm(c) {
       await addRecords(c, [[up.build, up.audit]]);
       // Shows the new plan, as the phone does.
       Object.assign(lotState(c.page), { site: up.site, sel: null, more: false, view: null, draw: null, group: null, frame: null, renum: null });
-      done();
+      done(); savedNote();
       drawProject(c.page);
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot upload a plan for this project.', 'Could not save. Try again.');
@@ -2080,7 +2100,7 @@ function scaleForm(c, site) {
       const drawn = site.lots.length ? await planBase(site) : null;
       // shortcut: the plan and every lot whose area changes go in one write; split it if a plan passes a few thousand lots.
       await saveEdits(c, L.planScale(site.plan, site.lots, drawn && !drawn.problem ? drawn.page : null, scale, { user: s.profile.name || s.user.email, at: nowStamp() }), 'plan');
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -2119,7 +2139,7 @@ function ownSiteForm(c, sites, site) {
       await saveEdits(c, L.planOwnSite(c.records.filter(r => r.type === 'sdp_plans'), plan, newSite, current), 'plan');
       // Shows the new site, as the phone does.
       Object.assign(lotState(c.page), { site: newSite.trim(), sel: null, more: false, view: null, group: null, renum: null });
-      done();
+      done(); savedNote();
       drawProject(c.page);
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.');
@@ -2150,11 +2170,11 @@ async function findLots(c, site, el) {
 
 /** The phone's "Lots found in the plan" review (or "No lots found"): what Find lots found, and what adding it replaces. */
 function foundLotsDialog(c, site, areas, page) {
-  const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, named = lots.filter(a => a.lotName).length;
+  const lots = areas.filter(a => a.isLot), large = areas.length - lots.length, withNames = lots.filter(a => a.lotName).length;
   const started = site.lots.filter(l => L.foundLot(l) && l.progress).length;
   const fix = 'Click a lot and set its block and lot in Name & use, or use Number lots to number a block at once (both under More lot tools).';
-  const names = named === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block (under More lot tools) to fix a block.'
-    : named ? `${plural(named, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - named} come in without them. ${fix}`
+  const names = withNames === lots.length ? 'Each lot takes the block and lot printed on the plan. Check them, and use Renumber Block (under More lot tools) to fix a block.'
+    : withNames ? `${plural(withNames, 'lot takes', 'lots take')} the block and lot printed on the plan; the other ${lots.length - withNames} come in without them. ${fix}`
       : `The plan's block and lot numbers could not be read, so the lots come in without them. ${fix}`;
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
@@ -2184,7 +2204,7 @@ function foundLotsDialog(c, site, areas, page) {
       for (let i = 0; i < saved.stale.length; i += 200) await saveEdits(c, saved.stale.slice(i, i + 200), 'lot');
       for (let i = 0; i < saved.builds.length; i += 200) await addRecords(c, saved.builds.slice(i, i + 200).map((build, k) => [build, i + k ? [] : saved.audit]));
       Object.assign(lotState(c.page), { sel: null, more: false, view: null, group: null, renum: null });
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.');
       d.querySelectorAll('button').forEach(x => { x.disabled = false; });
@@ -2196,11 +2216,12 @@ function foundLotsDialog(c, site, areas, page) {
 }
 
 // One click on the plan's tools with no form to show an error in, so a failure is an alert; the page is then drawn as saved.
-async function planAct(c, el, run) {
+async function planAct(c, el, run, note = true) {
   if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then try again.'); drawProject(c.page); return; }
   if (el) el.disabled = true;
   try {
     await run();
+    if (note) savedNote(); // not after a delete: the plan or the lots going is the answer
     Object.assign(lotState(c.page), { sel: null, more: false, view: null, frame: null, renum: null });
   } catch (x) {
     tell('Not saved', L.errorText(x, 'This account cannot change this plan.', 'Could not save. Try again.'));
@@ -2229,7 +2250,7 @@ async function deletePlan(c, plan) {
 function bindPlanTools(c) {
   const st = lotState(c.page), { sites, site } = lotSite(c, st);
   const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
-  const act = (el, run) => planAct(c, el, run);
+  const act = (el, run, note) => planAct(c, el, run, note);
   bind('plan-setup', 'ontoggle', el => { st.setup = el.open; });
   bind('plan-scale', 'onclick', () => scaleForm(c, site));
   bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
@@ -2244,14 +2265,14 @@ function bindPlanTools(c) {
     const found = site.lots.filter(L.foundLot), n = found.filter(l => !l.progress).length, kept = found.length - n;
     if (await askDanger(`Remove ${plural(n, 'found lot')}? Lots Find lots added that have no progress yet are taken off the plan on every phone and the website. Lots you added yourself or renumbered stay${
       kept ? `, and so ${kept === 1 ? 'does' : 'do'} the ${plural(kept, 'found lot')} that already ${kept === 1 ? 'has' : 'have'} progress` : ''}. Find lots can add them again.`, `Remove ${plural(n, 'lot')}`)) {
-      act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); });
+      act(el, async () => { const edits = L.foundLotsRemoved(site.plan, site.lots, lotWho(c)); for (let i = 0; i < edits.length; i += 200) await saveEdits(c, edits.slice(i, i + 200), 'lot'); }, false);
     }
   });
   bind('plan-rev', 'onchange', el => { const plan = site.plans.find(p => p.uuid === el.value); act(el, () => saveEdits(c, L.planInUse(site.plans, plan), 'plan')); });
   bind('plan-delete', 'onclick', async el => {
     const of = sites.length > 1 ? ` of ${site.site || 'Main site'}` : '';
     if (await askDanger(`Delete SDP v${site.plan.version ?? 1}${of}? This removes the plan and its ${plural(site.lots.length, 'lot')}, with their progress, billing and inspection records, from every phone and the website. This cannot be undone.`, `Delete SDP v${site.plan.version ?? 1}`)) {
-      act(el, () => deletePlan(c, site.plan));
+      act(el, () => deletePlan(c, site.plan), false);
     }
   });
 }
@@ -2379,6 +2400,7 @@ async function bindLots(c) {
               // shortcut: the block's lots and the audit entry go in one write; split it if a block passes a few hundred lots.
               await saveEdits(c, L.lotsRenumbered(lots, numbers, renum.to.trim(), renum.block, lotWho(c)), 'lot');
               renum.ids = []; // stays open, so the next click picks the next block
+              savedNote();
               drawProject(c.page);
             } catch (x) {
               err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
@@ -2466,7 +2488,7 @@ async function bindLots(c) {
       if (!lot) { st.draw = null; drawProject(c.page); return; }
       if (!navigator.onLine) { tell('You are offline', 'Connect to the internet, then save again.'); return; }
       e.target.disabled = true;
-      saveEdit(c, lot, saved.changes, 'lot', saved.audit).then(() => { Object.assign(st, { draw: null, view: null, sel: lot.uuid }); drawProject(c.page); },
+      saveEdit(c, lot, saved.changes, 'lot', saved.audit).then(() => { Object.assign(st, { draw: null, view: null, sel: lot.uuid }); drawProject(c.page); savedNote(); },
         x => { tell('Not saved', L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.')); e.target.disabled = false; });
     };
   }
@@ -2874,7 +2896,7 @@ function editIssue(c, issue) {
         actionType: 'Issue Creation', details: `Updated issue from ${f.date}`, oldValue: 'Previous issue state',
         newValue: `Status: ${f.status}, Remarks: ${issue.remarks || ''}`,
       }));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -2988,7 +3010,7 @@ function addOrder(c, type, continued = '') {
     try {
       const filed = L.orderDocument(type, o, suspension, c.documents);
       await addRecord(c, ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3043,7 +3065,7 @@ function editOrder(c, o) {
     save.disabled = true; err.textContent = '';
     try {
       await saveEdit(c, o, { status, remarks }, 'order', L.orderStatusAudit(o, status));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3097,7 +3119,7 @@ function relatedFile(c, file) {
       const { fileUrl = '' } = await uploadPicked(c, form);
       await (isNew ? addRecord(c, ids => L.newDocumentRecord(ids, { ...filed, fileUrl }), L.relatedAddedAudit(filed.documentName, fileUrl))
         : saveEdit(c, file, { fileUrl }, 'file', L.fileAttachedAudit(file, fileUrl)));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3162,7 +3184,7 @@ function editRequest(c, r) {
         const filed = L.orderDocument(f.requestType, o, suspension, c.documents);
         await addRecords(c, [[ids => L.newRequestRecord(ids, saved), L.requestAudit(f)], [ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName)]]);
       } else await saveEdit(c, r, saved, 'request', L.requestAudit(f));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3218,7 +3240,7 @@ function editLetter(c, l) {
     try {
       const saved = { ...f, ...await uploadPicked(c, form) };
       await (isNew ? addRecord(c, ids => L.newLetterRecord(ids, saved), L.letterAudit(f)) : saveEdit(c, l, saved, 'letter', L.letterAudit(f)));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3370,7 +3392,7 @@ function editPhotos(c, report) {
       const changes = L.editedPhotos(report, { titles: f.titles, removed: f.removed, added });
       const cover = L.latestSitePhoto(c.weekly.map(r => (r.uuid === report.uuid ? { ...r, ...changes } : r)));
       await saveEdits(c, [[report, changes, { actionType: 'Edited Weekly Report', details: `Modified report for ${report.reportingWeek}` }]], 'weekly report', { latestUpdatePhotoUrl: cover });
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3501,7 +3523,7 @@ function weeklyForm(c, report = null) {
         const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly, abstracts);
         await addRecords(c, [[added.build, added.audit]], added.projectFields);
       }
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3673,7 +3695,7 @@ function editWeather(c, report) {
     try {
       // ProjectViewModel.updateWeeklyReportWithWeather's entry, word for word.
       await saveEdit(c, report, changes, 'weekly report', { actionType: 'Edited Weekly Report', details: `Modified report and weather for ${report.reportingWeek}` });
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -3787,7 +3809,7 @@ function billingForm(c, old = null) {
       // Each billing saved gets its own entry, as MoneySection sends each one to updateProjectPayment; the scan goes on the edited one.
       await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, p === old ? { ...changes, ...refs } : changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
         : addBilling(c, { ...f, ...refs }));
-      done();
+      done(); savedNote();
     } catch (x) { failed(x); save.disabled = false; }
   };
   document.body.append(named(d));
@@ -4227,7 +4249,7 @@ function signatoriesForm(c, weekly) {
     save.disabled = true; err.textContent = '';
     try {
       await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.projectEditAudit(c.project, fields) }), []]], fields);
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
@@ -4267,7 +4289,7 @@ function recommendationsForm(c, month, saved) {
     try {
       await (saved ? saveEdit(c, saved, { recommendations: text }, 'monthly report', L.monthlyAudit(month, weeks, true))
         : addRecord(c, ids => L.newMonthlyRecord({ ...ids, preparedBy: s.profile.name || s.user.email }, month, weeks, text), L.monthlyAudit(month, weeks, false)));
-      done();
+      done(); savedNote();
     } catch (x) {
       err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
       save.disabled = false;
