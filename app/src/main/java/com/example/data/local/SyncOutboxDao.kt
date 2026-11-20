@@ -51,7 +51,4 @@ interface SyncOutboxDao {
     )
     suspend fun isUnconfirmedCreate(projectUuid: String): Boolean
 
-    /** The `entityUuid` this phone queued when it added the named attachment file (carries the project), or null. */
-    @Query("SELECT entityUuid FROM sync_outbox WHERE entityType = 'file' AND operation = 'UPSERT' AND (entityUuid = :name OR entityUuid LIKE '%/' || :name) LIMIT 1")
-    suspend fun fileEntityFor(name: String): String?
 }

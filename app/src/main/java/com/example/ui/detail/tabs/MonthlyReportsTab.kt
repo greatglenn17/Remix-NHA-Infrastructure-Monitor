@@ -41,6 +41,8 @@ fun MonthlyReportsTab(
     val availableMonths = remember(monthlyReports, weeklyReports) {
         val monthsFromMonthly = monthlyReports.map { it.reportingMonth }
         val monthsFromWeekly = weeklyReports.mapNotNull { rep ->
+            // The month its week starts in; a label written another way gives the first month it names, with the first year.
+            com.example.util.BlueBookForms.weekMonths(rep.reportingWeek)?.let { return@mapNotNull it.first() }
             val clean = rep.reportingWeek.replace(Regex("Week \\d+: "), "")
             val yearMatch = Regex("\\b(20\\d{2})\\b").find(clean)?.value ?: currentMonth.substringAfter(" ")
             val monthNames = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
@@ -63,13 +65,8 @@ fun MonthlyReportsTab(
     var dropdownExpanded by remember { mutableStateOf(false) }
 
     val monthWeeklyReports = remember(selectedMonth, weeklyReports) {
-        val monthStr = selectedMonth.split(" ").firstOrNull() ?: ""
-        val yearStr = selectedMonth.split(" ").lastOrNull() ?: ""
-        val shortMonth = if (monthStr.length >= 3) monthStr.take(3) else monthStr
-        weeklyReports.filter {
-            (it.reportingWeek.contains(monthStr, ignoreCase = true) || it.reportingWeek.contains(shortMonth, ignoreCase = true)) &&
-            it.reportingWeek.contains(yearStr, ignoreCase = true)
-        }.sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
+        weeklyReports.filter { com.example.util.BlueBookForms.weekInMonth(it.reportingWeek, selectedMonth) }
+            .sortedWith(com.example.ui.dialogs.WeekRange.byWeek)
     }
 
     // Weekly figures are cumulative (as of the week), so the month stands at its last week, not their sum.

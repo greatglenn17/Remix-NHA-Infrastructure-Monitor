@@ -705,12 +705,32 @@ export const previousReport = (reports, report) => reports
   .reduce((best, r) => (!best || r.daysElapsed > best.daysElapsed ? r : best), null);
 
 /**
- * MonthlyReportsTab.availableMonths: saved months, then the month each weekly report's week names (the first of
- * January..December it mentions, in the first year it names), else this month. `today` is yyyy-MM-dd.
+ * BlueBookForms.weekMonths: the month or two a week's label covers ("December 2026", "January 2027"), its first and
+ * last day's; null for a label that does not read. A first day written without its year ("Dec 28 - Jan 3, 2027") is in
+ * the year before when it would come after the last.
+ */
+export function weekMonths(label) {
+  const parts = (label || '').replace(/^Week \d+: /, '').split(' - ').map(x => x.trim());
+  if (parts.length !== 2) return null;
+  const end = longDay(parts[1]);
+  if (end == null) return null;
+  const year = new Date(end).getUTCFullYear(), bare = longDay(`${parts[0]}, ${year}`);
+  const start = longDay(parts[0]) ?? (bare != null && bare > end ? longDay(`${parts[0]}, ${year - 1}`) : bare);
+  if (start == null) return null;
+  const name = ms => `${MONTHS[new Date(ms).getUTCMonth()]} ${new Date(ms).getUTCFullYear()}`;
+  return [...new Set([name(start), name(end)])];
+}
+
+/**
+ * MonthlyReportsTab.availableMonths: saved months, then the month each weekly report's week starts in, else this
+ * month. `today` is yyyy-MM-dd.
  */
 export function reportMonths(weekly, monthly, today) {
   const [y, m] = today.split('-');
   const fromWeekly = weekly.map(r => {
+    const read = weekMonths(r.reportingWeek);
+    if (read) return read[0];
+    // A label written another way: the first month named in it, with the first year.
     const clean = (r.reportingWeek || '').replace(/Week \d+: /, '').toLowerCase();
     const year = (/\b(20\d{2})\b/.exec(clean) || [])[1] || y;
     const i = MONTHS.findIndex(x => clean.includes(x.toLowerCase()) || clean.includes(x.slice(0, 3).toLowerCase()));
@@ -720,11 +740,16 @@ export function reportMonths(weekly, monthly, today) {
   return all.length ? all : [`${MONTHS[+m - 1]} ${y}`];
 }
 
-/** MonthlyReportsTab.monthWeeklyReports: weeks naming the month (or its first 3 letters) and its year, in week order. */
+/**
+ * MonthlyReportsTab.monthWeeklyReports: the weeks with a day in the month, in week order. A label that does not read as
+ * dates counts when it names the month (or its first 3 letters) and its year.
+ */
 export function monthReports(weekly, month) {
   const parts = month.split(' ');
   const name = (parts[0] || '').toLowerCase(), year = (parts[parts.length - 1] || '').toLowerCase();
   return weekly.filter(r => {
+    const read = weekMonths(r.reportingWeek);
+    if (read) return read.some(x => x.toLowerCase() === month.toLowerCase());
     const w = (r.reportingWeek || '').toLowerCase();
     return (w.includes(name) || w.includes(name.slice(0, 3))) && w.includes(year);
   }).sort(byWeek);

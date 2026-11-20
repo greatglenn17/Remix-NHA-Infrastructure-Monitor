@@ -97,6 +97,18 @@ test('monthly view: months from saved and weekly reports, and the weeks of a mon
   assert.deepEqual(L.monthReports(weekly, 'November 2026').map(r => r.reportingWeek), ['Oct 31, 2026 - Nov 6, 2026', 'Nov 7, 2026 - Nov 13, 2026']);
 });
 
+test('monthly view: a week over New Year counts in December and the next January, not January of the year before', () => {
+  const weeks = [{ reportingWeek: 'Jan 10, 2026 - Jan 16, 2026' }, { reportingWeek: 'Dec 28, 2026 - Jan 3, 2027' }, { reportingWeek: 'Week 52: Dec 26 - Jan 1, 2027' }];
+  assert.deepEqual(L.weekMonths('Dec 28, 2026 - Jan 3, 2027'), ['December 2026', 'January 2027']);
+  assert.deepEqual(L.weekMonths('Week 52: Dec 26 - Jan 1, 2027'), ['December 2026', 'January 2027']);
+  assert.deepEqual(L.weekMonths('Oct 24, 2026 - Oct 30, 2026'), ['October 2026']);
+  assert.equal(L.weekMonths('This week'), null);
+  assert.deepEqual(L.monthReports(weeks, 'January 2026').map(r => r.reportingWeek), ['Jan 10, 2026 - Jan 16, 2026']);
+  assert.equal(L.monthReports(weeks, 'January 2027').length, 2);
+  assert.equal(L.monthReports(weeks, 'December 2026').length, 2);
+  assert.deepEqual(L.reportMonths(weeks, [], '2027-01-05'), ['January 2026', 'December 2026']);
+});
+
 test('revised completion from approved time extensions, the start date as day 1', () => {
   const p = { dateStarted: '2026-01-01', contractDurationDays: 100, completionDateOriginal: '2026-04-10', completionDateRevised: '-' };
   const te = (days, status = 'Approved') => ({ documentName: `Time Extension No. 1 - ${days} Days`, status });
@@ -273,6 +285,21 @@ test('print: the monthly form has every section and the month\'s figures', () =>
   assert.ok(!html.includes('Next') && !html.includes('Old'), 'October billing and August issue are left out');
   assert.ok(html.includes('<td>None</td>'), 'no variation or suspension orders');
   assert.ok(html.includes("<tr class='tot'><td colspan='3'>GRAND TOTAL</td><td class='n'>Php 1,000.00</td><td class='n'>10.00%</td><td class='n'>Php 9,000.00 (90.00%)</td></tr>"), 'payment grand total');
+});
+
+test('print: monthly balances follow the contract cost in date order, not the order the billings were entered', () => {
+  const project = { name: 'Phase 1', contractCostOriginal: 10000000, scopeOfWork: 'Roads' };
+  // November's billing was entered first, so October's saved balance also took it off.
+  const payments = [
+    { name: 'October billing', date: '2026-10-15', grossAmount: 1000000, percentage: 10, balanceAmount: 7000000, balancePercentage: 70 },
+    { name: 'November billing', date: '2026-11-15', grossAmount: 2000000, percentage: 20, balanceAmount: 8000000, balancePercentage: 80 },
+  ];
+  const print = month => P.monthlyReportHtml({ project, month, weeks: [], docs: [], payments, issues: [], weather: [], saved: {}, banner: '',
+    signatories: P.monthlySignatories(project, { name: 'Juan' }) });
+  const october = print('2026-10'), november = print('2026-11');
+  assert.ok(october.includes('Php 9,000,000.00 (90.00%)'), 'October leaves 90%');
+  assert.ok(!october.includes('Php 7,000,000.00'), 'not the saved balance');
+  assert.ok(november.includes("<td class='n'>Php 7,000,000.00 (70.00%)</td></tr></table>"), 'November ends at 70%');
 });
 
 test('print: extensions read either name style; one for approval does not move the schedule', () => {

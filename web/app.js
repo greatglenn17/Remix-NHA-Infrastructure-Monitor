@@ -1902,13 +1902,22 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
 /**
  * Saves lotSave results (`saves`: [[lot, saved]]): a lot's progress record is edited, or added when it has none.
  * shortcut: 100 lots a write (Firestore takes 500 changes in one), so a save that stops partway leaves the earlier lots
- * saved; saving again skips those and finishes the rest.
+ * saved; saving again skips those and finishes the rest, as long as the saves are built from freshLots.
  */
 async function saveLots(c, saves) {
   const edits = saves.filter(([lot]) => lot.progress).map(([lot, x]) => [lot.progress, x.changes, x.audits]);
   const adds = saves.filter(([lot]) => !lot.progress).map(([lot, x]) => [ids => L.newLotProgressRecord(ids, lot, x.changes), x.audits]);
   for (let i = 0; i < edits.length; i += 100) await saveEdits(c, edits.slice(i, i + 100), 'lot');
   for (let i = 0; i < adds.length; i += 100) await addRecords(c, adds.slice(i, i + 100));
+}
+
+/**
+ * `lots` as the project's records have them now. A form keeps the lots it opened with, so after a save that stopped
+ * partway they would still read as having no progress record, and saving again would add a second one.
+ */
+function freshLots(c, lots) {
+  const now = new Map(L.sdpSites(c.page.records || []).flatMap(x => x.lots).map(l => [l.uuid, l]));
+  return lots.map(l => now.get(l.uuid) || l);
 }
 
 /** Record inspection on a lot's card: the snapshot joins the lot's inspection history, and the lot's progress is set to match it. */
@@ -1919,8 +1928,8 @@ function inspectLot(c, lot) {
     pct: L.lotProgress(lot), road: L.lotUse(lot) === 'Road Lot', status: p.constructionStatus ?? 'Not Started', activity: p.currentActivity || '',
     contractor: p.contractor || c.project.contractor || '', remarksLabel: 'Inspection field remarks', saveLabel: 'Record inspection',
   }, async f => {
-    const x = L.lotInspection(lot, f, lotWho(c));
-    if (x.progress) await saveLots(c, [[lot, x.progress]]);
+    const [now] = freshLots(c, [lot]), x = L.lotInspection(now, f, lotWho(c));
+    if (x.progress) await saveLots(c, [[now, x.progress]]);
     await addRecords(c, [[x.build, x.audit]]);
   });
 }
@@ -1930,7 +1939,7 @@ function groupProgress(c, lots, done) {
   progressDialog({
     title: `Update ${plural(lots.length, 'lot')}`, saveLabel: `Save to ${plural(lots.length, 'lot')}`,
     note: 'Every lot picked gets this progress, status, activity and remarks. Each keeps its own dates, contractor, photos and billing.',
-  }, async f => { const saves = L.lotsProgressSave(lots, f, lotWho(c)); await saveLots(c, saves); done(); return saves.length > 0; });
+  }, async f => { const saves = L.lotsProgressSave(freshLots(c, lots), f, lotWho(c)); await saveLots(c, saves); done(); return saves.length > 0; });
 }
 
 /** Set use for the lots picked with group select, after a confirmation; a failure is an alert, as there is no form. */

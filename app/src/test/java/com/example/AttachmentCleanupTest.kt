@@ -9,6 +9,9 @@ import com.example.data.local.RecordSyncSchema
 import com.example.data.model.ContractorLetter
 import com.example.data.model.DeveloperRequest
 import com.example.data.model.Project
+import com.example.data.model.SdpLot
+import com.example.data.model.SdpLotProgress
+import com.example.data.model.SdpPlan
 import com.example.data.model.SyncOutboxEvent
 import com.example.data.model.WeeklyReport
 import kotlinx.coroutines.runBlocking
@@ -79,10 +82,23 @@ class AttachmentCleanupTest {
         assertTrue("the receiving copy", file(received).exists())
         assertTrue("the reply letter", file(reply).exists())
         assertFalse("a file no record holds", file(unused).exists())
-        val cloudDeletes = sql
-            .query("SELECT entityUuid FROM sync_outbox WHERE entityType = 'file' AND operation = 'DELETE'")
-            .use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
-        assertEquals("only the unused file's cloud copy is deleted", listOf("$project/0f8fad5b-d9cb-469f-a165-70867728950d.jpg"), cloudDeletes)
+        // The server can bring the record back (an approved order a Field Engineer deleted), so its cloud copy stays.
+        assertEquals("no cloud copy is deleted", 0, count("SELECT COUNT(*) FROM sync_outbox WHERE operation = 'DELETE'"))
+    }
+
+    @Test
+    fun lotPhoto_isKept() = runBlocking {
+        val projectId = db.projectDao().insertProject(project())
+        val photo = oldAttachment("0f8fad5b-d9cb-469f-a165-70867728950f.jpg")
+        val dao = db.projectDao()
+        val planId = dao.insertSdpPlan(SdpPlan(projectId = projectId, planName = "SDP", pdfFileUrl = "", uploadedDate = "2026-11-09", uploadedBy = "x"))
+        val lotId = dao.insertSdpLot(SdpLot(projectId = projectId, sdpPlanId = planId, blockNumber = "1", lotNumber = "1", polygonNormalizedJson = "[[0.1,0.1],[0.2,0.1],[0.2,0.2]]"))
+        // As the lot form saves it: Android's JSONArray writes "/" as "\/".
+        dao.insertOrUpdateLotProgress(SdpLotProgress(projectId = projectId, sdpPlanId = planId, sdpLotId = lotId, photosJson = Attachments.toJson(listOf(photo))))
+
+        Attachments.collectGarbage(context, db)
+
+        assertTrue("a photo its lot's progress still lists", file(photo).exists())
     }
 
     private fun weeklyReport(projectId: Long, photos: List<String>) = WeeklyReport(

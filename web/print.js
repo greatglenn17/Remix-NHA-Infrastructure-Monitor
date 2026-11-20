@@ -464,8 +464,9 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
     ${items.map(a => `<tr><td>${esc(a.itemDescription)}</td><td class='n'>${pct(a.weightPct)}</td><td class='n'>${pct(a.targetPct)}</td><td class='n'>${pct(a.actualPct)}</td><td class='n'>${pct(a.weightPct * a.actualPct / 100)}</td></tr>`).join('')}
     <tr class='tot'><td>TOTAL</td><td class='n'>${pct(sum(a => a.weightPct))}</td><td class='n'>${last ? pct(last.targetAccomplishmentPct) : ''}</td><td class='n'>${last ? pct(last.actualAccomplishmentPct) : ''}</td><td class='n'>${pct(sum(a => a.weightPct * a.actualPct / 100))}</td></tr></table>`);
 
-  // Billings up to month end; one with an unreadable date is kept, as on the phone.
-  const paid = L.netBillings(payments).filter(p => { const m = monthOf(p.date); return m == null || m <= month; });
+  // Billings up to month end; one with an unreadable date is kept, as on the phone. The balances are worked out from the
+  // contract cost in date order, as the Payments tab shows them: the saved ones count every billing entered before, of any date.
+  const paid = L.netBillings(payments, L.currentCost(project, docs)).filter(p => { const m = monthOf(p.date); return m == null || m <= month; });
   b.push(`<table><tr><th colspan='6' class='sec'>III. STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>NET AMOUNT</th><th>%</th></tr>
     ${Array.from({ length: Math.max(3, paid.length) }, (_, i) => {
       const p = paid[i];

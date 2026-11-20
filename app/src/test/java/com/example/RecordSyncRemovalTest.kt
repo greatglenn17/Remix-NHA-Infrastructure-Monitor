@@ -329,6 +329,38 @@ class RecordSyncRemovalTest {
         assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = ? AND state = 'PENDING'", "${keep.projectUuid}/$name"))
     }
 
+    // The foreign keys delete a project's records after the project row, so a tombstone then could not name its project.
+    @Test
+    fun deletedProject_queuesNoRecordTombstones_butADeletedRecordStillDoes() = runBlocking {
+        val p = project("P")
+        val id = db.projectDao().insertProject(p)
+        db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "One"))
+        db.projectDao().insertPendingDocument(PendingDocument(projectId = id, documentName = "Two"))
+        markAllSynced()
+        val deletes = "SELECT COUNT(*) FROM sync_outbox WHERE entityType = 'record:pending_documents' AND operation = 'DELETE'"
+
+        sql.execSQL("DELETE FROM pending_documents WHERE documentName = 'One'")
+        assertEquals("a record deleted on its own is tombstoned", 1, count(deletes))
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE operation = 'DELETE' AND payloadJson = ?", "{\"projectUuid\":\"${p.projectUuid}\"}"))
+
+        db.projectDao().deleteProjectById(id)
+        assertEquals(0, count("SELECT COUNT(*) FROM pending_documents"))
+        assertEquals("the project's own tombstone is enough", 1, count(deletes))
+    }
+
+    @Test
+    fun recordTombstonesWithoutAProject_fromAnOlderVersion_areDropped() = runBlocking {
+        val orphan = SyncOutboxEvent(entityType = "record:pending_documents", entityUuid = "a", operation = "DELETE", revision = 2, payloadJson = "{\"projectUuid\":\"\"}")
+        val kept = SyncOutboxEvent(entityType = "record:pending_documents", entityUuid = "b", operation = "DELETE", revision = 2, payloadJson = "{\"projectUuid\":\"p\"}")
+        db.syncOutboxDao().enqueue(orphan)
+        db.syncOutboxDao().enqueue(kept)
+
+        RecordSyncSchema.install(sql)
+
+        assertEquals(0, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = 'a'"))
+        assertEquals(1, count("SELECT COUNT(*) FROM sync_outbox WHERE entityUuid = 'b'"))
+    }
+
     @Test
     fun staleCloudCopy_doesNotBringBackLocallyDeletedRecord() = runBlocking {
         val p = project("P")

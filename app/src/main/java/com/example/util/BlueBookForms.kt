@@ -285,7 +285,9 @@ object BlueBookForms {
         b.append("<tr class='tot'><td>TOTAL</td><td class='n'>${pct(items.sumOf { it.weightPct })}</td><td class='n'>${lastWeekly?.let { pct(it.targetAccomplishmentPct) } ?: ""}</td><td class='n'>${lastWeekly?.let { pct(it.actualAccomplishmentPct) } ?: ""}</td><td class='n'>${pct(items.sumOf { it.weightPct * it.actualPct / 100 })}</td></tr></table>")
 
         b.append("<table><tr><th colspan='6' class='sec'>III. STATUS OF PAYMENT</th></tr><tr><th rowspan='2'></th><th rowspan='2'>DATE</th><th rowspan='2'>PERIOD COVERED</th><th colspan='2'>PAYMENTS MADE</th><th rowspan='2'>BALANCE</th></tr><tr><th>NET AMOUNT</th><th>%</th></tr>")
-        val paid = com.example.data.model.netBillings(payments).filter { p -> parseDate(p.date)?.let { YearMonth.from(it) <= month } ?: true }
+        // Balances from the contract cost in date order, as the Payments tab shows them: the saved ones count every billing entered before, of any date.
+        val cost = ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)
+        val paid = com.example.data.model.netBillings(payments, cost).filter { p -> parseDate(p.date)?.let { YearMonth.from(it) <= month } ?: true }
         repeat(maxOf(3, paid.size)) { i ->
             val p = paid.getOrNull(i)
             b.append("<tr><td>${i + 1}. ${esc(p?.name ?: "")}</td><td>${esc(p?.date?.let(::date) ?: "")}</td><td>${esc(p?.periodCovered ?: "")}</td><td class='n'>${p?.let { esc(peso(it.netAmount)) } ?: ""}</td><td class='n'>${p?.let { pct(it.percentage) } ?: ""}</td><td class='n'>${p?.let { esc("${peso(it.balanceAmount)} (${pct(it.balancePercentage)})") } ?: ""}</td></tr>")
@@ -627,6 +629,34 @@ object BlueBookForms {
         fun parse(text: String) = WEEK_FORMATS.firstNotNullOfOrNull { runCatching { LocalDate.parse(text, it) }.getOrNull() }
         val end = parse(parts[1]) ?: return null
         return parse(parts[0]) ?: parse("${parts[0]}, ${end.year}")
+    }
+
+    /**
+     * The month or two a week's label covers ("December 2026", "January 2027"), its first and last day's; null for a
+     * label that does not read. A first day written without its year ("Dec 28 - Jan 3, 2027") is in the year before
+     * when it would come after the last. The website has the same (logic.js weekMonths).
+     */
+    fun weekMonths(reportingWeek: String): List<String>? {
+        val parts = reportingWeek.replace(Regex("^Week \\d+: "), "").split(" - ").map { it.trim() }
+        if (parts.size != 2) return null
+        fun parse(text: String) = WEEK_FORMATS.firstNotNullOfOrNull { runCatching { LocalDate.parse(text, it) }.getOrNull() }
+        val end = parse(parts[1]) ?: return null
+        val start = parse(parts[0])
+            ?: parse("${parts[0]}, ${end.year}")?.let { if (it.isAfter(end)) it.minusYears(1) else it }
+            ?: return null
+        return listOf(start, end).map { YearMonth.from(it).format(MONTH) }.distinct()
+    }
+
+    /**
+     * The week is in [month] ("January 2027"): one of its days is. A label that does not read as dates counts when it
+     * names the month (or its first 3 letters) and its year.
+     */
+    fun weekInMonth(reportingWeek: String, month: String): Boolean {
+        weekMonths(reportingWeek)?.let { months -> return months.any { it.equals(month.trim(), ignoreCase = true) } }
+        val name = month.split(" ").firstOrNull().orEmpty()
+        val year = month.split(" ").lastOrNull().orEmpty()
+        return (reportingWeek.contains(name, ignoreCase = true) || reportingWeek.contains(name.take(3), ignoreCase = true)) &&
+            reportingWeek.contains(year, ignoreCase = true)
     }
 
     /**
