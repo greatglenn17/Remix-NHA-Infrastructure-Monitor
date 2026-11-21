@@ -221,8 +221,8 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     /** The header's sync chip, from the upload queue. Lazy because the DAO is set up in init. */
     val syncChip: StateFlow<com.example.ui.components.SyncChip> by lazy {
         // The account changes on sign-in and sign-out, when the Firebase user does.
-        combine(currentUserAccount, syncOutboxDao.newPendingCount(), syncOutboxDao.failedCount()) { _, pending, failed ->
-            com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, pending, failed)
+        combine(currentUserAccount, syncOutboxDao.newPendingCount(), syncOutboxDao.failedEvents()) { _, pending, failed ->
+            com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, pending, failed.size, com.example.ui.components.failureLines(failed))
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), com.example.ui.components.SyncChip.of(authManager.currentFirebaseUser != null, 0, 0))
     }
 

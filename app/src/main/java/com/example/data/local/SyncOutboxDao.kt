@@ -28,8 +28,8 @@ interface SyncOutboxDao {
     @Query("SELECT COUNT(*) FROM sync_outbox WHERE state = 'PENDING'")
     fun newPendingCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM sync_outbox WHERE state = 'FAILED'")
-    fun failedCount(): Flow<Int>
+    @Query("SELECT * FROM sync_outbox WHERE state = 'FAILED' ORDER BY createdAt ASC")
+    fun failedEvents(): Flow<List<SyncOutboxEvent>>
 
     @Query("SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE entityUuid = :entityUuid AND state IN ('PENDING', 'FAILED'))")
     suspend fun hasPendingFor(entityUuid: String): Boolean

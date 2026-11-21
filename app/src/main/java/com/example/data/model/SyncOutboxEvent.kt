@@ -31,3 +31,15 @@ data class SyncOutboxEvent(
         const val STATE_FAILED = "FAILED"
     }
 }
+
+/** A failed event's [SyncOutboxEvent.lastError] in plain words: "No signal", "Not allowed", or "Failed: <short message>". */
+fun syncErrorReading(error: String): String {
+    val e = error.lowercase()
+    return when {
+        listOf("unavailable", "deadline", "offline", "network", "resolve host", "timeout", "timed out", "retry limit", "connect")
+            .any { it in e } -> "No signal"
+        "permission" in e -> "Not allowed"
+        error.isBlank() -> "Failed"
+        else -> "Failed: " + error.lineSequence().first().trim().let { if (it.length > 80) it.take(79) + "…" else it }
+    }
+}

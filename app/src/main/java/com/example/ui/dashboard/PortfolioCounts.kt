@@ -130,7 +130,7 @@ internal val TERM_HELP = listOf(
     "Due in ${ProjectAttention.DUE_SOON_DAYS} days" to "Unfinished projects whose completion date (the revised one, if any) is ${ProjectAttention.DUE_SOON_DAYS} days away or less.",
     SYNC_HELP_FIRST to SyncChip.Synced.meaning,
     "UPLOADING" to SyncChip.Uploading(0).meaning,
-    "CHANGES WAITING" to SyncChip.Waiting(0).meaning + " Tap the chip to retry now.",
+    "CHANGES WAITING" to SyncChip.Waiting(0).meaning + " Tap the chip to see why and retry now.",
     "THIS PHONE ONLY" to SyncChip.PhoneOnly.meaning
 )
 

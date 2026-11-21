@@ -114,6 +114,7 @@ fun SyncDialog(sync: SyncChip, lastSynced: String, onRetry: (() -> Unit)?, onDis
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(sync.meaning, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                if (sync is SyncChip.Waiting) sync.reasons.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface) }
                 if (sync != SyncChip.PhoneOnly) Text(lastSynced, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
             }
         },
