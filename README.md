@@ -108,8 +108,21 @@ Releases are the **release** build, signed with the project's `debug.keystore` (
 
 The APK is `app/build/outputs/apk/release/app-release.apk`. It is not debuggable, so app data can't be read over USB.
 
-A release updates **both** `update.json` and `web/update.json` (identical; CI checks it). Phones read the website's copy
-(`https://nha-monitor-bulacan-2026.web.app/update.json`, so deploy hosting too) and fall back to the root one on GitHub, which older phones still read.
+A release updates **both** `update.json` and `web/update.json` (identical; CI checks it). Phones read both
+(`https://nha-monitor-bulacan-2026.web.app/update.json`, so deploy hosting too, and the root one on GitHub, which older phones still read) and take the newer.
+
+## 💾 Backups
+
+Firestore (set up 2026-11-21): a daily backup kept 7 days, a weekly backup (Sunday) kept 14 weeks, and point-in-time recovery for the last 7 days.
+Deleted records are erased for good 30 days after deletion (`purgeOldRecordTombstones`), so a backup is the only way back after that.
+
+```bash
+firebase firestore:backups:list --project nha-monitor-bulacan-2026
+# restore into a NEW database, check it, then copy back what is needed:
+firebase firestore:databases:restore --database restored-YYYYMMDD --backup <backup name> --project nha-monitor-bulacan-2026
+```
+
+Photos and scans in Storage are not in these backups. The website and phones no longer delete them; only the Super Admin can.
 
 `debug.keystore` is not in git. **Keep a backup copy somewhere safe**: without it no update can install over the phones' copy, and every phone would have to uninstall and reinstall.
 

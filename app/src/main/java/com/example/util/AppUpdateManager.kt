@@ -36,11 +36,14 @@ object AppUpdateManager {
 
     /** Reads update.json from Hosting, then raw GitHub. Null when neither could be reached, so callers don't claim "up to date". */
     suspend fun checkForUpdates(customUpdateUrl: String? = null): AppUpdateInfo? =
-        firstUpdateInfo(customUpdateUrl?.let { listOf(it) } ?: listOf(UPDATE_URL, FALLBACK_UPDATE_URL))
+        newestUpdateInfo(customUpdateUrl?.let { listOf(it) } ?: listOf(UPDATE_URL, FALLBACK_UPDATE_URL))
 
-    /** The first of [urls] that answers with a readable update.json (Hosting answers a missing file with index.html, which fails to parse). */
-    internal suspend fun firstUpdateInfo(urls: List<String>): AppUpdateInfo? = withContext(Dispatchers.IO) {
-        urls.firstNotNullOfOrNull { readUpdateInfo(it) }
+    /**
+     * The newest readable update.json of [urls] (Hosting answers a missing file with index.html, which fails to parse).
+     * Both are read: Hosting is deployed by hand, so its copy can be older than main's after a release.
+     */
+    internal suspend fun newestUpdateInfo(urls: List<String>): AppUpdateInfo? = withContext(Dispatchers.IO) {
+        urls.mapNotNull { readUpdateInfo(it) }.maxByOrNull { it.latestVersionCode }
     }
 
     private fun readUpdateInfo(url: String): AppUpdateInfo? {

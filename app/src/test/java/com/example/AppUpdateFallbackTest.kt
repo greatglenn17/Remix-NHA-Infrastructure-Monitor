@@ -25,13 +25,16 @@ class AppUpdateFallbackTest {
         serve("/down", 503, "")
         serve("/html", 200, "<!doctype html><title>NHA Monitor</title>")
         serve("/ok", 200, """{"versionCode": 999999, "versionName": "9.9.9", "apkDownloadUrl": "https://example.test/a.apk"}""")
+        serve("/old", 200, """{"versionCode": 999998, "versionName": "9.9.8", "apkDownloadUrl": "https://example.test/b.apk"}""")
         server.start()
         try {
             val base = "http://127.0.0.1:${server.address.port}"
-            val info = AppUpdateManager.firstUpdateInfo(listOf("$base/down", "$base/html", "$base/ok"))
+            val info = AppUpdateManager.newestUpdateInfo(listOf("$base/down", "$base/html", "$base/ok"))
             assertEquals(999999, info?.latestVersionCode)
             assertEquals(true, info?.isUpdateAvailable)
-            assertNull(AppUpdateManager.firstUpdateInfo(listOf("$base/down", "$base/html")))
+            assertNull(AppUpdateManager.newestUpdateInfo(listOf("$base/down", "$base/html")))
+            // A stale Hosting copy first does not hide the newer one behind it.
+            assertEquals(999999, AppUpdateManager.newestUpdateInfo(listOf("$base/old", "$base/ok"))?.latestVersionCode)
         } finally {
             server.stop(0)
         }

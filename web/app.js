@@ -637,7 +637,7 @@ function renderDashboard() {
   main.innerHTML = `
     <section class="card portfolio" id="portfolio"></section>
     <div class="toolbar">
-      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town, contractor or staff" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
+      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search projects or staff" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
       <div class="seg" id="scope" role="group" aria-label="Which projects"></div>
       <label class="sort">Sort<select id="sort">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}"${k === s.sort ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       <span class="count" id="shown" role="status"></span>
@@ -3869,7 +3869,7 @@ function billingForm(c, old = null) {
     if (errors.length) { showErrors(err, errors); return; }
     if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     const abstracts = c.of('project_abstracts'), ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old, abstracts);
-    if (ahead.length) { err.textContent = `${ahead.join(' ')} ${abstracts.length ? 'Upload the newer abstract first' : 'Save the newer weekly report first'}, or lower this billing.`; return; }
+    if (ahead.length) { showErrors(err, [...ahead, `${abstracts.length ? 'Upload the newer abstract first' : 'Save the newer weekly report first'}, or lower this billing.`]); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {

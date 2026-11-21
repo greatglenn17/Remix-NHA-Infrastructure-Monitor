@@ -1459,12 +1459,12 @@ private fun IssueInputRow(
 internal fun savedWeather(logs: List<com.example.data.model.DailyHourlyWeather>): Map<String, List<String>> {
     val known = com.example.data.model.WeatherCondition.entries.map { it.name }.toSet()
     return logs.associate { log ->
-        val parts = log.hourlyConditionsCsv.split(",").map { it.trim() }
+        val parts = log.hourlyConditionsCsv.split(",").map { it.trim().uppercase().replace(' ', '_') } // as web/logic.js weatherKey
         log.dayOfWeek to List(24) { h -> parts.getOrNull(h)?.takeIf { it in known } ?: "FAIR" }
     }
 }
 
-private fun twoDecimals(value: Double) ="%.2f".format(java.util.Locale.US, value)
+private fun twoDecimals(value: Double) = "%.2f".format(java.util.Locale.US, value)
 
 /** A text field to type in, with a list to pick the usual entries from. */
 @Composable

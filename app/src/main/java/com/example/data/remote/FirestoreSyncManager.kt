@@ -48,6 +48,9 @@ sealed class FirestoreSyncStatus {
     data class Error(val message: String) : FirestoreSyncStatus()
 }
 
+/** The outbox's send order: projects, then records, then files (photos last, so they never hold back the text). */
+internal fun outboxOrder(entityType: String): Int = when (entityType) { "project" -> 0; Attachments.ENTITY_TYPE -> 2; else -> 1 }
+
 class FirestoreSyncManager(
     private val context: Context,
     private val db: AppDatabase,
@@ -547,9 +550,7 @@ class FirestoreSyncManager(
 
         // Projects first: a record (or file) is only accepted once its project exists in the cloud. Files last, so
         // slow photo uploads never hold back the text; a record names its file by ref, which readers fetch on view.
-        val pending = db.syncOutboxDao().pendingEventsList().sortedBy {
-            when (it.entityType) { "project" -> 0; Attachments.ENTITY_TYPE -> 2; else -> 1 }
-        }
+        val pending = db.syncOutboxDao().pendingEventsList().sortedBy { outboxOrder(it.entityType) }
         if (pending.isEmpty()) {
             markAllSent()
             return@withContext Result.success(0)

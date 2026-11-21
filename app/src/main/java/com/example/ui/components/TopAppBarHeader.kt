@@ -112,7 +112,7 @@ fun SyncDialog(sync: SyncChip, lastSynced: String, onRetry: (() -> Unit)?, onDis
         onDismissRequest = onDismiss,
         title = { Text(sync.label.lowercase().replaceFirstChar { it.uppercase() }, color = scheme.onSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) { // many failures: scroll, don't clip
                 Text(sync.meaning, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
                 if (sync is SyncChip.Waiting) sync.reasons.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface) }
                 if (sync != SyncChip.PhoneOnly) Text(lastSynced, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
