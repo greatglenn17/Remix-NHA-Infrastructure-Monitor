@@ -298,13 +298,14 @@ body.signed-out main { max-width: none; padding: 0; }
 .pl.big .bar i { border-radius: 5px; }
 
 /* Bento: the phone's order (SummarySection.kt) read down three columns, with Needs attention across the top and the money
-   across the foot, as the phone's header and footer. Cards keep their own height: a short column ends early on bare
-   canvas, never inside a stretched, empty card. */
+   across the foot, as the phone's header and footer. Side by side, the columns end level: the last card of a shorter
+   column grows to the tallest one (user's ask, 2026-11-21), so no bare canvas shows under it. */
 .bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; margin-top: 12px; }
 .bento > .section, .bento > .bento-foot { grid-column: 1 / -1; }
-.bento .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bento .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; align-self: stretch; }
+.bento .col > .section:last-child { flex: 1 0 auto; }
 /* Foot: Contract cost under column 1 and the payment table under 2 and 3; the table alone (.wide) spans all three. */
-.bento-foot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; min-width: 0; }
+.bento-foot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; min-width: 0; }
 .bento-foot > .section + .wide { grid-column: 2 / -1; }
 .section { padding: 4px 16px 16px; min-width: 0; }
 .section-head { display: flex; align-items: center; gap: 8px; min-height: 48px; }
@@ -411,7 +412,8 @@ thead .num { font-family: inherit; }
    dates beside cost and payments. */
 @media (max-width: 1140px) {
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bento > .bento-foot { grid-column: auto; display: flex; flex-direction: column; align-items: stretch; }
+  .bento > .bento-foot { grid-column: auto; display: flex; flex-direction: column; align-items: stretch; align-self: stretch; }
+  .bento-foot > .section:last-child { flex: 1 0 auto; }
   .bento { grid-auto-flow: row dense; } /* the foot fills the cell beside plan and dates, before the full-width Status of billing */
 }
 @media (max-width: 900px) {
