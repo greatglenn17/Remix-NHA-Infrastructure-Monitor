@@ -9,7 +9,7 @@ import {
 import {
   getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot, runTransaction, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getStorage, connectStorageEmulator, ref, getDownloadURL, getBytes, uploadBytes } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 import { firebaseConfig, driveClientId } from './firebase-config.js';
 import { DRIVE_SCOPE, driveFiles, copyToDrive } from './drive.js';
 import * as L from './logic.js';
@@ -750,7 +750,6 @@ function projectForm(c = null) {
   // deleteProject: the phone's own audit entry names no project, so it never reaches the cloud; the tombstone keeps who and when.
   if (project) bindDelete(d, `Delete “${project.name}”? It will be removed from this website and from every phone. This cannot be undone.`, async () => {
     await updateDoc(doc(db, 'projects', c.page.id), L.deletedProject(project, { uid: s.user.uid, now: Date.now() }));
-    dropFiles(L.unusedFiles([...c.records, project], [], [], null));
     location.hash = '#/';
   });
   document.body.append(named(d));
@@ -2249,7 +2248,7 @@ async function planAct(c, el, run, note = true) {
 
 /**
  * Deletes a plan with its lots, roads, lot progress and inspections, as the phone's delete does: each is marked
- * deleted, and their files leave the bucket.
+ * deleted, and their files stay in the bucket.
  * shortcut: the records under the plan go first, in batches, then the plan with its audit entry, not one write; if it
  * stops partway the plan is still listed, and Delete plan again finishes it.
  */
@@ -2261,7 +2260,6 @@ async function deletePlan(c, plan) {
     await batch.commit();
   }
   await saveEdits(c, [[plan, null, gone.audit]], 'plan');
-  dropFiles(L.unusedFiles(gone.children, [], c.records.filter(r => r.uuid !== plan.uuid), c.project));
 }
 
 /** The plan's own tools on Progress → Lots: its scale, a quarter turn, its print area, the revision in use, a site of its own, and deleting it. */
@@ -3282,7 +3280,7 @@ function editLetter(c, l) {
 
 /**
  * Wires a form's Delete button: asks `question` first, then runs `remove` with the form's buttons off and closes the
- * form. The record is marked deleted, as a phone's delete is uploaded; saveEdits takes its files out of the bucket.
+ * form. The record is marked deleted, as a phone's delete is uploaded; its files stay in the bucket.
  */
 function bindDelete(d, question, remove) {
   const del = d.querySelector('[data-delete]'), save = d.querySelector('.btn'), err = d.querySelector('.error');
@@ -3341,7 +3339,7 @@ async function attachmentBlob(file, maxEdge = L.SCAN_MAX_EDGE) {
 /**
  * Uploads the files picked in a form to attachments/<projectUuid>/<id>.jpg|.pdf, where the phones look for them, and
  * returns { input name: its `nhafile:` reference } to save on the record ('' for a column whose Remove box is ticked).
- * shortcut: a file whose record then fails to save stays in the bucket; a replaced or removed one leaves it once the record is saved (saveEdits).
+ * shortcut: a file whose record then fails to save stays in the bucket, unused.
  */
 async function uploadPicked(c, form) {
   // A ticked Remove box clears its column; a file picked for the same column wins.
@@ -3625,16 +3623,6 @@ async function saveEdits(c, edits, noun, projectFields = null) {
     });
     saveProject(t, project, projectFields, uid, now);
   });
-  const after = edits.filter(([, changes]) => changes).map(([rec, changes]) => ({ ...rec, ...changes }));
-  dropFiles(L.unusedFiles(edits.map(([rec]) => rec), after, c.records, { ...c.project, ...projectFields }));
-}
-
-/**
- * Takes out of the bucket the files a saved delete or edit left unused, as a phone's cleanup does for the files it
- * uploaded. Not waited for: the record is saved either way, and a file that cannot be removed just stays.
- */
-function dropFiles(refs) {
-  for (const r of refs) deleteObject(ref(storage, L.storagePathOf(r))).catch(x => console.warn('A deleted record\'s file stays in the bucket', r, x.code || x));
 }
 
 /**

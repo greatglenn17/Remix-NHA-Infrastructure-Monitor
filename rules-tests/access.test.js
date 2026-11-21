@@ -131,6 +131,9 @@ describe('assigned field engineer', () => {
     return assertFails(setDoc(doc(asEng().firestore(), 'records/R'), { uuid: 'R', projectUuid: 'Q', revision: 2, assignedUids: ['other'], updatedByUid: 'eng' }));
   });
   it('uploads image 1 KB', () => assertSucceeds(uploadBytes(ref(asEng().storage(), 'attachments/P/g.jpg'), bytes(1024), jpeg)));
+  it('re-uploads a file with the same bytes', () => assertSucceeds(uploadBytes(ref(asEng().storage(), 'attachments/P/f.jpg'), bytes(10), jpeg)));
+  it('cannot overwrite a file with other bytes', () => assertFails(uploadBytes(ref(asEng().storage(), 'attachments/P/f.jpg'), bytes(11), jpeg)));
+  it('cannot delete a project file', () => assertFails(deleteObject(ref(asEng().storage(), 'attachments/P/f.jpg'))));
   it('cannot upload non-image', () =>
     assertFails(uploadBytes(ref(asEng().storage(), 'attachments/P/g.txt'), bytes(10), { contentType: 'text/plain' })));
   it('cannot upload 20 MB', () =>
@@ -300,6 +303,10 @@ describe('super admin', () => {
   it('reads and uploads project files', async () => {
     await assertSucceeds(getBytes(ref(asAdmin().storage(), 'attachments/P/f.jpg')));
     await assertSucceeds(uploadBytes(ref(asAdmin().storage(), 'attachments/P/a.jpg'), bytes(10), jpeg));
+  });
+  it('overwrites and deletes a project file', async () => {
+    await assertSucceeds(uploadBytes(ref(asAdmin().storage(), 'attachments/P/f.jpg'), bytes(11), jpeg));
+    await assertSucceeds(deleteObject(ref(asAdmin().storage(), 'attachments/P/f.jpg')));
   });
   it('reads legacy file (only admin)', () => assertSucceeds(getBytes(ref(asAdmin().storage(), 'attachments/f.jpg'))));
   it('lists all projects', () => assertSucceeds(getDocs(collection(asAdmin().firestore(), 'projects'))));

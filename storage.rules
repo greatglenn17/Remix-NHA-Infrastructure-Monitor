@@ -30,11 +30,15 @@ service firebase.storage {
     //   attachments/{projectUuid}/{fileId}.jpg|.pdf  (see Attachments.kt)
     match /attachments/{projectUuid}/{fileName} {
       allow read: if seesAll() || inProject(projectUuid);
-      allow create, update: if (isSuperAdmin() || (isWriter() && inProject(projectUuid)))
+      // A deleted record can come back (the order guard puts back an approved order) and needs its file as it was,
+      // so a writer may only re-upload the same bytes (a retried upload), and only the Super Admin deletes.
+      allow create, update: if (isSuperAdmin()
+                                || (isWriter() && inProject(projectUuid)
+                                    && (resource == null || request.resource.md5Hash == resource.md5Hash)))
         && request.resource.size < 20 * 1024 * 1024
         && (request.resource.contentType.matches('image/.*')
             || request.resource.contentType == 'application/pdf');
-      allow delete: if isSuperAdmin() || (isWriter() && inProject(projectUuid));
+      allow delete: if isSuperAdmin();
     }
 
     // Old 1.4.x path without a project: Super Admin only.
