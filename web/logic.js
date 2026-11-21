@@ -369,8 +369,7 @@ const LEVEL_RANK = { critical: 0, warning: 1, stale: 2 };
 
 /**
  * ProjectAttention.flags: critical, then warning, then stale. `today` and `latestReportAt` are yyyy-MM-dd;
- * `requests` are the project's developer requests, `issues` its issues. Web only: a critical issue past its target date
- * is flagged (the phone shows it on the Issues tab alone).
+ * `requests` are the project's developer requests, `issues` its issues (a critical one past its target date is flagged).
  */
 export function attentionFlags(project, docs, billed, today, requests = [], latestReportAt = null, issues = []) {
   const flags = [];

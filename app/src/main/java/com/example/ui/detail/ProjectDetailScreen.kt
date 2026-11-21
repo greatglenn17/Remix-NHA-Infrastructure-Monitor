@@ -227,7 +227,8 @@ fun ProjectDetailScreen(
                                 currentProject, pendingDocuments, billedTotal,
                                 latestReport?.let { Instant.ofEpochMilli(it.createdAtTimestamp).atZone(ZoneId.systemDefault()).toLocalDate() },
                                 today,
-                                developerRequests
+                                developerRequests,
+                                projectIssues
                             ),
                             documents = pendingDocuments,
                             latestReport = latestReport,

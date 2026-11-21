@@ -747,11 +747,13 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private val portfolioItems: Flow<List<PortfolioItem>> = combine(
-        userScopedProjects, allPendingDocuments, billedTotalsByProject, reportDao.getLatestWeeklyReportTimes(), projectDao.getAllDeveloperRequests()
-    ) { projects, docs, billed, latest, requests ->
+        userScopedProjects, allPendingDocuments, billedTotalsByProject, reportDao.getLatestWeeklyReportTimes(),
+        combine(projectDao.getAllDeveloperRequests(), projectDao.getAllIssues(), ::Pair)
+    ) { projects, docs, billed, latest, (requests, issues) ->
         val today = LocalDate.now()
         val docsByProject = docs.groupBy { it.projectId }
         val requestsByProject = requests.groupBy { it.projectId }
+        val issuesByProject = issues.groupBy { it.projectId }
         val latestByProject = latest.associate {
             it.projectId to Instant.ofEpochMilli(it.latestAt).atZone(ZoneId.systemDefault()).toLocalDate()
         }
@@ -762,7 +764,9 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             val lastUpdate = latestByProject[project.id]
             PortfolioItem(
                 project = project,
-                flags = ProjectAttention.flags(project, projectDocs, billedTotal, lastUpdate, today, requestsByProject[project.id].orEmpty()),
+                flags = ProjectAttention.flags(
+                    project, projectDocs, billedTotal, lastUpdate, today, requestsByProject[project.id].orEmpty(), issuesByProject[project.id].orEmpty()
+                ),
                 billedFraction = BillingProgress.billedFraction(billedTotal, cost),
                 billedTotal = billedTotal,
                 contractCost = cost,

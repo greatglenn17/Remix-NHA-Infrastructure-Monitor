@@ -26,7 +26,7 @@ object Portfolio {
         overdue = items.count { it.has(AttentionKind.OVERDUE) },
         behind = items.count { it.has(AttentionKind.BEHIND) },
         billingAhead = items.count { it.has(AttentionKind.BILLING_AHEAD) },
-        waitingApproval = items.sumOf { it.pendingDocsCount },
+        waitingApproval = items.count { it.pendingDocsCount > 0 },
         dueSoon = items.count { it.has(AttentionKind.DUE_SOON) }
     )
 

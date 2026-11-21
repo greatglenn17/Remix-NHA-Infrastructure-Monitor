@@ -41,7 +41,7 @@ class PortfolioTest {
         lastFieldUpdate = null
     )
 
-    @Test fun summarize_countsProjectsPerFlagAndDocuments() {
+    @Test fun summarize_countsProjectsPerFlag() {
         val s = Portfolio.summarize(listOf(
             item("A", BEHIND to WARNING, pendingDocs = 2),
             item("B", BEHIND to CRITICAL, DUE_SOON to WARNING, pendingDocs = 3),
@@ -49,7 +49,7 @@ class PortfolioTest {
         ))
         assertEquals(1, s.overdue)
         assertEquals(2, s.behind)
-        assertEquals(5, s.waitingApproval)
+        assertEquals(2, s.waitingApproval) // projects with an order waiting, as the website counts
         assertEquals(1, s.dueSoon)
         assertEquals(0, s.billingAhead)
     }
