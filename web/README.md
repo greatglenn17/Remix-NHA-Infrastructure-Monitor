@@ -204,15 +204,12 @@ is read only.
   storage.rules already lets an assigned writer add these, and uploads through the Firebase SDK need no bucket CORS
   setting (that is only for reading file bytes). An attached file can be replaced, or removed with the "Remove the
   attached file" box.
-- **Files no record holds any more leave the bucket** (`dropFiles`, `L.unusedFiles`). After a delete or an edit is
-  saved (`saveEdits`, Delete plan, Delete project), the files the records held before and nothing holds now are
-  deleted from Storage: a deleted record's scans and photos, a replaced or removed attachment, a photo taken off a
-  weekly report, a deleted plan's PDF and its lots' photos, and every file of a deleted project. A file another
-  record or the project's card photo still holds stays; a mention in the audit log does not keep one. This is the
-  phone's own cleanup (`Attachments`), which only reaches the files that phone uploaded and waits a day; the website
-  does it at once. storage.rules already lets an assigned writer delete a project's files. The delete is not waited
-  for: a file that cannot be removed (offline, no access) just stays, and a file uploaded for a record that then
-  fails to save still stays too.
+- **Files stay in the bucket.** A delete or an edit (a deleted record, plan or project, a replaced or removed
+  attachment, a photo taken off a weekly report) leaves the old file in Storage, as the phone does
+  (`Attachments.collectGarbage` only clears the phone's own copies): a deleted record can come back, for example the
+  order guard puts back an approved order a Field Engineer deleted, and it must still find its file. storage.rules
+  lets only the Super Admin delete a file, and lets an assigned writer overwrite one only with the same bytes (a
+  retried upload). A file uploaded for a record that then fails to save stays too.
 - **New weekly report** (Progress → Weekly) is the app's weekly report form without its photo and weather steps:
   the week (7 days from the first day picked, the Saturday of this week to start), the three accomplishment lines,
   manpower, equipment, activities and issues. With an approved bar chart the targets are its plan for the week's last

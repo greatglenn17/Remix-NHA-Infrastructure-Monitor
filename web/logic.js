@@ -542,20 +542,9 @@ export function storagePathOf(ref) {
 /**
  * Attachments.refsIn: every `nhafile:` reference anywhere in `value` (a record, a list of them, a project).
  * Backslashes are dropped first: a phone writes a list of references as JSON with each / as \/ (org.json), and a
- * reference read past that would look like a file nothing holds.
+ * reference read past that would be missed.
  */
 export const fileRefsIn = value => JSON.stringify(value ?? '').replace(/\\/g, '').match(/nhafile:(?:[0-9a-f-]{36}\/)?[0-9a-f-]{36}\.(?:jpg|pdf)/g) || [];
-
-/**
- * Attachments' orphan cleanup for one save: the files `before` (records as they were) held that nothing holds after it.
- * `after` are those records as saved (a deleted one left out), `records` the project's records (the saved ones are
- * skipped by uuid) and `project` the project. A mention in the audit log does not keep a file.
- */
-export function unusedFiles(before, after, records, project) {
-  const saved = new Set(before.map(r => r.uuid));
-  const held = new Set(fileRefsIn([after, records.filter(r => !saved.has(r.uuid) && r.type !== 'audit_logs'), project]));
-  return [...new Set(fileRefsIn(before))].filter(ref => !held.has(ref));
-}
 
 /** Attachments.MAX_BYTES: files must be smaller than this, the same limit as storage.rules. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
