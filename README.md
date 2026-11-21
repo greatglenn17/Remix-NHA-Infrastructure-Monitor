@@ -108,6 +108,9 @@ Releases are the **release** build, signed with the project's `debug.keystore` (
 
 The APK is `app/build/outputs/apk/release/app-release.apk`. It is not debuggable, so app data can't be read over USB.
 
+A release updates **both** `update.json` and `web/update.json` (identical; CI checks it). Phones read the website's copy
+(`https://nha-monitor-bulacan-2026.web.app/update.json`, so deploy hosting too) and fall back to the root one on GitHub, which older phones still read.
+
 `debug.keystore` is not in git. **Keep a backup copy somewhere safe**: without it no update can install over the phones' copy, and every phone would have to uninstall and reinstall.
 
 ---

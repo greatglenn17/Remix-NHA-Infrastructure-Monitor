@@ -30,15 +30,25 @@ data class AppUpdateInfo(
 
 object AppUpdateManager {
 
-    private const val UPDATE_URL = "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
+    private const val UPDATE_URL = "https://nha-monitor-bulacan-2026.web.app/update.json"
+    // Older phones still read raw GitHub; it stays the fallback for when Hosting can't be reached.
+    private const val FALLBACK_UPDATE_URL = "https://raw.githubusercontent.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/main/update.json"
 
-    /** Reads update.json from main. Null when it could not be reached, so callers don't claim "up to date". */
-    suspend fun checkForUpdates(customUpdateUrl: String? = null): AppUpdateInfo? = withContext(Dispatchers.IO) {
-        try {
-            val connection = URL(customUpdateUrl ?: UPDATE_URL).openConnection() as HttpURLConnection
+    /** Reads update.json from Hosting, then raw GitHub. Null when neither could be reached, so callers don't claim "up to date". */
+    suspend fun checkForUpdates(customUpdateUrl: String? = null): AppUpdateInfo? =
+        firstUpdateInfo(customUpdateUrl?.let { listOf(it) } ?: listOf(UPDATE_URL, FALLBACK_UPDATE_URL))
+
+    /** The first of [urls] that answers with a readable update.json (Hosting answers a missing file with index.html, which fails to parse). */
+    internal suspend fun firstUpdateInfo(urls: List<String>): AppUpdateInfo? = withContext(Dispatchers.IO) {
+        urls.firstNotNullOfOrNull { readUpdateInfo(it) }
+    }
+
+    private fun readUpdateInfo(url: String): AppUpdateInfo? {
+        return try {
+            val connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = 10_000
             connection.readTimeout = 10_000
-            if (connection.responseCode != 200) return@withContext null
+            if (connection.responseCode != 200) return null
             val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             val serverVersionCode = json.optInt("versionCode", BuildConfig.VERSION_CODE)
             AppUpdateInfo(
