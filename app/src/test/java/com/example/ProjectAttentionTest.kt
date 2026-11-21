@@ -133,6 +133,23 @@ class ProjectAttentionTest {
         assertEquals(2, ProjectAttention.waitingApproval(docs))
     }
 
+    // web/logic.test.mjs "attentionFlags ... issue" cases: only the open critical issue past its target counts.
+    @Test fun criticalIssuePastTarget_isCritical_sameCasesAsWebsite() {
+        fun issue(critical: Boolean, status: String, target: String) = com.example.data.model.ProjectIssue(
+            projectId = 1, date = "2026-10-01", description = "D", actionTaken = "", remarks = "", loggedBy = "",
+            status = status, isCritical = critical, targetDate = target
+        )
+        val issues = listOf(
+            issue(true, "Pending", "2026-11-01"), issue(false, "Pending", "2026-11-01"),
+            issue(true, "Resolved", "2026-11-01"), issue(true, "Pending", "2026-12-01")
+        )
+        val day = LocalDate.of(2026, 11, 18)
+        val f = ProjectAttention.flags(project(50.0, 50.0), emptyList(), 0.0, LocalDate.of(2026, 11, 17), day, issues = issues)
+        assertEquals(listOf(Triple(AttentionKind.CRITICAL_ISSUE_OVERDUE, CRITICAL, "1 critical issue past target date")), f.map { Triple(it.kind, it.level, it.message) })
+        // The target day itself is not late yet (the website compares target < today).
+        assertEquals(emptyList<Any>(), ProjectAttention.flags(project(50.0, 50.0), emptyList(), 0.0, day, LocalDate.of(2026, 11, 1), issues = issues))
+    }
+
     @Test fun dueInThirtyDays_isWarning() {
         val f = flags(project(completion = "2026-11-25")).of(DUE_SOON).single()
         assertEquals(WARNING, f.level)
