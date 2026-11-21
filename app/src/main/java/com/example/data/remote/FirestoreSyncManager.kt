@@ -10,7 +10,9 @@ import com.example.data.local.RecordSyncSchema
 import com.example.data.model.AssignedUids
 import com.example.data.model.Project
 import com.example.data.model.SyncOutboxEvent
+import com.example.data.model.syncErrorReading
 import com.example.util.AppNotificationManager
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentChange
@@ -45,6 +47,9 @@ sealed class FirestoreSyncStatus {
     data class Synced(val timestamp: Long = System.currentTimeMillis()) : FirestoreSyncStatus()
     data class Error(val message: String) : FirestoreSyncStatus()
 }
+
+/** The outbox's send order: projects, then records, then files (photos last, so they never hold back the text). */
+internal fun outboxOrder(entityType: String): Int = when (entityType) { "project" -> 0; Attachments.ENTITY_TYPE -> 2; else -> 1 }
 
 class FirestoreSyncManager(
     private val context: Context,
@@ -543,8 +548,9 @@ class FirestoreSyncManager(
             return@withContext Result.failure(IllegalStateException("User is not authenticated with Firebase."))
         }
 
-        // Projects first: a record (or file) is only accepted once its project exists in the cloud.
-        val pending = db.syncOutboxDao().pendingEventsList().sortedBy { if (it.entityType == "project") 0 else 1 }
+        // Projects first: a record (or file) is only accepted once its project exists in the cloud. Files last, so
+        // slow photo uploads never hold back the text; a record names its file by ref, which readers fetch on view.
+        val pending = db.syncOutboxDao().pendingEventsList().sortedBy { outboxOrder(it.entityType) }
         if (pending.isEmpty()) {
             markAllSent()
             return@withContext Result.success(0)
@@ -674,13 +680,15 @@ class FirestoreSyncManager(
                     recordEvents[uuid] = mutableListOf(event.eventId)
                     if (recordDocs.size == RECORD_BATCH) syncedCount += sendRecords(recordDocs, recordEvents, uploadedRecords)
                 } else if (event.entityType == Attachments.ENTITY_TYPE) {
+                    if (recordDocs.isNotEmpty()) syncedCount += sendRecords(recordDocs, recordEvents, uploadedRecords)
                     Attachments.upload(context, event)
                     db.syncOutboxDao().markSynced(event.eventId)
                     syncedCount++
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 Log.w(tag, "Failed to sync outbox event ${event.eventId}", e)
-                db.syncOutboxDao().updateAttempt(event.eventId, "FAILED", e.localizedMessage.orEmpty())
+                db.syncOutboxDao().updateAttempt(event.eventId, "FAILED", failureText(e))
             }
         }
 
@@ -745,7 +753,8 @@ class FirestoreSyncManager(
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     Log.w(tag, "Failed to sync record $uuid", e)
-                    events[uuid].orEmpty().forEach { db.syncOutboxDao().updateAttempt(it, "FAILED", e.localizedMessage.orEmpty()) }
+                    val error = failureText(e)
+                    events[uuid].orEmpty().forEach { db.syncOutboxDao().updateAttempt(it, "FAILED", error) }
                 }
             }
         }
@@ -754,6 +763,16 @@ class FirestoreSyncManager(
         docs.clear()
         events.clear()
         return ok.size
+    }
+
+    /**
+     * The error saved on a failed event, which the sync window reads ([syncErrorReading]). Storage's network failures
+     * say only "unknown error", so the cause goes too. Anything but a lack of signal also goes to Crashlytics.
+     */
+    private fun failureText(e: Exception): String {
+        val text = listOfNotNull(e.localizedMessage, e.cause?.toString()).joinToString(" Cause: ")
+        if (syncErrorReading(text) != "No signal") FirebaseCrashlytics.getInstance().recordException(e)
+        return text
     }
 
     private fun markAllSent() {

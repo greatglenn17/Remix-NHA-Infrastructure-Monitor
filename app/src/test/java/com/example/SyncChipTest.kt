@@ -5,7 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.data.model.AppThemeMode
 import com.example.data.model.DefaultUserAccount
+import com.example.data.model.SyncOutboxEvent
+import com.example.data.model.syncErrorReading
 import com.example.ui.components.SyncChip
+import com.example.ui.components.failureLines
 import com.example.ui.components.TopAppBarHeader
 import com.example.ui.components.SyncDialog
 import com.example.ui.components.label
@@ -65,6 +68,22 @@ class SyncChipTest {
 
     @Config(qualifiers = "w411dp-h891dp") @Test fun header_light() = shoot(AppThemeMode.LIGHT)
     @Config(qualifiers = "w411dp-h891dp") @Test fun header_dark() = shoot(AppThemeMode.DARK)
+
+    @Test
+    fun failedUploads_readInPlainWords() {
+        fun failed(type: String, error: String) = SyncOutboxEvent(entityType = type, entityUuid = "u", operation = "UPSERT", revision = 1, payloadJson = "{}", lastError = error)
+        assertEquals(
+            listOf("2 records: No signal", "1 project: Not allowed", "1 photo or file: Failed: Object too large"),
+            failureLines(listOf(
+                failed("record:weekly_reports", "UNAVAILABLE: Unable to resolve host firestore.googleapis.com"),
+                failed("project", "PERMISSION_DENIED: Missing or insufficient permissions."),
+                failed("record:project_payments", "An unknown error occurred. Cause: java.net.UnknownHostException: Unable to resolve host"),
+                failed("file", "Object too large"),
+            ))
+        )
+        assertEquals("No signal", syncErrorReading("DEADLINE_EXCEEDED: Deadline expired"))
+        assertEquals("Failed", syncErrorReading(""))
+    }
 
     @Test
     fun lastSyncedText_readable() {

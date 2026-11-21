@@ -369,8 +369,7 @@ const LEVEL_RANK = { critical: 0, warning: 1, stale: 2 };
 
 /**
  * ProjectAttention.flags: critical, then warning, then stale. `today` and `latestReportAt` are yyyy-MM-dd;
- * `requests` are the project's developer requests, `issues` its issues. Web only: a critical issue past its target date
- * is flagged (the phone shows it on the Issues tab alone).
+ * `requests` are the project's developer requests, `issues` its issues (a critical one past its target date is flagged).
  */
 export function attentionFlags(project, docs, billed, today, requests = [], latestReportAt = null, issues = []) {
   const flags = [];
@@ -432,6 +431,50 @@ export function attentionOrder(a, b, today) {
 
 /** The flag that put a project first: overdue before the other critical ones, else its worst. */
 export const leadingFlag = flags => flags.find(f => f.kind === 'overdue') || flags[0];
+
+/**
+ * The dashboard's Sort, on itemOf's items: 'name'; 'done', least work done first; 'due', fewest days left first (overdue
+ * first, finished and undated last); 'cost', largest contract cost first; anything else is attentionOrder. Ties go by name.
+ */
+export function dashboardOrder(sort, today) {
+  const name = (a, b) => (a.p.name || '').localeCompare(b.p.name || '');
+  const due = it => (isCompleted(it.p) ? null : isoDay(effectiveCompletion(it.p))) ?? Number.MAX_SAFE_INTEGER;
+  const work = it => Number(it.p.actualAccomplishment) || 0;
+  return {
+    name,
+    done: (a, b) => work(a) - work(b) || name(a, b),
+    due: (a, b) => due(a) - due(b) || name(a, b),
+    cost: (a, b) => b.cost - a.cost || name(a, b),
+  }[sort] || ((a, b) => attentionOrder(a, b, today));
+}
+
+/**
+ * Rows as CSV for Excel: a UTF-8 BOM so ₱ shows, CRLF lines, a cell quoted when it holds a comma, quote or line break.
+ * Text that starts like a formula (= + - @) gets a leading ' so Excel shows it instead of running it; numbers stay numbers.
+ */
+export function toCsv(rows) {
+  const cell = v => {
+    const t = typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v ?? '');
+    return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  return `﻿${rows.map(r => r.map(cell).join(',')).join('\r\n')}\r\n`;
+}
+
+/**
+ * The dashboard's "Download list": one row per item (itemOf's figures, as on the cards), numbers plain, dates yyyy-mm-dd.
+ * `billedKnown` false (billings or orders not loaded) leaves the billed and cost cells empty, as the card says "Not loaded".
+ */
+export function dashboardCsv(items, today, billedKnown = true) {
+  const day = d => (isoDay(d) == null ? '' : d.trim());
+  const round = n => Math.round(n * 100) / 100;
+  const status = p => { const late = daysOverdue(p, today); return late ? `Overdue by ${plural(late, 'day', 'days')}` : shownWord(badgeStatus(p).text); };
+  return toCsv([
+    ['Project', 'Location', 'Contractor', 'Assigned staff', 'Status', 'Work done (%)', 'Billed (₱)', 'Billed (%)', 'Contract cost (₱)', 'Completion date', 'Last field update', 'Flags'],
+    ...items.map(({ p, billed, cost, lastUpdate, flags }) => [p.name, p.location, p.contractor, p.assignedStaff, status(p), round(Number(p.actualAccomplishment) || 0),
+      billedKnown ? round(billed) : '', billedKnown && cost > 0 ? round(billed / cost * 100) : '', billedKnown && cost > 0 ? round(cost) : '',
+      day(effectiveCompletion(p)), day(lastUpdate), flags.map(f => f.message).join('; ')]),
+  ]);
+}
 
 // The record types each flag is worked out from. Behind and overdue need none: without the orders the dashboard
 // keeps the target and status the phone saved on the project (itemOf), so they rest on the project's own fields.
@@ -542,20 +585,9 @@ export function storagePathOf(ref) {
 /**
  * Attachments.refsIn: every `nhafile:` reference anywhere in `value` (a record, a list of them, a project).
  * Backslashes are dropped first: a phone writes a list of references as JSON with each / as \/ (org.json), and a
- * reference read past that would look like a file nothing holds.
+ * reference read past that would be missed.
  */
 export const fileRefsIn = value => JSON.stringify(value ?? '').replace(/\\/g, '').match(/nhafile:(?:[0-9a-f-]{36}\/)?[0-9a-f-]{36}\.(?:jpg|pdf)/g) || [];
-
-/**
- * Attachments' orphan cleanup for one save: the files `before` (records as they were) held that nothing holds after it.
- * `after` are those records as saved (a deleted one left out), `records` the project's records (the saved ones are
- * skipped by uuid) and `project` the project. A mention in the audit log does not keep a file.
- */
-export function unusedFiles(before, after, records, project) {
-  const saved = new Set(before.map(r => r.uuid));
-  const held = new Set(fileRefsIn([after, records.filter(r => !saved.has(r.uuid) && r.type !== 'audit_logs'), project]));
-  return [...new Set(fileRefsIn(before))].filter(ref => !held.has(ref));
-}
 
 /** Attachments.MAX_BYTES: files must be smaller than this, the same limit as storage.rules. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;

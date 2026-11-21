@@ -126,11 +126,11 @@ internal val TERM_HELP = listOf(
         "Shown in red from ${pct(-ProjectAttention.CRITICAL_SLIPPAGE)} behind.",
     "Billing ahead of work" to "Billed is more than ${pct(ProjectAttention.BILLING_GAP_POINTS)} ahead of work done, " +
         "for example billed 65%, work done 38.50%.",
-    "Waiting approval" to "Variation orders, time extensions, suspensions and resumptions not yet approved.",
+    "Waiting approval" to "Projects with a variation order, time extension, suspension or resumption not yet approved.",
     "Due in ${ProjectAttention.DUE_SOON_DAYS} days" to "Unfinished projects whose completion date (the revised one, if any) is ${ProjectAttention.DUE_SOON_DAYS} days away or less.",
     SYNC_HELP_FIRST to SyncChip.Synced.meaning,
     "UPLOADING" to SyncChip.Uploading(0).meaning,
-    "CHANGES WAITING" to SyncChip.Waiting(0).meaning + " Tap the chip to retry now.",
+    "CHANGES WAITING" to SyncChip.Waiting(0).meaning + " Tap the chip to see why and retry now.",
     "THIS PHONE ONLY" to SyncChip.PhoneOnly.meaning
 )
 

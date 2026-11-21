@@ -3,14 +3,16 @@ package com.example.util
 import com.example.data.model.DeveloperRequest
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.ProjectIssue
 import com.example.data.model.ProjectStatus
+import com.example.data.model.isOverdue
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /** Red, amber, grey; declaration order is the rank. */
 enum class AttentionLevel { CRITICAL, WARNING, STALE }
 
-enum class AttentionKind { BEHIND, BILLING_AHEAD, WAITING_APPROVAL, REQUEST_NOT_PACKAGED, DUE_SOON, OVERDUE, NO_RECENT_UPDATE }
+enum class AttentionKind { BEHIND, BILLING_AHEAD, WAITING_APPROVAL, REQUEST_NOT_PACKAGED, DUE_SOON, OVERDUE, CRITICAL_ISSUE_OVERDUE, NO_RECENT_UPDATE }
 
 data class AttentionFlag(val kind: AttentionKind, val level: AttentionLevel, val message: String)
 
@@ -40,7 +42,8 @@ object ProjectAttention {
         billedTotal: Double,
         latestReportAt: LocalDate?,
         today: LocalDate,
-        requests: List<DeveloperRequest> = emptyList()
+        requests: List<DeveloperRequest> = emptyList(),
+        issues: List<ProjectIssue> = emptyList()
     ): List<AttentionFlag> {
         val flags = mutableListOf<AttentionFlag>()
         val finished = project.actualAccomplishment >= 100.0
@@ -96,6 +99,13 @@ object ProjectAttention {
                     flags += AttentionFlag(AttentionKind.NO_RECENT_UPDATE, AttentionLevel.STALE, "No field update in ${days(days)}")
                 }
             }
+        }
+
+        // Even on a finished project, as on the website (attentionFlags): the issue is still open.
+        val lateIssues = issues.count { it.isCritical && it.isOverdue(today) }
+        if (lateIssues > 0) {
+            val noun = if (lateIssues == 1) "critical issue" else "critical issues"
+            flags += AttentionFlag(AttentionKind.CRITICAL_ISSUE_OVERDUE, AttentionLevel.CRITICAL, "$lateIssues $noun past target date")
         }
 
         return flags.sortedBy { it.level }

@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.nhaconstruction.monitoring.mmcfpg"
     minSdk = 24
     targetSdk = 36
-    versionCode = 314
-    versionName = "2.8.34"
+    versionCode = 315
+    versionName = "2.8.35"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -59,6 +59,9 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  // pdfbox-android brings in bouncycastle; nothing uses its post-quantum ciphers, whose data files add ~8 MB.
+  // Only the resource files go: the classes stay, so the BC provider still loads.
+  packaging { resources { excludes += "org/bouncycastle/pqc/**" } }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -83,9 +86,6 @@ dependencies {
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
-  implementation(libs.vico.compose)
-  implementation(libs.vico.compose.m3)
-  implementation(libs.vico.core)
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.security.crypto)
   implementation(libs.androidx.lifecycle.runtime.compose)
@@ -97,20 +97,13 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.mlkit.document.scanner)
   implementation(libs.pdfbox.android)
-  implementation(libs.converter.moshi)
-  implementation(libs.firebase.ai)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.storage)
   implementation(libs.firebase.auth)
   implementation(libs.firebase.messaging)
   implementation(libs.firebase.crashlytics)
-  implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
-  implementation(libs.moshi.kotlin)
-  implementation(libs.okhttp)
-  implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -128,7 +121,6 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }
 
 roborazzi {

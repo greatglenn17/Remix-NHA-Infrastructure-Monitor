@@ -286,7 +286,8 @@ object Attachments {
     suspend fun upload(context: Context, event: SyncOutboxEvent) {
         if (event.operation == "DELETE") return
         val (project, name) = split("$SCHEME:${event.entityUuid}") ?: return
-        val cloud = FirebaseStorage.getInstance().reference.child(storagePath(project, name))
+        // Storage retries one upload for 10 minutes by default; give up sooner, so the event stays queued for the next sync.
+        val cloud = FirebaseStorage.getInstance().apply { maxUploadRetryTimeMillis = 60_000 }.reference.child(storagePath(project, name))
         val file = File(dir(context), name)
         if (!file.exists() && !fetchMovedCopy(event, name, file)) return
         cloud.putFile(Uri.fromFile(file), storageMetadata { contentType = contentTypeOf(name) }).await()

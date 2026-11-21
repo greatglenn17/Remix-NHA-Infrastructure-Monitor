@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
@@ -87,12 +88,15 @@ fun AddWeeklyReportDialog(
     // The project's saved reports: a new one starts from the latest week's actual.
     reports: List<com.example.data.model.WeeklyReport> = emptyList(),
     // The project's uploaded abstracts: a week takes its Actual % from the latest one on or before its last day.
-    abstracts: List<com.example.data.model.ProjectAbstract> = emptyList()
+    abstracts: List<com.example.data.model.ProjectAbstract> = emptyList(),
+    // The edited report's saved weather logs, so Save keeps its weather.
+    weatherLogs: List<com.example.data.model.DailyHourlyWeather> = emptyList()
 ) {
     // Only new reports keep a draft; editing a saved report works as before.
     val context = androidx.compose.ui.platform.LocalContext.current
     var draft by remember { mutableStateOf(if (existingReport == null) WeeklyDrafts.load(context, projectId) else null) }
-    var decided by remember { mutableStateOf(draft == null) }
+    // Saveable so a rotation while the camera is open comes back to the form, where the photo lands, not to this prompt.
+    var decided by rememberSaveable { mutableStateOf(draft == null) }
     val offered = draft
     if (!decided && offered != null) {
         AlertDialog(
@@ -110,7 +114,7 @@ fun AddWeeklyReportDialog(
         )
         return
     }
-    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents, reports, abstracts)
+    WeeklyReportForm(project, projectId, existingReport, draft, onDismiss, onSubmit, today, documents, reports, abstracts, weatherLogs)
 }
 
 @Composable
@@ -124,7 +128,8 @@ private fun WeeklyReportForm(
     today: java.time.LocalDate,
     documents: List<com.example.data.model.PendingDocument>,
     reports: List<com.example.data.model.WeeklyReport>,
-    abstracts: List<com.example.data.model.ProjectAbstract>
+    abstracts: List<com.example.data.model.ProjectAbstract>,
+    weatherLogs: List<com.example.data.model.DailyHourlyWeather>
 ) {
     // A draft fills the form the same way a saved report does when editing.
     val seed = existingReport ?: draft?.report
@@ -257,7 +262,10 @@ private fun WeeklyReportForm(
         }
     }
     // Geo-tag: new photos get the time and GPS position printed on them and kept with the report.
-    var geoTag by remember { mutableStateOf(false) }
+    // Saveable: a photo taken across a rotation is stamped as the switch was set.
+    var geoTag by rememberSaveable { mutableStateOf(false) }
+    // Photos being copied in (a geo-tagged one waits up to ~15 s for a GPS fix); Save waits for them.
+    var importing by remember { mutableStateOf(0) }
     var captionFor by remember { mutableStateOf<String?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var showDateRangePicker by remember { mutableStateOf(false) }
@@ -272,6 +280,7 @@ private fun WeeklyReportForm(
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
+        importing++
         photoScope.launch {
             for (uri in uris) {
                 try {
@@ -283,19 +292,22 @@ private fun WeeklyReportForm(
                     attachFailed(e)
                 }
             }
+            importing--
         }
     }
 
-    var pendingCameraFile by remember { mutableStateOf<java.io.File?>(null) }
+    // A path, not a File, so it survives in the saved state while the camera app is open.
+    var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { saved ->
-        val file = pendingCameraFile ?: return@rememberLauncherForActivityResult
-        pendingCameraFile = null
+        val file = pendingCameraPath?.let { java.io.File(it) } ?: return@rememberLauncherForActivityResult
+        pendingCameraPath = null
         if (!saved) {
             file.delete()
             return@rememberLauncherForActivityResult
         }
+        importing++
         photoScope.launch {
             try {
                 val fix = if (geoTag) com.example.data.files.PhotoDetails.currentLocation(context) else null
@@ -306,6 +318,8 @@ private fun WeeklyReportForm(
                 photoDetails[ref] = detail
             } catch (e: Exception) {
                 attachFailed(e)
+            } finally {
+                importing--
             }
         }
     }
@@ -317,17 +331,12 @@ private fun WeeklyReportForm(
 
     // Daily Weather State for 7 Days of the Week (24 Hours per Day)
     val daysOfWeek = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    // Every hour starts Fair; an edited report opens with its saved weather, and a draft's wins over both.
     val dailyHourlyWeather = remember {
-        mutableStateMapOf(
-            "Monday" to mutableStateListOf(*Array(24) { "FAIR" }),
-            "Tuesday" to mutableStateListOf(*Array(24) { "FAIR" }),
-            "Wednesday" to mutableStateListOf(*Array(24) { if (it in 13..16) "CLOUDY" else "FAIR" }),
-            "Thursday" to mutableStateListOf(*Array(24) { if (it in 14..17) "RAINY" else "FAIR" }),
-            "Friday" to mutableStateListOf(*Array(24) { if (it in 12..15) "RAIN_SHOWERS" else "FAIR" }),
-            "Saturday" to mutableStateListOf(*Array(24) { "FAIR" }),
-            "Sunday" to mutableStateListOf(*Array(24) { "FAIR" })
-        ).apply {
-            draft?.weather?.forEach { (day, hours) -> if (day in keys && hours.size == 24) put(day, mutableStateListOf(*hours.toTypedArray())) }
+        mutableStateMapOf(*daysOfWeek.map { it to mutableStateListOf(*Array(24) { "FAIR" }) }.toTypedArray()).apply {
+            (savedWeather(weatherLogs) + draft?.weather.orEmpty()).forEach { (day, hours) ->
+                if (day in keys && hours.size == 24) put(day, mutableStateListOf(*hours.toTypedArray()))
+            }
         }
     }
 
@@ -360,7 +369,8 @@ private fun WeeklyReportForm(
 
     val grandTotalManpower = remember(manpowerItems) { manpowerItems.sumOf { it.count } }
 
-    var step by remember { mutableStateOf(WeeklyStep.WEEK) }
+    // Saveable: back from the camera after a rotation on the Photos step, not step 1.
+    var step by rememberSaveable { mutableStateOf(WeeklyStep.WEEK) }
     // The figures as the boxes show them: a typed one that the chart or the abstract replaced is not checked.
     val errors = weeklyErrors(scopeItems.associate { it.name to Pair(targetText(it.name), actualText(it.name)) }, scopeItems.map { it.name })
     fun snapshot() = listOf(
@@ -404,7 +414,7 @@ private fun WeeklyReportForm(
     LongForm(
         title = if (existingReport == null) "New weekly report" else "Edit weekly report",
         dirty = dirty,
-        saveEnabled = errors.isEmpty(),
+        saveEnabled = errors.isEmpty() && importing == 0,
         onDismiss = { dropDraft(); onDismiss() },
         saveTag = "submit_weekly_report_button",
         topContent = {
@@ -424,6 +434,7 @@ private fun WeeklyReportForm(
         bottomStart = {
             TextButton(onClick = { step = WeeklyStep.entries[step.ordinal - 1] }, enabled = step.ordinal > 0) { Text("Back") }
             TextButton(onClick = { step = WeeklyStep.entries[step.ordinal + 1] }, enabled = step != WeeklyStep.REVIEW) { Text("Next") }
+            if (importing > 0) Text("Adding photo…", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         },
         onSave = {
             dropDraft()
@@ -1250,7 +1261,7 @@ private fun WeeklyReportForm(
                                 showPhotoSourceDialog = false
                                 try {
                                     val (file, uri) = Attachments.newCameraFile(context)
-                                    pendingCameraFile = file
+                                    pendingCameraPath = file.path
                                     cameraLauncher.launch(uri)
                                 } catch (e: Exception) {
                                     attachFailed(e)
@@ -1441,6 +1452,15 @@ private fun IssueInputRow(
                 )
             }
         }
+    }
+}
+
+/** A saved report's weather logs as the form's day to 24 hours; a missing or unknown hour reads Fair, as on the Weather tab and the website. */
+internal fun savedWeather(logs: List<com.example.data.model.DailyHourlyWeather>): Map<String, List<String>> {
+    val known = com.example.data.model.WeatherCondition.entries.map { it.name }.toSet()
+    return logs.associate { log ->
+        val parts = log.hourlyConditionsCsv.split(",").map { it.trim().uppercase().replace(' ', '_') } // as web/logic.js weatherKey
+        log.dayOfWeek to List(24) { h -> parts.getOrNull(h)?.takeIf { it in known } ?: "FAIR" }
     }
 }
 

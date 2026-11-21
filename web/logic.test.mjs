@@ -1166,37 +1166,17 @@ test('plan tools: the scale and the areas it works out, a quarter turn, the revi
   assert.deepEqual([L.sdpSites(typed)[0].plans.map(p => p.uuid), L.sdpSites(typed)[0].plan.uuid, L.sdpSites(typed.slice(0, 1))[0].plan.uuid], [['a2', 'a1'], 'a2', 'a1']);
 });
 
-test('files: a delete or an edit names the files nothing holds any more, and no others', () => {
+test('files: every reference a record holds, wherever it sits', () => {
   const P = '11111111-1111-4111-8111-111111111111', id = n => `${String(n).repeat(8)}-0000-4000-8000-000000000000`;
   const jpg = n => `nhafile:${P}/${id(n)}.jpg`, pdf = n => `nhafile:${P}/${id(n)}.pdf`;
   // Every reference, wherever it sits: a column, a JSON list inside a column, the old form without a project.
   assert.deepEqual(L.fileRefsIn({ fileUrl: pdf(1), photosJson: JSON.stringify([jpg(2), { url: jpg(3) }]), old: `nhafile:${id(4)}.jpg`, web: 'https://example.com/a.jpg', bad: 'nhafile:x.jpg' }),
     [pdf(1), jpg(2), jpg(3), `nhafile:${id(4)}.jpg`]);
   assert.deepEqual([L.fileRefsIn(null), L.fileRefsIn([])], [[], []]);
-  // A list a phone saved writes each / as \/ (org.json): its files are held all the same, and go when it is deleted.
+  // A list a phone saved writes each / as \/ (org.json): its files are found all the same.
   const phone = { uuid: 'w9', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(7), jpg(8)]).replaceAll('/', '\\/') };
   assert.equal(phone.attachedPhotoUrlsJson.includes('\\/'), true);
   assert.deepEqual(L.fileRefsIn(phone), [jpg(7), jpg(8)]);
-  assert.deepEqual(L.unusedFiles([{ uuid: 'w8', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(7), jpg(9)]) }], [], [phone], null), [jpg(9)]);
-  assert.deepEqual(L.unusedFiles([phone], [], [phone], null), [jpg(7), jpg(8)]);
-
-  const report = { uuid: 'w1', type: 'weekly_reports', attachedPhotoUrlsJson: JSON.stringify([jpg(1), jpg(2), jpg(3)]) };
-  const letter = { uuid: 'c1', type: 'contractor_letters', replyFileUrl: pdf(4), receivedFileUrl: pdf(5) };
-  const audit = { uuid: 'a1', type: 'audit_logs', newValue: `File: ${pdf(4)}` };
-  const records = [report, letter, audit, { uuid: 'd1', type: 'pending_documents', fileUrl: pdf(5) }];
-  const project = { projectUuid: P, latestUpdatePhotoUrl: jpg(1) };
-  // A deleted report: its photos, but not the one the project still shows.
-  assert.deepEqual(L.unusedFiles([report], [], records, project), [jpg(2), jpg(3)]);
-  // A deleted letter: the file only the audit log mentions goes; the one another record holds stays.
-  assert.deepEqual(L.unusedFiles([letter], [], records, project), [pdf(4)]);
-  // An edit: a photo taken off the list and a scan replaced; what the record keeps stays.
-  assert.deepEqual(L.unusedFiles([report], [{ ...report, attachedPhotoUrlsJson: JSON.stringify([jpg(1), jpg(3)]) }], records, project), [jpg(2)]);
-  assert.deepEqual(L.unusedFiles([letter], [{ ...letter, replyFileUrl: pdf(6) }], records, project), [pdf(4)]);
-  assert.deepEqual(L.unusedFiles([letter], [{ ...letter, replyFileUrl: '' }], records, project), [pdf(4)]);
-  // An edit that touches no file, and a record without files.
-  assert.deepEqual([L.unusedFiles([letter], [{ ...letter, subject: 'x' }], records, project), L.unusedFiles([audit], [], records, project), L.unusedFiles([{ uuid: 'n' }], [], records, null)], [[], [], []]);
-  // A deleted project: every file of it, once each.
-  assert.deepEqual(L.unusedFiles([...records, project], [], [], null), [jpg(1), jpg(2), jpg(3), pdf(4), pdf(5)]);
 });
 
 test('several lots at once and inspections: one progress or use for the lots picked, and a snapshot with its history, are written like the phone', () => {
@@ -1804,4 +1784,26 @@ test('web dashboard: a flag built on records that failed to load is left out', (
 test('billingText: the billing labels in sentence case, as the lot card and plan say them', () => {
   assert.deepEqual(['M1 BILLED (80%)', 'M2 BILLED (20%)', 'M1 + M2 BILLED (100%)', 'NOT BILLED', '', undefined, 'BILLED'].map(L.billingText),
     ['M1 billed · 80%', 'M2 billed · 20%', 'M1 + M2 billed · 100%', 'Not billed', 'Not billed', 'Not billed', 'M1 billed · 80%']);
+});
+
+test('dashboard CSV: BOM, plain numbers, iso dates, quoted commas, quotes and line breaks, formulas kept as text', () => {
+  const item = { p: { name: 'Road "A", phase 2', location: 'Bulacan\nMalolos', contractor: '=HYPERLINK("x")', assignedStaff: 'Ana', status: 'On-going',
+    actualAccomplishment: '41.255', completionDateOriginal: '2027-03-01' }, billed: 1500000.5, cost: 3000001, lastUpdate: '2026-11-20',
+    flags: [{ message: 'Due in 3 days' }, { message: 'No field update in 14 days' }] };
+  const csv = L.dashboardCsv([item], '2026-11-21');
+  assert.ok(csv.startsWith('﻿Project,Location,Contractor,Assigned staff,Status,Work done (%),Billed (₱),'));
+  assert.equal(csv.split('\r\n')[1], '"Road ""A"", phase 2","Bulacan\nMalolos","\'=HYPERLINK(""x"")",Ana,On-going,41.26,1500000.5,50,3000001,2027-03-01,2026-11-20,Due in 3 days; No field update in 14 days');
+  assert.equal(L.toCsv([[-5, 'a,b']]), '﻿-5,"a,b"\r\n');
+  // Billings not loaded: the money cells are empty, not 0.
+  assert.match(L.dashboardCsv([item], '2026-11-21', false), /,41\.26,,,,2027-03-01,/);
+});
+
+test('dashboard sort: days left puts overdue first and finished or undated last; an unknown sort is the attention order', () => {
+  const it = (name, due, done = 10, cost = 0) => ({ p: { name, completionDateOriginal: due, actualAccomplishment: done, status: done >= 100 ? 'Completed' : 'On-going' }, cost, flags: [] });
+  const items = [it('Done', '2026-01-01', 100), it('Late', '2026-11-01'), it('None', ''), it('Soon', '2026-12-01', 50, 9)];
+  const names = sort => [...items].sort(L.dashboardOrder(sort, '2026-11-21')).map(x => x.p.name);
+  assert.deepEqual(names('due'), ['Late', 'Soon', 'Done', 'None']);
+  assert.equal(names('cost')[0], 'Soon');
+  assert.deepEqual(names('done'), ['Late', 'None', 'Soon', 'Done']);
+  assert.deepEqual(names('nonsense'), [...items].sort((a, b) => L.attentionOrder(a, b, '2026-11-21')).map(x => x.p.name));
 });
