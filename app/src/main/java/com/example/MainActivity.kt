@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Surface
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import com.example.ui.dashboard.DashboardScreen
@@ -82,7 +83,9 @@ class MainActivity : ComponentActivity() {
                     } else {
                         // Dialog States
                         var showCreateProjectDialog by remember { mutableStateOf(false) }
-                        var showAddWeeklyReportDialog by remember { mutableStateOf(false) }
+                        // Saveable: the weekly form takes camera photos, and a rotation meanwhile must reopen it for the photo to land.
+                        // Keyed on the project so a flag restored without one (process death) can't pop the form open on the next project picked.
+                        var showAddWeeklyReportDialog by rememberSaveable(selectedProjectId) { mutableStateOf(false) }
                         var showAddMonthlyReportDialog by remember { mutableStateOf(false) }
                         var showAddTimeExtensionDialog by remember { mutableStateOf(false) }
                         var showAddWorkSuspensionDialog by remember { mutableStateOf(false) }
@@ -186,7 +189,8 @@ class MainActivity : ComponentActivity() {
                                 documents = viewModel.pendingDocuments.collectAsState().value,
                                 reports = viewModel.weeklyReports.collectAsState().value,
                                 abstracts = viewModel.projectAbstracts.collectAsState().value,
-                                onDismiss = { 
+                                weatherLogs = viewModel.dailyWeatherLogs.collectAsState().value.filter { reportToEdit != null && it.weeklyReportId == reportToEdit.id },
+                                onDismiss = {
                                     showAddWeeklyReportDialog = false
                                     viewModel.weeklyReportToEdit.value = null
                                 },

@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -68,9 +68,10 @@ fun rememberAttachmentCamera(kind: Attachments.Kind, stamp: () -> List<String> =
     val scope = rememberCoroutineScope()
     val latestOnAttached by rememberUpdatedState(onAttached)
     val latestStamp by rememberUpdatedState(stamp)
-    var pending by remember { mutableStateOf<java.io.File?>(null) }
+    // A path in the saved state, so a rotation or process death while the camera is open keeps the photo.
+    var pending by rememberSaveable { mutableStateOf<String?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        val file = pending ?: return@rememberLauncherForActivityResult
+        val file = pending?.let { java.io.File(it) } ?: return@rememberLauncherForActivityResult
         pending = null
         if (!saved) { file.delete(); return@rememberLauncherForActivityResult }
         scope.launch {
@@ -83,7 +84,7 @@ fun rememberAttachmentCamera(kind: Attachments.Kind, stamp: () -> List<String> =
     }
     return {
         val (file, uri) = Attachments.newCameraFile(context)
-        pending = file
+        pending = file.path
         launcher.launch(uri)
     }
 }
