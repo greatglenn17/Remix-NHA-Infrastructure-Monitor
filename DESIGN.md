@@ -292,7 +292,9 @@ My projects | All projects, for accounts that see every project (not Super Viewe
 ### Inputs / Fields
 - **Style:** Field fill, 1px `outline` stroke, 8px radius, 11px 12px padding, at least 44px tall. The label sits above (13px/400, `text-2`). The search field has a 38px left inset for the icon and a Cmd/Ctrl+K hint on the right that hides on focus, when typed in, and on touch screens.
 - **Focus:** the border turns Progress Blue and gains a 1px ring (`box-shadow: 0 0 0 1px`).
-- **Error:** a 13px/400 Rose line under the fields, with `role="alert"`.
+- **Error:** a 13px/400 Rose line under the fields, with `role="alert"`. When a check finds several problems they are listed one to a line (the bar chart's list), each in its own words.
+- **Optional:** a field the save does not need says "(optional)" in its label; a required one says nothing.
+- **Form footer:** in an edit window the error line and the buttons sit in a footer on the panel colour, under a hairline, that sticks to the bottom of the window's scroll, so Save is always in view, on a phone too. Scrolled to the end it sits under the last field and covers none. A long list of errors scrolls inside it after a quarter of the screen.
 - **Saved:** once a save has gone through, one 13px Emerald line at the foot of the window, centred, on a solid panel with an `outline` hairline and 8px corners: "Saved. Phones get it on their next sync." ("Profile saved." for the profile). It stays until the next key or click or until another page opens (New project, which opens the project it made, carries it there), never takes a click, never prints, and is said through the hidden status line too. A form saved with nothing to write shows none. A save that fails shows its error in the form and no line. A delete shows none (the record leaving the list is the answer), and the Users screen and the abstracts keep their own lines, which name what changed.
 
 ### Navigation
