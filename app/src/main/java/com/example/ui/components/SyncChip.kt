@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.data.model.SyncOutboxEvent
+import com.example.data.model.syncErrorReading
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -13,13 +15,13 @@ sealed class SyncChip {
     object Synced : SyncChip()
     /** Changes queued and not tried yet; the upload starts as soon as they are queued. */
     data class Uploading(val count: Int) : SyncChip()
-    /** An upload failed (usually no signal); they are retried on the next start or sync. */
-    data class Waiting(val count: Int) : SyncChip()
+    /** An upload failed; they are retried on the next start or sync. [reasons] says why ([failureLines]). */
+    data class Waiting(val count: Int, val reasons: List<String> = emptyList()) : SyncChip()
 
     companion object {
-        fun of(cloudSignedIn: Boolean, pending: Int, failed: Int): SyncChip = when {
+        fun of(cloudSignedIn: Boolean, pending: Int, failed: Int, reasons: List<String> = emptyList()): SyncChip = when {
             !cloudSignedIn -> PhoneOnly
-            failed > 0 -> Waiting(pending + failed)
+            failed > 0 -> Waiting(pending + failed, reasons)
             pending > 0 -> Uploading(pending)
             else -> Synced
         }
@@ -39,7 +41,18 @@ val SyncChip.meaning: String get() = when (this) {
     SyncChip.PhoneOnly -> "Signed in offline: changes stay on this phone and are not sent to the cloud."
     SyncChip.Synced -> "Every change made on this phone is in the cloud."
     is SyncChip.Uploading -> "Changes are being sent to the cloud now."
-    is SyncChip.Waiting -> "Changes could not be sent, usually for lack of signal. They are sent again the next time the app starts or syncs."
+    is SyncChip.Waiting -> "Some changes could not be sent. They are sent again the next time the app starts or syncs."
+}
+
+/** The sync window's list of failed uploads, one line per kind and reading: "2 records: No signal". */
+fun failureLines(failed: List<SyncOutboxEvent>): List<String> =
+    failed.groupingBy { kindOf(it.entityType) to syncErrorReading(it.lastError) }.eachCount()
+        .map { (key, n) -> "$n ${if (n == 1) key.first.first else key.first.second}: ${key.second}" }
+
+private fun kindOf(entityType: String): Pair<String, String> = when (entityType) {
+    "project" -> "project" to "projects"
+    "file" -> "photo or file" to "photos or files"
+    else -> "record" to "records"
 }
 
 private val SYNCED_AT = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a", Locale.US)

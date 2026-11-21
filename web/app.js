@@ -4692,7 +4692,9 @@ function photoUrl(refText) {
   const path = L.storagePathOf(refText);
   if (!path) return Promise.resolve(null);
   if (!photoUrls.has(path)) photoUrls.set(path, getDownloadURL(ref(storage, path)).catch(x => {
-    if (x?.code !== 'storage/object-not-found' && x?.code !== 'storage/unauthorized') photoUrls.delete(path);
+    // Phones send a record before its photo, so a missing file is asked for again a minute later.
+    if (x?.code === 'storage/object-not-found') setTimeout(() => photoUrls.delete(path), 60_000);
+    else if (x?.code !== 'storage/unauthorized') photoUrls.delete(path);
     return null;
   }));
   return photoUrls.get(path);
