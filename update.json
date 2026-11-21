@@ -1,8 +1,8 @@
 {
-  "versionCode": 314,
-  "versionName": "2.8.34",
-  "releaseNotes": "v2.8.34: Billings on the same date keep their place when one is edited, on the phone and the website.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.34/NHA_Monitor_v2.8.34_Build314.apk",
-  "apkSha256": "83349be5b5513e1a87d870e6e6038d00f0bfd3f5e4f22e1da6c96a854c4447f7",
+  "versionCode": 315,
+  "versionName": "2.8.35",
+  "releaseNotes": "v2.8.35: Weekly reports keep their real weather and their photos; report text is sent before photos; Waiting approval counts projects, as on the website.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.35/NHA_Monitor_v2.8.35_Build315.apk",
+  "apkSha256": "51eed06feb68a278bff8d311720633df6a827626f10b5b4ef502520b19d21384",
   "isMandatory": true
 }
