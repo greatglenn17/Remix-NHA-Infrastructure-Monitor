@@ -777,9 +777,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
    stronger and ringed white over a dark halo (the phone still fills it amber, which read as 51–75%). */
 .lot-stage polygon.billed { stroke: var(--billed-edge); stroke-width: 3.5; stroke-dasharray: 14 7; }
 .lot-stage polygon.dim { fill-opacity: 0.08; stroke: #94A3B8; stroke-opacity: 0.25; stroke-width: 0.75; }
-.lot-stage .draft { fill: #1D4ED8; fill-opacity: 0.2; stroke: #1D4ED8; stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.lot-stage .draft { fill: #1D4ED8; fill-opacity: 0.2; stroke: #1D4ED8; stroke-width: 1.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .lot-stage polyline.draft { fill: none; }
-.lot-stage path.draft { stroke-width: 10; } /* a corner: a dot the same size at any zoom */
+.lot-stage path.draft { stroke-width: 6; } /* a corner: a dot the same size at any zoom; 1.5 and 6 px, as 2.5 and 10 were too thick (user, 2026-11-21) */
 .lot-viewer.drawing .lot-stage, .lot-viewer.drawing .lot-stage:active { cursor: crosshair; }
 .lot-draw { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 8px; }
 .lot-draw p { flex: 1 1 240px; margin: 0; }
