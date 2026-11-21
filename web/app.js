@@ -1296,7 +1296,8 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     ${kv(`Actual${weekEnd ? ` for ${L.displayDate(weekEnd)}` : ''}`, pct(latest.actualAccomplishmentPct))}${kv('Submitted by', latest.submittedByStaff)}`
     : `<div class="empty-row"><i class="ghost" aria-hidden="true"></i><p class="muted">No weekly reports yet</p>${issues}</div>`);
   const lots = housing && L.lotSummary(records);
-  const construction = housing ? constructionCard(lots, payments, now, L.abstractUnits(project, lots.saleable)) : '';
+  const construction = housing ? constructionCard(lots, now) : '';
+  const billing = housing ? billingStatusCard(lots, payments, L.abstractUnits(project, lots.saleable)) : '';
   const paymentCard = section('Status of payment', 'receipt_long', payments.length === 0 ? `
     <div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p><div class="ghost-rows" aria-hidden="true"><i></i><i></i><i></i></div></div>` : `
     <div class="scroll"><table class="pay">
@@ -1316,13 +1317,15 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
 
   // The phone's order (SummarySection.kt) read down the columns: report and construction, the profile, plan and dates,
   // then cost beside the payments. Without the housing card, Contract cost moves up under the report (at every width) so column 1 is
-  // not one short card; that is the one place the order leaves the phone's.
+  // not one short card. Status of billing, inside Status of construction on the phone, is a full-width row above the money
+  // here, so no column runs long. Those are the places the order leaves the phone's.
   return `
     <div class="bento">
       ${attention}
       <div class="col">${report}${construction || costCard}</div>
       <div class="col">${profile}</div>
       <div class="col">${barChartCard(project, documents, now, page.curve)}${dates}</div>
+      ${billing}
       <div class="bento-foot">${construction ? costCard : ''}${paymentCard}</div>
     </div>`;
 }
@@ -1481,24 +1484,24 @@ function barChartCard(project, documents, now, curveOpen) {
     <details class="curve" id="chart-curve"${curveOpen ? ' open' : ''}><summary>${icon('expand_more', 'sm')}S-curve · ${plural(L.chartMonths(version).length, 'month')}</summary>${curveTable(version)}</details>`, '', edit);
 }
 
-/** ConstructionCard: saleable lots by progress band in the lot map's colours, then the Status of billing; nothing without saleable lots. */
-function constructionCard(summary, payments, now, units) {
+/** ConstructionCard: saleable lots by progress band in the lot map's colours; nothing without saleable lots. */
+function constructionCard(summary, now) {
   if (!summary.saleable) return '';
   return section('Status of construction', 'home_work', `
     <p class="muted asof">As of ${esc(L.displayDate(now))}</p>
     <div class="lot-bar" role="img" aria-label="${esc(L.LOT_BANDS.map((b, i) => `${b}: ${summary.bands[i]}`).join(', '))}">${summary.bands.map((n, i) => (n ? `<i class="lot-${i}" style="flex:${n}"></i>` : '')).join('')}</div>
     ${L.LOT_BANDS.map((b, i) => `<div class="band"><i class="dot lot-${i}" aria-hidden="true"></i>${kv(b, String(summary.bands[i]))}</div>`).join('')}
-    <div class="band total"><b>Grand total${summary.sites > 1 ? `, all ${summary.sites} sites` : ''}</b><b class="num words">${plural(summary.saleable, 'saleable lot')}</b></div>
-    <p class="sub strong">Status of billing</p>
-    ${billingRows(L.billingStatus(payments, units), units, units === summary.saleable ? 'lot' : 'unit')}
-    ${units === summary.saleable ? '' : `<p class="muted small">Counted against the profile's ${plural(units, 'unit')}, not the ${plural(summary.saleable, 'saleable lot')} drawn.</p>`}`);
+    <div class="band total"><b>Grand total${summary.sites > 1 ? `, all ${summary.sites} sites` : ''}</b><b class="num words">${plural(summary.saleable, 'saleable lot')}</b></div>`);
 }
 
-function billingRows(rows, total, word) {
-  const billed = rows.filter(r => r.units > 0), none = rows.filter(r => !(r.units > 0)).map(r => r.label);
-  const rest = none.length ? `<p class="muted small">${billed.length ? 'Not billed yet' : 'No lots billed yet for'}: ${esc(none.join(', '))}.</p>` : '';
-  return (billed.length ? `<table class="billing"><thead><tr><th>Billed for</th><th class="num">${word === 'unit' ? 'Units' : 'Lots'} billed</th></tr></thead>
-      <tbody>${billed.map(r => `<tr><td>${esc(r.label)}</td><td class="num words">${r.units} of ${plural(total, word)}</td></tr>`).join('')}</tbody></table>` : '') + rest;
+/** BillingStatusCard: lots or units billed per housing billing type, a tile each across the page; nothing without saleable lots. */
+function billingStatusCard(summary, payments, units) {
+  if (!summary.saleable) return '';
+  const word = units === summary.saleable ? 'lot' : 'unit';
+  return section('Status of billing', 'request_quote', `
+    <div class="money tiles">${L.billingStatus(payments, units).map(r => `<div><span>${esc(r.label)}</span>${r.units > 0
+      ? `<b>${r.units}<small> of ${plural(units, word)} billed</small></b>` : '<b class="word">Not billed yet</b>'}</div>`).join('')}</div>
+    ${word === 'lot' ? '' : `<p class="muted small">Counted against the profile's ${plural(units, 'unit')}, not the ${plural(summary.saleable, 'saleable lot')} drawn.</p>`}`);
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */
