@@ -906,6 +906,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .assign-list .check span { display: grid; gap: 2px; }
 .edit-form .actions { display: flex; justify-content: flex-end; gap: 8px; }
 .edit-form .error:empty { display: none; }
+/* The error line and the buttons stick to the foot of the window's scroll so Save is always in view; the -20px and the padding fill the dialog's own bottom padding, so nothing shows under them. */
+.edit-form .form-foot { position: sticky; bottom: -20px; display: grid; gap: 10px; margin: 0 -20px -20px; padding: 12px 20px 20px; background: var(--surface-solid); border-top: 1px solid var(--border); }
+.edit-form .form-foot .error { max-height: 25vh; overflow-y: auto; } /* a long list of errors leaves the fields room */
 
 /* Weather (WeatherChartTab); the clock SVG is the print's, recoloured for the dark site */
 .wx .field { margin-top: 4px; }

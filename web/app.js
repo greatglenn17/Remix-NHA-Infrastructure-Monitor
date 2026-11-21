@@ -121,6 +121,8 @@ function askDanger(text, action = text.split(' ')[0]) {
 let dialogCount = 0;
 /** Names a dialog by its heading, so a screen reader announces it. */
 const named = d => { const h = d.querySelector('h2'); if (h) { h.id ||= `dialog-title-${++dialogCount}`; d.setAttribute('aria-labelledby', h.id); } return d; };
+/** A form's errors one to a line, as the bar chart lists them, in its error box (role="alert", so they are still read out). */
+const showErrors = (err, errors) => { err.innerHTML = `<ul class="bc-errors">${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; };
 const today = () => new Date().toLocaleDateString('en-CA'); // yyyy-MM-dd in the viewer's time zone
 const pct = n => `${(Number(n) || 0).toFixed(2)}%`;
 const clamp = f => Math.max(0, Math.min(1, f || 0));
@@ -436,8 +438,8 @@ async function editProfile() {
     <label class="field">Full name<input name="fullName" autocomplete="name" value="${v('displayName')}" required></label>
     <label class="field">Position / title<input name="position" autocomplete="organization-title" placeholder="e.g. Supervising Project Engineer" value="${v('position')}" required></label>
     <label class="field">Office / department / region<input name="office" autocomplete="organization" placeholder="e.g. NHA Regional Office III" value="${v('office')}" required></label>
-    <p class="error" role="alert">${esc(loadError)}</p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${loadError ? ' disabled' : ''}>Save changes</button></div>
+    <div class="form-foot"><p class="error" role="alert">${esc(loadError)}</p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${loadError ? ' disabled' : ''}>Save changes</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ name: form.fullName.value.trim(), position: form.position.value.trim(), office: form.office.value.trim() });
@@ -644,18 +646,18 @@ function projectForm(c = null) {
   d.innerHTML = `<form novalidate>
     <h2>${project ? 'Edit project' : 'New project'}</h2>
     ${text('Project name', 'name', ' required')}
-    ${text('Location', 'location')}
-    ${text('Implementing office', 'implementingOffice')}
+    ${text('Location (optional)', 'location')}
+    ${text('Implementing office (optional)', 'implementingOffice')}
     ${text('Contractor name', 'contractor', ' required')}
     <label class="field">Project type<select name="type">${[...L.PROJECT_TYPES, 'Custom...'].map(t => opt(t, custom ? 'Custom...' : start.projectType)).join('')}</select></label>
     <label class="field" id="pj-custom" hidden>Custom project type<input name="customType" value="${custom ? v('projectType') : ''}"></label>
     <div class="wk-row">
-      ${text('Land area', 'landArea', ' inputmode="decimal"')}
+      ${text('Land area (optional)', 'landArea', ' inputmode="decimal"')}
       <label class="field">Unit<select name="landUnit">${L.LAND_UNITS.map(u => opt(u, start.landUnit)).join('')}</select></label>
-      ${text('No. of units', 'numberOfUnits', ' inputmode="numeric"')}
+      ${text('No. of units (optional)', 'numberOfUnits', ' inputmode="numeric"')}
     </div>
-    ${project ? `${text('Projected beneficiaries', 'projectedBeneficiaries')}${text('Board resolution / date', 'boardResolution')}
-      ${text('Notice of award', 'noticeOfAward')}${text('Notice to proceed', 'noticeToProceed')}` : ''}
+    ${project ? `${text('Projected beneficiaries (optional)', 'projectedBeneficiaries')}${text('Board resolution / date (optional)', 'boardResolution')}
+      ${text('Notice of award (optional)', 'noticeOfAward')}${text('Notice to proceed (optional)', 'noticeToProceed')}` : ''}
     <h3>Scope of works</h3>
     <p class="muted small">Each item's weight is its share of the total, and the total is the original contract cost.</p>
     <div class="wk-rows" data-rows>${start.scope.map(row).join('')}</div>
@@ -675,8 +677,8 @@ function projectForm(c = null) {
       ${text('Final accomplishment %', 'final', ' inputmode="decimal"')}
     </div>
     <p class="muted small" id="pj-final"></p>`}
-    <p class="error" role="alert"></p>
-    <div class="actions">${project && L.canDeleteProject(project, s.user.uid, s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete project</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${project && L.canDeleteProject(project, s.user.uid, s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete project</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   // form.elements: a form's own `name` property would shadow the Project name box.
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
@@ -716,7 +718,7 @@ function projectForm(c = null) {
     e.preventDefault();
     // The phone checks for a project of the same name and location only when one is created.
     const f = values(), errors = L.projectErrors(f, project ? [] : s.projects || [], today());
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     const edit = project && L.editedProject(project, f);
     if (edit && !Object.keys(edit.fields).length) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
@@ -770,8 +772,8 @@ async function assignForm(c) {
     <h2>Assign people</h2>
     <p class="muted">Ticked accounts can open this project. What they can change in it still depends on their role.</p>
     <div class="assign-list" data-list><p class="muted">Loading accounts…</p></div>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn" disabled>Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn" disabled>Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn'), list = d.querySelector('[data-list]');
   const values = () => [...list.querySelectorAll('input:checked')].map(i => i.value);
@@ -849,8 +851,8 @@ function driveForm(c) {
     <p class="muted">Copies this project's photos and PDF files to your Google Drive, into the folder <b>NHA Monitor / ${esc(c.project.name)}</b>: the photos of each weekly report in that week's folder, then Billings, Documents, Letters to Contractor, Developer Requests and Subdivision Plan.</p>
     <p class="muted">Files already copied are skipped, so run it again any time to add the new ones. Nothing is removed from NHA Monitor, and the site can only see the Drive files it made itself.</p>
     <p role="status"></p>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${icon('cloud_upload', 'sm')}Sign in to Google and copy</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${icon('cloud_upload', 'sm')}Sign in to Google and copy</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), status = d.querySelector('[role=status]'), go = d.querySelector('.actions .btn');
   let open = true;
@@ -1357,8 +1359,8 @@ function barChartForm(c) {
     <div data-sheets></div>
     <ul class="bc-errors" data-errors aria-live="polite"></ul>
     <div class="bc-body" data-body></div>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), tabs = d.querySelector('[data-tabs]'), body = d.querySelector('[data-body]'), errs = d.querySelector('[data-errors]');
   const err = d.querySelector('p.error'), save = d.querySelector('.actions .btn');
@@ -1797,8 +1799,8 @@ function editLot(c, lot) {
         <label class="field">Billing remarks (optional)<input name="note${i + 1}" autocomplete="off"></label></div>`).join('')}
       <small class="muted">M2 can be marked once M1 is billed.</small>
     </fieldset>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   // M2 follows M1: it is billed after M1 and unbilled before M1. A newly ticked mark asks for its reference.
@@ -1873,8 +1875,8 @@ function progressDialog({ title, note, pct = 0, road = false, status = 'Not Star
     <label class="field">Current activity (e.g. rebar, concreting)<input name="currentActivity" value="${esc(activity)}" autocomplete="off"></label>
     ${contractor == null ? '' : `<label class="field">Contractor<input name="contractor" value="${esc(contractor)}" autocomplete="off"></label>`}
     <label class="field">${esc(remarksLabel)}<input name="remarks" autocomplete="off"></label>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${esc(saveLabel)}</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${esc(saveLabel)}</button></div></div>
   </form>`;
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), button = d.querySelector('.btn');
   const picked = () => L.pickedProgress(pct, Number(el.band.value), road);
@@ -1982,10 +1984,10 @@ function lotForm(c, site, lot, polygon = null, area = 0, onSaved = () => {}) {
     <label class="field"><span data-lot-label></span><input name="lotNo" value="${esc(lot?.lotNumber || '')}" autocomplete="off"></label>
     ${lot ? '' : `<label class="field" data-unit>Housing unit (optional)<input name="unit" autocomplete="off"></label>
     <label class="field">Lot area (sq.m)<input name="area" inputmode="decimal" value="${area > 0 ? area : '50.0'}" autocomplete="off"></label>
-    <label class="field">Description / remarks<input name="description" autocomplete="off"></label>`}
-    <p class="error" role="alert"></p>
+    <label class="field">Description / remarks (optional)<input name="description" autocomplete="off"></label>`}
+    <div class="form-foot"><p class="error" role="alert"></p>
     <div class="actions">${lot ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Remove lot</button>` : ''}
-      <button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+      <button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
   // A new road lot or easement has one number and no block of its own; a saved lot keeps the block it has.
@@ -2051,10 +2053,10 @@ function planForm(c) {
       <small class="muted" data-revised>A revised plan starts with no lots; the plan it replaces keeps its own.</small></fieldset>` : ''}
     <label class="field">Plan document name<input name="planName" autocomplete="off"></label>
     <label class="field">Plan (PDF)<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
-    <label class="field">Description / remarks<input name="description" autocomplete="off"></label>
+    <label class="field">Description / remarks (optional)<input name="description" autocomplete="off"></label>
     <p class="muted small">Its lots are then drawn here with Add lot, or found on the phone with Find lots.</p>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save plan</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save plan</button></div></div>
   </form>`;
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
   const fresh = () => el.kind?.value === 'site';
@@ -2100,8 +2102,8 @@ function scaleForm(c, site) {
     <h2>Plan scale</h2>
     <p class="muted small">Type the scale printed on the plan, e.g. SCALE 1:1000. Lot areas are worked out from it; areas someone typed in stay.</p>
     <label class="field">Scale 1 :<input name="scale" inputmode="numeric" maxlength="6" autocomplete="off" value="${Number(site.plan.scaleDenominator) || ''}"></label>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const done = () => { d.close(); d.remove(); };
@@ -2139,8 +2141,8 @@ function ownSiteForm(c, sites, site) {
     ${site.site ? '' : '<label class="field">Name of the first site<input name="currentSiteName" autocomplete="off" value="Phase 1"></label>'}
     <label class="field">Name of the new site<input name="newSite" autocomplete="off" value="Phase ${sites.length + 1}"></label>
     <p class="muted small">v${esc(v)} becomes version 1 of this site.</p>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Make site</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Make site</button></div></div>
   </form>`;
   const form = d.querySelector('form'), el = form.elements, err = d.querySelector('.error'), save = d.querySelector('.btn');
   const done = () => { d.close(); d.remove(); };
@@ -2200,9 +2202,9 @@ function foundLotsDialog(c, site, areas, page) {
     <h2>Lots found in the plan</h2>
     <p>${esc(`Found ${plural(lots.length, 'lot')} in ${plural(new Set(lots.map(a => a.block)).size, 'block')}${large ? `, and ${plural(large, 'larger area')} (open spaces or facilities)` : ''}.`)}</p>
     <p class="muted small">${esc(`${names} Earlier found lots with no progress yet are replaced; renumbered lots stay${started ? `; the ${started} with progress stay` : ''}.`)}</p>
-    <p class="error" role="alert"></p>
+    <div class="form-foot"><p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button>${
-      large ? '<button type="button" class="btn" data-add="all">Add lots and larger areas</button>' : ''}<button type="button" class="btn" data-add="lots">Add lots</button></div>
+      large ? '<button type="button" class="btn" data-add="all">Add lots and larger areas</button>' : ''}<button type="button" class="btn" data-add="lots">Add lots</button></div></div>
   </form>` : `<form novalidate>
     <h2>No lots found</h2>
     <p>Find lots works on a plan PDF exported from CAD, where each lot is a closed outline. A scanned plan or a photo has no clear outlines; add its lots by hand with Add lot.</p>
@@ -2899,8 +2901,8 @@ function editIssue(c, issue) {
     <label class="field">Target date (optional)<input type="date" name="targetDate" value="${esc(issue.targetDate || '')}"></label>
     <label class="check"><input type="checkbox" name="isCritical"${L.isCriticalIssue(issue) ? ' checked' : ''}>Critical issue</label>
     <label class="field">Status<select name="status">${statuses.map(v => opt(v, status, L.shownWord(v))).join('')}</select></label>
-    <p class="error" role="alert"></p>
-    <div class="actions">${!isNew && L.canDeleteIssue(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete issue</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${!isNew && L.canDeleteIssue(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete issue</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => {
@@ -2916,7 +2918,7 @@ function editIssue(c, issue) {
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.issueErrors(f);
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (!isNew && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
@@ -3018,8 +3020,8 @@ function addOrder(c, type, continued = '') {
     <h2>New ${esc(type.toLowerCase())}</h2>
     <input type="hidden" name="requestType" value="${esc(type)}">
     ${orderFields(c, '')}
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   bindOrderFields(c, form);
@@ -3034,7 +3036,7 @@ function addOrder(c, type, continued = '') {
     e.preventDefault();
     const o = orderValues(form), suspension = c.documents.find(x => x.uuid === o.coOf);
     const errors = L.orderErrors(type, o, suspension);
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
@@ -3068,8 +3070,8 @@ function editOrder(c, o) {
     ${hasEnd ? '<label class="field">End date<input type="date" data-end></label>' : ''}
     <label class="field">Remarks<input name="remarks" value="${esc(L.withEnd(o.remarks))}" autocomplete="off"${off}></label>
     ${L.isSuspension(o) ? `<button type="button" class="text-btn" data-continue>${icon('add_circle', 'sm')}Add continuance of work suspension</button>` : ''}
-    <p class="error" role="alert"></p>
-    <div class="actions">${canApprove ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete order</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${off}>Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions">${canApprove ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete order</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn"${off}>Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), end = d.querySelector('[data-end]');
   if (end) {
@@ -3118,13 +3120,13 @@ function relatedFile(c, file) {
     <h2>${isNew ? 'Add related project document' : esc(file.documentName)}</h2>
     ${isNew ? `<label class="field">Document type<select name="docType">${L.RELATED_TYPES.map(o => `<option>${esc(o)}</option>`).join('')}</select></label>
     <label class="field" data-title>Specific document title<input name="title" placeholder="e.g. Environmental Compliance Certificate" autocomplete="off"></label>
-    <label class="field">Reference / serial no. / date<input name="reference" placeholder="e.g. Ref: NHA-2026-001 | Date: 2026-01-15" autocomplete="off"></label>
+    <label class="field">Reference / serial no. / date (optional)<input name="reference" placeholder="e.g. Ref: NHA-2026-001 | Date: 2026-01-15" autocomplete="off"></label>
     <label class="field">Document status<select name="status">${L.RELATED_STATUSES.map(o => `<option${o === 'Pending' ? ' selected' : ''}>${o}</option>`).join('')}</select></label>
-    <label class="field">Remarks / description<input name="remarks" autocomplete="off"></label>`
+    <label class="field">Remarks / description (optional)<input name="remarks" autocomplete="off"></label>`
     : `<p class="muted">Status: ${esc(file.status || 'Pending')} | ${esc(file.remarks || 'No remarks')}</p>`}
     ${fileField('fileUrl', 'Scanned copy', file?.fileUrl)}
-    <p class="error" role="alert"></p>
-    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete file</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete file</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   if (isNew) (form.docType.onchange = () => { form.querySelector('[data-title]').style.display = form.docType.value === L.RELATED_TYPES.at(-1) ? '' : 'none'; })();
@@ -3173,15 +3175,15 @@ function editRequest(c, r) {
   d.innerHTML = `<form novalidate>
     <h2>${isNew ? 'New developer request' : 'Developer request'}</h2>
     <label class="field">Request for<select name="requestType">${types.map(v => `<option${v === type ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
-    <label class="field">Details (letter no., reason)<input name="details" value="${esc(r.details || '')}"></label>
-    <label class="field">Date of developer's request<input type="date" name="dateRequested" value="${esc(r.dateRequested || '')}"></label>
+    <label class="field">Details (letter no., reason; optional)<input name="details" value="${esc(r.details || '')}"></label>
+    <label class="field">Date of developer's request (optional)<input type="date" name="dateRequested" value="${esc(r.dateRequested || '')}"></label>
     <label class="field">Date received by NHA<input type="date" name="dateReceived" value="${esc(r.dateReceived || '')}" required></label>
     <label class="field">Date packaged (blank: not yet)<input type="date" name="datePackaged" value="${esc(r.datePackaged || '')}"></label>
     ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
     ${fileField('requestFileUrl', "Developer's request letter", r.requestFileUrl)}
     ${isNew ? orderFields(c) : ''}
-    <p class="error" role="alert"></p>
-    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   if (isNew) bindOrderFields(c, form);
@@ -3203,7 +3205,7 @@ function editRequest(c, r) {
     e.preventDefault();
     const f = values(), o = order(), suspension = c.documents.find(x => x.uuid === o.coOf);
     const errors = [...L.requestErrors(f), ...(isNew ? L.orderErrors(f.requestType, o, suspension) : [])];
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (!isNew && snapshot() === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
@@ -3239,11 +3241,11 @@ function editLetter(c, l) {
     <label class="field">Subject<input name="subject" value="${esc(l.subject || '')}" required autocomplete="off"></label>
     <label class="field">Date received by the contractor (blank: not yet)<input type="date" name="dateReceived" value="${esc(l.dateReceived || '')}"></label>
     ${fileField('receivedFileUrl', 'Receiving copy', l.receivedFileUrl)}
-    <label class="field">Action taken by contractor<textarea name="actionTaken" rows="3">${esc(l.actionTaken || '')}</textarea></label>
+    <label class="field">Action taken by contractor (optional)<textarea name="actionTaken" rows="3">${esc(l.actionTaken || '')}</textarea></label>
     <label class="field">Date of reply (blank: no reply yet)<input type="date" name="dateReplied" value="${esc(l.dateReplied || '')}"></label>
     ${fileField('replyFileUrl', "Contractor's reply letter", l.replyFileUrl)}
-    <p class="error" role="alert"></p>
-    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete letter</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete letter</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => {
@@ -3263,7 +3265,7 @@ function editLetter(c, l) {
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.letterErrors(f);
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (!isNew && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
@@ -3385,8 +3387,8 @@ function editPhotos(c, report) {
     </li>`).join('')}</ul>` : emptyLine('No photos on this report yet.')}
     <label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label>
     <div class="photo-new"></div>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), fresh = d.querySelector('.photo-new');
   // Each picked photo gets a title box of its own.
@@ -3480,8 +3482,8 @@ function weeklyForm(c, report = null) {
     ${list('issues', 'Issues encountered / action taken', 'Add issue')}
     <datalist id="wk-designations">${L.MANPOWER_DESIGNATIONS.map(v => opt(v)).join('')}</datalist>
     <datalist id="wk-equipment">${L.EQUIPMENT_NAMES.map(v => opt(v)).join('')}</datalist>
-    <p class="error" role="alert"></p>
-    <div class="actions">${report && L.canDeleteReport(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete report</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${report && L.canDeleteReport(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete report</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
   const box = d.querySelector('#wk-lines');
@@ -3541,7 +3543,7 @@ function weeklyForm(c, report = null) {
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.weeklyErrors(f);
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (report && !refiled && JSON.stringify(f) === initial) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
@@ -3664,8 +3666,8 @@ function editWeather(c, report) {
         <div class="wx-hours"><span class="muted">AM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h)).join('')}
         <span class="muted">PM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h + 12)).join('')}</div></fieldset>`;
     }).join('')}
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const paint = (di, hours, as = () => brush) => {
@@ -3765,10 +3767,10 @@ function billingForm(c, old = null) {
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   d.innerHTML = `<form novalidate>
     <h2>${old ? 'Edit billing' : 'Add billing / disbursement voucher'}</h2>
-    <label class="field">Billing name<input name="name" value="${esc(old?.name || '')}" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
-    <label class="field">DV No. (Disbursement Voucher)<input name="dvNo" value="${esc(old?.dvNo || '')}" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
+    <label class="field">Billing name (optional)<input name="name" value="${esc(old?.name || '')}" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
+    <label class="field">DV No. (Disbursement Voucher; optional)<input name="dvNo" value="${esc(old?.dvNo || '')}" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
     <label class="field">Date<input type="date" name="date" value="${esc(old ? old.date || '' : today())}" required></label>
-    <label class="field">Period covered<input name="periodCovered" value="${esc(old ? old.periodCovered || '' : L.monthPeriod(today()))}" autocomplete="off"></label>
+    <label class="field">Period covered (optional)<input name="periodCovered" value="${esc(old ? old.periodCovered || '' : L.monthPeriod(today()))}" autocomplete="off"></label>
     ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${types.map(t => opt(t, t, old?.billingType)).join('')}</select></label>` : ''}
     <label class="field" data-by-unit style="display:none">Number of lots<input name="units" value="${esc(Number(old?.units) > 0 ? String(old.units) : '')}" inputmode="numeric" autocomplete="off"></label>
     <label class="field" data-by-unit style="display:none">Amount per lot (₱)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
@@ -3776,8 +3778,8 @@ function billingForm(c, old = null) {
     <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
     <div class="billing-preview" aria-live="polite"></div>
     ${fileField('fileUrl', 'Scanned DV', old?.fileUrl)}
-    <p class="error" role="alert"></p>
-    <div class="actions">${old ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete billing</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div>
+    <div class="form-foot"><div class="error" role="alert"></div>
+    <div class="actions">${old ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete billing</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">${old ? 'Save changes' : 'Save billing'}</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => ({ billingType: '', ...textFields(form) });
@@ -3828,7 +3830,7 @@ function billingForm(c, old = null) {
   form.onsubmit = async e => {
     e.preventDefault();
     const f = values(), errors = L.billingErrors(f);
-    if (errors.length) { err.textContent = errors.join(' '); return; }
+    if (errors.length) { showErrors(err, errors); return; }
     if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     const abstracts = c.of('project_abstracts'), ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old, abstracts);
     if (ahead.length) { err.textContent = `${ahead.join(' ')} ${abstracts.length ? 'Upload the newer abstract first' : 'Save the newer weekly report first'}, or lower this billing.`; return; }
@@ -4264,8 +4266,8 @@ function signatoriesForm(c, weekly) {
     ${signer('Prepared by', 'prepared', at.prepared)}
     ${signer(weekly ? 'Checked and reviewed by' : 'Checked by', 'checked', weekly ? at.weeklyChecked : at.checked)}
     ${signer('Noted by', 'noted', weekly ? at.weeklyNoted : at.noted)}
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const values = () => Object.fromEntries(new FormData(form));
@@ -4307,8 +4309,8 @@ function recommendationsForm(c, month, saved) {
     <h2>Recommendations – ${esc(month)}</h2>
     <label class="field">Recommendations (if any)<textarea name="recommendations" rows="6">${esc(saved?.recommendations ?? '')}</textarea></label>
     <p class="muted">Printed under VIII. Recommendations on this month's report, here and on the phones.</p>
-    <p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div>
+    <div class="form-foot"><p class="error" role="alert"></p>
+    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), box = form.elements.recommendations;
   const initial = box.value;
