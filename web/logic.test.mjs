@@ -1785,3 +1785,25 @@ test('billingText: the billing labels in sentence case, as the lot card and plan
   assert.deepEqual(['M1 BILLED (80%)', 'M2 BILLED (20%)', 'M1 + M2 BILLED (100%)', 'NOT BILLED', '', undefined, 'BILLED'].map(L.billingText),
     ['M1 billed · 80%', 'M2 billed · 20%', 'M1 + M2 billed · 100%', 'Not billed', 'Not billed', 'Not billed', 'M1 billed · 80%']);
 });
+
+test('dashboard CSV: BOM, plain numbers, iso dates, quoted commas, quotes and line breaks, formulas kept as text', () => {
+  const item = { p: { name: 'Road "A", phase 2', location: 'Bulacan\nMalolos', contractor: '=HYPERLINK("x")', assignedStaff: 'Ana', status: 'On-going',
+    actualAccomplishment: '41.255', completionDateOriginal: '2027-03-01' }, billed: 1500000.5, cost: 3000001, lastUpdate: '2026-11-20',
+    flags: [{ message: 'Due in 3 days' }, { message: 'No field update in 14 days' }] };
+  const csv = L.dashboardCsv([item], '2026-11-21');
+  assert.ok(csv.startsWith('﻿Project,Location,Contractor,Assigned staff,Status,Work done (%),Billed (₱),'));
+  assert.equal(csv.split('\r\n')[1], '"Road ""A"", phase 2","Bulacan\nMalolos","\'=HYPERLINK(""x"")",Ana,On-going,41.26,1500000.5,50,3000001,2027-03-01,2026-11-20,Due in 3 days; No field update in 14 days');
+  assert.equal(L.toCsv([[-5, 'a,b']]), '﻿-5,"a,b"\r\n');
+  // Billings not loaded: the money cells are empty, not 0.
+  assert.match(L.dashboardCsv([item], '2026-11-21', false), /,41\.26,,,,2027-03-01,/);
+});
+
+test('dashboard sort: days left puts overdue first and finished or undated last; an unknown sort is the attention order', () => {
+  const it = (name, due, done = 10, cost = 0) => ({ p: { name, completionDateOriginal: due, actualAccomplishment: done, status: done >= 100 ? 'Completed' : 'On-going' }, cost, flags: [] });
+  const items = [it('Done', '2026-01-01', 100), it('Late', '2026-11-01'), it('None', ''), it('Soon', '2026-12-01', 50, 9)];
+  const names = sort => [...items].sort(L.dashboardOrder(sort, '2026-11-21')).map(x => x.p.name);
+  assert.deepEqual(names('due'), ['Late', 'Soon', 'Done', 'None']);
+  assert.equal(names('cost')[0], 'Soon');
+  assert.deepEqual(names('done'), ['Late', 'None', 'Soon', 'Done']);
+  assert.deepEqual(names('nonsense'), [...items].sort((a, b) => L.attentionOrder(a, b, '2026-11-21')).map(x => x.p.name));
+});

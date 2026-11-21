@@ -38,14 +38,19 @@ const ROLE_LABELS = {
   VIEWER: 'Viewer', SUPER_VIEWER: 'Super Viewer',
 };
 const SCHEDULE_ORDER = /time extension|work suspension|work resumption/i;
-// PortfolioCounts: the banner's one row of filters, each a count of projects. Red for the critical two, quiet for the rest.
+// PortfolioCounts: the banner's one row of filters, each a count of projects. Red for the critical ones, quiet for the rest.
+// The last two are web only: the phone shows a late critical issue on its Issues tab and a quiet project on its card.
 const COUNTS = [
   { kind: 'overdue', label: 'Overdue', icon: 'warning', tone: 'behind' },
   { kind: 'behind', label: 'Behind schedule', icon: 'trending_down', tone: 'behind' },
   { kind: 'billingAhead', label: 'Billing ahead of work', icon: 'payments', tone: 'watch' },
   { kind: 'waiting', label: 'Waiting approval', icon: 'hourglass_top', tone: 'watch' },
   { kind: 'dueSoon', label: 'Due in 30 days', icon: 'event', tone: 'watch' },
+  { kind: 'issue', label: 'Late critical issue', icon: 'notification_important', tone: 'behind' },
+  { kind: 'stale', label: 'No recent field update', icon: 'update', tone: 'watch' },
 ];
+// The dashboard's Sort (L.dashboardOrder); the first is the default.
+const SORTS = { attention: 'Needs attention first', name: 'Name, A to Z', done: 'Work done, least first', due: 'Days left, fewest first', cost: 'Contract cost, largest first' };
 // PortfolioCounts.TERM_HELP, from the same thresholds as ProjectAttention (the phone's sync chip terms are left out).
 const TERM_HELP = [
   ['Overdue', 'Unfinished projects past their completion date (the revised one, if any).'],
@@ -53,6 +58,8 @@ const TERM_HELP = [
   ['Billing ahead of work', 'Billed is more than 10% ahead of work done, for example billed 65%, work done 38.50%.'],
   ['Waiting approval', 'Projects with a variation order, time extension, suspension or resumption not yet approved.'],
   ['Due in 30 days', 'Unfinished projects whose completion date (the revised one, if any) is 30 days away or less.'],
+  ['Late critical issue', 'Projects with a critical issue still Pending after its target date.'],
+  ['No recent field update', 'Unfinished projects, not suspended, with no weekly report added in 14 days or more (counted from the start date until the first report).'],
   ['Bar colours', 'Work done is blue on plan or slipping, amber from 10% behind, red from 15% behind or once overdue, green when finished. Billed is violet.'],
 ];
 // A project's figures, each with the day it is for: the header's plan is today's; a report's and an abstract's are their own day's.
@@ -78,7 +85,7 @@ const who = document.getElementById('who');
 const s = {
   user: null, claims: {}, profile: {}, projects: null, projectsError: null, loaded: {},
   payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), issues: new Map(), unsub: [], unsubPage: [], page: null,
-  filter: null, mineOnly: false, q: '',
+  filter: null, mineOnly: false, q: '', sort: 'attention',
 };
 
 /** Escapes text for HTML; every value from Firestore goes through it. */
@@ -258,6 +265,8 @@ const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|driv
 
 function route() {
   const m = PAGE.exec(location.hash);
+  // Leaving the dashboard for a project: Back brings the dashboard to the same place, focus on that project's card.
+  if (m && document.getElementById('grid')) s.back = { y: window.scrollY, id: m[1] };
   window.scrollTo(0, 0);
   s.land = m && s.page?.id === m[1] ? 'tab' : 'page';
   s.landFrom = document.activeElement;
@@ -592,7 +601,8 @@ function workDone(p, big, plan = '') {
 }
 // Billed % needs the billings and the orders (approved variation orders change the contract cost). A project page
 // (onPage) has its own; a card's may not have loaded.
-const billedLine = (it, big, onPage = big) => (['project_payments', 'pending_documents'].some(t => typeof s.loaded[t] === 'string') && !onPage
+const billedFailed = () => ['project_payments', 'pending_documents'].some(t => typeof s.loaded[t] === 'string');
+const billedLine = (it, big, onPage = big) => (billedFailed() && !onPage
   ? progressLine('Billed', 'Not loaded', '', 'muted', 0, 'billed') : progressLine('Billed', L.billedLabel(it.billed, it.cost),
   it.billed > 0 ? esc(L.formatPhp(it.billed)) : '', 'muted', it.cost > 0 ? it.billed / it.cost : 0, 'billed', big));
 /** The status badge on cards and the project header; an overdue project says so instead of "On-going". */
@@ -602,19 +612,48 @@ function statusBadge(p) {
     : (b => `<span class="badge lv-${b.level}">${esc(L.shownWord(b.text))}</span>`)(L.badgeStatus(p));
 }
 
+// The dashboard's view lives in the hash, #/?flag=overdue&q=road&mine=1&sort=name, so it can be linked and survives a
+// reload. A bare #/ (the back link) keeps the view as it was; an unknown value is the default.
+function readDashboardHash() {
+  const at = location.hash.indexOf('?');
+  if (at < 0) return;
+  const h = new URLSearchParams(location.hash.slice(at + 1));
+  s.filter = COUNTS.some(c => c.kind === h.get('flag')) ? h.get('flag') : null;
+  s.q = h.get('q') || '';
+  s.mineOnly = h.get('mine') === '1';
+  s.sort = Object.hasOwn(SORTS, h.get('sort') ?? '') ? h.get('sort') : 'attention';
+}
+function writeDashboardHash() {
+  const h = String(new URLSearchParams(Object.entries({ flag: s.filter, q: s.q, mine: s.mineOnly ? '1' : '', sort: s.sort === 'attention' ? '' : s.sort }).filter(([, v]) => v)));
+  const want = h ? `#/?${h}` : '#/';
+  if (location.hash !== want) history.replaceState(null, '', want);
+}
+
 function renderDashboard() {
   freshScreen();
+  readDashboardHash();
   main.innerHTML = `
     <section class="card portfolio" id="portfolio"></section>
     <div class="toolbar">
-      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town or contractor" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
+      <label class="search">${icon('search')}<input id="q" type="search" placeholder="Search name, town, contractor or staff" aria-label="Search projects" value="${esc(s.q)}"><kbd>${MAC ? '⌘' : 'Ctrl'} K</kbd></label>
       <div class="seg" id="scope" role="group" aria-label="Which projects"></div>
+      <label class="sort">Sort<select id="sort">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}"${k === s.sort ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       <span class="count" id="shown" role="status"></span>
       ${L.canCreateProject(s.claims) ? `<button class="btn" id="project-add">${icon('add_circle', 'sm')}New project</button>` : ''}
+      <button class="text-btn" id="csv" disabled>${icon('download', 'sm')}Download list</button>
       <button class="text-btn help-btn" id="help">${icon('info')}What these mean</button>
     </div>
     <ul class="grid" id="grid"></ul>`;
   document.getElementById('q').oninput = e => { s.q = e.target.value; redrawDashboard(); };
+  document.getElementById('sort').onchange = e => { s.sort = e.target.value; redrawDashboard(); };
+  // The projects shown now, after filter, search and sort, with the figures on their cards.
+  document.getElementById('csv').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([L.dashboardCsv(s.shown, today(), !billedFailed())], { type: 'text/csv;charset=utf-8' }));
+    a.download = `NHA projects ${today()}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   document.getElementById('help').onclick = () => showTermHelp();
   if (L.canCreateProject(s.claims)) document.getElementById('project-add').onclick = () => projectForm();
   if (s.projects === null || RECORD_TYPES.some(t => !s.loaded[t])) announce('Loading projects…');
@@ -910,6 +949,8 @@ function redrawDashboard() {
   // PortfolioCounts: one row of filters, each counting projects; only non-zero ones; pressing the active one clears it.
   const counts = COUNTS.map(c => ({ ...c, n: inScope.filter(it => it.flags.some(f => f.kind === c.kind)).length })).filter(c => c.n > 0);
   if (s.filter && !counts.some(c => c.kind === s.filter)) s.filter = null;
+  writeDashboardHash();
+  const back = s.back; s.back = null;
   const banner = document.getElementById('portfolio');
   const focused = document.activeElement?.closest?.('#portfolio [data-kind]')?.dataset.kind;
   const onHead = document.activeElement?.matches?.('#portfolio h1');
@@ -944,9 +985,12 @@ function redrawDashboard() {
   const q = s.q.trim().toLowerCase();
   const shown = inScope
     .filter(it => !s.filter || it.flags.some(f => f.kind === s.filter))
-    .filter(it => !q || [it.p.name, it.p.location, it.p.contractor].join(' ').toLowerCase().includes(q))
-    // Needs attention first, worst first (L.attentionOrder).
-    .sort((a, b) => L.attentionOrder(a, b, today()));
+    // ProjectViewModel's search: name, location, contractor and assigned staff.
+    .filter(it => !q || [it.p.name, it.p.location, it.p.contractor, it.p.assignedStaff].join(' ').toLowerCase().includes(q))
+    // By default needs attention first, worst first (L.attentionOrder).
+    .sort(L.dashboardOrder(s.sort, today()));
+  s.shown = shown;
+  document.getElementById('csv').disabled = !shown.length;
   document.getElementById('shown').textContent = shown.length === inScope.length ? '' : `Showing ${shown.length} of ${inScope.length}`;
 
   if (shown.length === 0) {
@@ -964,6 +1008,10 @@ function redrawDashboard() {
   }
   grid.innerHTML = shown.map(tile).join('');
   loadPhotos(grid);
+  if (back) {
+    window.scrollTo(0, back.y);
+    grid.querySelector(`a[href="#/p/${CSS.escape(back.id)}"]`)?.focus({ preventScroll: true });
+  }
 }
 
 function showTermHelp(terms = TERM_HELP) {

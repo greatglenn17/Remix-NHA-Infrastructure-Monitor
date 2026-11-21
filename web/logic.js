@@ -432,6 +432,50 @@ export function attentionOrder(a, b, today) {
 /** The flag that put a project first: overdue before the other critical ones, else its worst. */
 export const leadingFlag = flags => flags.find(f => f.kind === 'overdue') || flags[0];
 
+/**
+ * The dashboard's Sort, on itemOf's items: 'name'; 'done', least work done first; 'due', fewest days left first (overdue
+ * first, finished and undated last); 'cost', largest contract cost first; anything else is attentionOrder. Ties go by name.
+ */
+export function dashboardOrder(sort, today) {
+  const name = (a, b) => (a.p.name || '').localeCompare(b.p.name || '');
+  const due = it => (isCompleted(it.p) ? null : isoDay(effectiveCompletion(it.p))) ?? Number.MAX_SAFE_INTEGER;
+  const work = it => Number(it.p.actualAccomplishment) || 0;
+  return {
+    name,
+    done: (a, b) => work(a) - work(b) || name(a, b),
+    due: (a, b) => due(a) - due(b) || name(a, b),
+    cost: (a, b) => b.cost - a.cost || name(a, b),
+  }[sort] || ((a, b) => attentionOrder(a, b, today));
+}
+
+/**
+ * Rows as CSV for Excel: a UTF-8 BOM so ₱ shows, CRLF lines, a cell quoted when it holds a comma, quote or line break.
+ * Text that starts like a formula (= + - @) gets a leading ' so Excel shows it instead of running it; numbers stay numbers.
+ */
+export function toCsv(rows) {
+  const cell = v => {
+    const t = typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? `'${v}` : String(v ?? '');
+    return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  return `﻿${rows.map(r => r.map(cell).join(',')).join('\r\n')}\r\n`;
+}
+
+/**
+ * The dashboard's "Download list": one row per item (itemOf's figures, as on the cards), numbers plain, dates yyyy-mm-dd.
+ * `billedKnown` false (billings or orders not loaded) leaves the billed and cost cells empty, as the card says "Not loaded".
+ */
+export function dashboardCsv(items, today, billedKnown = true) {
+  const day = d => (isoDay(d) == null ? '' : d.trim());
+  const round = n => Math.round(n * 100) / 100;
+  const status = p => { const late = daysOverdue(p, today); return late ? `Overdue by ${plural(late, 'day', 'days')}` : shownWord(badgeStatus(p).text); };
+  return toCsv([
+    ['Project', 'Location', 'Contractor', 'Assigned staff', 'Status', 'Work done (%)', 'Billed (₱)', 'Billed (%)', 'Contract cost (₱)', 'Completion date', 'Last field update', 'Flags'],
+    ...items.map(({ p, billed, cost, lastUpdate, flags }) => [p.name, p.location, p.contractor, p.assignedStaff, status(p), round(Number(p.actualAccomplishment) || 0),
+      billedKnown ? round(billed) : '', billedKnown && cost > 0 ? round(billed / cost * 100) : '', billedKnown && cost > 0 ? round(cost) : '',
+      day(effectiveCompletion(p)), day(lastUpdate), flags.map(f => f.message).join('; ')]),
+  ]);
+}
+
 // The record types each flag is worked out from. Behind and overdue need none: without the orders the dashboard
 // keeps the target and status the phone saved on the project (itemOf), so they rest on the project's own fields.
 const FLAG_SOURCES = { stale: ['weekly_reports', 'pending_documents'], billingAhead: ['project_payments', 'pending_documents'],
