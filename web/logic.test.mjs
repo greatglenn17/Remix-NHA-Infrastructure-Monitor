@@ -859,6 +859,7 @@ test('new project: who may add one, what stops the form, the document a phone wo
     projectType: 'Housing Project', landArea: '2.5 Hectares', numberOfUnits: '120', projectedBeneficiaries: '', boardResolution: '', noticeOfAward: '', noticeToProceed: '',
     preparedByName: '', preparedByPosition: '', preparedByOffice: '', checkedByName: '', checkedByPosition: '', checkedByOffice: '', notedByName: '', notedByPosition: '', notedByOffice: '',
     weeklyCheckedByName: '', weeklyCheckedByPosition: '', weeklyCheckedByOffice: '', weeklyNotedByName: '', weeklyNotedByPosition: '', weeklyNotedByOffice: '',
+    billingPreparedByName: '', billingPreparedByPosition: '', billingPreparedByOffice: '', billingCheckedByName: '', billingCheckedByPosition: '', billingCheckedByOffice: '', billingReviewedByName: '', billingReviewedByPosition: '', billingReviewedByOffice: '', billingRecommendedByName: '', billingRecommendedByPosition: '', billingRecommendedByOffice: '',
     latestUpdatePhotoUrl: '', barChartJson: '', contractCostOriginal: 4000000.5, contractCostRevised: 4000000.5, contractDurationDays: 365,
     dateStarted: '2026-01-01', completionDateOriginal: '2026-12-31', completionDateRevised: '2026-12-31', status: 'On-going', targetAccomplishment: 0, actualAccomplishment: 0,
     assignedStaff: 'Engr. Cruz', revision: 1, createdAt: 1700000000000, updatedAt: 1700000000000, createdByUid: 'u1', updatedByUid: 'u1', isDeleted: false, assignedUids: ['u1'],

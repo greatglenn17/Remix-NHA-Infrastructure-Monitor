@@ -2282,7 +2282,7 @@ export function projectErrors(f, projects, today) {
 
 /** The Project fields a phone uploads that the new project form leaves blank. */
 const BLANK_PROJECT_FIELDS = ['projectedBeneficiaries', 'boardResolution', 'noticeOfAward', 'noticeToProceed',
-  ...['prepared', 'checked', 'noted', 'weeklyChecked', 'weeklyNoted'].flatMap(k => [`${k}ByName`, `${k}ByPosition`, `${k}ByOffice`]),
+  ...['prepared', 'checked', 'noted', 'weeklyChecked', 'weeklyNoted', 'billingPrepared', 'billingChecked', 'billingReviewed', 'billingRecommended'].flatMap(k => [`${k}ByName`, `${k}ByPosition`, `${k}ByOffice`]),
   'latestUpdatePhotoUrl', 'barChartJson'];
 
 /**
