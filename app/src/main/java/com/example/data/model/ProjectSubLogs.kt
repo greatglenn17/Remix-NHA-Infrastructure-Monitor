@@ -150,9 +150,10 @@ data class DeveloperRequest(
     val requestFileUrl: String = "",
     // A request for billing: what is billed (one of HOUSING_BILLING_TYPES), how many lots or units, and the uuid of
     // the billing saved from it under Payments (blank until then).
-    val billingType: String = "",
-    val units: Int = 0,
-    val paymentUuid: String = "",
+    // Defaults match MIGRATION_42_43, so a request saved before these fields (no keys in its data) still syncs in.
+    @ColumnInfo(defaultValue = "") val billingType: String = "",
+    @ColumnInfo(defaultValue = "0") val units: Int = 0,
+    @ColumnInfo(defaultValue = "") val paymentUuid: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
