@@ -1,8 +1,8 @@
 {
-  "versionCode": 320,
-  "versionName": "2.8.40",
-  "releaseNotes": "v2.8.40: Request for billing in Developer requests, marked billed under Payments with its DV No. and scanned DV. The billing abstract warns before printing when billed to date is above the actual.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.40/NHA_Monitor_v2.8.40_Build320.apk",
-  "apkSha256": "81f342f5f3e5616a21a88b0093ba2b9af7d2dc9289454816c81507044eb27716",
+  "versionCode": 321,
+  "versionName": "2.8.41",
+  "releaseNotes": "v2.8.41: A new weekly report starts with the manpower and equipment of the latest weekly report, so only the changes are typed.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.41/NHA_Monitor_v2.8.41_Build321.apk",
+  "apkSha256": "eddeee6ed8520f0aecc2af55650f5dbda76251ac47758261d062b061d280b35d",
   "isMandatory": false
 }
