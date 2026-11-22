@@ -1802,6 +1802,11 @@ export function weeklyLines(project, docs, asOf) {
 
 /** BillingAbstract.carriedActuals: a new report's Actual % boxes start from the latest report's, so a week without a new abstract keeps the last actual. */
 export const carriedActuals = weekly => { const last = latestWeekly(weekly); return last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => ({ actual: a.actualPct.toFixed(2) })) : []; };
+/** A new report's manpower and equipment start as the latest report's, so only the changes are typed; with none, the usual designations at zero. */
+export const carriedCrew = weekly => {
+  const last = latestWeekly(weekly), manpower = last ? manpowerOf(last.manpowerJson) : [];
+  return { manpower: manpower.length ? manpower : MANPOWER_START.map(designation => ({ designation, count: 0 })), equipment: last ? equipmentOf(last.equipmentJson) : [] };
+};
 
 /**
  * AbstractExcel.actuals: the abstract's parts ([{ name, amount, actualPct }]) as the three lines' Actual % boxes;

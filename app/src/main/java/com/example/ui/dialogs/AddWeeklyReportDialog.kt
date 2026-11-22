@@ -343,11 +343,13 @@ private fun WeeklyReportForm(
     var selectedWeatherDayName by remember(daysOfWeekWithDates) { mutableStateOf(daysOfWeekWithDates.first().first) }
     var selectedHourIndex by remember { mutableStateOf(12) }
 
+    // A new report's crew starts as the latest report's, so only the changes are typed.
+    val crewSeed = seed ?: com.example.util.BillingAbstract.latestWeekly(reports)
     // Manpower Table State: the usual designations with zero counts, so no sample
     // headcount is ever submitted as if it were real.
     var manpowerItems by remember {
         mutableStateOf(
-            seed?.let { parseManpowerList(it.manpowerJson) }?.takeIf { it.isNotEmpty() }
+            crewSeed?.let { parseManpowerList(it.manpowerJson) }?.takeIf { it.isNotEmpty() }
                 ?: listOf(
                     ManpowerItem("Project Engineer", 0),
                     ManpowerItem("Foreman", 0),
@@ -359,7 +361,7 @@ private fun WeeklyReportForm(
 
     // Equipment Summary Table State
     var equipmentItems by remember {
-        mutableStateOf(seed?.let { parseEquipmentList(it.equipmentJson) } ?: emptyList())
+        mutableStateOf(crewSeed?.let { parseEquipmentList(it.equipmentJson) } ?: emptyList())
     }
 
     // Issues Encountered / Action Taken Table State
