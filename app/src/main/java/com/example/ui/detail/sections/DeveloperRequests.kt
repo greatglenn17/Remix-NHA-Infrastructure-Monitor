@@ -2,6 +2,7 @@ package com.example.ui.detail.sections
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -11,8 +12,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.model.DeveloperRequest
+import com.example.data.model.HOUSING_BILLING_TYPES
+import com.example.data.model.ProjectPayment
+import com.example.data.model.billingText
+import com.example.data.model.billingUnitName
 import com.example.ui.components.DateField
 import com.example.ui.theme.LocalNHAColors
 import com.example.util.ProjectAttention
@@ -26,7 +32,9 @@ fun DeveloperRequestsCard(
     today: LocalDate,
     onAdd: (() -> Unit)?,
     onOpen: ((DeveloperRequest) -> Unit)?,
-    modifier: Modifier
+    modifier: Modifier,
+    // The billings, to say whether a request for billing is billed yet.
+    payments: List<ProjectPayment> = emptyList()
 ) {
     val openFile = com.example.ui.components.rememberAttachmentOpener()
     SectionCard(
@@ -50,7 +58,9 @@ fun DeveloperRequestsCard(
             LogEntry(
                 r.requestType,
                 if (packaged) MaterialTheme.colorScheme.onSurface else LocalNHAColors.current.watch,
-                listOf(
+                listOfNotNull(
+                    if (r.requestType != ProjectAttention.BILLING_REQUEST) null
+                    else r.billingText + " · " + (payments.firstOrNull { it.uuid == r.paymentUuid }?.let { "Billed, DV ${it.dvNo}" } ?: "Not yet billed (under Payments)"),
                     "Requested: ${r.dateRequested.ifBlank { "-" }}  ·  Received: ${r.dateReceived.ifBlank { "-" }}",
                     if (packaged) "Packaged: ${r.datePackaged}" else "NOT YET PACKAGED" + (waiting?.let { " · $it days since received" } ?: ""),
                     r.details
@@ -73,7 +83,7 @@ fun DeveloperRequestsCard(
  * asks for, and [onSave] gets that order's document name and remarks so it goes to Documents as Pending.
  * [documents] are the project's, for numbering a continuance.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DeveloperRequestDialog(
     projectId: Long,
@@ -91,9 +101,14 @@ fun DeveloperRequestDialog(
     var received by remember { mutableStateOf(existing?.dateReceived ?: today.toString()) }
     var packaged by remember { mutableStateOf(existing?.datePackaged ?: "") }
     var requestFile by remember { mutableStateOf(existing?.requestFileUrl ?: "") }
+    var billingType by remember { mutableStateOf(existing?.billingType?.ifBlank { null } ?: HOUSING_BILLING_TYPES.first()) }
+    var unitsText by remember { mutableStateOf(existing?.units?.takeIf { it > 0 }?.toString() ?: "") }
     var expanded by remember { mutableStateOf(false) }
     val order = remember { com.example.ui.dialogs.OrderFields() }
-    val snapshot = listOf(type, details, requested, received, packaged, requestFile) + order.snapshot()
+    // A request for billing asks for its date, what is billed and how many, and files no order.
+    val billing = type == ProjectAttention.BILLING_REQUEST
+    val units = unitsText.trim().takeIf { Regex("[1-9]\\d*").matches(it) }?.toIntOrNull()
+    val snapshot = listOf(type, details, requested, received, packaged, requestFile, billingType, unitsText) + order.snapshot()
     val initial = remember { snapshot }
     val close = com.example.ui.components.rememberDiscardGuard(snapshot != initial, onDismiss)
     AlertDialog(
@@ -117,9 +132,23 @@ fun DeveloperRequestDialog(
                 DateField(label = "Date of developer's request", value = requested, onValueChange = { requested = it }, clearable = true)
                 DateField(label = "Date received by NHA", value = received, onValueChange = { received = it })
                 DateField(label = "Date packaged (blank: not yet)", value = packaged, onValueChange = { packaged = it }, clearable = true)
+                if (billing) {
+                    Text("Billed for", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        HOUSING_BILLING_TYPES.forEach { t ->
+                            FilterChip(selected = t == billingType, onClick = { billingType = t }, label = { Text(t) }, modifier = Modifier.testTag("request_billing_type_$t"))
+                        }
+                    }
+                    OutlinedTextField(
+                        value = unitsText, onValueChange = { unitsText = it }, label = { Text("Number of ${billingUnitName(billingType)}s") }, singleLine = true,
+                        isError = unitsText.isNotBlank() && units == null, supportingText = { if (unitsText.isNotBlank() && units == null) Text("Enter a whole number") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth().testTag("request_billing_units")
+                    )
+                }
                 Text("Developer's request letter", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 LetterFileField("request", requestFile, "developer_request_file") { requestFile = it }
-                if (existing == null) {
+                if (existing == null && !billing) {
                     Text("Order requested", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     Text("Saved to Documents › $type as Pending.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     com.example.ui.dialogs.OrderFieldInputs(type, order, documents, workItems)
@@ -131,12 +160,15 @@ fun DeveloperRequestDialog(
         },
         confirmButton = {
             Button(shape = MaterialTheme.shapes.small, 
-                enabled = received.isNotBlank() && (existing != null || order.valid(type, documents)),
+                enabled = received.isNotBlank() && if (billing) requested.isNotBlank() && units != null else existing != null || order.valid(type, documents),
                 onClick = {
                     val base = existing ?: DeveloperRequest(projectId = projectId, requestType = type)
                     onSave(
-                        base.copy(requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged, requestFileUrl = requestFile),
-                        if (existing == null) order.name(type, documents) to order.remarks(type) else null
+                        base.copy(
+                            requestType = type, details = details.trim(), dateRequested = requested, dateReceived = received, datePackaged = packaged, requestFileUrl = requestFile,
+                            billingType = if (billing) billingType else "", units = if (billing) units ?: 0 else 0
+                        ),
+                        if (existing == null && !billing) order.name(type, documents) to order.remarks(type) else null
                     )
                 },
                 modifier = Modifier.testTag("save_developer_request_button")

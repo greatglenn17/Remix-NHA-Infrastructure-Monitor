@@ -103,7 +103,7 @@ fun SummarySection(
         { m ->
             DeveloperRequestsCard(
                 requests, today, { editRequest = null; showRequestDialog = true }.takeIf { canUpdateOrders },
-                if (canUpdateOrders) { r: com.example.data.model.DeveloperRequest -> editRequest = r; showRequestDialog = true } else null, m
+                if (canUpdateOrders) { r: com.example.data.model.DeveloperRequest -> editRequest = r; showRequestDialog = true } else null, m, payments
             )
         },
         { m ->
