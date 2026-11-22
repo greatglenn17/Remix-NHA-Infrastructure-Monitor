@@ -1,8 +1,8 @@
 {
-  "versionCode": 319,
-  "versionName": "2.8.39",
-  "releaseNotes": "v2.8.39: In New abstract, a box no longer takes more than what is left of the item, so the to date never passes the QTY.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.39/NHA_Monitor_v2.8.39_Build319.apk",
-  "apkSha256": "4f650d928c34c266934db832fc6391b7e0071993e20c8311bd080c83cefd2297",
+  "versionCode": 320,
+  "versionName": "2.8.40",
+  "releaseNotes": "v2.8.40: Request for billing in Developer requests, marked billed under Payments with its DV No. and scanned DV. The billing abstract warns before printing when billed to date is above the actual.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.40/NHA_Monitor_v2.8.40_Build320.apk",
+  "apkSha256": "81f342f5f3e5616a21a88b0093ba2b9af7d2dc9289454816c81507044eb27716",
   "isMandatory": false
 }
