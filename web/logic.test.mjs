@@ -1695,6 +1695,47 @@ test('the next abstract is made from the one before it: previous is its to date,
   assert.deepEqual([thrice[0].toDate, thrice[0].balance, thrice[1].toDate], [[3, 3000, 100], [0, 0], [null, 3000, 100]]);
 });
 
+test('the next abstract takes housing construction items in houses: each house is QTY / the housing units', () => {
+  const head = (kind, no, name) => ({ kind, no, name, qty: null, amount: null });
+  const item = (no, name, qty, unit, unitCost) => ({ kind: 'item', no, name, qty, unit, unitCost, amount: qty * unitCost, toDate: [0, 0, 0] });
+  const rows = [head('part', '2', 'LAND DEVELOPMENT'), item('2.1', 'Catch basin', 96, 'unit', 100),
+    head('part', '3', 'HOUSING CONSTRUCTION'), item('3.1', 'Soil poisoning', 10508, 'sq.m', 50), head('group', '3.2', 'ROOFING'), item('3.2.1', 'Roofing', 18500, 'sq.m', 10),
+    { kind: 'subtotal', name: 'Subtotal (Housing Construction)', amount: 710400, toDate: [null, 0, 0] }];
+  assert.deepEqual(L.abstractHouseLines(rows, 370), [3, 5]);
+  // With no housing units (the fallback 1) nothing is in houses.
+  assert.deepEqual(L.abstractHouseLines(rows, 1), []);
+  assert.deepEqual(L.abstractHouses(rows, { 3: 120 }, 1), { 3: 120 });
+  // 120 houses of soil poisoning is 120 x 10,508 / 370 = 3,408 sq.m; land development stays as typed; a NaN stays one, for nextAbstractErrors to name.
+  const typed = L.abstractHouses(rows, { 1: 12, 3: 120, 5: 12.5 }, 370);
+  assert.deepEqual(typed, { 1: 12, 3: 3408, 5: 625 });
+  assert.equal(L.nextAbstractRows(rows, typed)[3].period[1], 170400);
+  assert.deepEqual(L.abstractHouses(rows, typed, 370, true), { 1: 12, 3: 120, 5: 12.5 }); // a saved abstract's quantities back as houses
+  assert.ok(Number.isNaN(L.abstractHouses(rows, { 3: NaN }, 370)[3]));
+  // A quantity that does not split evenly comes back to the houses typed.
+  assert.deepEqual(L.abstractHouses(rows, L.abstractHouses(rows, { 3: 7 }, 9), 9, true), { 3: 7 });
+  // The last house gives the QTY exactly, however the abstracts before it rounded, and no more.
+  // `houses` abstract after abstract: the last one's line and the errors saving it gives.
+  const line = (qty, houses) => {
+    const one = [head('part', '3', 'HOUSING CONSTRUCTION'), item('3.1', 'Soil poisoning', qty, 'sq.m', 1)];
+    const before = houses.slice(0, -1).reduce((done, h) => L.nextAbstractRows(done, L.abstractHouses(done, { 1: h }, 370)), one), last = L.abstractHouses(before, { 1: houses.at(-1) }, 370);
+    return [L.nextAbstractRows(before, last)[1], L.nextAbstractErrors(before, last)];
+  };
+  for (const [qty, houses] of [[1000, [19, 19, 332]], [1000, [1, 18, 351]], [12345.67, [100, 100, 100, 70]], [10508, [35.5, 0, 334.5]]]) {
+    const [done, errors] = line(qty, houses);
+    assert.deepEqual([done.toDate[0], done.balance[0], errors], [qty, 0, []], `${qty}: ${houses}`);
+  }
+  assert.match(line(1000, [19, 19, 333])[1].join(), /would pass the quantity 1,000/); // past the units is still refused
+  // A box left as it opened keeps its saved quantity: 1000 sq.m opens as 35.2113 houses, which would be 1,000.0009.
+  const opened = { 3: ['35.2113', 1000] };
+  assert.deepEqual({ ...L.abstractHouses(rows, { 3: 35.2113 }, 370), ...L.untouchedQuantities({ 3: '35.2113' }, opened) }, { 3: 1000 });
+  assert.deepEqual(L.untouchedQuantities({ 3: '35.2114' }, opened), {});
+  assert.deepEqual(L.untouchedQuantities({ 3: '1' }, { 3: '1' }), {}); // not a kept pair
+  // The draft keeps what the boxes opened with.
+  const draft = L.nextAbstractDraft({ asOf: '2026-11-20', from: 'a|b|370', text: { 3: '35.2113' }, opened, kept: true });
+  assert.deepEqual(L.keptNextAbstract(JSON.stringify(draft)).opened, opened);
+  assert.deepEqual(L.keptNextAbstract(JSON.stringify({ ...draft, opened: undefined })).opened, {});
+});
+
 test('the next abstract continues the latest one dated before it', () => {
   const first = { uuid: 'a', asOf: '2026-11-13', rowsJson: JSON.stringify(NEXT_ROWS), equivUnits: 520, updatedAt: 1 };
   const second = { uuid: 'b', asOf: '2026-11-20', rowsJson: JSON.stringify(L.nextAbstractRows(NEXT_ROWS, { 0: 20, 8: 10.5 }, 520)), equivUnits: 520, updatedAt: 2 };
@@ -1740,11 +1781,11 @@ test('undo of a saved abstract: back to the one it replaced, or removed when the
 
 test('an unfinished New abstract is kept as a draft: its date and what was typed, only while something is typed', () => {
   const next = { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, kept: true };
-  assert.deepEqual(L.nextAbstractDraft(next), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' } });
+  assert.deepEqual(L.nextAbstractDraft(next), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, opened: {} });
   assert.equal(L.nextAbstractDraft({ ...next, text: { 8: ' ' } }), null); // nothing typed: nothing to keep
   assert.equal(L.nextAbstractDraft({ ...next, kept: false }), null); // quantities the date already had, not typed here
   // Read back from the browser: the form as it was left; anything else is no draft.
-  assert.deepEqual(L.keptNextAbstract(JSON.stringify(L.nextAbstractDraft(next))), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, kept: true });
+  assert.deepEqual(L.keptNextAbstract(JSON.stringify(L.nextAbstractDraft(next))), { asOf: '2026-11-20', from: 'a|b', text: { 0: '20', 8: ' ' }, opened: {}, kept: true });
   for (const text of [null, '', '{', '[]', '{"asOf":5,"text":{}}', '{"asOf":"2026-11-20","text":[1]}', '{"asOf":"2026-11-20"}']) assert.equal(L.keptNextAbstract(text), null);
 });
 
