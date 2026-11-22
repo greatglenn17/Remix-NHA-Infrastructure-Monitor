@@ -401,6 +401,19 @@ test('developer request edits: checks and the app audit entry', () => {
   assert.deepEqual(L.requestErrors({ dateReceived: '' }), ['Pick the date received by NHA.']);
   assert.deepEqual(L.requestErrors({ dateReceived: '2026-11-01', dateRequested: '', datePackaged: '' }), []);
   assert.deepEqual(L.requestErrors({ dateReceived: '2026-11-01', datePackaged: 'soon' }), ['Pick a valid date packaged.']);
+  // A request for billing needs its date, what is billed and a whole number of lots or units.
+  const bill = { requestType: L.BILLING_REQUEST, dateReceived: '2026-11-01', dateRequested: '2026-10-30', billingType: 'Land acquisition', units: 12 };
+  assert.deepEqual(L.requestErrors(bill), []);
+  assert.deepEqual(L.requestErrors({ ...bill, dateRequested: '', billingType: '', units: 0 }),
+    ['Pick the date of the request.', 'Pick what the billing is for.', 'Type the number of housing units, a whole number.']);
+  assert.deepEqual(L.requestErrors({ ...bill, units: 1.5 }), ['Type the number of lots, a whole number.']);
+  assert.equal(L.billingRequestText(bill), '12 lots · Land acquisition');
+  assert.equal(L.billingRequestText({ units: 1, billingType: 'M2 - Housing unit' }), '1 housing unit · M2 - Housing unit');
+  // It waits under Payments until a billing is saved from it; one whose billing was deleted waits again.
+  const asked = [{ ...bill, uuid: 'r1', paymentUuid: '' }, { ...bill, uuid: 'r2', paymentUuid: 'p1' }, { ...bill, uuid: 'r3', paymentUuid: 'gone' }, { requestType: 'Time Extension', uuid: 'r4' }];
+  assert.deepEqual(L.pendingBillingRequests(asked, [{ uuid: 'p1' }]).map(r => r.uuid), ['r1', 'r3']);
+  assert.deepEqual(L.billedRequestErrors({ dvNo: ' ' }, false), ['Type the DV No.', 'Attach the scanned DV form.']);
+  assert.deepEqual(L.billedRequestErrors({ dvNo: 'DV-1' }, true), []);
   const f = { requestType: 'Time Extension', details: 'Letter 12', dateReceived: '2026-11-01', datePackaged: '' };
   assert.equal(L.requestAudit(f).details, 'Time Extension request received 2026-11-01');
   assert.deepEqual(L.requestAudit({ ...f, datePackaged: '2026-11-12' }), {
@@ -537,8 +550,10 @@ test('new developer request: the order it files is named and worded as the phone
   const stamps = { uuid: 'u1', projectUuid: 'p1', assignedUids: ['a'], revision: 1, updatedAt: 5, updatedByUid: 'a', isDeleted: false };
   assert.deepEqual(L.newRequestRecord(ids, { requestType: vo, details: 'Letter 12', dateRequested: '', dateReceived: '2026-11-12', datePackaged: '' }), {
     ...stamps, type: 'developer_requests',
-    data: '{"requestType":"Variation Order","details":"Letter 12","dateRequested":"","dateReceived":"2026-11-12","datePackaged":"","requestFileUrl":""}',
+    data: '{"requestType":"Variation Order","details":"Letter 12","dateRequested":"","dateReceived":"2026-11-12","datePackaged":"","requestFileUrl":"","billingType":"","units":0,"paymentUuid":""}',
   });
+  assert.equal(L.newRequestRecord(ids, { requestType: L.BILLING_REQUEST, details: '', dateRequested: '2026-11-10', dateReceived: '2026-11-12', datePackaged: '', billingType: 'M1 - Housing unit', units: 12 }).data,
+    '{"requestType":"Request for billing","details":"","dateRequested":"2026-11-10","dateReceived":"2026-11-12","datePackaged":"","requestFileUrl":"","billingType":"M1 - Housing unit","units":12,"paymentUuid":""}');
   assert.deepEqual(L.newDocumentRecord(ids, filed), {
     ...stamps, type: 'pending_documents',
     data: '{"documentName":"Variation Order No. 2 (Deductive) - PHP 1,500,000.50","status":"Pending","remarks":"Reason: Less fill | Date Approved: 2026-11-05","isCoreChecklist":0,"fileUrl":""}',
@@ -1593,6 +1608,12 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
     { no: '3.1', name: 'MILESTONE 1 (80%)', unit: 'UNIT', type: 'M1 - Housing unit', amount: 5600000, previous: 56000, thisPeriod: 112000 },
     { no: '3.2', name: 'MILESTONE 2 (20%)', unit: 'UNIT', type: 'M2 - Housing unit', amount: 1400000, previous: 0, thisPeriod: 14000 },
   ]);
+  // Printing warns of a part billed above its line's actual (housing: 182,000 of 7,000,000 against 1%), and of the grand total above the overall.
+  assert.deepEqual(L.billingAbstractWarnings(uploaded, abstract), ['Housing Construction: billed to date 2.60% is above the actual 1.00%.']);
+  assert.deepEqual(L.billingAbstractWarnings(uploaded, L.billingAbstract(project, [], saved, uploaded, { ...period, development: 11 }, 100)), [
+    'Land Development: billed to date 26.00% is above the actual 25.21%.', 'Housing Construction: billed to date 2.60% is above the actual 1.00%.',
+    'Grand total: billed to date 11.52% is above the actual 10.73%.']);
+  assert.deepEqual(L.billingAbstractWarnings(uploaded, L.billingAbstract(project, [], [], uploaded, {}, 100)), []);
   // A blank, unreadable or negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
   assert.deepEqual(L.billingAbstract(project, [], [], uploaded, { covered: '', lots: 1, development: -5, m1: 'x', m2: '' }, 3).parts.flatMap(p => p.lines.map(l => l.thisPeriod)), [333333.33, 0, 0, 0]);
   // Land development is typed in lots too: 40 of 370 lots of 31,820,000 (86,000 a lot) are 3,440,000.

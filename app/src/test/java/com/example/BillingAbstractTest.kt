@@ -157,6 +157,16 @@ class BillingAbstractTest {
             ),
             abstract.parts.flatMap { it.lines }
         )
+        // Printing warns of a part billed above its line's actual (housing: 182,000 of 7,000,000 against 1%), and of the grand total above the overall.
+        assertEquals(listOf("Housing Construction: billed to date 2.60% is above the actual 1.00%."), BillingAbstract.printWarnings(uploaded, abstract))
+        assertEquals(
+            listOf(
+                "Land Development: billed to date 26.00% is above the actual 25.21%.", "Housing Construction: billed to date 2.60% is above the actual 1.00%.",
+                "Grand total: billed to date 11.52% is above the actual 10.73%."
+            ),
+            BillingAbstract.printWarnings(uploaded, BillingAbstract.of(project, emptyList(), saved, uploaded, period.copy(development = 11.0), 100))
+        )
+        assertEquals(emptyList<String>(), BillingAbstract.printWarnings(uploaded, BillingAbstract.of(project, emptyList(), emptyList(), uploaded, BillingAbstract.Period(), 100)))
         // A negative figure is 0; a quantity's amount is at 2 decimals (1 of 3 units of 1,000,000 is 333,333.33).
         assertEquals(
             listOf(333_333.33, 0.0, 0.0, 0.0),

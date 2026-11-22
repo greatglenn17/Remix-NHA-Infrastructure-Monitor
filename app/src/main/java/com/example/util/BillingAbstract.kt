@@ -128,6 +128,21 @@ object BillingAbstract {
         )
     }
 
+    /**
+     * Each part of [sheet] (from [of]) whose billed to date, previous and this period, passes that line's actual in
+     * [abstract], and the grand total against its overall actual, at 2 decimals as printed. A warning only: the
+     * sheet still prints (web/logic.js billingAbstractWarnings).
+     */
+    fun printWarnings(abstract: ProjectAbstract, sheet: Abstract): List<String> {
+        val actuals = ProjectAbstracts.lineActuals(abstract)
+        val names = listOf("Land Acquisition Cost", "Land Development", "Housing Construction")
+        fun share(lines: List<Line>): Double = lines.sumOf { it.amount }.let { of -> if (of > 0) round2(lines.sumOf { it.previous + it.thisPeriod } / of * 100) else 0.0 }
+        return (sheet.parts.map { Triple(it.name, it.lines, actuals.getOrNull(names.indexOf(it.name)) ?: 0.0) } +
+            Triple("Grand total", sheet.parts.flatMap { it.lines }, abstract.overallPct))
+            .filter { (_, lines, actual) -> share(lines) > round2(actual) }
+            .map { (name, lines, actual) -> "$name: billed to date ${"%.2f".format(Locale.US, share(lines))}% is above the actual ${"%.2f".format(Locale.US, round2(actual))}%." }
+    }
+
     // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
     private fun billedBy(payments: List<ProjectPayment>, asOf: String): List<ProjectPayment> =
         day(asOf).let { last -> payments.filter { p -> day(p.date)?.let { last != null && !it.isAfter(last) } == true } }
