@@ -217,7 +217,11 @@ class BillingAbstractTest {
         val abstract = uploaded.copy(equivUnits = 100.0, rowsJson = ProjectAbstracts.rowsJson(rows.map { if (it.kind == "subtotal") it.copy(equiv = listOf(1.0, 2.0, 3.0)) else it }))
         val saved = payments.dropLast(1) + billing(9, "Land development", 99.0, "2025-03-15")
         fun sheet(period: BillingAbstract.Period) = BlueBookForms.billingAbstract(
-            project, emptyList(), saved, abstract, period, 100, Signatories("Juan", "Engineer", "", "District Manager", "", "Regional Manager")
+            project, emptyList(), saved, abstract, period, 100, Signatories(
+                "Juan Dela Paz", "General Manager", "Ana Cruz", "Principal Engineer A", "Rosa Lim", "Regional Manager",
+                preparedOffice = "Sample Builders Co.", checkedOffice = "Sample District Office", notedOffice = "Region 9 Office",
+                reviewedName = "Ben Reyes", reviewedPosition = "District Manager"
+            )
         )
         val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 15.5))
         fun has(vararg cells: String, page: String = html) =
@@ -242,6 +246,11 @@ class BillingAbstractTest {
         // The actual is the abstract's own, as on Print abstract, not the 7.10% billed to date.
         assertTrue(html.contains("ACTUAL ACCOMPLISHMENT</td><td class='pc'>:</td><td>10.73%"))
         assertTrue(html.contains("ADVANCE/SLIPPAGE</td><td class='pc'>:</td><td>-1.27%"))
-        assertTrue(html.contains("Approved by:"))
+        // Its own four signers in one row; Recommending Approval has no colon, and a blank office prints no line.
+        assertTrue(Regex("<div class='keep'>\\s*<table class='sig'><tr>\\s*<td>Prepared by:<br><br><br><b>JUAN DELA PAZ</b><div class='line'></div>General Manager<br>Sample Builders Co.</td>" +
+            "\\s*<td>Checked by:<br><br><br><b>ANA CRUZ</b><div class='line'></div>Principal Engineer A<br>Sample District Office</td>" +
+            "\\s*<td>Reviewed by:<br><br><br><b>BEN REYES</b><div class='line'></div>District Manager</td>" +
+            "\\s*<td>Recommending Approval<br><br><br><b>ROSA LIM</b><div class='line'></div>Regional Manager<br>Region 9 Office</td>\\s*</tr></table>").containsMatchIn(html))
+        assertTrue(!html.contains("Approved by") && !html.contains("Noted by"))
     }
 }

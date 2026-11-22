@@ -31,6 +31,7 @@ import com.example.ui.detail.sections.RelatedFilesList
 import com.example.ui.detail.sections.SummarySection
 import com.example.ui.detail.sections.MoneySection
 import com.example.ui.detail.tabs.*
+import com.example.ui.dialogs.SignatoriesKind
 import com.example.ui.viewmodel.ProjectViewModel
 import com.example.util.ContractCost
 import com.example.util.ProjectAttention
@@ -122,15 +123,20 @@ fun ProjectDetailScreen(
             onEmail = { preview = null; com.example.util.BlueBookPrint.email(context, jobName, html) }
         )
     }
-    // Weekly and monthly reports ask for their signatories first; set while that dialog is open.
-    // (weekly?, print): the weekly and monthly reports keep separate checkers and noters.
-    var printWithSignatories by remember { mutableStateOf<Pair<Boolean, (com.example.util.Signatories) -> Unit>?>(null) }
-    printWithSignatories?.let { (weekly, print) ->
+    // Weekly and monthly reports and the billing abstract ask for their signatories first; set while that dialog is open.
+    // (kind, print): the weekly and monthly reports keep separate checkers and noters, the billing abstract its own four.
+    var printWithSignatories by remember { mutableStateOf<Pair<SignatoriesKind, (com.example.util.Signatories) -> Unit>?>(null) }
+    printWithSignatories?.let { (kind, print) ->
+        val billing = kind == SignatoriesKind.BILLING
         com.example.ui.dialogs.SignatoriesDialog(
-            initial = viewModel.signatoriesFor(currentProject, weekly),
-            weekly = weekly,
+            initial = if (billing) viewModel.billingSignatoriesFor(currentProject) else viewModel.signatoriesFor(currentProject, kind == SignatoriesKind.WEEKLY),
+            kind = kind,
             onDismiss = { printWithSignatories = null },
-            onPrint = { s -> printWithSignatories = null; viewModel.saveSignatories(currentProject, s, weekly); print(s) }
+            onPrint = { s ->
+                printWithSignatories = null
+                if (billing) viewModel.saveBillingSignatories(currentProject, s) else viewModel.saveSignatories(currentProject, s, kind == SignatoriesKind.WEEKLY)
+                print(s)
+            }
         )
     }
 
@@ -273,7 +279,7 @@ fun ProjectDetailScreen(
                                     onAddWeeklyReportClick = onAddWeeklyReportClick,
                                     onEditWeeklyReportClick = { viewModel.weeklyReportToEdit.value = it; onAddWeeklyReportClick() },
                                     onDeleteWeeklyReportClick = { viewModel.deleteWeeklyReport(it) },
-                                    onPrintWeeklyReportClick = { report -> printWithSignatories = true to { s: com.example.util.Signatories -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report, s) } } }
+                                    onPrintWeeklyReportClick = { report -> printWithSignatories = SignatoriesKind.WEEKLY to { s: com.example.util.Signatories -> printForm("Weekly Report - ${report.reportingWeek}") { viewModel.weeklyReportForm(currentProject, report, s) } } }
                                 )
                                 "Monthly" -> MonthlyReportsTab(project = currentProject,
                                     monthlyReports = monthlyReports,
@@ -285,7 +291,7 @@ fun ProjectDetailScreen(
                                     onSignOffClick = { report, roleType, status, notes ->
                                         viewModel.updateMonthlySignoff(report, roleType, status, notes)
                                     },
-                                    onPrintMonthClick = { month, weeks -> printWithSignatories = false to { s: com.example.util.Signatories -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks, s) } } }
+                                    onPrintMonthClick = { month, weeks -> printWithSignatories = SignatoriesKind.MONTHLY to { s: com.example.util.Signatories -> printForm("Monthly Report - $month") { viewModel.monthlyReportForm(currentProject, month, weeks, s) } } }
                                 )
                             "Lots" -> SubdivisionPlanTab(
                                 project = currentProject,
@@ -432,7 +438,7 @@ fun ProjectDetailScreen(
                             onSave = (viewModel::saveAbstract).takeIf { canUpload },
                             onDelete = (viewModel::deleteAbstract).takeIf { canUpload },
                             onPrintAbstract = { abstract ->
-                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                printWithSignatories = SignatoriesKind.MONTHLY to { s: com.example.util.Signatories ->
                                     printForm("Abstract of Physical Accomplishment - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
                                         viewModel.actualAbstractForm(currentProject, abstract, s)
                                     }
@@ -440,7 +446,7 @@ fun ProjectDetailScreen(
                             },
                             onPrintBilling = { abstract, period ->
                                 val saleable = com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count
-                                printWithSignatories = false to { s: com.example.util.Signatories ->
+                                printWithSignatories = SignatoriesKind.BILLING to { s: com.example.util.Signatories ->
                                     // Not the detailed abstract's name, so the two PDFs do not replace each other.
                                     printForm("Billing Abstract - As of ${com.example.util.ProjectSchedule.displayDate(abstract.asOf)}") {
                                         viewModel.billingAbstractForm(currentProject, abstract, period, saleable, s)

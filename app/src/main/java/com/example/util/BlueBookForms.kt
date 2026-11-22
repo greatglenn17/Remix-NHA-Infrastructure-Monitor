@@ -35,12 +35,16 @@ import kotlin.math.sin
 /** The person printing the form, for the "Prepared by" block. */
 data class Preparer(val name: String, val title: String, val office: String)
 
-/** The Prepared by / Checked by / Noted by block of the weekly and monthly reports. */
+/**
+ * The Prepared by / Checked by / Noted by block of the weekly and monthly reports. The billing abstract adds Reviewed by
+ * and prints Noted as Recommending Approval; the other prints ignore Reviewed by.
+ */
 data class Signatories(
     val preparedName: String, val preparedPosition: String,
     val checkedName: String, val checkedPosition: String,
     val notedName: String, val notedPosition: String,
-    val preparedOffice: String = "", val checkedOffice: String = "", val notedOffice: String = ""
+    val preparedOffice: String = "", val checkedOffice: String = "", val notedOffice: String = "",
+    val reviewedName: String = "", val reviewedPosition: String = "", val reviewedOffice: String = ""
 )
 
 data class Extension(val no: String, val days: Int, val reason: String, val status: String)
@@ -444,7 +448,7 @@ object BlueBookForms {
               $rows
               ${total("GRAND TOTAL", all)}
             </table>
-            <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
+            <div class='keep'>${billingSignatures(signatories)}</div>
             """,
             banner,
             fullPage = true,
@@ -543,11 +547,24 @@ object BlueBookForms {
 
     private fun office(name: String) = if (name.isBlank()) "" else "<br>${esc(name.trim())}"
 
+    private fun signer(title: String, name: String, position: String, officeName: String) =
+        "<td>$title<br><br><br><b>${esc(name.uppercase())}</b><div class='line'></div>${esc(position)}${office(officeName)}</td>"
+
     private fun signatures(s: Signatories, checkedTitle: String = "Checked by", notedTitle: String = "Noted by") = """
         <table class='sig'><tr>
-          <td>Prepared by:<br><br><br><b>${esc(s.preparedName.uppercase())}</b><div class='line'></div>${esc(s.preparedPosition)}${office(s.preparedOffice)}</td>
-          <td>$checkedTitle:<br><br><br><b>${esc(s.checkedName.uppercase())}</b><div class='line'></div>${esc(s.checkedPosition)}${office(s.checkedOffice)}</td>
-          <td>$notedTitle:<br><br><br><b>${esc(s.notedName.uppercase())}</b><div class='line'></div>${esc(s.notedPosition)}${office(s.notedOffice)}</td>
+          ${signer("Prepared by:", s.preparedName, s.preparedPosition, s.preparedOffice)}
+          ${signer("$checkedTitle:", s.checkedName, s.checkedPosition, s.checkedOffice)}
+          ${signer("$notedTitle:", s.notedName, s.notedPosition, s.notedOffice)}
+        </tr></table>
+    """
+
+    /** The billing abstract's four signers in one row; Recommending Approval has no colon, as on the district's sheet. */
+    private fun billingSignatures(s: Signatories) = """
+        <table class='sig'><tr>
+          ${signer("Prepared by:", s.preparedName, s.preparedPosition, s.preparedOffice)}
+          ${signer("Checked by:", s.checkedName, s.checkedPosition, s.checkedOffice)}
+          ${signer("Reviewed by:", s.reviewedName, s.reviewedPosition, s.reviewedOffice)}
+          ${signer("Recommending Approval", s.notedName, s.notedPosition, s.notedOffice)}
         </tr></table>
     """
 
