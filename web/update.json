@@ -1,8 +1,1 @@
-{
-  "versionCode": 316,
-  "versionName": "2.8.36",
-  "releaseNotes": "v2.8.36: The Actual Accomplishment tab shows the abstract's work in lots and units (land, Milestone 1 and 2), with what is billed and what can still be billed.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.36/NHA_Monitor_v2.8.36_Build316.apk",
-  "apkSha256": "0ffdf278c647ef53a8b2b47c9b9b0d94d6deea6e72afb1186f285ffb2d170c0d",
-  "isMandatory": false
-}
+{"versionCode":317,"versionName":"2.8.37","releaseNotes":"v2.8.37: The billing abstract prints its own four signatories (Prepared by, Checked by, Reviewed by, Recommending Approval), saved for the project.","apkDownloadUrl":"https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.37/NHA_Monitor_v2.8.37_Build317.apk","apkSha256":"411ac1fe83784269aa4971e1084637cfa6596e88d733f3ca10a34a141b4734dc","isMandatory":false}
