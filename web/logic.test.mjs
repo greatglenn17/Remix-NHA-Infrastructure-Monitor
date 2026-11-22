@@ -1915,3 +1915,19 @@ test('dashboard sort: days left puts overdue first and finished or undated last;
   assert.deepEqual(names('done'), ['Late', 'None', 'Soon', 'Done']);
   assert.deepEqual(names('nonsense'), [...items].sort((a, b) => L.attentionOrder(a, b, '2026-11-21')).map(x => x.p.name));
 });
+
+test('a new weekly report starts with the latest report\'s manpower and equipment', () => {
+  const r = (week, manpower, equipment) => ({ reportingWeek: week, manpowerJson: JSON.stringify(manpower), equipmentJson: JSON.stringify(equipment) });
+  const weekly = [
+    r('Oct 19, 2026 - Oct 25, 2026', [{ designation: 'Foreman', count: 2 }], [{ description: 'Backhoe', count: 1, status: 'Idle' }]),
+    r('Oct 5, 2026 - Oct 11, 2026', [{ designation: 'Laborers', count: 9 }], []),
+  ];
+  assert.deepEqual(L.carriedCrew(weekly), {
+    manpower: [{ designation: 'Foreman', count: 2, remarks: '' }],
+    equipment: [{ description: 'Backhoe', count: 1, status: 'Idle', remarks: '' }],
+  });
+  // No report yet, or one without manpower: the usual designations at zero.
+  const start = L.MANPOWER_START.map(designation => ({ designation, count: 0 }));
+  assert.deepEqual(L.carriedCrew([]), { manpower: start, equipment: [] });
+  assert.deepEqual(L.carriedCrew([r('Oct 19, 2026 - Oct 25, 2026', [], [])]).manpower, start);
+});

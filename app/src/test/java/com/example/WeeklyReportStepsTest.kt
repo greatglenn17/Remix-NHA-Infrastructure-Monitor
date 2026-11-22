@@ -152,4 +152,33 @@ class WeeklyReportStepsTest {
         assertEquals("Mini Dump Truck", JSONArray(equipment).getJSONObject(0).getString("description"))
         assertEquals("Contractor/Developer", JSONArray(issues).getJSONObject(0).getString("actionBy"))
     }
+
+    // A new report's manpower and equipment start as the latest week's, so only the changes are typed.
+    @Test fun newReport_startsWithLatestCrew() {
+        val project = Project(
+            name = "P", location = "L", implementingOffice = "O", contractor = "C", scopeOfWork = "",
+            contractCostOriginal = 1000.0, contractCostRevised = 0.0, contractDurationDays = 100, dateStarted = "2026-01-05",
+            completionDateOriginal = "2026-12-31", completionDateRevised = ""
+        )
+        fun report(week: String, manpower: String, equipment: String) = WeeklyReport(
+            projectId = 1, reportingWeek = week, daysElapsed = 0, remainingDays = 0, targetAccomplishmentPct = 0.0, actualAccomplishmentPct = 0.0,
+            manpowerJson = manpower, equipmentJson = equipment, activitiesJson = "[]", issuesJson = "[]", accomplishmentItemsJson = "[]",
+            documentsIssuedReceivedJson = "[]", attachedPhotoUrlsJson = "[]", submittedByStaff = "me"
+        )
+        val manpower = JSONArray().put(JSONObject().put("designation", "Foreman").put("count", 2).put("remarks", "")).toString()
+        val equipment = JSONArray().put(JSONObject().put("description", "Backhoe").put("count", 1).put("status", "Idle").put("remarks", "")).toString()
+        val reports = listOf(
+            report("Oct 19, 2026 - Oct 25, 2026", manpower, equipment),
+            report("Oct 5, 2026 - Oct 11, 2026", JSONArray().put(JSONObject().put("designation", "Laborers").put("count", 9).put("remarks", "")).toString(), "[]")
+        )
+        var saved: Pair<String, String>? = null
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                AddWeeklyReportDialog(project = project, projectId = 1, reports = reports, onDismiss = {},
+                    onSubmit = { _, _, _, _, _, _, _, crew, machines, _, _, _ -> saved = crew to machines })
+            }
+        }
+        rule.onNodeWithTag("submit_weekly_report_button").performClick()
+        assertEquals(manpower to equipment, saved)
+    }
 }

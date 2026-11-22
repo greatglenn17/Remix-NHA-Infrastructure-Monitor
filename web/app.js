@@ -3505,8 +3505,7 @@ function editPhotos(c, report) {
 function weeklyForm(c, report = null) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
-  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: L.carriedActuals(c.weekly), equipment: [], activities: [{}], issues: [],
-    manpower: L.MANPOWER_START.map(designation => ({ designation, count: 0 })) };
+  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: L.carriedActuals(c.weekly), ...L.carriedCrew(c.weekly), activities: [{}], issues: [] };
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   // A saved value outside the list stays a choice, so opening and saving does not change it.
   const pick = (choices, cur = '') => (cur && !choices.includes(cur) ? [cur, ...choices] : choices).map(v => opt(v, v, cur)).join('');
