@@ -4106,8 +4106,11 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
     location.hash = `#/p/${page.id}/actual`;
   };
   const boxes = () => main.querySelectorAll('[data-next]').forEach(box => { box.oninput = () => {
+    // A number past what is left of the item's QTY becomes what is left, so the to date never passes it.
+    const now = state(), capped = L.cappedBox(box.value, L.nextAbstractMost(now.rows, houseUnits(c))[box.dataset.next]);
+    if (capped !== box.value) box.value = capped;
     next.text[box.dataset.next] = box.value; next.kept = true; draft();
-    const now = state(), rows = made(now);
+    const rows = made(now);
     document.getElementById(`next-done-${box.dataset.next}`).textContent = L.quantityText(rows[box.dataset.next].toDate[0]);
     const houses = document.getElementById(`next-qty-${box.dataset.next}`);
     if (houses) houses.textContent = houseText(rows[box.dataset.next], houseUnits(c), rows[box.dataset.next].period[0]);

@@ -1988,6 +1988,27 @@ export function abstractHouses(rows, typed, units, back = false) {
   return Object.fromEntries(Object.entries(typed).map(([i, v]) => [i, !houses.has(Number(i)) || !v || !Number.isFinite(v) ? v : back ? round4(v * units / rows[i].qty) : quantity(rows[i], v)]));
 }
 
+/**
+ * ProjectAbstracts.nextMost: the most each pay line's box takes this period, by row index (`rows` the source's): what
+ * is left of its QTY, in houses on a house line (abstractHouses), so typing more cannot pass the QTY. A line already
+ * past its QTY takes 0 more. A quantity is cut to 4 decimals, so its to date stays within the QTY; houses round, and
+ * a sliver left is 0.0001 house, since the last house's 0.01 snap takes either to the QTY exactly.
+ */
+export function nextAbstractMost(rows, units) {
+  const houses = new Set(abstractHouseLines(rows, units));
+  return Object.fromEntries(rows.flatMap((r, i) => {
+    if (!isPayLine(r) || !(r.qty > 0)) return [];
+    const left = Math.max(0, r.qty - (Number(r.toDate?.[0]) || 0)), h = left * units / r.qty;
+    return [[i, houses.has(i) ? (h > 0 ? Math.max(round4(h), 0.0001) : 0) : Math.floor(left * 1e4 + 1e-6) / 1e4]];
+  }));
+}
+
+/** ProjectAbstracts.capped: a box's `text`, or `most` in its place when it is a number above `most`. */
+export function cappedBox(text, most) {
+  const n = String(text).replace(/,/g, '').trim();
+  return most != null && /^-?(\d+(\.\d*)?|\.\d+)$/.test(n) && Number(n) > most ? String(most) : text;
+}
+
 /** The saved quantities (`opened`: [box text, quantity] by row index) of the boxes whose `text` is still what they opened with, which are saved as they were. */
 export const untouchedQuantities = (text, opened) => Object.fromEntries(Object.entries(opened ?? {})
   .filter(([i, o]) => Array.isArray(o) && typeof o[0] === 'string' && text[i] === o[0] && Number.isFinite(o[1])).map(([i, o]) => [i, o[1]]));
