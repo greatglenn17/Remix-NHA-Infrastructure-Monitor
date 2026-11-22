@@ -1956,6 +1956,41 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         if (updated != project) updateProjectMaster(updated)
     }
 
+    /**
+     * The billing abstract's own signers; blanks fall back to the contractor's office for Prepared by, the signed-in
+     * user for Checked by, and the monthly report's Checked by and Noted by for Reviewed by and Recommending Approval.
+     */
+    fun billingSignatoriesFor(project: Project): com.example.util.Signatories {
+        val user = currentUserAccount.value
+        val district = project.implementingOffice.ifBlank { "Bulacan District Office" }
+        return com.example.util.Signatories(
+            preparedName = project.billingPreparedByName,
+            preparedPosition = project.billingPreparedByPosition,
+            preparedOffice = project.billingPreparedByOffice.ifBlank { project.contractor },
+            checkedName = project.billingCheckedByName.ifBlank { user.name },
+            checkedPosition = project.billingCheckedByPosition.ifBlank { user.title.ifBlank { "Principal Engineer A" } },
+            checkedOffice = project.billingCheckedByOffice.ifBlank { district },
+            reviewedName = project.billingReviewedByName.ifBlank { project.checkedByName },
+            reviewedPosition = project.billingReviewedByPosition.ifBlank { project.checkedByPosition.ifBlank { "District Manager" } },
+            reviewedOffice = project.billingReviewedByOffice.ifBlank { project.checkedByOffice.ifBlank { district } },
+            notedName = project.billingRecommendedByName.ifBlank { project.notedByName },
+            notedPosition = project.billingRecommendedByPosition.ifBlank { project.notedByPosition.ifBlank { "Regional Manager" } },
+            notedOffice = project.billingRecommendedByOffice.ifBlank { project.notedByOffice.ifBlank { "Region 3 Office" } }
+        )
+    }
+
+    /** Remembers the billing abstract's signers on the project; the weekly and monthly ones are left alone. */
+    fun saveBillingSignatories(project: Project, s: com.example.util.Signatories) {
+        if (!currentUserAccount.value.role.hasPermission(Permission.EDIT_PROJECT)) return
+        val updated = project.copy(
+            billingPreparedByName = s.preparedName, billingPreparedByPosition = s.preparedPosition, billingPreparedByOffice = s.preparedOffice,
+            billingCheckedByName = s.checkedName, billingCheckedByPosition = s.checkedPosition, billingCheckedByOffice = s.checkedOffice,
+            billingReviewedByName = s.reviewedName, billingReviewedByPosition = s.reviewedPosition, billingReviewedByOffice = s.reviewedOffice,
+            billingRecommendedByName = s.notedName, billingRecommendedByPosition = s.notedPosition, billingRecommendedByOffice = s.notedOffice
+        )
+        if (updated != project) updateProjectMaster(updated)
+    }
+
     suspend fun projectProfileForm(project: Project): String {
         val user = currentUserAccount.value
         return com.example.util.BlueBookForms.projectProfile(

@@ -251,6 +251,7 @@ class ProjectAbstractsTest {
         assertTrue(Regex("<thead><tr><th rowspan='3'>ITEM NO\\.</th>.*<th>QTY</th><th>AMOUNT</th><th>% WT</th></tr></thead>").containsMatchIn(html))
         assertTrue(!html.contains("BALANCE")) // the printed abstract of the actual work has no BALANCE columns
         assertTrue(Regex("<div class='keep'>\\s*<table class='sig'>[\\s\\S]*Prepared by:[\\s\\S]*Checked by:[\\s\\S]*Approved by:").containsMatchIn(html))
+        assertTrue(!html.contains("Reviewed by") && !html.contains("Recommending Approval")) // the billing abstract's signers are its own
         has("2.1.1", "Mobilization/Demobilization", "1", "l.s.", "400,000.00", "400,000.00", "0", "0.00", "0.00%", "0.25", "100,000.00", "25.00%", "0.25", "100,000.00", "25.00%")
         // A cell the sheet left empty stays blank, and the workbook's text is escaped.
         has("2.2.1", "Fill &amp; &lt;Compaction&gt;", "", "", "", "1,600,000.00", "", "", "", "", "", "", "", "404,000.00", "25.25%")

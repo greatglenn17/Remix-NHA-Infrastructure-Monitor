@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
         ProjectAbstract::class,
         SyncOutboxEvent::class
     ],
-    version = 41,
+    version = 42,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -430,6 +430,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // The billing abstract's own four signers.
+        private val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (column in BILLING_SIGNATORY_COLUMNS) {
+                    db.execSQL("ALTER TABLE projects ADD COLUMN $column TEXT NOT NULL DEFAULT ''")
+                }
+            }
+        }
+
         private val MIGRATION_31_32 = object : Migration(31, 32) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sdp_lot_progress ADD COLUMN m2BillingStatus TEXT NOT NULL DEFAULT 'NOT BILLED'")
@@ -442,6 +451,12 @@ abstract class AppDatabase : RoomDatabase() {
         val OFFICE_COLUMNS = listOf("preparedByOffice", "checkedByOffice", "notedByOffice", "weeklyCheckedByOffice", "weeklyNotedByOffice")
         val SIGNATORY_COLUMNS = listOf("preparedByName", "preparedByPosition", "checkedByName", "checkedByPosition", "notedByName", "notedByPosition")
         val WEEKLY_SIGNATORY_COLUMNS = listOf("weeklyCheckedByName", "weeklyCheckedByPosition", "weeklyNotedByName", "weeklyNotedByPosition")
+        val BILLING_SIGNATORY_COLUMNS = listOf(
+            "billingPreparedByName", "billingPreparedByPosition", "billingPreparedByOffice",
+            "billingCheckedByName", "billingCheckedByPosition", "billingCheckedByOffice",
+            "billingReviewedByName", "billingReviewedByPosition", "billingReviewedByOffice",
+            "billingRecommendedByName", "billingRecommendedByPosition", "billingRecommendedByOffice"
+        )
 
         fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -453,7 +468,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "nha_construction_db_10"
                 )
-                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41)
+                .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37, MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42)
                 .addCallback(DatabaseCallback(context.applicationContext, scope))
                 .build()
                 INSTANCE = instance
