@@ -859,6 +859,7 @@ test('new project: who may add one, what stops the form, the document a phone wo
     projectType: 'Housing Project', landArea: '2.5 Hectares', numberOfUnits: '120', projectedBeneficiaries: '', boardResolution: '', noticeOfAward: '', noticeToProceed: '',
     preparedByName: '', preparedByPosition: '', preparedByOffice: '', checkedByName: '', checkedByPosition: '', checkedByOffice: '', notedByName: '', notedByPosition: '', notedByOffice: '',
     weeklyCheckedByName: '', weeklyCheckedByPosition: '', weeklyCheckedByOffice: '', weeklyNotedByName: '', weeklyNotedByPosition: '', weeklyNotedByOffice: '',
+    billingPreparedByName: '', billingPreparedByPosition: '', billingPreparedByOffice: '', billingCheckedByName: '', billingCheckedByPosition: '', billingCheckedByOffice: '', billingReviewedByName: '', billingReviewedByPosition: '', billingReviewedByOffice: '', billingRecommendedByName: '', billingRecommendedByPosition: '', billingRecommendedByOffice: '',
     latestUpdatePhotoUrl: '', barChartJson: '', contractCostOriginal: 4000000.5, contractCostRevised: 4000000.5, contractDurationDays: 365,
     dateStarted: '2026-01-01', completionDateOriginal: '2026-12-31', completionDateRevised: '2026-12-31', status: 'On-going', targetAccomplishment: 0, actualAccomplishment: 0,
     assignedStaff: 'Engr. Cruz', revision: 1, createdAt: 1700000000000, updatedAt: 1700000000000, createdByUid: 'u1', updatedByUid: 'u1', isDeleted: false, assignedUids: ['u1'],
@@ -936,25 +937,32 @@ test('project edit: the form starts from the saved project, writes only what cha
   assert.deepEqual(L.projectStart({ ...project, scopeOfWork: 'Land development and housing' }, '2026-11-12').scope, [{ name: 'Land development and housing', amount: '', weightPct: '100' }]);
 });
 
-test('signatories: the project fields a weekly or a monthly report saves, only where they differ, and the audit entry', () => {
+test('signatories: the project fields a weekly or a monthly report or the billing abstract saves, only where they differ, and the audit entry', () => {
   const project = { name: 'Pandi Heights', status: 'On-going', actualAccomplishment: 35, contractCostRevised: 4500000,
     preparedByName: 'Engr. Cruz', preparedByPosition: 'Senior Engineer A', preparedByOffice: 'Bulacan District Office', weeklyCheckedByName: 'Engr. Reyes' };
   const form = { preparedName: ' Engr. Cruz ', preparedPosition: 'Senior Engineer A', preparedOffice: 'Bulacan District Office',
     checkedName: 'Engr. Reyes', checkedPosition: 'Principal Engineer A', checkedOffice: 'Bulacan District Office',
     notedName: 'Engr. Santos', notedPosition: 'District Manager', notedOffice: ' Bulacan District Office ' };
   // Weekly: its own checker and noter; what is already saved (after trimming) is not written again.
-  assert.deepEqual(L.signatoryFields(project, form, true), {
+  assert.deepEqual(L.signatoryFields(project, form, 'weekly'), {
     weeklyCheckedByPosition: 'Principal Engineer A', weeklyCheckedByOffice: 'Bulacan District Office',
     weeklyNotedByName: 'Engr. Santos', weeklyNotedByPosition: 'District Manager', weeklyNotedByOffice: 'Bulacan District Office',
   });
   // Monthly: the same form goes to the monthly checker and noter; Prepared by is shared.
-  assert.deepEqual(L.signatoryFields(project, { ...form, preparedPosition: 'Principal Engineer C' }, false), {
+  assert.deepEqual(L.signatoryFields(project, { ...form, preparedPosition: 'Principal Engineer C' }, 'monthly'), {
     preparedByPosition: 'Principal Engineer C', checkedByName: 'Engr. Reyes', checkedByPosition: 'Principal Engineer A', checkedByOffice: 'Bulacan District Office',
     notedByName: 'Engr. Santos', notedByPosition: 'District Manager', notedByOffice: 'Bulacan District Office',
   });
+  // Billing: its own four, billing* only; the reports' Prepared by is not touched.
+  assert.deepEqual(L.signatoryFields({ ...project, billingCheckedByName: 'Engr. Reyes' }, { ...form, preparedName: 'Pedro Santos', preparedPosition: '', preparedOffice: 'PS Builders',
+    reviewedName: 'Rosa Diaz', reviewedPosition: 'District Manager', reviewedOffice: '', recommendedName: 'Lina Cruz', recommendedPosition: 'Regional Manager', recommendedOffice: 'Region 3 Office' }, 'billing'), {
+    billingPreparedByName: 'Pedro Santos', billingPreparedByOffice: 'PS Builders', billingCheckedByPosition: 'Principal Engineer A', billingCheckedByOffice: 'Bulacan District Office',
+    billingReviewedByName: 'Rosa Diaz', billingReviewedByPosition: 'District Manager',
+    billingRecommendedByName: 'Lina Cruz', billingRecommendedByPosition: 'Regional Manager', billingRecommendedByOffice: 'Region 3 Office',
+  });
   // A name cleared is saved as blank; nothing different is nothing to save.
-  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, true) }, { ...form, checkedName: '' }, true), { weeklyCheckedByName: '' });
-  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, true) }, form, true), {});
+  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, 'weekly') }, { ...form, checkedName: '' }, 'weekly'), { weeklyCheckedByName: '' });
+  assert.deepEqual(L.signatoryFields({ ...project, ...L.signatoryFields(project, form, 'weekly') }, form, 'weekly'), {});
   assert.deepEqual(L.projectEditAudit(project, { weeklyNotedByName: 'Engr. Santos' }),
     { actionType: 'Project Edit', details: 'Updated project master: Pandi Heights', oldValue: 'Status: On-going', newValue: 'Status: On-going, Revised Cost: ₱4500000' });
   assert.deepEqual(Object.keys(L.SIGNATORY_POSITIONS), ['prepared', 'weeklyChecked', 'weeklyNoted', 'checked', 'noted']);

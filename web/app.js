@@ -4293,26 +4293,33 @@ function relatedCard(files, editable = false) {
 }
 
 /**
- * SignatoriesDialog: who signs the weekly (or monthly) report. Save remembers them on the project for every printout,
- * as the phone does when it prints (saveSignatories), with the "Project Edit" audit entry.
+ * SignatoriesDialog: who signs the weekly or monthly report, or the billing abstract (`mode` 'weekly', 'monthly',
+ * 'billing'). Save remembers them on the project for every printout, as the phone does when it prints
+ * (saveSignatories), with the "Project Edit" audit entry.
  */
-function signatoriesForm(c, weekly) {
-  const start = (weekly ? P.weeklySignatories : P.monthlySignatories)(c.project, s.profile);
+function signatoriesForm(c, mode) {
+  const weekly = mode === 'weekly';
+  const start = { weekly: P.weeklySignatories, monthly: P.monthlySignatories, billing: P.billingSignatories }[mode](c.project, s.profile);
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
   // The usual choices as buttons under the box: a suggestion list only offers what matches the text already in it.
   const pick = (name, label, values) => `<label class="field">${label}<input name="${name}" value="${esc(start[name])}"></label>
-    <div class="chips" role="group" aria-label="${label} choices">${values.map(v => `<button type="button" data-fill="${name}">${esc(v)}</button>`).join('')}</div>`;
-  const signer = (title, key, positions) => `<h3>${title}</h3>
+    ${values.length ? `<div class="chips" role="group" aria-label="${label} choices">${values.map(v => `<button type="button" data-fill="${name}">${esc(v)}</button>`).join('')}</div>` : ''}`;
+  const signer = (title, key, positions, offices = L.SIGNATORY_OFFICES) => `<h3>${title}</h3>
     <label class="field">Name<input name="${key}Name" value="${esc(start[`${key}Name`])}"></label>
     ${pick(`${key}Position`, 'Position', positions)}
-    ${pick(`${key}Office`, 'Office', L.SIGNATORY_OFFICES)}`;
+    ${pick(`${key}Office`, 'Office', offices)}`;
   const at = L.SIGNATORY_POSITIONS;
+  // The billing abstract's Prepared by is the contractor's: no suggestions.
   d.innerHTML = `<form novalidate>
-    <h2>${weekly ? 'Weekly' : 'Monthly'} report signatories</h2>
+    ${mode === 'billing' ? `<h2>Billing abstract signatories</h2>
+    ${signer('Prepared by', 'prepared', [], [])}
+    ${signer('Checked by', 'checked', at.prepared)}
+    ${signer('Reviewed by', 'reviewed', at.checked)}
+    ${signer('Recommending Approval', 'recommended', at.noted)}` : `<h2>${weekly ? 'Weekly' : 'Monthly'} report signatories</h2>
     ${signer('Prepared by', 'prepared', at.prepared)}
     ${signer(weekly ? 'Checked and reviewed by' : 'Checked by', 'checked', weekly ? at.weeklyChecked : at.checked)}
-    ${signer('Noted by', 'noted', weekly ? at.weeklyNoted : at.noted)}
+    ${signer('Noted by', 'noted', weekly ? at.weeklyNoted : at.noted)}`}
     <div class="form-foot"><p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
@@ -4329,7 +4336,7 @@ function signatoriesForm(c, weekly) {
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
   form.onsubmit = async e => {
     e.preventDefault();
-    const fields = L.signatoryFields(c.project, values(), weekly);
+    const fields = L.signatoryFields(c.project, values(), mode);
     if (!Object.keys(fields).length) { done(); return; }
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
@@ -4388,7 +4395,7 @@ function recommendationsForm(c, month, saved) {
 /** The print bar's right side: Recommendations (monthly) and Signatories, for those who can edit the project, and the Print button. */
 const printActions = (c, label, monthly = false) => `<span class="print-actions">${L.canEdit(c.project, s.user.uid, s.claims) ? `${monthly ? `<button class="text-btn" id="recommendations">${icon('edit', 'sm')}Recommendations</button>` : ''}<button class="text-btn" id="signatories">${icon('edit', 'sm')}Signatories</button>` : ''}
   <button class="btn" id="do-print" disabled>${icon('print', 'sm')}${label}</button></span>`;
-const bindSignatories = (c, weekly) => { const b = document.getElementById('signatories'); if (b) b.onclick = () => signatoriesForm(c, weekly); };
+const bindSignatories = (c, mode) => { const b = document.getElementById('signatories'); if (b) b.onclick = () => signatoriesForm(c, mode); };
 
 /* ---------- Weekly report print (BlueBookForms.weeklyReport on an A4 sheet) ---------- */
 
@@ -4408,7 +4415,7 @@ async function drawPrint(c) {
   main.innerHTML = `<div class="print-bar no-print">${back}${printActions(c, 'Preparing photos…')}</div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
-  bindSignatories(c, true);
+  bindSignatories(c, 'weekly');
   // Photos are the report's uploaded images (PDFs and files not uploaded yet are left out, as on the phone).
   const titles = L.photoDetails(report.photoDetailsJson);
   const refs = L.attachmentList(report.attachedPhotoUrlsJson).filter(x => !L.isPdf(x));
@@ -4460,7 +4467,7 @@ function drawActualAbstractPrint(c) {
     <div class="bb-scroll"><div class="bb full land" id="sheet">${P.actualAbstractHtml({
       project, docs: documents, abstract, signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
     })}</div></div>`;
-  bindSignatories(c, false);
+  bindSignatories(c, 'monthly');
   const btn = document.getElementById('do-print');
   btn.disabled = false;
   btn.onclick = () => window.print();
@@ -4496,14 +4503,14 @@ function drawAbstractPrint(c) {
     document.getElementById('sheet').innerHTML = P.billingAbstractHtml({
       project, docs: documents, payments, abstract, units: L.abstractUnits(project, L.lotSummary(records).saleable),
       period: { covered: typed.covered, lots: number(typed.lots), development: number(typed.development), m1: number(typed.m1), m2: number(typed.m2) },
-      signatories: P.monthlySignatories(project, s.profile), banner: 'blue-book-header.png',
+      signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png',
     });
   };
   drawSheet();
   const boxes = document.getElementById('apa-typed');
   boxes.oninput = e => { typed[e.target.name] = e.target.value; drawSheet(); };
   if (active) { const again = boxes.querySelector(`[name="${active.name}"]`); again?.focus(); again?.setSelectionRange(active.selectionStart, active.selectionEnd); }
-  bindSignatories(c, false);
+  bindSignatories(c, 'billing');
   const btn = document.getElementById('do-print');
   btn.disabled = false;
   btn.onclick = () => window.print();
@@ -4520,7 +4527,7 @@ async function drawMonthlyPrint(c) {
       ${printActions(c, 'Preparing…', true)}</div>
     <p class="muted no-print print-note">A4, as the phone prints it. Choose "Save as PDF" in the print window to keep a copy.</p>
     <div class="bb-scroll"><div class="bb" id="sheet"></div></div>`;
-  bindSignatories(c, false);
+  bindSignatories(c, 'monthly');
   const saved = of('monthly_reports').find(r => (r.reportingMonth || '').trim().toLowerCase() === month.toLowerCase());
   const recommend = document.getElementById('recommendations');
   if (recommend) recommend.onclick = () => recommendationsForm(c, month, saved);

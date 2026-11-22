@@ -2282,7 +2282,7 @@ export function projectErrors(f, projects, today) {
 
 /** The Project fields a phone uploads that the new project form leaves blank. */
 const BLANK_PROJECT_FIELDS = ['projectedBeneficiaries', 'boardResolution', 'noticeOfAward', 'noticeToProceed',
-  ...['prepared', 'checked', 'noted', 'weeklyChecked', 'weeklyNoted'].flatMap(k => [`${k}ByName`, `${k}ByPosition`, `${k}ByOffice`]),
+  ...['prepared', 'checked', 'noted', 'weeklyChecked', 'weeklyNoted', 'billingPrepared', 'billingChecked', 'billingReviewed', 'billingRecommended'].flatMap(k => [`${k}ByName`, `${k}ByPosition`, `${k}ByOffice`]),
   'latestUpdatePhotoUrl', 'barChartJson'];
 
 /**
@@ -2374,13 +2374,20 @@ export const SIGNATORY_POSITIONS = {
 };
 export const SIGNATORY_OFFICES = ['Bulacan District Office', 'Region 3 Office'];
 
+/** Each signatories form's project fields (`<field>ByName` etc.) for the form's keys (`<key>Name` etc.). */
+const SIGNER_FIELDS = {
+  weekly: [['prepared', 'prepared'], ['weeklyChecked', 'checked'], ['weeklyNoted', 'noted']],
+  monthly: [['prepared', 'prepared'], ['checked', 'checked'], ['noted', 'noted']],
+  billing: [['billingPrepared', 'prepared'], ['billingChecked', 'checked'], ['billingReviewed', 'reviewed'], ['billingRecommended', 'recommended']],
+};
+
 /**
- * saveSignatories: the project fields that differ from `s`, a weekly or a monthly report's signatories as the form has
- * them (trimmed). Prepared by is shared; the weekly report has its own checker and noter. Empty when nothing differs.
+ * saveSignatories: the project fields that differ from `s`, the signatories as the form has them (trimmed), for `mode`
+ * 'weekly', 'monthly' or 'billing'. Prepared by is shared by the reports; the weekly report has its own checker and
+ * noter, and the billing abstract its own four signers. Empty when nothing differs.
  */
-export function signatoryFields(project, s, weekly) {
-  const [checked, noted] = weekly ? ['weeklyChecked', 'weeklyNoted'] : ['checked', 'noted'];
-  const all = [['prepared', 'prepared'], [checked, 'checked'], [noted, 'noted']].flatMap(([field, key]) =>
+export function signatoryFields(project, s, mode) {
+  const all = SIGNER_FIELDS[mode].flatMap(([field, key]) =>
     ['Name', 'Position', 'Office'].map(part => [`${field}By${part}`, String(s[`${key}${part}`] ?? '').trim()]));
   return Object.fromEntries(all.filter(([k, v]) => (project[k] ?? '') !== v));
 }

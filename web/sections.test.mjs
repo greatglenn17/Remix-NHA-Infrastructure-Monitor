@@ -501,7 +501,8 @@ test('billing abstract: each line as quantity, amount and share before, in this 
     { kind: 'part', name: 'LAND DEVELOPMENT' }, { kind: 'subtotal', amount: 2000000 }, { kind: 'part', name: 'HOUSING CONSTRUCTION' }, { kind: 'subtotal', amount: 7000000 }]) };
   const payments = [{ uuid: 'a', billingType: 'Land acquisition', grossAmount: 400000, date: '2025-02-01' }, { uuid: 'adv', billingType: '', grossAmount: 1500000, date: '2025-02-02' },
     { uuid: 'late', billingType: 'Land development', grossAmount: 99, date: '2025-03-15' }];
-  const signatories = { preparedName: 'Juan', preparedPosition: 'Engineer', checkedName: '', checkedPosition: 'District Manager', notedName: '', notedPosition: 'Regional Manager' };
+  const signatories = P.billingSignatories({ ...project, billingPreparedByName: 'Pedro Santos', billingPreparedByPosition: 'General Manager', billingPreparedByOffice: 'PS Builders',
+    billingReviewedByName: 'Rosa Diaz', checkedByName: 'Not Shown', notedByName: 'Lina Cruz' }, { name: 'Juan' });
   const sheet = period => P.billingAbstractHtml({ project, docs: [], payments, abstract, period, units: 100, signatories });
   const html = sheet({ covered: ' February 1 - 28, 2025 ', lots: 0, development: 15.5, m1: 0, m2: 0 });
   const row = (...cells) => new RegExp(cells.map(c => `>${c.replace(/[.()%]/g, '\\$&')}</td>`).join('<td[^>]*'));
@@ -527,7 +528,26 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   // The actual is the abstract's own, as on Print abstract, not the 7.10% billed to date.
   assert.match(html, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
   assert.match(html, /ADVANCE\/SLIPPAGE<\/td><td class='pc'>:<\/td><td>-1.27%/);
-  assert.match(html, /Approved by:/);
+  // Its own four signers in one row; the last title has no colon, as on the district's sheet.
+  assert.match(html, /<div class='keep'><table class='sig'><tr><td>Prepared by:<br><br><br><b>PEDRO SANTOS<\/b><div class='line'><\/div>General Manager<br>PS Builders<\/td>/);
+  assert.match(html, /<td>Checked by:<br><br><br><b>JUAN<\/b>.*<td>Reviewed by:<br><br><br><b>ROSA DIAZ<\/b>.*<td>Recommending Approval<br><br><br><b>LINA CRUZ<\/b><div class='line'><\/div>Regional Manager<br>Region 3 Office<\/td><\/tr><\/table>/);
+  assert.ok(!/Approved by|NOT SHOWN/.test(html));
+});
+
+test('billing abstract signatories: saved ones first, else the contractor, the signed-in engineer and the monthly report\'s checker and noter', () => {
+  const project = { contractor: 'ABC Builders', implementingOffice: 'NHA Bulacan', checkedByName: 'Rosa Diaz', notedByName: 'Lina Cruz', notedByPosition: 'Officer-in-Charge' };
+  assert.deepEqual(P.billingSignatories(project, { name: 'Juan', title: 'Principal Engineer C' }), {
+    preparedName: '', preparedPosition: '', preparedOffice: 'ABC Builders',
+    checkedName: 'Juan', checkedPosition: 'Principal Engineer C', checkedOffice: 'NHA Bulacan',
+    reviewedName: 'Rosa Diaz', reviewedPosition: 'District Manager', reviewedOffice: 'NHA Bulacan',
+    recommendedName: 'Lina Cruz', recommendedPosition: 'Officer-in-Charge', recommendedOffice: 'Region 3 Office',
+  });
+  const blank = P.billingSignatories({}, {});
+  assert.deepEqual([blank.checkedPosition, blank.checkedOffice, blank.reviewedOffice, blank.recommendedPosition],
+    ['Principal Engineer A', 'Bulacan District Office', 'Bulacan District Office', 'Regional Manager']);
+  const saved = P.billingSignatories({ ...project, billingCheckedByName: 'Ana Reyes', billingRecommendedByOffice: 'Main Office' }, { name: 'Juan' });
+  assert.equal(saved.checkedName, 'Ana Reyes');
+  assert.equal(saved.recommendedOffice, 'Main Office');
 });
 
 test('abstract of the actual work: the billing format\'s top with the tab\'s target, every row in the abstract\'s columns, then the signatures', () => {

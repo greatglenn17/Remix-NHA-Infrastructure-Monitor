@@ -202,9 +202,13 @@ function basicInfo(project, docs, label1, value1, label2, value2) {
 
 /** BlueBookForms.signatures. */
 function signatures(s, checkedTitle, notedTitle = 'Noted by') {
+  return signRow(s, [['Prepared by:', 'prepared'], [`${checkedTitle}:`, 'checked'], [`${notedTitle}:`, 'noted']]);
+}
+
+/** One row of signers, each [its title as printed, its key in `s`]: the title, the name in capitals over the line, the position and office. */
+function signRow(s, signers) {
   const office = name => ((name || '').trim() ? `<br>${esc(name.trim())}` : '');
-  const sign = (title, name, position, off) => `<td>${title}:<br><br><br><b>${esc((name || '').toUpperCase())}</b><div class='line'></div>${esc(position)}${office(off)}</td>`;
-  return `<table class='sig'><tr>${sign('Prepared by', s.preparedName, s.preparedPosition, s.preparedOffice)}${sign(checkedTitle, s.checkedName, s.checkedPosition, s.checkedOffice)}${sign(notedTitle, s.notedName, s.notedPosition, s.notedOffice)}</tr></table>`;
+  return `<table class='sig'><tr>${signers.map(([title, k]) => `<td>${title}<br><br><br><b>${esc((s[`${k}Name`] || '').toUpperCase())}</b><div class='line'></div>${esc(s[`${k}Position`])}${office(s[`${k}Office`])}</td>`).join('')}</tr></table>`;
 }
 
 /* ---------- The Abstract of Physical Accomplishment in the billing format (BlueBookForms.billingAbstract) ---------- */
@@ -219,7 +223,7 @@ const qty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigit
  * and amount, what was billed before, in this billing (`period`, the typed figures of L.billingAbstract) and to date
  * (quantity, amount, share of the line). `units` is the project's lots or housing units. Its target and actual are
  * the Print abstract's (actualAbstractHtml): the plan on the "As of" date and the abstract's own overall actual, not
- * what is billed. It has neither BALANCE nor equivalent-units columns.
+ * what is billed. It has neither BALANCE nor equivalent-units columns. Its signers are its own four (billingSignatories).
  */
 export function billingAbstractHtml({ project, docs, payments, abstract, period, units, signatories, banner }) {
   const { parts, targetPct } = L.billingAbstract(project, docs, payments, abstract, period, units), covered = String(period.covered ?? '').trim();
@@ -239,7 +243,7 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
       ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
       ${total('GRAND TOTAL', all)}
     </table>
-    <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
+    <div class='keep'>${signRow(signatories, [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval', 'recommended']])}</div>`;
 }
 
 /**
@@ -399,6 +403,24 @@ export function monthlySignatories(project, user) {
     checkedOffice: project.checkedByOffice || project.implementingOffice || 'Bulacan District Office',
     notedName: project.notedByName || '', notedPosition: project.notedByPosition || 'Regional Manager',
     notedOffice: project.notedByOffice || 'Region 3 Office',
+  };
+}
+
+/**
+ * The billing abstract's own four signers (`billing*` on the project): Prepared by the contractor, Checked by the
+ * signed-in engineer, then the monthly report's Checked by as Reviewed by and its Noted by as Recommending Approval.
+ */
+export function billingSignatories(project, user) {
+  const m = monthlySignatories(project, user);
+  return {
+    preparedName: project.billingPreparedByName || '', preparedPosition: project.billingPreparedByPosition || '',
+    preparedOffice: project.billingPreparedByOffice || project.contractor || '',
+    checkedName: project.billingCheckedByName || user.name || '', checkedPosition: project.billingCheckedByPosition || user.title || 'Principal Engineer A',
+    checkedOffice: project.billingCheckedByOffice || project.implementingOffice || 'Bulacan District Office',
+    reviewedName: project.billingReviewedByName || m.checkedName, reviewedPosition: project.billingReviewedByPosition || m.checkedPosition,
+    reviewedOffice: project.billingReviewedByOffice || m.checkedOffice,
+    recommendedName: project.billingRecommendedByName || m.notedName, recommendedPosition: project.billingRecommendedByPosition || m.notedPosition,
+    recommendedOffice: project.billingRecommendedByOffice || m.notedOffice,
   };
 }
 
