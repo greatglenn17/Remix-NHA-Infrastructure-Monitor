@@ -1,1 +1,8 @@
-{"versionCode":317,"versionName":"2.8.37","releaseNotes":"v2.8.37: The billing abstract prints its own four signatories (Prepared by, Checked by, Reviewed by, Recommending Approval), saved for the project.","apkDownloadUrl":"https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.37/NHA_Monitor_v2.8.37_Build317.apk","apkSha256":"411ac1fe83784269aa4971e1084637cfa6596e88d733f3ca10a34a141b4734dc","isMandatory":false}
+{
+  "versionCode": 317,
+  "versionName": "2.8.37",
+  "releaseNotes": "v2.8.37: The billing abstract prints its own four signatories (Prepared by, Checked by, Reviewed by, Recommending Approval), saved for the project.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.37/NHA_Monitor_v2.8.37_Build317.apk",
+  "apkSha256": "411ac1fe83784269aa4971e1084637cfa6596e88d733f3ca10a34a141b4734dc",
+  "isMandatory": false
+}
