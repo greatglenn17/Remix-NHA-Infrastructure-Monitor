@@ -207,6 +207,28 @@ object ProjectAbstracts {
     }
 
     /**
+     * The most each pay line's box takes this period, by row index ([rows] the source's): what is left of its QTY, in
+     * houses on a house line ([houses]), so typing more cannot pass the QTY. A line already past its QTY takes 0 more.
+     * A quantity is cut to 4 decimals, so its to date stays within the QTY; houses round, and a sliver left is 0.0001
+     * house, since the last house's 0.01 snap takes either to the QTY exactly.
+     */
+    fun nextMost(rows: List<AbstractExcel.Row>, units: Int): Map<Int, Double> {
+        val lines = houseLines(rows, units).toSet()
+        return rows.indices.filter { isPayLine(rows[it]) && (rows[it].qty ?: 0.0) > 0 }.associateWith { i ->
+            val qty = rows[i].qty!!
+            val left = maxOf(0.0, qty - (rows[i].toDate.getOrNull(0) ?: 0.0))
+            val h = left * units / qty
+            if (i in lines) (if (h > 0) maxOf(round4(h), 0.0001) else 0.0) else kotlin.math.floor(left * 1e4 + 1e-6) / 1e4
+        }
+    }
+
+    /** A box's [text], or [most] in its place when it is a number above [most], as the website's cappedBox. */
+    fun capped(text: String, most: Double?): String {
+        val n = text.replace(",", "").trim()
+        return if (most != null && Regex("""-?(\d+(\.\d*)?|\.\d+)""").matches(n) && n.toDouble() > most) java.math.BigDecimal.valueOf(most).stripTrailingZeros().toPlainString() else text
+    }
+
+    /**
      * The rows of the next abstract. [rows] are the source's, [typed] this period's quantity by row index (none typed
      * is no work this period). As on the sheet: PREVIOUS is the source's TO DATE; a pay line's THIS PERIOD amount is
      * the quantity at its unit cost and its % that amount over the line's amount; TO DATE is previous plus this

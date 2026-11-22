@@ -1725,6 +1725,17 @@ test('the next abstract takes housing construction items in houses: each house i
     assert.deepEqual([done.toDate[0], done.balance[0], errors], [qty, 0, []], `${qty}: ${houses}`);
   }
   assert.match(line(1000, [19, 19, 333])[1].join(), /would pass the quantity 1,000/); // past the units is still refused
+  // A box takes at most what is left: 1000 - 2 x 51.3514 sq.m is 332 houses, which gives the QTY; a land line in its own unit.
+  const two = [19, 19].reduce(done => L.nextAbstractRows(done, L.abstractHouses(done, { 1: 19 }, 370)), [head('part', '3', 'HOUSING CONSTRUCTION'), item('3.1', 'Soil poisoning', 1000, 'sq.m', 1)]);
+  assert.deepEqual(L.nextAbstractMost(two, 370), { 1: 332 });
+  assert.deepEqual(L.nextAbstractMost([{ ...rows[1], toDate: [90.5, 0, 0] }, { ...rows[1], toDate: [100, 0, 0] }], 370), { 0: 5.5, 1: 0 }); // already past its QTY: 0 more
+  assert.deepEqual(['400', '1,000', '332', '12.', '-5', 'abc', ''].map(t => L.cappedBox(t, 332)), ['332', '332', '332', '12.', '-5', 'abc', '']);
+  assert.equal(L.cappedBox('400', undefined), '400'); // not a pay line
+  // Past 4 decimals: a quantity is cut, so it saves; a sliver of a house is still typed, and the snap ends it at the QTY.
+  const fine = [{ ...rows[1], qty: 1.23456 }], sliver = [head('part', '3', 'HOUSING CONSTRUCTION'), { ...item('3.1', 'Soil poisoning', 3408, 'sq.m', 1), toDate: [3407.999, 0, 0] }];
+  assert.deepEqual([L.nextAbstractMost(fine, 370), L.nextAbstractErrors(fine, { 0: 1.2345 })], [{ 0: 1.2345 }, []]);
+  assert.deepEqual(L.nextAbstractMost(sliver, 120), { 1: 0.0001 });
+  assert.equal(L.nextAbstractRows(sliver, L.abstractHouses(sliver, { 1: 0.0001 }, 120))[1].toDate[0], 3408);
   // A box left as it opened keeps its saved quantity: 1000 sq.m opens as 35.2113 houses, which would be 1,000.0009.
   const opened = { 3: ['35.2113', 1000] };
   assert.deepEqual({ ...L.abstractHouses(rows, { 3: 35.2113 }, 370), ...L.untouchedQuantities({ 3: '35.2113' }, opened) }, { 3: 1000 });

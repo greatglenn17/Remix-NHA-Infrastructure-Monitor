@@ -211,6 +211,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
     val source = found.source.takeIf { found.error.isEmpty() }
     val rows = remember(source?.rowsJson) { source?.let { ProjectAbstracts.rows(it.rowsJson) }.orEmpty() }
     val houses = remember(rows, units) { ProjectAbstracts.houseLines(rows, units).toSet() }
+    // What is left of each item's QTY: a box takes no more, so the to date never passes it.
+    val most = remember(rows, units) { ProjectAbstracts.nextMost(rows, units) }
     // This period's quantities of the abstract already filed for the date, which the boxes start from.
     val saved = remember(rows, found.same) { ProjectAbstracts.nextTyped(rows, found.same) }
     // What is typed, as text by row index, and what the boxes started from.
@@ -275,7 +277,7 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                         OutlinedTextField(
-                                            value = text[i].orEmpty(), onValueChange = { text = text + (i to it) }, label = { Text(if (i in houses) "Houses this period" else "This period") }, singleLine = true,
+                                            value = text[i].orEmpty(), onValueChange = { text = text + (i to ProjectAbstracts.capped(it, most[i])) }, label = { Text(if (i in houses) "Houses this period" else "This period") }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f).testTag("next_period_$i")
                                         )
                                         Text(

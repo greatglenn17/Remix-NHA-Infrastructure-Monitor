@@ -362,6 +362,21 @@ class ProjectAbstractsTest {
             assertEquals("$qty: $houses", listOf(qty, 0.0, emptyList<String>()), listOf(done.toDate[0], done.balance[0], errors))
         }
         assertTrue(ended(1000.0, listOf(19.0, 19.0, 333.0)).second.single().contains("would pass the quantity 1,000")) // past the units is still refused
+        // A box takes at most what is left: 1000 - 2 x 51.3514 sq.m is 332 houses, which gives the QTY; a land line in its own unit.
+        val two = listOf(19.0, 19.0).fold(listOf(head("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", 1000.0, "sq.m", 1.0, listOf(0.0, 0.0, 0.0)))) { done, h ->
+            ProjectAbstracts.nextRows(done, ProjectAbstracts.houses(done, mapOf(1 to h), 370))
+        }
+        assertEquals(mapOf(1 to 332.0), ProjectAbstracts.nextMost(two, 370))
+        assertEquals(mapOf(0 to 5.5, 1 to 0.0), ProjectAbstracts.nextMost(listOf(rows[1].copy(toDate = listOf(90.5, 0.0, 0.0)), rows[1].copy(toDate = listOf(100.0, 0.0, 0.0))), 370)) // already past its QTY: 0 more
+        assertEquals(listOf("332", "332", "332", "12.", "-5", "abc", ""), listOf("400", "1,000", "332", "12.", "-5", "abc", "").map { ProjectAbstracts.capped(it, 332.0) })
+        assertEquals("400", ProjectAbstracts.capped("400", null)) // not a pay line
+        // Past 4 decimals: a quantity is cut, so it saves; a sliver of a house is still typed, and the snap ends it at the QTY.
+        val fine = listOf(rows[1].copy(qty = 1.23456))
+        assertEquals(mapOf(0 to 1.2345), ProjectAbstracts.nextMost(fine, 370))
+        assertEquals(emptyList<String>(), ProjectAbstracts.nextErrors(fine, mapOf(0 to 1.2345)))
+        val sliver = listOf(head("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", 3408.0, "sq.m", 1.0, listOf(3407.999, 0.0, 0.0)))
+        assertEquals(mapOf(1 to 0.0001), ProjectAbstracts.nextMost(sliver, 120))
+        assertEquals(3408.0, ProjectAbstracts.nextRows(sliver, ProjectAbstracts.houses(sliver, mapOf(1 to 0.0001), 120))[1].toDate[0])
     }
 
     @Test fun next_abstract_continues_the_latest_one_dated_before_it() {
