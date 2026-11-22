@@ -1967,6 +1967,32 @@ export function nextAbstractTyped(sourceRows, same) {
 }
 
 /**
+ * ProjectAbstracts.houseLines: the indexes of the pay lines of a Housing Construction part, which the New abstract
+ * takes in houses; none when `units`, the project's housing units, is only the fallback 1 (L.abstractUnits).
+ */
+export function abstractHouseLines(rows, units) {
+  let line = '';
+  return units > 1 ? rows.flatMap((r, i) => { if (r.kind === 'part') line = accomplishmentLine(r.name); return line === ACCOMPLISHMENT_LINES[2] && isPayLine(r) ? [i] : []; }) : [];
+}
+
+/**
+ * ProjectAbstracts.houses: `typed` (by row index, `rows` the source's) with each house line's houses this period as
+ * its quantity, each house QTY / `units`. It is worked from the houses to date, so the last house gives the QTY
+ * exactly however the abstracts before it rounded: the to date is the houses to date x QTY / `units` at 4 decimals,
+ * the QTY itself within 0.01 house of `units`, and this period the to date less the previous. `back` turns this
+ * period's quantities into houses. The rest, 0 and a NaN (a box that is not a number) stay.
+ */
+export function abstractHouses(rows, typed, units, back = false) {
+  const houses = new Set(abstractHouseLines(rows, units));
+  const quantity = (r, v) => { const prev = Number(r.toDate?.[0]) || 0; return round4((Math.abs(prev * units / r.qty + v - units) < 0.01 ? r.qty : round4(prev + v * r.qty / units)) - prev); };
+  return Object.fromEntries(Object.entries(typed).map(([i, v]) => [i, !houses.has(Number(i)) || !v || !Number.isFinite(v) ? v : back ? round4(v * units / rows[i].qty) : quantity(rows[i], v)]));
+}
+
+/** The saved quantities (`opened`: [box text, quantity] by row index) of the boxes whose `text` is still what they opened with, which are saved as they were. */
+export const untouchedQuantities = (text, opened) => Object.fromEntries(Object.entries(opened ?? {})
+  .filter(([i, o]) => Array.isArray(o) && typeof o[0] === 'string' && text[i] === o[0] && Number.isFinite(o[1])).map(([i, o]) => [i, o[1]]));
+
+/**
  * ProjectAbstracts.nextRows: the rows of the next abstract. `rows` are the source's, `typed` this period's quantity
  * by row index (none typed is no work this period). As on the sheet: PREVIOUS is the source's TO DATE; a pay line's
  * THIS PERIOD amount is the quantity at its unit cost and its % that amount over the line's amount; TO DATE is
@@ -2080,12 +2106,12 @@ export const abstractUndoneNote = ({ rec, changes }) => `Undid the last save. Th
  * The New abstract form (page.next) as the draft the browser keeps: its date, what it continues and what is typed.
  * null, so nothing is kept, until a quantity is typed here (`kept`) and while every box is empty.
  */
-export const nextAbstractDraft = next => (next.kept && Object.values(next.text).some(t => String(t).trim() !== '') ? { asOf: next.asOf, from: next.from, text: next.text } : null);
+export const nextAbstractDraft = next => (next.kept && Object.values(next.text).some(t => String(t).trim() !== '') ? { asOf: next.asOf, from: next.from, text: next.text, opened: next.opened ?? {} } : null);
 
 /** A kept draft's text as the form to continue (page.next); null when it is not one. */
 export function keptNextAbstract(kept) {
   const d = keptObject(kept);
-  return d && typeof d.asOf === 'string' && keptObject(JSON.stringify(d.text ?? null)) ? { asOf: d.asOf, from: String(d.from ?? ''), text: d.text, kept: true } : null;
+  return d && typeof d.asOf === 'string' && keptObject(JSON.stringify(d.text ?? null)) ? { asOf: d.asOf, from: String(d.from ?? ''), text: d.text, opened: keptObject(JSON.stringify(d.opened ?? null)) ?? {}, kept: true } : null;
 }
 
 /** FormValidation.percentError's reading: blank is 0, else 0 to 100; NaN for anything else. */

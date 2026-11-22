@@ -197,11 +197,12 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
 /**
  * "New abstract": the next abstract, made here from the one before it ([ProjectAbstracts.nextSource]). The engineer
  * picks the "As of" date and types each pay item's quantity for this period; previous, to date, the amounts and the
- * percentages are computed ([ProjectAbstracts.nextRows]). [onSave] gets the record and
+ * percentages are computed ([ProjectAbstracts.nextRows]). A housing construction item takes the number of houses
+ * instead, each house its QTY ÷ [units] ([ProjectAbstracts.houses]). [onSave] gets the record and
  * whether it replaces the abstract already filed for its date.
  */
 @Composable
-private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, today: LocalDate, onDismiss: () -> Unit, onSave: (ProjectAbstract, Boolean) -> Unit) {
+private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, units: Int, today: LocalDate, onDismiss: () -> Unit, onSave: (ProjectAbstract, Boolean) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     // Saved: a turn of the phone must not lose the quantities typed so far.
     var asOf by rememberSaveable { mutableStateOf(today.toString()) }
@@ -209,22 +210,27 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
     // The abstract this one continues; none while the date cannot be used.
     val source = found.source.takeIf { found.error.isEmpty() }
     val rows = remember(source?.rowsJson) { source?.let { ProjectAbstracts.rows(it.rowsJson) }.orEmpty() }
+    val houses = remember(rows, units) { ProjectAbstracts.houseLines(rows, units).toSet() }
+    // This period's quantities of the abstract already filed for the date, which the boxes start from.
+    val saved = remember(rows, found.same) { ProjectAbstracts.nextTyped(rows, found.same) }
     // What is typed, as text by row index, and what the boxes started from.
     var text by rememberSaveable { mutableStateOf(emptyMap<Int, String>()) }
     var started by rememberSaveable { mutableStateOf(emptyMap<Int, String>()) }
     var from by rememberSaveable { mutableStateOf("") }
-    // Another abstract to continue, or a date that already has one, starts from what that date has; any other date keeps what was typed.
-    val key = "${source?.uuid}|${found.same?.uuid}"
+    // Another abstract to continue, a date that already has one, or other housing units start from what that date has; any other date keeps what was typed.
+    val key = "${source?.uuid}|${found.same?.uuid}|$units"
     if (rows.isNotEmpty() && from != key) {
         from = key
-        started = ProjectAbstracts.nextTyped(rows, found.same).mapValues { java.math.BigDecimal.valueOf(it.value).stripTrailingZeros().toPlainString() }
+        started = ProjectAbstracts.houses(rows, saved, units, back = true).mapValues { java.math.BigDecimal.valueOf(it.value).stripTrailingZeros().toPlainString() }
         text = started
     }
     // A blank box is not typed; text that is not a number is NaN, which nextErrors names.
     val filled = text.filterValues { it.isNotBlank() }
     // A plain decimal with commas allowed, as on the website (its typedQuantities).
     val typed = filled.mapValues { (_, t) -> t.replace(",", "").trim().takeIf { Regex("""-?(\d+(\.\d*)?|\.\d+)""").matches(it) }?.toDouble() ?: Double.NaN }
-    val computed = ProjectAbstracts.nextRows(rows, typed, source?.equivUnits ?: 0.0)
+    // The houses typed for the housing construction items as their quantities; a house box left as it started keeps its saved quantity exactly.
+    val quantities = ProjectAbstracts.houses(rows, typed, units) + saved.filterKeys { it in houses && text[it] == started[it] }
+    val computed = ProjectAbstracts.nextRows(rows, quantities, source?.equivUnits ?: 0.0)
     var problems by remember { mutableStateOf("") }
     var asking by remember { mutableStateOf<ProjectAbstract?>(null) }
     val close = rememberDiscardGuard(filled != started, onDismiss)
@@ -247,7 +253,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                 LazyColumn(Modifier.weight(1f, fill = false).testTag("new_abstract_rows"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         Text(
-                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.",
+                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed." +
+                                if (houses.isEmpty()) "" else " Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ ${ProjectAbstracts.quantityText(units.toDouble())}, the project's housing units.",
                             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
                         )
                     }
@@ -268,7 +275,7 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                         OutlinedTextField(
-                                            value = text[i].orEmpty(), onValueChange = { text = text + (i to it) }, label = { Text("This period") }, singleLine = true,
+                                            value = text[i].orEmpty(), onValueChange = { text = text + (i to it) }, label = { Text(if (i in houses) "Houses this period" else "This period") }, singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f).testTag("next_period_$i")
                                         )
                                         Text(
@@ -276,6 +283,11 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                                             fontWeight = FontWeight.SemiBold, color = scheme.onSurface, modifier = Modifier.weight(1f).testTag("next_done_$i")
                                         )
                                     }
+                                    // The houses typed as the item's own quantity, as on the website: "houses × 28.4 = 3,408 sq.m".
+                                    if (i in houses) Text(
+                                        "houses × ${ProjectAbstracts.quantityText((row.qty ?: 0.0) / units)} = ${quantities[i]?.let { if (it.isFinite()) ProjectAbstracts.quantityText(it) else "–" } ?: "0"} ${row.unit}",
+                                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.testTag("next_houses_$i")
+                                    )
                                 }
                             }
                             row.kind == "part" || row.kind == "group" -> item(key = i) {
@@ -291,7 +303,7 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
             Button(
                 shape = MaterialTheme.shapes.small, enabled = source != null,
                 onClick = {
-                    val errors = ProjectAbstracts.nextErrors(rows, typed)
+                    val errors = ProjectAbstracts.nextErrors(rows, quantities)
                     if (errors.isNotEmpty()) problems = errors.take(3).joinToString(" ") + if (errors.size > 3) " And ${errors.size - 3} more." else ""
                     else source?.let { ProjectAbstracts.nextRecord(it, computed, asOf, madeBy) }?.let { if (found.same != null) asking = it else onSave(it, false) }
                 },
@@ -352,7 +364,7 @@ fun ActualAccomplishmentSection(
         noteIsError = false
         note = "${if (replaced) "Replaced" else "Saved"} the abstract as of ${ProjectAbstracts.summary(record)}."
     }
-    if (making) NewAbstractDialog(abstracts, uploadedBy, today, onDismiss = { making = false }) { record, replaced -> making = false; save(record, replaced) }
+    if (making) NewAbstractDialog(abstracts, uploadedBy, units, today, onDismiss = { making = false }) { record, replaced -> making = false; save(record, replaced) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
