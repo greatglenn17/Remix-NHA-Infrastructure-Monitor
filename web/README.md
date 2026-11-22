@@ -58,7 +58,9 @@ is read only.
   (`P.billingAbstractHtml`, the phone's `BlueBookForms.billingAbstract`), a landscape A4 sheet with each line (1 land
   acquisition, 2 land development, 3.1 Milestone 1 at 80% and 3.2 Milestone 2 at 20% of housing) as its contract
   quantity, unit cost and amount, what was billed before, in this billing and to date as quantity, amount and share,
-  subtotals and the grand total. It has neither BALANCE nor equivalent-units columns. Its figures (`L.billingAbstract`,
+  subtotals and the grand total. It has neither BALANCE nor equivalent-units columns. It is signed by its own four
+  (`P.billingSignatories`, the project's `billing*` fields): Prepared by, Checked by, Reviewed by and Recommending
+  Approval. Its figures (`L.billingAbstract`,
   the phone's `BillingAbstract.of`):
   - **The part amounts** are the uploaded abstract's own, its parts' contract amounts by accomplishment line
     (`L.abstractLineAmounts`), not the bar chart's or the Scope of Works'. A line without an amount is left out.
@@ -372,7 +374,10 @@ is read only.
   (`P.weeklySignatories`, `P.monthlySignatories`). Save writes the fields that differ to the project
   (`L.signatoryFields`), one revision up, with the app's "Project Edit" audit entry, and the sheet redraws. Prepared
   by is shared by both reports; the weekly report has its own checker and noter. The phone asks for them each time
-  it prints and saves them then; here they are saved with the button, and a viewer prints what is saved.
+  it prints and saves them then; here they are saved with the button, and a viewer prints what is saved. On the
+  billing abstract's print page the form is "Billing abstract signatories": Prepared by (the contractor's, typed),
+  Checked by, Reviewed by and Recommending Approval, saved only to the project's `billing*` fields; blank, they are
+  the contractor, the signed-in engineer and the monthly report's Checked by and Noted by.
 - **Recommendations** on a monthly report's print page, for the people who can edit the project, is the text printed
   under VIII. Recommendations. It is kept in the month's `monthly_reports` record, which the phones print from too:
   the first save makes the record as the app's `submitMonthlyReport` does (`L.newMonthlyRecord`: the month's last
