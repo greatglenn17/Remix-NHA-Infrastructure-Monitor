@@ -17,7 +17,7 @@ import java.util.Locale
  * The Abstract of Physical Accomplishment the contractor attaches before a billing (the district's billing format),
  * printed from an uploaded abstract on the Actual Accomplishment tab, and the rule that what is billed never passes
  * the work done. web/logic.js has the website's copy (latestWeekly, partAmounts, billingAheadErrors, abstractUnits,
- * billingAbstract); change both together.
+ * billingAbstract, unitsStanding); change both together.
  */
 object BillingAbstract {
     private fun round2(v: Double) = Math.round(v * 100) / 100.0
@@ -106,8 +106,7 @@ object BillingAbstract {
     fun of(project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, abstract: ProjectAbstract, period: Period, units: Int): Abstract {
         val (acquisition, development, housing) = ProjectAbstracts.lineAmounts(abstract)
         val asOf = day(abstract.asOf)
-        // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
-        val before = payments.filter { p -> day(p.date)?.let { asOf != null && !it.isAfter(asOf) } == true }
+        val before = billedBy(payments, abstract.asOf)
         fun line(no: String, name: String, unit: String, type: String, amount: Double, thisPeriod: Double) = Line(
             no, name, unit, type, amount,
             previous = round2(before.filter { it.billingType == type }.sumOf { it.grossAmount }),
@@ -126,6 +125,41 @@ object BillingAbstract {
                     counted("3.2", "MILESTONE 2 (20%)", "UNIT", HOUSING_BILLING_TYPES[3], round2(housing - m1), period.m2)
                 ))
             ).filter { part -> part.lines.any { it.amount > 0 } }
+        )
+    }
+
+    // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
+    private fun billedBy(payments: List<ProjectPayment>, asOf: String): List<ProjectPayment> =
+        day(asOf).let { last -> payments.filter { p -> day(p.date)?.let { last != null && !it.isAfter(last) } == true } }
+
+    /** A line of the Actual tab's "In lots and units" table: [contract] lots or units, those the work [done] to date is worth, those [billed], and the whole ones that [canBill]. */
+    data class UnitsRow(val name: String, val unit: String, val contract: Int, val done: Double, val billed: Double, val canBill: Int)
+
+    /**
+     * The abstract's to-date work in lots and units, at the billing abstract's unit costs (each line's amount / [units]),
+     * shown on the tab and never printed. Housing's work fills Milestone 1 before Milestone 2. Billed is the gross of
+     * the saved billings of each type: all of them for the latest of [abstracts], for an older one those dated on or
+     * before its "As of" date (as [of]'s previous). A line without an amount is left out.
+     */
+    fun inUnits(abstract: ProjectAbstract, abstracts: List<ProjectAbstract>, payments: List<ProjectPayment>, units: Int): List<UnitsRow> {
+        val (acquisition, development, housing) = ProjectAbstracts.lineAmounts(abstract)
+        val (acquired, developed, built) = ProjectAbstracts.toDateAmounts(abstract)
+        val counted = if (abstracts.any { it.asOf > abstract.asOf }) billedBy(payments, abstract.asOf) else payments
+        val m1 = round2(housing * 0.8)
+        val h = built.coerceAtMost(housing).coerceAtLeast(0.0)
+        fun row(name: String, unit: String, type: String, amount: Double, done: Double): UnitsRow? {
+            if (amount <= 0) return null
+            val each = amount / units
+            val doneAmount = done.coerceIn(0.0, amount)
+            val billed = counted.filter { it.billingType == type }.sumOf { it.grossAmount }
+            // The 1e-6 keeps a whole count that floating point puts a hair under it.
+            return UnitsRow(name, unit, units, round2(doneAmount / each), round2(billed / each), Math.floor((doneAmount - billed) / each + 1e-6).toInt().coerceAtLeast(0))
+        }
+        return listOfNotNull(
+            row("Land acquisition", "lots", HOUSING_BILLING_TYPES[0], acquisition, acquired),
+            row("Land development", "lots", HOUSING_BILLING_TYPES[1], development, developed),
+            row("Milestone 1 (80%)", "units", HOUSING_BILLING_TYPES[2], m1, minOf(h, m1)),
+            row("Milestone 2 (20%)", "units", HOUSING_BILLING_TYPES[3], round2(housing - m1), h - m1)
         )
     }
 }
