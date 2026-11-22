@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import com.example.data.model.AppThemeMode
 import com.example.data.model.Project
 import com.example.data.model.ProjectAbstract
+import com.example.data.model.ProjectPayment
 import com.example.data.model.WeeklyReport
 import com.example.ui.detail.ProjectSection
 import com.example.ui.detail.ProjectSectionTabs
@@ -98,6 +100,7 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithText("2  LAND DEVELOPMENT").assertExists()
         rule.onNodeWithText("Amount 2,000,000.00 · To date 25.21%").assertExists()
         // The pay items are a table of the sheet's columns, under their headings; an empty cell is blank.
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("abstract_row_1")) // under the lots and units it is below the screen
         listOf("ITEM DESCRIPTION", "THIS PERIOD", "TO DATE").forEach { rule.onAllNodesWithText(it).onFirst().assertExists() } // each open part has its own headings
         rule.onAllNodesWithText("BALANCE").assertCountEquals(0) // the table ends at TO DATE, as on the website and the printed abstracts
         rule.onNodeWithTag("abstract_row_1").assert(hasText("2.1.1")).assert(hasText("Mobilization/Demobilization")).assert(hasText("l.s."))
@@ -108,6 +111,7 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithTag("abstract_row_1").assertDoesNotExist()
         rule.onNodeWithTag("abstract_row_2").assertDoesNotExist()
         rule.onNodeWithTag("abstract_row_5").assert(hasText("GRAND TOTAL")).assert(hasText("1,074,000.00")) // the grand total stays in sight
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("section_chip_Feb 14, 2025"))
         rule.onNodeWithTag("upload_abstract").assertExists()
         rule.onNodeWithTag("delete_abstract").assertExists()
         // An earlier date can be picked.
@@ -121,6 +125,39 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithTag("upload_abstract").assertDoesNotExist()
     }
 
+    // The work done in lots and units, at the billing abstract's unit costs of 100 units: on the screen, never printed.
+    @Config(qualifiers = "w360dp-h640dp")
+    @Test fun tab_showsTheWorkDoneInLotsAndUnits() {
+        val billed = ProjectPayment(
+            projectId = 1, name = "Billing 1", date = "2025-03-01", periodCovered = "", grossAmount = 300_000.0, percentage = 0.0,
+            balanceAmount = 0.0, balancePercentage = 0.0, billingType = "Land development"
+        )
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                ActualAccomplishmentSection(
+                    project, emptyList(), listOf(abstract.copy(id = 2, asOf = "2025-02-14", uuid = "older"), abstract), "", null, null, {}, { _, _ -> },
+                    payments = listOf(billed), units = 100
+                )
+            }
+        }
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("units_table"))
+        // Land development: 504,000 done of 20,000 a lot, 300,000 billed; Milestone 1: 70,000 done of 56,000 a unit.
+        rule.onNodeWithTag("standing_Land development, 100 lots").assert(hasText("25.2")).assert(hasText("15")).assert(hasText("10"))
+        rule.onNodeWithTag("standing_Milestone 1 (80%), 100 units").assert(hasText("1.25")).assert(hasText("0")).assert(hasText("1"))
+        rule.onNodeWithTag("standing_Land acquisition, 100 lots").assertDoesNotExist() // the abstract has no land acquisition
+        rule.onNodeWithText("At the billing abstract's unit costs (each line's amount ÷ 100). Billed: every saved billing. Not printed.").assertExists()
+        // The older abstract counts only the billings dated up to its As of date.
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("section_chip_Feb 14, 2025"))
+        rule.onNodeWithTag("section_chip_Feb 14, 2025").performClick()
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("units_table"))
+        rule.onNodeWithTag("standing_Land development, 100 lots").assert(hasText("25.2")).assert(hasText("0")).assert(hasText("25"))
+        rule.onNodeWithText("At the billing abstract's unit costs (each line's amount ÷ 100). Billed: the billings dated up to Feb 14, 2025. Not printed.").assertExists()
+        // Not in the Monthly view.
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("section_chip_Monthly"))
+        rule.onNodeWithTag("section_chip_Monthly").performClick()
+        rule.onNodeWithTag("units_table").assertDoesNotExist()
+    }
+
     // "Print billing abstract": this billing's figures are typed, land development in lots and not started from the abstract's own this-period amount.
     @Test fun tab_printsTheBillingAbstractFromTheTypedFigures() {
         val withPeriod = abstract.copy(rowsJson = abstract.rowsJson.replace(""""period":[null,null,null],"toDate":[null,504000,25.21]""", """"period":[null,104000,5.2],"toDate":[null,504000,25.21]"""))
@@ -131,7 +168,7 @@ class ActualAccomplishmentUiTest {
             }
         }
         rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("print_billing_abstract")) // under the Weekly | Monthly chips it is below the small screen
-        rule.onNodeWithTag("print_billing_abstract").performClick()
+        rule.onNodeWithTag("print_billing_abstract").performScrollTo().performClick() // the card is taller than the small screen
         rule.onNodeWithText("This billing").assertExists()
         rule.onNodeWithText("Previous is what the billings saved up to Mar 14, 2025 came to. Nothing typed here is saved.").assertExists()
         rule.onNodeWithTag("billing_lots").assertDoesNotExist() // the abstract has no land acquisition
@@ -283,8 +320,9 @@ class ActualAccomplishmentUiTest {
     @Config(qualifiers = "w320dp-h891dp")
     @Test fun billingDialog_opensOverThePayItemsTable() {
         rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ActualAccomplishmentSection(project, emptyList(), listOf(first), "", null, null, {}, { _, _ -> }) } }
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("abstract_row_0")) // under the lots and units
         rule.onNodeWithTag("abstract_row_0").assertIsDisplayed()
-        rule.onNodeWithTag("print_billing_abstract").performClick()
+        rule.onNodeWithTag("print_billing_abstract").assertIsDisplayed().performClick()
         rule.onNodeWithText("This billing").assertExists()
     }
 

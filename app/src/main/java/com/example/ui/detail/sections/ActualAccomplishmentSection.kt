@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.data.model.ProjectAbstract
+import com.example.data.model.ProjectPayment
 import com.example.ui.components.DateField
 import com.example.ui.components.rememberDiscardGuard
 import com.example.ui.theme.figures
@@ -304,7 +305,9 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
 /**
  * Actual Accomplishment: the uploaded Abstracts of Physical Accomplishment of the actual work, each kept under its
  * "As of" date; the latest is the project's actual. Shows the chosen one's target, actual and advance/slippage by
- * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]), then every pay item in a table of
+ * line ([ProjectAbstracts.standing], from [project]'s bar chart and [documents]) and, under it, its work in lots and
+ * units ([BillingAbstract.inUnits], from the saved billings [payments] and the project's [units]; on the screen only,
+ * never on a printed sheet, and not in Monthly), then every pay item in a table of
  * the sheet's columns, as the website's: it scrolls sideways, and each part folds. Two sheets print from it: "Print abstract" ([onPrintAbstract]) is the detailed one of the actual work;
  * "Print billing abstract" takes this billing's figures, then [onPrintBilling] prints the billing format.
  * "New abstract" makes the next one here from the latest ([NewAbstractDialog]), its date starting at [today].
@@ -323,7 +326,9 @@ fun ActualAccomplishmentSection(
     onDelete: ((ProjectAbstract) -> Unit)?,
     onPrintAbstract: (ProjectAbstract) -> Unit,
     onPrintBilling: (ProjectAbstract, BillingAbstract.Period) -> Unit,
-    today: LocalDate = LocalDate.now()
+    today: LocalDate = LocalDate.now(),
+    payments: List<ProjectPayment> = emptyList(),
+    units: Int = 1
 ) {
     val projectId = project.id
     val scheme = MaterialTheme.colorScheme
@@ -460,6 +465,19 @@ fun ActualAccomplishmentSection(
                 StandingRow("", listOf("Target", "Actual", "+/-"), header = true)
                 remember(project, documents, viewed) { ProjectAbstracts.standing(project, documents, viewed) }.forEach { row ->
                     StandingRow(row.name, listOf(row.target?.let(ProjectAbstracts::pct) ?: "-", ProjectAbstracts.pct(row.actual), ProjectAbstracts.diffText(row.diff)))
+                }
+                val inUnits = remember(viewed, abstracts, payments, units) { BillingAbstract.inUnits(viewed, abstracts, payments, units) }
+                if (!inMonthly && inUnits.isNotEmpty()) Column(Modifier.padding(top = 8.dp).testTag("units_table")) {
+                    // The contract's lots or units go with the name: a fifth column cuts "Contract" in two on a 360dp phone.
+                    StandingRow("In lots and units", listOf("Done to date", "Billed", "Can still bill"), header = true)
+                    inUnits.forEach { row ->
+                        StandingRow("${row.name}, ${row.contract} ${row.unit}", listOf(ProjectAbstracts.quantityText(row.done), ProjectAbstracts.quantityText(row.billed), "${row.canBill}"))
+                    }
+                    val billed = if (abstracts.any { it.asOf > viewed.asOf }) "the billings dated up to ${ProjectSchedule.displayDate(viewed.asOf)}" else "every saved billing"
+                    Text(
+                        "At the billing abstract's unit costs (each line's amount ÷ $units). Billed: $billed. Not printed.",
+                        style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
                 // The month's abstract is not a record: it has no file, no maker and no billing.
                 if (!inMonthly) {

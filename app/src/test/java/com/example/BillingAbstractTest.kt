@@ -173,6 +173,45 @@ class BillingAbstractTest {
         assertEquals(listOf("Land Development"), BillingAbstract.of(project, emptyList(), payments, land, period, 100).parts.map { it.name })
     }
 
+    // The Actual tab's "In lots and units" (web/logic.test.mjs "unitsStanding"): 370 units at the real billing abstract's unit costs.
+    private fun toDate(kind: String, name: String, amount: Double, done: Double) = row(kind, "", name, amount).copy(toDate = listOf(null, done, null))
+    private fun worked(housingDone: Double = 100_000_000.0, asOf: String = "2025-03-14") = uploaded.copy(asOf = asOf, rowsJson = ProjectAbstracts.rowsJson(listOf(
+        row("part", "1", "LAND ACQUISITION COST"), toDate("subtotal", "Subtotal (Land Acquisition Cost)", 26_235_612.20, 26_235_612.20),
+        row("part", "2", "LAND DEVELOPMENT"), toDate("subtotal", "Subtotal (Land Development)", 31_820_000.0, 15_910_000.0),
+        row("part", "3", "HOUSING CONSTRUCTION"), toDate("subtotal", "Subtotal (Housing Construction)", 228_766_486.0, housingDone)
+    )))
+    private val unitBillings = listOf(
+        billing(11, "Land acquisition", 26_235_612.20, "2025-01-10"), billing(12, "Land development", 86_000.0 * 150, "2025-02-10"),
+        billing(13, "M1 - Housing unit", 494_630.24 * 150, "2025-03-20")
+    )
+    private fun units(rows: List<BillingAbstract.UnitsRow>) = rows.map { listOf(it.name, it.unit, it.contract, it.done, it.billed, it.canBill) }
+
+    @Test fun theAbstractInLotsAndUnits() {
+        val abstract = worked()
+        assertEquals(listOf(26_235_612.20, 15_910_000.0, 100_000_000.0), ProjectAbstracts.toDateAmounts(abstract))
+        assertEquals(
+            listOf(
+                listOf("Land acquisition", "lots", 370, 370.0, 370.0, 0),
+                listOf("Land development", "lots", 370, 185.0, 150.0, 35),
+                listOf("Milestone 1 (80%)", "units", 370, 202.17, 150.0, 52),
+                listOf("Milestone 2 (20%)", "units", 370, 0.0, 0.0, 0)
+            ),
+            units(BillingAbstract.inUnits(abstract, listOf(abstract), unitBillings, 370))
+        )
+        // Housing past Milestone 1 fills it, and the rest is Milestone 2's.
+        val built = BillingAbstract.inUnits(worked(200_000_000.0), emptyList(), emptyList(), 370)
+        assertEquals(listOf(370.0, 137.37), built.drop(2).map { it.done })
+        assertEquals(listOf(370, 137), built.drop(2).map { it.canBill })
+        // An older abstract counts only the billings dated up to its As of date: Milestone 1's of March 20 is not.
+        val older = worked(asOf = "2025-03-01")
+        assertEquals(listOf(370.0, 150.0, 0.0, 0.0), BillingAbstract.inUnits(older, listOf(older, abstract), unitBillings, 370).map { it.billed })
+        assertEquals(202, BillingAbstract.inUnits(older, listOf(older, abstract), unitBillings, 370)[2].canBill)
+        // A project without housing has only the land lines; one without amounts, none.
+        val land = abstract.copy(rowsJson = ProjectAbstracts.rowsJson(ProjectAbstracts.rows(abstract.rowsJson).take(4)))
+        assertEquals(listOf("Land acquisition", "Land development"), BillingAbstract.inUnits(land, listOf(land), unitBillings, 370).map { it.name })
+        assertEquals(emptyList<BillingAbstract.UnitsRow>(), BillingAbstract.inUnits(abstract.copy(rowsJson = "[]"), emptyList(), unitBillings, 370))
+    }
+
     @Test fun printsEachLineBeforeInThisBillingAndToDate() {
         // The uploaded abstract gives the part amounts; the billing of March 15 is after its As-of date, so it is not in "previous".
         val abstract = uploaded.copy(equivUnits = 100.0, rowsJson = ProjectAbstracts.rowsJson(rows.map { if (it.kind == "subtotal") it.copy(equiv = listOf(1.0, 2.0, 3.0)) else it }))

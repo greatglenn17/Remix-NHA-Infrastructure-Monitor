@@ -1590,9 +1590,7 @@ export const abstractUnits = (project, saleable = 0) => Number.parseInt(String(p
  * that is not a number above 0 counts as 0. `targetPct` is the plan on the "As of" date.
  */
 export function billingAbstract(project, docs, payments, abstract, period, units) {
-  const [acquisition, development, housing] = abstractLineAmounts(abstract), asOf = isoDay(abstract.asOf);
-  // A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted.
-  const before = payments.filter(p => { const day = isoDay(p.date); return day != null && asOf != null && day <= asOf; });
+  const [acquisition, development, housing] = abstractLineAmounts(abstract), before = billingsUpTo(payments, abstract.asOf);
   const round = v => Math.round(v * 100) / 100, typed = v => Math.max(0, Number(v) || 0);
   const line = (no, name, unit, type, amount, thisPeriod) => ({ no, name, unit, type, amount,
     previous: round(before.filter(p => p.billingType === type).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0)), thisPeriod: round(thisPeriod) });
@@ -1607,6 +1605,36 @@ export function billingAbstract(project, docs, payments, abstract, period, units
         counted('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], m1, period.m1), counted('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - m1), period.m2)] },
     ].filter(part => part.lines.some(l => l.amount > 0)),
   };
+}
+
+/** The saved billings dated on or before `asOf`. A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted. */
+function billingsUpTo(payments, asOf) {
+  const until = isoDay(asOf);
+  return payments.filter(p => { const day = isoDay(p.date); return day != null && until != null && day <= until; });
+}
+
+/**
+ * BillingAbstract.inUnits: the Actual tab's "In lots and units" table (on screen only, never printed), the abstract's
+ * to-date work in the billing abstract's lots and units: each line's amount over `units` is its unit cost. Rows
+ * { name, unit, contract, done, billed, canBill } for the four billing lines with an amount, housing as Milestone 1
+ * (filled first) and Milestone 2. Billed is the gross of the saved billings of that type: all of them for the latest
+ * abstract, those dated up to its "As of" for an older one. done and billed at 2 decimals, canBill whole.
+ */
+export function unitsStanding(abstract, abstracts, payments, units) {
+  const [acquisition, development, housing] = abstractLineAmounts(abstract), toDate = abstractToDateAmounts(abstract);
+  const round = v => Math.round(v * 100) / 100, clamp = (v, max) => Math.min(Math.max(v, 0), max);
+  const m1 = round(housing * 0.8), m2 = round(housing - m1), built = clamp(toDate[2], housing);
+  const billings = abstract.asOf === latestAbstract(abstracts)?.asOf ? payments : billingsUpTo(payments, abstract.asOf);
+  return [
+    ['Land acquisition', 'lots', acquisition, clamp(toDate[0], acquisition)],
+    ['Land development', 'lots', development, clamp(toDate[1], development)],
+    ['Milestone 1 (80%)', 'units', m1, Math.min(built, m1)],
+    ['Milestone 2 (20%)', 'units', m2, clamp(built - m1, m2)],
+  ].flatMap(([name, unit, amount, done], i) => {
+    if (!(amount > 0)) return [];
+    const cost = amount / units, billed = billings.filter(p => p.billingType === HOUSING_BILLING_TYPES[i]).reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
+    return [{ name, unit, contract: units, done: round(done / cost), billed: round(billed / cost), canBill: Math.max(0, Math.floor((done - billed) / cost + 1e-6)) }];
+  });
 }
 
 /**
@@ -1825,6 +1853,9 @@ export const abstractLineAmounts = abstract => abstractLineSums(abstract, r => r
 
 /** ProjectAbstracts.periodAmounts: each accomplishment line's THIS PERIOD amount on the abstract; 0 where the sheet has none. */
 export const abstractPeriodAmounts = abstract => abstractLineSums(abstract, r => r.period?.[1]);
+
+/** ProjectAbstracts.toDateAmounts: each accomplishment line's TO DATE amount on the abstract; 0 where the sheet has none. */
+export const abstractToDateAmounts = abstract => abstractLineSums(abstract, r => r.toDate?.[1]);
 
 /**
  * ProjectAbstracts.standing: the tab's Target / Actual / +/- table for an abstract, as four rows { name, target,

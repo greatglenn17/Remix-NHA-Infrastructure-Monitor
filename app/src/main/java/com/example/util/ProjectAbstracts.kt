@@ -15,7 +15,7 @@ import java.util.Locale
 /**
  * The uploaded abstracts of a project (Actual Accomplishment tab): each is kept under its "As of" date, and the latest
  * is the project's actual accomplishment. web/logic.js has the website's copy (abstractRows, latestAbstract,
- * abstractForWeek, abstractFields, abstractLineAmounts, abstractPeriodAmounts, abstractStanding, projectActualAfter,
+ * abstractForWeek, abstractFields, abstractLineAmounts, abstractPeriodAmounts, abstractToDateAmounts, abstractStanding, projectActualAfter,
  * monthlyAbstract, monthlyAbstractNote); change both together.
  */
 object ProjectAbstracts {
@@ -81,6 +81,9 @@ object ProjectAbstracts {
 
     /** Each accomplishment line's THIS PERIOD amount on the abstract; 0 where the sheet has none. */
     fun periodAmounts(abstract: ProjectAbstract): List<Double> = lineSums(abstract) { it.period.getOrNull(1) }
+
+    /** Each accomplishment line's TO DATE amount on the abstract; 0 where the sheet has none. */
+    fun toDateAmounts(abstract: ProjectAbstract): List<Double> = lineSums(abstract) { it.toDate.getOrNull(1) }
 
     /** A row of the tab's Target / Actual / +/- table; [target] and [diff] are null without a bar chart. */
     data class Standing(val name: String, val target: Double?, val actual: Double, val diff: Double?)

@@ -258,8 +258,13 @@ is read only.
     Acquisition, Land Development, Housing Construction and Overall. A line's target is the weekly form's: the
     approved bar chart's plan for that line on the "As of" date ("-" without a chart); the overall target is the
     chart's plan that day, else the project's stored target. The actuals are the abstract's. +/- is the actual less
-    the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). The file's
-    name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
+    the target, each at 2 decimals, with its sign ("+4.66%", "-7.58%", "0.00%"; "-" without a target). Under it,
+    on screen only (never printed, and not in the Monthly view), **In lots and units** (`L.unitsStanding`, the
+    phone's `BillingAbstract.inUnits`) puts the abstract's to date in the billing abstract's lots and units: at each
+    line's amount over N (the billing abstract's units), the Contract (N), Done to date, Billed and Can still bill
+    (whole) of Land acquisition, Land development and Milestone 1 (80%) and 2 (20%), the housing to date filling
+    Milestone 1 first. Billed is every saved billing of that type for the latest abstract, those dated up to its "As
+    of" for an older one. A line without an amount is left out. The file's name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
     folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at TO DATE, as the
     printed abstracts do: the BALANCE and equivalent-units columns are read and kept on the record but not shown
     (the phone's table ends at TO DATE too). On a laptop or wider (a window of about 1,180px or more) the 15 columns

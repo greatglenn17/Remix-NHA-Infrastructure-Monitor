@@ -1597,6 +1597,33 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
   assert.deepEqual(L.billingAbstract(project, [], payments, { ...uploaded, rowsJson: JSON.stringify(ABSTRACT_ROWS.slice(2, 7)) }, period, 100).parts.map(p => p.name), ['Land Development']);
 });
 
+test('unitsStanding: the abstract to date in lots and units at the billing abstract unit costs', () => {
+  // 370 units: 70,907.06 a lot of land acquisition, 86,000 of land development, 618,287.80 a house (494,630.24 + 123,657.56).
+  const sheet = (asOf, housingDone, parts = 3) => ({ asOf, rowsJson: JSON.stringify([
+    { kind: 'part', name: 'LAND ACQUISITION COST' }, { kind: 'subtotal', amount: 26235612.2, toDate: [null, 26235612.2, 100] },
+    { kind: 'part', name: 'LAND DEVELOPMENT' }, { kind: 'subtotal', amount: 31820000, toDate: [null, 15910000, 50] },
+    { kind: 'part', name: 'HOUSING CONSTRUCTION' }, { kind: 'subtotal', amount: 228766486, toDate: [null, housingDone, 0] },
+  ].slice(0, parts * 2)) });
+  const abstract = sheet('2026-11-14', 100000000);
+  assert.deepEqual(L.abstractToDateAmounts(abstract), [26235612.2, 15910000, 100000000]);
+  const billings = [{ billingType: 'Land acquisition', grossAmount: 26235612.2, date: '2026-01-10' }, { billingType: 'Land development', grossAmount: 12900000, date: '2026-11-20' },
+    { billingType: 'M1 - Housing unit', grossAmount: 74194536, date: '' }, { billingType: '', grossAmount: 5000000, date: '2026-01-01' }];
+  const rows = (a, all = [a]) => L.unitsStanding(a, all, billings, 370).map(r => [r.name, r.unit, r.contract, r.done, r.billed, r.canBill]);
+  // The latest abstract counts every billing, whatever its date.
+  assert.deepEqual(rows(abstract), [
+    ['Land acquisition', 'lots', 370, 370, 370, 0],
+    ['Land development', 'lots', 370, 185, 150, 35],
+    ['Milestone 1 (80%)', 'units', 370, 202.17, 150, 52],
+    ['Milestone 2 (20%)', 'units', 370, 0, 0, 0],
+  ]);
+  // Milestone 1 fills first; the rest of the housing to date is Milestone 2.
+  assert.deepEqual(rows(sheet('2026-11-14', 200000000)).slice(2).map(r => r.slice(3)), [[370, 150, 220], [137.37, 0, 137]]);
+  // An older abstract counts only the billings dated up to its As of: not the one of Nov 20 or the undated one.
+  assert.deepEqual(rows(abstract, [abstract, sheet('2026-11-21', 0)]).slice(1).map(r => r.slice(4)), [[0, 185], [0, 202], [0, 0]]);
+  // Without a housing part there are only the land rows.
+  assert.deepEqual(rows(sheet('2026-11-14', 0, 2)).map(r => r[0]), ['Land acquisition', 'Land development']);
+});
+
 // A made-up project: Land Acquisition is a part that is its own pay line; group subtotals carry no % on the sheet.
 const NEXT_ROWS = (() => {
   const none = [null, null, null];

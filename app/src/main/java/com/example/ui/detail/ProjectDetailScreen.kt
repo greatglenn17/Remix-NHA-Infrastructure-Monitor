@@ -446,7 +446,9 @@ fun ProjectDetailScreen(
                                         viewModel.billingAbstractForm(currentProject, abstract, period, saleable, s)
                                     }
                                 }
-                            }
+                            },
+                            payments = projectPayments,
+                            units = com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)
                         )
                     }
                     ProjectSection.MONEY -> MoneySection(
