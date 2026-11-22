@@ -3964,6 +3964,16 @@ function standingTable(c, abstract) {
     <p class="muted small">${planned ? '' : 'Target: the project\'s target; it has no approved bar chart. '}${figuresHelp()}</p>`;
 }
 
+/** The abstract's to date in the billing abstract's lots and units (L.unitsStanding): on screen only, so no-print. */
+function unitsTable(c, abstract, list) {
+  const rows = L.unitsStanding(abstract, list, c.payments, L.abstractUnits(c.project, L.lotSummary(c.records).saleable));
+  if (!rows.length) return '';
+  const q = v => `<td class="num">${L.quantityText(v)}</td>`, latest = abstract.asOf === L.latestAbstract(list)?.asOf;
+  return `<div class="no-print"><div class="scroll"><table class="grid-table apa-standing"><caption>In lots and units</caption><thead><tr><td></td><th class="num">Contract</th><th class="num">Done to date</th><th class="num">Billed</th><th class="num">Can still bill</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${L.quantityText(r.contract)} ${r.unit}</td>${q(r.done)}${q(r.billed)}${q(r.canBill)}</tr>`).join('')}</tbody></table></div>
+    <p class="muted small">At the billing abstract's unit costs (each line's amount ÷ ${L.quantityText(rows[0].contract)}). Billed: ${latest ? 'every saved billing' : `the billings dated up to ${esc(L.displayDate(abstract.asOf))}`}. Not printed.</p></div>`;
+}
+
 /**
  * `#/p/<id>/actual/monthly[/<date>]`: the abstract of a month as of that date (today without one), computed from the
  * filed ones and never saved (L.monthlyAbstract). It has no Upload, New abstract, Print billing abstract or Delete.
@@ -4005,6 +4015,7 @@ function actualBody(c) {
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
       ${standingTable(c, shown)}
+      ${unitsTable(c, shown, list)}
       ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}
       <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>
