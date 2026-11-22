@@ -767,8 +767,8 @@ object BlueBookForms {
         table.apa { font-size: 7.5pt; }
         table.apa th, table.apa td { padding: 1mm 0.8mm; }
         img.banner { display: block; width: 100%; margin-bottom: 3mm; }
-        table.sig { margin-top: 6mm; }
-        table.sig td { border: none; width: 33%; }
+        table.sig { margin-top: 6mm; table-layout: fixed; } /* equal columns, three or four signers */
+        table.sig td { border: none; }
         .line { border-top: 0.6pt solid #000; width: 85%; margin-top: 0.5mm; }
         .note { font-size: 8pt; font-style: italic; }
         /* The closing note and sign-offs (with the monthly recommendations) print on one page. */
