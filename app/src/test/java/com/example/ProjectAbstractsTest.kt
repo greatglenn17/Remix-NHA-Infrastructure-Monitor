@@ -336,7 +336,10 @@ class ProjectAbstractsTest {
             head("group", "3.2", "ROOFING"), line("item", "3.2.1", "Roofing", 18500.0, "sq.m", 10.0, listOf(0.0, 0.0, 0.0)),
             sum("subtotal", "Subtotal (Housing Construction)", 710400.0, 0.0, 0.0, true),
         )
-        assertEquals(listOf(3, 5), ProjectAbstracts.houseLines(rows))
+        assertEquals(listOf(3, 5), ProjectAbstracts.houseLines(rows, 370))
+        // With no housing units (the fallback 1) nothing is in houses.
+        assertEquals(emptyList<Int>(), ProjectAbstracts.houseLines(rows, 1))
+        assertEquals(mapOf(3 to 120.0), ProjectAbstracts.houses(rows, mapOf(3 to 120.0), 1))
         // 120 houses of soil poisoning is 120 x 10,508 / 370 = 3,408 sq.m; land development stays as typed; a NaN stays one, for nextErrors to name.
         val typed = ProjectAbstracts.houses(rows, mapOf(1 to 12.0, 3 to 120.0, 5 to 12.5), 370)
         assertEquals(mapOf(1 to 12.0, 3 to 3408.0, 5 to 625.0), typed)
@@ -345,6 +348,19 @@ class ProjectAbstractsTest {
         assertTrue(ProjectAbstracts.houses(rows, mapOf(3 to Double.NaN), 370)[3]!!.isNaN())
         // A quantity that does not split evenly comes back to the houses typed.
         assertEquals(mapOf(3 to 7.0), ProjectAbstracts.houses(rows, ProjectAbstracts.houses(rows, mapOf(3 to 7.0), 9), 9, back = true))
+        // The last house gives the QTY exactly, however the abstracts before it rounded, and no more: `houses` abstract
+        // after abstract, the last one's line and the errors saving it gives.
+        fun ended(qty: Double, houses: List<Double>): Pair<AbstractExcel.Row, List<String>> {
+            val one = listOf(head("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", qty, "sq.m", 1.0, listOf(0.0, 0.0, 0.0)))
+            val before = houses.dropLast(1).fold(one) { done, h -> ProjectAbstracts.nextRows(done, ProjectAbstracts.houses(done, mapOf(1 to h), 370)) }
+            val last = ProjectAbstracts.houses(before, mapOf(1 to houses.last()), 370)
+            return ProjectAbstracts.nextRows(before, last)[1] to ProjectAbstracts.nextErrors(before, last)
+        }
+        for ((qty, houses) in listOf(1000.0 to listOf(19.0, 19.0, 332.0), 1000.0 to listOf(1.0, 18.0, 351.0), 12345.67 to listOf(100.0, 100.0, 100.0, 70.0), 10508.0 to listOf(35.5, 0.0, 334.5))) {
+            val (done, errors) = ended(qty, houses)
+            assertEquals("$qty: $houses", listOf(qty, 0.0, emptyList<String>()), listOf(done.toDate[0], done.balance[0], errors))
+        }
+        assertTrue(ended(1000.0, listOf(19.0, 19.0, 333.0)).second.single().contains("would pass the quantity 1,000")) // past the units is still refused
     }
 
     @Test fun next_abstract_continues_the_latest_one_dated_before_it() {

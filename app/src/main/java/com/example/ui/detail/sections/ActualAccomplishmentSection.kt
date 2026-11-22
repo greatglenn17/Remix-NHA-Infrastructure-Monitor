@@ -210,24 +210,26 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
     // The abstract this one continues; none while the date cannot be used.
     val source = found.source.takeIf { found.error.isEmpty() }
     val rows = remember(source?.rowsJson) { source?.let { ProjectAbstracts.rows(it.rowsJson) }.orEmpty() }
-    val houses = remember(rows) { ProjectAbstracts.houseLines(rows).toSet() }
+    val houses = remember(rows, units) { ProjectAbstracts.houseLines(rows, units).toSet() }
+    // This period's quantities of the abstract already filed for the date, which the boxes start from.
+    val saved = remember(rows, found.same) { ProjectAbstracts.nextTyped(rows, found.same) }
     // What is typed, as text by row index, and what the boxes started from.
     var text by rememberSaveable { mutableStateOf(emptyMap<Int, String>()) }
     var started by rememberSaveable { mutableStateOf(emptyMap<Int, String>()) }
     var from by rememberSaveable { mutableStateOf("") }
-    // Another abstract to continue, or a date that already has one, starts from what that date has; any other date keeps what was typed.
-    val key = "${source?.uuid}|${found.same?.uuid}"
+    // Another abstract to continue, a date that already has one, or other housing units start from what that date has; any other date keeps what was typed.
+    val key = "${source?.uuid}|${found.same?.uuid}|$units"
     if (rows.isNotEmpty() && from != key) {
         from = key
-        started = ProjectAbstracts.houses(rows, ProjectAbstracts.nextTyped(rows, found.same), units, back = true).mapValues { java.math.BigDecimal.valueOf(it.value).stripTrailingZeros().toPlainString() }
+        started = ProjectAbstracts.houses(rows, saved, units, back = true).mapValues { java.math.BigDecimal.valueOf(it.value).stripTrailingZeros().toPlainString() }
         text = started
     }
     // A blank box is not typed; text that is not a number is NaN, which nextErrors names.
     val filled = text.filterValues { it.isNotBlank() }
     // A plain decimal with commas allowed, as on the website (its typedQuantities).
     val typed = filled.mapValues { (_, t) -> t.replace(",", "").trim().takeIf { Regex("""-?(\d+(\.\d*)?|\.\d+)""").matches(it) }?.toDouble() ?: Double.NaN }
-    // The houses typed for the housing construction items as their quantities.
-    val quantities = ProjectAbstracts.houses(rows, typed, units)
+    // The houses typed for the housing construction items as their quantities; a house box left as it started keeps its saved quantity exactly.
+    val quantities = ProjectAbstracts.houses(rows, typed, units) + saved.filterKeys { it in houses && text[it] == started[it] }
     val computed = ProjectAbstracts.nextRows(rows, quantities, source?.equivUnits ?: 0.0)
     var problems by remember { mutableStateOf("") }
     var asking by remember { mutableStateOf<ProjectAbstract?>(null) }
@@ -251,8 +253,8 @@ private fun NewAbstractDialog(abstracts: List<ProjectAbstract>, madeBy: String, 
                 LazyColumn(Modifier.weight(1f, fill = false).testTag("new_abstract_rows"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         Text(
-                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed. " +
-                                "Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ ${ProjectAbstracts.quantityText(units.toDouble())}, the project's housing units.",
+                            "Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed." +
+                                if (houses.isEmpty()) "" else " Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ ${ProjectAbstracts.quantityText(units.toDouble())}, the project's housing units.",
                             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
                         )
                     }

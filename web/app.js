@@ -4029,8 +4029,11 @@ const typedQuantities = text => Object.fromEntries(Object.entries(text).filter((
   .map(([i, t]) => { const n = String(t).replace(/,/g, '').trim(); return [i, /^-?(\d+(\.\d*)?|\.\d+)$/.test(n) ? Number(n) : NaN]; }));
 /** The project's housing units, the N each housing construction item's QTY is split by: the billing abstract's. */
 const houseUnits = c => L.abstractUnits(c.project, L.lotSummary(c.records).saleable);
-/** The form's quantities: what is typed, with the houses of the housing construction items as their quantities (L.abstractHouses). */
-const nextQuantities = (c, rows) => L.abstractHouses(rows, typedQuantities(c.page.next.text), houseUnits(c));
+/**
+ * The form's quantities: what is typed, with the houses of the housing construction items as their quantities
+ * (L.abstractHouses) in `units`, and a box still showing the houses it opened with as its saved quantity.
+ */
+const nextQuantities = (next, rows, units) => ({ ...L.abstractHouses(rows, typedQuantities(next.text), units), ...L.untouchedQuantities(next.text, next.opened) });
 /** Under a housing item's box: the houses typed as the item's own quantity, "houses × 28.4 = 3,408 sq.m". */
 const houseText = (r, units, q) => `houses × ${L.quantityText(r.qty / units)} = ${Number.isFinite(q ?? 0) ? L.quantityText(q ?? 0) : '–'} ${r.unit}`;
 /** Numbers by row index as the boxes' text. */
@@ -4049,7 +4052,6 @@ function nextAbstractBody(c) {
   return `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>
     ${section('New abstract', 'edit', `
       <p class="muted small">Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.
-        Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ ${esc(L.quantityText(houseUnits(c)))}, the project's housing units.
         What you type is kept in this browser until you save or discard it, so you can close this and continue later.</p>
       <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="next-as-of" value="${esc(c.page.next.asOf)}"></label>
         <button class="btn" id="next-save"${error ? ' disabled' : ''}>${icon('check_circle', 'sm')}Save</button><a class="text-btn" href="#/p/${esc(c.page.id)}/actual">Close</a>
@@ -4060,20 +4062,30 @@ function nextAbstractBody(c) {
 /** The form under its date, as { error, html }: why that date cannot be used, or the overall line and the pay items with what is typed (page.next). */
 function nextAbstractSheet(c) {
   const next = c.page.next, { source, same, error } = L.nextAbstractSource(c.of('project_abstracts'), next.asOf);
-  const rows = source && !error ? L.abstractRows(source.rowsJson) : [], units = houseUnits(c), houses = new Set(L.abstractHouseLines(rows));
-  const before = `${source?.uuid}|${same?.uuid}`, from = `${before}|houses`;
-  // A draft kept before housing items took houses has their quantities there: they become houses.
-  if (rows.length && next.from === before) Object.assign(next, { from, text: { ...next.text, ...boxText(Object.fromEntries(Object.entries(L.abstractHouses(rows, typedQuantities(next.text), units, true))
-    .filter(([i, v]) => houses.has(Number(i)) && Number.isFinite(v)))) } });
+  const rows = source && !error ? L.abstractRows(source.rowsJson) : [], units = houseUnits(c), houses = new Set(L.abstractHouseLines(rows, units));
+  // The boxes' text with each house box's [text, quantity] as it opens, so a box left alone keeps its quantity exactly.
+  const opening = quantities => {
+    const shown = boxText(L.abstractHouses(rows, quantities, units, true));
+    return { text: shown, opened: Object.fromEntries([...houses].filter(i => Number.isFinite(quantities[i])).map(i => [i, [shown[i], quantities[i]]])) };
+  };
+  // `from` is what the boxes were typed against, the housing units last.
+  const before = `${source?.uuid}|${same?.uuid}`, from = `${before}|${units}`;
+  // A draft kept before housing items took houses (no units: quantities), or in other housing units: its quantities are shown in these.
+  if (rows.length && next.from !== from && (next.from === before || next.from.startsWith(`${before}|`))) {
+    const was = Number(next.from.slice(before.length + 1)) || 1, lines = new Set([...L.abstractHouseLines(rows, was), ...houses]);
+    const kept = Object.fromEntries(Object.entries(nextQuantities(next, rows, was)).filter(([i, v]) => lines.has(Number(i)) && Number.isFinite(v))), shown = opening(kept);
+    Object.assign(next, { from, text: { ...next.text, ...shown.text }, opened: shown.opened });
+  }
   // Another abstract to continue, or a date that already has one, starts from what that date has.
-  if (rows.length && next.from !== from) Object.assign(next, { from, kept: false, text: boxText(L.abstractHouses(rows, L.nextAbstractTyped(rows, same), units, true)) });
-  const computed = L.nextAbstractRows(rows, nextQuantities(c, rows), Number(source?.equivUnits) || 0);
+  if (rows.length && next.from !== from) Object.assign(next, { from, kept: false, ...opening(L.nextAbstractTyped(rows, same)) });
+  const computed = L.nextAbstractRows(rows, nextQuantities(next, rows, units), Number(source?.equivUnits) || 0);
   const q = v => `<td class="num">${L.quantityText(v)}</td>`;
   const line = (r, i) => (L.isPayLine(r) ? `<tr><td>${esc(r.no)}</td><td>${esc(r.name)}</td>${q(r.qty)}<td>${esc(r.unit)}</td>${q(computed[i].prev[0])}
       <td><input inputmode="decimal" data-next="${i}" value="${esc(next.text[i] ?? '')}" aria-label="${houses.has(i) ? 'Houses this period' : 'This period'}: ${esc(`${r.no} ${r.name}`)}">${houses.has(i)
         ? `<div class="muted small houses" id="next-qty-${i}">${esc(houseText(r, units, computed[i].period[0]))}</div>` : ''}</td><td class="num" id="next-done-${i}">${L.quantityText(computed[i].toDate[0])}</td></tr>`
     : r.kind === 'part' || r.kind === 'group' ? `<tr class="apa-group"><td>${esc(r.no)}</td><td colspan="6">${esc(r.name)}</td></tr>` : '');
-  return { error, html: error ? `<p class="error">${esc(error)}</p>` : `<p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
+  return { error, html: error ? `<p class="error">${esc(error)}</p>` : `${houses.size ? `<p class="muted small" id="next-houses-note">Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ ${esc(L.quantityText(units))}, the project's housing units.</p>` : ''}
+      <p id="next-overall">${esc(L.nextAbstractNote(source, same, computed))}</p>
       <div class="scroll"><table class="grid-table apa-next"><thead><tr><th>ITEM NO.</th><th>ITEM DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>PREVIOUS</th><th>THIS PERIOD</th><th>TO DATE</th></tr></thead>
         <tbody>${rows.map(line).join('')}</tbody></table></div>` };
 }
@@ -4082,7 +4094,7 @@ function nextAbstractSheet(c) {
 function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
   const page = c.page, next = page.next, asOf = document.getElementById('next-as-of'), save = document.getElementById('next-save');
   const state = () => { const found = L.nextAbstractSource(all, next.asOf); return { ...found, rows: found.source && !found.error ? L.abstractRows(found.source.rowsJson) : [] }; };
-  const made = ({ source, rows }) => L.nextAbstractRows(rows, nextQuantities(c, rows), Number(source.equivUnits) || 0);
+  const made = ({ source, rows }) => L.nextAbstractRows(rows, nextQuantities(next, rows, houseUnits(c)), Number(source.equivUnits) || 0);
   // A browser fires change at each key typed in a date box, so only the sheet under it is redrawn and the box keeps the keyboard's place.
   // The draft follows the form: kept from the first quantity typed here, dropped when the boxes are empty again.
   const draft = () => keep(c, 'abstract-draft', L.nextAbstractDraft(next));
@@ -4103,7 +4115,7 @@ function bindNextAbstract(c, { say, show, failed, actualAfter, all }) {
   }; });
   boxes();
   save.onclick = async () => {
-    const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, nextQuantities(c, now.rows));
+    const now = state(), errors = now.error ? [now.error] : L.nextAbstractErrors(now.rows, nextQuantities(next, now.rows, houseUnits(c)));
     if (errors.length) { say(errors.slice(0, 3).join(' ') + (errors.length > 3 ? ` And ${errors.length - 3} more.` : '')); return; }
     const fields = L.nextAbstractFields(now.source, made(now), next.asOf, s.profile.name || s.user.email), old = now.same;
     if (old && !await ask(`Replace the abstract as of ${L.displayDate(fields.asOf)}?`, { action: 'Replace', danger: true, detail: 'An abstract of that date is already filed; this one takes its place.' })) return;

@@ -176,21 +176,33 @@ object ProjectAbstracts {
         return rows.indices.filter { isPayLine(rows[it]) && rows[it].period.getOrNull(0) != null }.associateWith { rows[it].period[0]!! }
     }
 
-    /** The indexes of the pay lines of a Housing Construction part, which the New abstract takes in houses. */
-    fun houseLines(rows: List<AbstractExcel.Row>): List<Int> {
+    /**
+     * The indexes of the pay lines of a Housing Construction part, which the New abstract takes in houses; none when
+     * [units], the project's housing units, is only the fallback 1 ([BillingAbstract.units]).
+     */
+    fun houseLines(rows: List<AbstractExcel.Row>, units: Int): List<Int> {
+        if (units <= 1) return emptyList()
         var line = ""
         return rows.indices.filter { i -> if (rows[i].kind == "part") line = accomplishmentLine(rows[i].name); line == ACCOMPLISHMENT_LINES[2] && isPayLine(rows[i]) }
     }
 
     /**
-     * [typed] by row index with each house line's houses as its quantity, houses x (QTY / [units], the project's housing
-     * units), at 4 decimals; [back] turns quantities into houses. The rest, and a NaN (a box that is not a number), stay.
+     * [typed] (by row index, [rows] the source's) with each house line's houses this period as its quantity, each house
+     * QTY / [units]. It is worked from the houses to date, so the last house gives the QTY exactly however the abstracts
+     * before it rounded: the to date is the houses to date x QTY / [units] at 4 decimals, the QTY itself within 0.01
+     * house of [units], and this period the to date less the previous. [back] turns this period's quantities into
+     * houses. The rest, 0 and a NaN (a box that is not a number) stay.
      */
     fun houses(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>, units: Int, back: Boolean = false): Map<Int, Double> {
-        val lines = houseLines(rows).toSet()
+        val lines = houseLines(rows, units).toSet()
         return typed.mapValues { (i, v) ->
             val qty = rows[i].qty ?: 0.0
-            if (i !in lines || !v.isFinite()) v else round4(if (back) v * units / qty else v * qty / units)
+            val prev = rows[i].toDate.getOrNull(0) ?: 0.0
+            when {
+                i !in lines || v == 0.0 || !v.isFinite() -> v
+                back -> round4(v * units / qty)
+                else -> round4((if (kotlin.math.abs(prev * units / qty + v - units) < 0.01) qty else round4(prev + v * qty / units)) - prev)
+            }
         }
     }
 

@@ -225,8 +225,8 @@ class ActualAccomplishmentUiTest {
         androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         val filed = mutableStateListOf(first)
         openNewAbstract(filed, "2026-11-20") { filed += it }
-        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed. " +
-            "Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ 1, the project's housing units.").assertExists()
+        // No housing units: nothing is in houses, so the form does not speak of them.
+        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.").assertExists()
         inForm("new_abstract_note").assert(hasText("Overall to date 77.77%, from 77.77% as of Nov 13, 2026."))
         inForm("next_done_0").assert(hasText("To date 420"))
         rule.onNodeWithText("520 LOT · Previous 420").assertExists()
@@ -278,12 +278,15 @@ class ActualAccomplishmentUiTest {
     }
 
     // A housing construction item takes houses: 120 houses of 10,508 sq.m over 370 units is 3,408 sq.m, which is what is saved.
-    @Test fun newAbstract_housingItemsTakeHouses_andSaveTheirQuantities() {
-        val rows = listOf(
+    private val houseRows by lazy {
+        listOf(
             heading("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", 10508.0, "sq.m", 50.0, listOf(0.0, 0.0, 0.0)),
             sum("subtotal", "Subtotal (Housing Construction)", 525400.0, 0.0, 0.0), sum("total", "GRAND TOTAL", 525400.0, 0.0, 0.0),
         )
-        val housing = first.copy(rowsJson = ProjectAbstracts.rowsJson(rows))
+    }
+    private val housing by lazy { first.copy(rowsJson = ProjectAbstracts.rowsJson(houseRows)) }
+
+    @Test fun newAbstract_housingItemsTakeHouses_andSaveTheirQuantities() {
         val filed = mutableStateListOf(housing)
         rule.setContent {
             NHATheme(themeMode = AppThemeMode.LIGHT) {
@@ -300,6 +303,22 @@ class ActualAccomplishmentUiTest {
         // Made again for that date, the box starts from the houses it saved.
         rule.onNodeWithTag("new_abstract").performClick()
         inForm("next_period_1").assert(hasText("120"))
+    }
+
+    // Saved again untouched, a house box keeps its quantity: 1,000 sq.m opens as 35.2113 houses, which would be 1,000.0009.
+    @Test fun newAbstract_houseBoxLeftAsItOpened_keepsItsSavedQuantity() {
+        val again = ProjectAbstracts.nextRecord(housing, ProjectAbstracts.nextRows(houseRows, mapOf(1 to 1000.0)), "2026-11-20", "Engr. Sample").copy(id = 2)
+        var saved: ProjectAbstract? = null
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                ActualAccomplishmentSection(project, emptyList(), listOf(housing, again), "Engr. Sample", { saved = it }, {}, {}, { _, _ -> }, LocalDate.parse("2026-11-20"), units = 370)
+            }
+        }
+        rule.onNodeWithTag("new_abstract").performClick()
+        inForm("next_period_1").assert(hasText("35.2113"))
+        rule.onNodeWithTag("save_new_abstract").performClick()
+        rule.onNodeWithTag("confirm_replace_abstract").performClick()
+        assertEquals(1000.0, ProjectAbstracts.rows(saved!!.rowsJson)[1].period[0])
     }
 
     // Made again for a date that already has an abstract: the boxes start from that one's quantities, and saving asks first.
