@@ -25,8 +25,10 @@ object ProjectAttention {
     const val STALE_DAYS = 14
     val ORDER_TYPES = listOf("Variation Order", "Time Extension", "Work Suspension", "Work Resumption")
     val REQUEST_TYPES = listOf(
-        "Work Suspension Order", "Continuance of Work Suspension Order", "Work Resumption Order", "Variation Order", "Time Extension"
+        "Work Suspension Order", "Continuance of Work Suspension Order", "Work Resumption Order", "Variation Order", "Time Extension", "Request for billing"
     )
+    /** A request for billing files no order; it waits under Payments until a billing is saved from it. */
+    val BILLING_REQUEST = REQUEST_TYPES[5]
 
     /** A document with one of [ORDER_TYPES] in its name is an order, on every phone and the website. */
     fun isOrderName(name: String): Boolean = ORDER_TYPES.any { name.contains(it, ignoreCase = true) }

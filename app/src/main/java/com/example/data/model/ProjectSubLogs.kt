@@ -148,11 +148,25 @@ data class DeveloperRequest(
     val datePackaged: String = "",
     // The developer's request letter, scanned or uploaded; an attachment reference.
     val requestFileUrl: String = "",
+    // A request for billing: what is billed (one of HOUSING_BILLING_TYPES), how many lots or units, and the uuid of
+    // the billing saved from it under Payments (blank until then).
+    // Defaults match MIGRATION_42_43, so a request saved before these fields (no keys in its data) still syncs in.
+    @ColumnInfo(defaultValue = "") val billingType: String = "",
+    @ColumnInfo(defaultValue = "0") val units: Int = 0,
+    @ColumnInfo(defaultValue = "") val paymentUuid: String = "",
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** What a request for billing asks for, "12 lots · Land acquisition" (web/logic.js billingRequestText). */
+val DeveloperRequest.billingText: String
+    get() = "$units ${billingUnitName(billingType)}${if (units == 1) "" else "s"} · ${billingType.ifBlank { "-" }}"
+
+/** The requests for billing no saved billing came from yet; one whose billing was deleted waits again (pendingBillingRequests). */
+fun pendingBillingRequests(requests: List<DeveloperRequest>, payments: List<ProjectPayment>): List<DeveloperRequest> =
+    requests.filter { r -> r.requestType == com.example.util.ProjectAttention.BILLING_REQUEST && payments.none { it.uuid == r.paymentUuid } }
 
 /** A letter NHA sent the contractor, what the contractor did about it, and the contractor's reply letter once it comes. */
 @Entity(

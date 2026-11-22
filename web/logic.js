@@ -1309,7 +1309,19 @@ export function issueErrors(f) {
 }
 
 /** ProjectAttention.REQUEST_TYPES. */
-export const REQUEST_TYPES = ['Work Suspension Order', 'Continuance of Work Suspension Order', 'Work Resumption Order', 'Variation Order', 'Time Extension'];
+export const REQUEST_TYPES = ['Work Suspension Order', 'Continuance of Work Suspension Order', 'Work Resumption Order', 'Variation Order', 'Time Extension', 'Request for billing'];
+/** ProjectAttention.BILLING_REQUEST: a request for a billing files no order; it waits under Payments until a billing is saved from it. */
+export const BILLING_REQUEST = REQUEST_TYPES[5];
+
+/** BillingRequests.text: what a billing request asks for, "12 lots · Land acquisition". */
+export const billingRequestText = r => `${plural(Number(r.units) || 0, billingUnitName(r.billingType), `${billingUnitName(r.billingType)}s`)} · ${r.billingType || '-'}`;
+
+/** BillingRequests.pending: the billing requests no saved billing came from yet (one whose billing was deleted waits again). */
+export const pendingBillingRequests = (requests, payments) =>
+  requests.filter(r => r.requestType === BILLING_REQUEST && !payments.some(p => p.uuid && p.uuid === r.paymentUuid));
+
+/** BillingRequests.billedErrors: a billing from a request counts only with its DV No. and the scanned DV form. */
+export const billedRequestErrors = (f, hasFile) => [!String(f.dvNo ?? '').trim() && 'Type the DV No.', !hasFile && 'Attach the scanned DV form.'].filter(Boolean);
 
 /**
  * A request card's title. Details that are only an order number join the type ("Work Suspension Order No. 1");
@@ -1329,6 +1341,11 @@ export function requestErrors(f) {
     !iso.test(f.dateReceived || '') && 'Pick the date received by NHA.',
     f.dateRequested && !iso.test(f.dateRequested) && "Pick a valid date of the developer's request.",
     f.datePackaged && !iso.test(f.datePackaged) && 'Pick a valid date packaged.',
+    ...(f.requestType === BILLING_REQUEST ? [
+      !f.dateRequested && 'Pick the date of the request.',
+      !HOUSING_BILLING_TYPES.includes(f.billingType) && 'Pick what the billing is for.',
+      !/^[1-9]\d*$/.test(String(f.units ?? '').trim()) && `Type the number of ${billingUnitName(f.billingType)}s, a whole number.`,
+    ] : []),
   ].filter(Boolean);
 }
 
@@ -1410,7 +1427,7 @@ export const newLetterRecord = (ids, f) => newRecord(ids, 'contractor_letters', 
 /** A new developer_requests record: the DeveloperRequest row. */
 export const newRequestRecord = (ids, f) => newRecord(ids, 'developer_requests', {
   requestType: f.requestType, details: f.details, dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged,
-  requestFileUrl: f.requestFileUrl || '',
+  requestFileUrl: f.requestFileUrl || '', billingType: f.billingType || '', units: Number(f.units) || 0, paymentUuid: '',
 });
 
 /**
@@ -1605,6 +1622,19 @@ export function billingAbstract(project, docs, payments, abstract, period, units
         counted('3.1', 'MILESTONE 1 (80%)', 'UNIT', HOUSING_BILLING_TYPES[2], m1, period.m1), counted('3.2', 'MILESTONE 2 (20%)', 'UNIT', HOUSING_BILLING_TYPES[3], round(housing - m1), period.m2)] },
     ].filter(part => part.lines.some(l => l.amount > 0)),
   };
+}
+
+/**
+ * BillingAbstract.printWarnings: each part of `sheet` (billingAbstract's) whose billed to date, previous and this
+ * period, passes that line's actual in `abstract`, and the grand total against its overall actual, at 2 decimals as
+ * printed. A warning only: the sheet still prints.
+ */
+export function billingAbstractWarnings(abstract, sheet) {
+  const actuals = abstractLineActuals(abstract).map(Number), round = v => Math.round(v * 100) / 100;
+  const share = lines => { const of = lines.reduce((t, l) => t + l.amount, 0); return of > 0 ? round(lines.reduce((t, l) => t + l.previous + l.thisPeriod, 0) / of * 100) : 0; };
+  const lines = ['Land Acquisition Cost', 'Land Development', 'Housing Construction'];
+  return [...sheet.parts.map(p => [p.name, p.lines, actuals[lines.indexOf(p.name)]]), ['Grand total', sheet.parts.flatMap(p => p.lines), Number(abstract.overallPct) || 0]]
+    .flatMap(([name, of, actual]) => (share(of) > round(actual) ? [`${name}: billed to date ${share(of).toFixed(2)}% is above the actual ${round(actual).toFixed(2)}%.`] : []));
 }
 
 /** The saved billings dated on or before `asOf`. A billing's date is yyyy-MM-dd text: compared as days, so one without a date is not counted. */

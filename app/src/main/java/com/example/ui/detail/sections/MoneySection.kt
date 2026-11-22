@@ -10,6 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.data.model.DeveloperRequest
+import com.example.data.model.billingText
 import com.example.data.model.netAmount
 import com.example.data.model.netBillings
 import com.example.data.model.ProjectPayment
@@ -19,6 +21,7 @@ import com.example.data.model.hasPermission
 import com.example.ui.dashboard.ProgressLine
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.detail.tabs.ViewDvScanDialog
+import com.example.ui.theme.LocalNHAColors
 import com.example.util.BillingProgress
 import com.example.utils.CurrencyFormatter
 
@@ -38,9 +41,13 @@ fun MoneySection(
     billingCheck: (ProjectPayment, ProjectPayment?) -> List<String> = { _, _ -> emptyList() },
     onAddPayment: (ProjectPayment) -> Unit,
     onUpdatePayment: (ProjectPayment) -> Unit,
-    onDeletePayment: (ProjectPayment) -> Unit
+    onDeletePayment: (ProjectPayment) -> Unit,
+    // Requests for billing no billing came from yet (pendingBillingRequests); [onBilledRequest] saves one with its billing's uuid.
+    billingRequests: List<DeveloperRequest> = emptyList(),
+    onBilledRequest: (DeveloperRequest) -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var billingRequest by remember { mutableStateOf<DeveloperRequest?>(null) }
     var viewingDvPayment by remember { mutableStateOf<ProjectPayment?>(null) }
     var paymentToAttachScan by remember { mutableStateOf<ProjectPayment?>(null) }
     var paymentToEdit by remember { mutableStateOf<ProjectPayment?>(null) }
@@ -64,6 +71,24 @@ fun MoneySection(
             modifier = Modifier.fillMaxSize()
         ) {
             item { BillingSummary(payments, contractCost, actualPercent) }
+            if (billingRequests.isNotEmpty()) item(key = "billing_requests") {
+                SectionCard("Billing requests (${billingRequests.size})", Icons.Default.MoveToInbox) {
+                    billingRequests.forEach { r ->
+                        LogEntry(
+                            r.billingText, LocalNHAColors.current.watch,
+                            listOf(
+                                "Requested: ${r.dateRequested.ifBlank { "-" }}  ·  Received: ${r.dateReceived.ifBlank { "-" }}",
+                                if (r.datePackaged.isNotBlank()) "Packaged: ${r.datePackaged}" else "Not yet packaged"
+                            ),
+                            trailing = if (canManagePayments) { { TextButton(onClick = { billingRequest = r }, modifier = Modifier.testTag("mark_billed_${r.uuid}")) { Text("Mark billed") } } } else null
+                        )
+                    }
+                    Text(
+                        "Not yet billed. One counts in the Status of billing once marked billed with its DV No. and scanned DV form.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             val net = netBillings(payments, contractCost).associateBy { it.id }
             payments.chunked(perRow).forEach { row ->
                 item(key = row.first().id) {
@@ -97,6 +122,29 @@ fun MoneySection(
         )
     }
 
+    // A new billing's share and balance after it, with the contract cost of today and every billing before it.
+    fun added(p: ProjectPayment): ProjectPayment {
+        val newBal = contractCost - (payments.sumOf { it.grossAmount } + p.grossAmount)
+        return p.copy(percentage = share(p.grossAmount, contractCost), balanceAmount = newBal, balancePercentage = share(newBal, contractCost))
+    }
+    billingRequest?.let { request ->
+        AddPaymentDialog(
+            baseCost = contractCost,
+            currentTotalPaid = payments.sumOf { it.grossAmount },
+            onDismiss = { billingRequest = null },
+            isHousing = true,
+            previous = payments,
+            landPerLot = landPerLot,
+            check = { billingCheck(it, null) },
+            request = request,
+            onSubmit = { p ->
+                onAddPayment(added(p))
+                onBilledRequest(request.copy(paymentUuid = p.uuid))
+                billingRequest = null
+            }
+        )
+    }
+
     if (showAddDialog) {
         AddPaymentDialog(
             baseCost = contractCost,
@@ -107,11 +155,7 @@ fun MoneySection(
             landPerLot = landPerLot,
             check = { billingCheck(it, null) },
             onSubmit = { p ->
-                val gross = p.grossAmount
-                val pct = if (contractCost > 0) (gross / contractCost) * 100 else 0.0
-                val newBal = contractCost - (payments.sumOf { it.grossAmount } + gross)
-                val balPct = if (contractCost > 0) (newBal / contractCost) * 100 else 0.0
-                onAddPayment(p.copy(percentage = pct, balanceAmount = newBal, balancePercentage = balPct))
+                onAddPayment(added(p))
                 showAddDialog = false
             }
         )

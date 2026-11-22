@@ -39,6 +39,7 @@ import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectPayment
 import com.example.ui.components.DateField
 import com.example.ui.components.rememberDiscardGuard
+import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.figures
 import com.example.util.AbstractExcel
 import com.example.util.BillingAbstract
@@ -152,7 +153,13 @@ private fun ItemRow(row: AbstractExcel.Row, index: Int, scroll: ScrollState) {
  * billing), then Print. Nothing typed here is saved. A line the abstract has no amount for has no box.
  */
 @Composable
-private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Unit, onPrint: (BillingAbstract.Period) -> Unit) {
+private fun BillingFiguresDialog(
+    abstract: ProjectAbstract,
+    onDismiss: () -> Unit,
+    // Where billed to date would pass the actual (BillingAbstract.printWarnings): shown, but the sheet still prints.
+    warnings: (BillingAbstract.Period) -> List<String> = { emptyList() },
+    onPrint: (BillingAbstract.Period) -> Unit
+) {
     val amounts = remember(abstract.rowsJson) { ProjectAbstracts.lineAmounts(abstract) }
     var covered by remember { mutableStateOf("") }
     var lots by remember { mutableStateOf("") }
@@ -161,6 +168,8 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
     var m2 by remember { mutableStateOf("") }
     // A blank or unreadable number is 0, and so is a negative.
     fun number(text: String) = FormValidation.parseAmount(text) ?: 0.0
+    val period = BillingAbstract.Period(covered, number(lots), number(development), number(m1), number(m2))
+    val warned = remember(period) { warnings(period) }
     @Composable fun FigureBox(label: String, value: String, tag: String, number: Boolean = true, onChange: (String) -> Unit) = OutlinedTextField(
         value = value, onValueChange = onChange, label = { Text(label) }, singleLine = true,
         keyboardOptions = if (number) KeyboardOptions(keyboardType = KeyboardType.Decimal) else KeyboardOptions.Default,
@@ -182,13 +191,16 @@ private fun BillingFiguresDialog(abstract: ProjectAbstract, onDismiss: () -> Uni
                     "Previous is what the billings saved up to ${ProjectSchedule.displayDate(abstract.asOf)} came to. Nothing typed here is saved.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                warned.forEach {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = LocalNHAColors.current.watch, modifier = Modifier.testTag("billing_print_warning"))
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onPrint(BillingAbstract.Period(covered, number(lots), number(development), number(m1), number(m2))) },
+                onClick = { onPrint(period) },
                 modifier = Modifier.testTag("confirm_print_billing_abstract")
-            ) { Text("Print") }
+            ) { Text(if (warned.isEmpty()) "Print" else "Print anyway") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
@@ -358,7 +370,12 @@ fun ActualAccomplishmentSection(
     var deleting by remember { mutableStateOf<ProjectAbstract?>(null) }
     var billing by remember { mutableStateOf<ProjectAbstract?>(null) }
     var making by rememberSaveable { mutableStateOf(false) }
-    billing?.let { record -> BillingFiguresDialog(record, onDismiss = { billing = null }) { period -> billing = null; onPrintBilling(record, period) } }
+    billing?.let { record ->
+        BillingFiguresDialog(
+            record, onDismiss = { billing = null },
+            warnings = { period -> BillingAbstract.printWarnings(record, BillingAbstract.of(project, documents, payments, record, period, units)) }
+        ) { period -> billing = null; onPrintBilling(record, period) }
+    }
 
     fun save(record: ProjectAbstract, replaced: Boolean) {
         onSave?.invoke(record)

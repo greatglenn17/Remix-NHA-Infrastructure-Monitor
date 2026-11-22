@@ -26,9 +26,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.DeveloperRequest
 import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.ProjectPayment
 import com.example.data.model.billedByAmount
+import com.example.data.model.billingText
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
 import com.example.ui.components.DateField
@@ -56,17 +58,31 @@ fun AddPaymentDialog(
     // The contract amount of land development per lot on a billing date: where its amount per lot starts without an earlier billing.
     landPerLot: (date: String) -> Double = { 0.0 },
     // Why this billing cannot be saved (it would pass the actual accomplishment) and what to do about it; empty when it can.
-    check: (ProjectPayment) -> List<String> = { emptyList() }
+    check: (ProjectPayment) -> List<String> = { emptyList() },
+    // A request for billing being billed: its type and lots or units start the form, and it saves only with the DV No. and scanned DV.
+    request: DeveloperRequest? = null
 ) {
+    // The latest billing of a type starts its amount per lot or unit; land development without one starts from its contract amount per lot.
+    fun priceFor(t: String, on: String) = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
+        .maxByOrNull { it.id }?.unitPrice
+        .let { it ?: if (billedByAmount(t)) landPerLot(on).takeIf { per -> per > 0 && per.isFinite() } else null }
+    val askedPrice = request?.let { priceFor(it.billingType, today.toString()) }
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var dvNo by remember { mutableStateOf(existing?.dvNo ?: "") }
     var date by remember { mutableStateOf(existing?.date ?: today.toString()) }
     var periodCovered by remember { mutableStateOf(existing?.periodCovered ?: currentMonthPeriod(today)) }
-    var amountStr by remember { mutableStateOf(existing?.let { "%.2f".format(java.util.Locale.US, it.grossAmount) } ?: "") }
+    // Land development is billed by the amount: a request's lots at the amount per lot.
+    var amountStr by remember {
+        mutableStateOf(
+            existing?.let { "%.2f".format(java.util.Locale.US, it.grossAmount) }
+                ?: request?.takeIf { billedByAmount(it.billingType) }?.let { r -> askedPrice?.let { "%.2f".format(java.util.Locale.US, Math.round(r.units * it * 100) / 100.0) } }
+                ?: ""
+        )
+    }
     var fileUrl by remember { mutableStateOf(existing?.fileUrl ?: "") }
-    var type by remember { mutableStateOf(existing?.billingType ?: "") }
-    var unitsStr by remember { mutableStateOf(existing?.units?.takeIf { it > 0 }?.toString() ?: "") }
-    var priceStr by remember { mutableStateOf(existing?.unitPrice?.takeIf { it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
+    var type by remember { mutableStateOf(existing?.billingType ?: request?.billingType ?: "") }
+    var unitsStr by remember { mutableStateOf((existing?.units ?: request?.units)?.takeIf { it > 0 }?.toString() ?: "") }
+    var priceStr by remember { mutableStateOf((existing?.unitPrice ?: askedPrice)?.takeIf { it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
     var retention by remember { mutableStateOf(existing?.retentionPct ?: 0.0) }
 
     val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
@@ -82,6 +98,9 @@ fun AddPaymentDialog(
     var ahead by remember(type, amountStr, unitsStr, priceStr, date) { mutableStateOf("") }
     // Rounded to the centavo, as on the website (logic.js billingGross).
     val gross = if (byUnit) Math.round((units ?: 0) * (FormValidation.parseAmount(priceStr) ?: 0.0) * 100) / 100.0 else FormValidation.parseAmount(amountStr) ?: 0.0
+    // BillingRequests.billedErrors: a billing from a request counts only with its DV No. and the scanned DV form.
+    val dvMissing = if (request == null) null
+    else listOfNotNull("Type the DV No.".takeIf { dvNo.isBlank() }, "Attach the scanned DV form.".takeIf { fileUrl.isBlank() }).joinToString(" ").ifBlank { null }
     val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
@@ -92,7 +111,7 @@ fun AddPaymentDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.AttachFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (existing == null) "Add Billing / Disbursement Voucher" else "Edit Billing")
+                Text(if (existing != null) "Edit Billing" else if (request != null) "Mark the billing request billed" else "Add Billing / Disbursement Voucher")
             }
         },
         text = {
@@ -103,6 +122,10 @@ fun AddPaymentDialog(
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (request != null) Text(
+                    "Requested ${request.dateRequested.ifBlank { "-" }}: ${request.billingText}. It counts in the Status of billing once saved with its DV No. and scanned DV form.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
                     label = { Text("Billing Name") },
@@ -130,9 +153,7 @@ fun AddPaymentDialog(
                                 onClick = {
                                     if (t != type) {
                                         type = t
-                                        priceStr = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
-                                            .maxByOrNull { it.id }?.unitPrice
-                                            .let { it ?: if (billedByAmount(t)) landPerLot(date).takeIf { per -> per > 0 && per.isFinite() } else null }
+                                        priceStr = priceFor(t, date)
                                             ?.let { "%.2f".format(java.util.Locale.US, it) } ?: ""
                                     }
                                 },
@@ -238,6 +259,7 @@ fun AddPaymentDialog(
                         DvSourceButtons(attachDv)
                     }
                 }
+                dvMissing?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("billing_dv_missing")) }
                 if (ahead.isNotBlank()) Text(ahead, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("billing_ahead_error"))
             }
         },
@@ -254,7 +276,7 @@ fun AddPaymentDialog(
                     if (errors.isEmpty()) onSubmit(payment)
                     else ahead = errors.joinToString(" ")
                 },
-                enabled = amountErr == null && unitsErr == null && priceErr == null,
+                enabled = amountErr == null && unitsErr == null && priceErr == null && dvMissing == null,
                 shape = RoundedCornerShape(50.dp)
             ) {
                 Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.SemiBold)

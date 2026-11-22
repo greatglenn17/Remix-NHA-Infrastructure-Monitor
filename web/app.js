@@ -1238,6 +1238,7 @@ function drawProject(page) {
   main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
   const billingAdd = document.getElementById('billing-add');
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
+  main.querySelectorAll('[data-bill-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.billRequest); if (r) billingForm(c, null, r); }; });
   // The saved billing, not the card's net one: an edit starts from what is stored.
   main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
   const letterAdd = document.getElementById('letter-add');
@@ -3226,16 +3227,31 @@ function editRequest(c, r) {
     <label class="field">Date received by NHA<input type="date" name="dateReceived" value="${esc(r.dateReceived || '')}" required></label>
     <label class="field">Date packaged (blank: not yet)<input type="date" name="datePackaged" value="${esc(r.datePackaged || '')}"></label>
     ${r.datePackaged ? '' : '<button type="button" class="text-btn" data-today>Packaged today</button>'}
+    <div data-billing-fields>
+      <label class="field">Billed for<select name="billingType">${L.HOUSING_BILLING_TYPES.map(v => `<option${v === r.billingType ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+      <label class="field">Number of lots<input name="units" value="${Number(r.units) > 0 ? esc(String(r.units)) : ''}" inputmode="numeric" autocomplete="off"></label>
+    </div>
     ${fileField('requestFileUrl', "Developer's request letter", r.requestFileUrl)}
-    ${isNew ? orderFields(c) : ''}
+    ${isNew ? `<div data-orders>${orderFields(c)}</div>` : ''}
     <div class="form-foot"><div class="error" role="alert"></div>
     <div class="actions">${isNew ? '' : `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete request</button>`}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   if (isNew) bindOrderFields(c, form);
+  // A request for billing asks what is billed and how many, and files no order.
+  const showOrder = form.requestType.onchange, billingFields = d.querySelector('[data-billing-fields]'), orders = d.querySelector('[data-orders]');
+  (form.billingType.onchange = form.requestType.onchange = () => {
+    showOrder?.();
+    const billing = form.requestType.value === L.BILLING_REQUEST;
+    billingFields.style.display = billing ? '' : 'none';
+    if (orders) orders.style.display = billing ? 'none' : '';
+    form.units.previousSibling.textContent = `Number of ${L.billingUnitName(form.billingType.value)}s`;
+    form.dateRequested.previousSibling.textContent = `Date of developer's request${billing ? '' : ' (optional)'}`;
+  })();
   const values = () => {
-    const f = Object.fromEntries(new FormData(form));
-    return { requestType: f.requestType, details: f.details.trim(), dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged };
+    const f = Object.fromEntries(new FormData(form)), billing = f.requestType === L.BILLING_REQUEST;
+    return { requestType: f.requestType, details: f.details.trim(), dateRequested: f.dateRequested, dateReceived: f.dateReceived, datePackaged: f.datePackaged,
+      billingType: billing ? f.billingType : '', units: billing ? Number(f.units.trim()) || 0 : 0 };
   };
   const order = () => orderValues(form); // a new request only
   const snapshot = () => JSON.stringify(isNew ? order() : values());
@@ -3259,8 +3275,8 @@ function editRequest(c, r) {
       const saved = { ...f, ...await uploadPicked(c, form) };
       if (isNew) {
         // The request, then the order it asks for, each with its audit entry, as the phone saves them.
-        const filed = L.orderDocument(f.requestType, o, suspension, c.documents);
-        await addRecords(c, [[ids => L.newRequestRecord(ids, saved), L.requestAudit(f)], [ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName)]]);
+        const filed = f.requestType === L.BILLING_REQUEST ? null : L.orderDocument(f.requestType, o, suspension, c.documents);
+        await addRecords(c, [[ids => L.newRequestRecord(ids, saved), L.requestAudit(f)], ...(filed ? [[ids => L.newDocumentRecord(ids, filed), L.addedDocumentAudit(filed.documentName)]] : [])]);
       } else await saveEdit(c, r, saved, 'request', L.requestAudit(f));
       done(); savedNote();
     } catch (x) {
@@ -3791,9 +3807,9 @@ async function addIssue(c, f) {
  * gross / retention / net. Save writes a new billing with its share and balance, or the edit with the later balances
  * it moves, each with the app's audit entry.
  */
-function billingForm(c, old = null) {
+function billingForm(c, old = null, request = null) {
   // An edited billing keeps its type and retention as choices, whatever the project type is now.
-  const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType);
+  const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType) || Boolean(request);
   const types = !old?.billingType || L.HOUSING_BILLING_TYPES.includes(old.billingType) ? L.HOUSING_BILLING_TYPES : [old.billingType, ...L.HOUSING_BILLING_TYPES];
   const oldRetention = Number(old?.retentionPct) || 0, retentions = L.RETENTIONS.includes(oldRetention) ? L.RETENTIONS : [...L.RETENTIONS, oldRetention];
   const money = v => (Number(v) > 0 ? Number(v).toFixed(2) : '');
@@ -3801,9 +3817,10 @@ function billingForm(c, old = null) {
   d.className = 'help edit-form';
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   d.innerHTML = `<form novalidate>
-    <h2>${old ? 'Edit billing' : 'Add billing / disbursement voucher'}</h2>
+    <h2>${old ? 'Edit billing' : request ? 'Mark the billing request billed' : 'Add billing / disbursement voucher'}</h2>
+    ${request ? `<p class="muted small">Requested ${esc(L.displayDate(request.dateRequested))}: ${esc(L.billingRequestText(request))}. It counts in the Status of billing once saved with its DV No. and scanned DV form.</p>` : ''}
     <label class="field">Billing name (optional)<input name="name" value="${esc(old?.name || '')}" placeholder="e.g. 3rd Progress Billing" autocomplete="off"></label>
-    <label class="field">DV No. (Disbursement Voucher; optional)<input name="dvNo" value="${esc(old?.dvNo || '')}" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
+    <label class="field">DV No. (Disbursement Voucher${request ? '' : '; optional'})<input name="dvNo" value="${esc(old?.dvNo || '')}" placeholder="e.g. DV-2026-08-0199" autocomplete="off"></label>
     <label class="field">Date<input type="date" name="date" value="${esc(old ? old.date || '' : today())}" required></label>
     <label class="field">Period covered (optional)<input name="periodCovered" value="${esc(old ? old.periodCovered || '' : L.monthPeriod(today()))}" autocomplete="off"></label>
     ${housing ? `<label class="field">Billed for<select name="billingType">${opt('', 'Other')}${types.map(t => opt(t, t, old?.billingType)).join('')}</select></label>` : ''}
@@ -3845,6 +3862,15 @@ function billingForm(c, old = null) {
   if (housing) form.billingType.onchange = () => { onType(); preview(); };
   form.oninput = preview;
   if (old) { showType(); preview(); }
+  if (request) {
+    form.billingType.value = request.billingType;
+    onType();
+    form.units.value = String(Number(request.units) || '');
+    // Land development is billed by the amount: the lots requested at the amount per lot.
+    const price = L.parseAmount(form.unitPrice.value);
+    if (L.billedByAmount(request.billingType) && price) form.grossAmount.value = (Math.round((Number(request.units) || 0) * price * 100) / 100).toFixed(2);
+    preview();
+  }
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
   const close = async () => ((JSON.stringify(values()) === initial && !hasPicked(form)) || await ask(old ? 'Discard your changes to this billing?' : 'Discard this new billing?', DISCARD)) && done();
@@ -3864,7 +3890,7 @@ function billingForm(c, old = null) {
   };
   form.onsubmit = async e => {
     e.preventDefault();
-    const f = values(), errors = L.billingErrors(f);
+    const f = values(), errors = [...L.billingErrors(f), ...(request ? L.billedRequestErrors(f, Boolean(form.fileUrl.files[0])) : [])];
     if (errors.length) { showErrors(err, errors); return; }
     if (old && JSON.stringify(f) === initial && !hasPicked(form)) { done(); return; }
     const abstracts = c.of('project_abstracts'), ahead = L.billingAheadErrors(c.project, c.documents, c.payments, c.weekly, f, old, abstracts);
@@ -3875,7 +3901,7 @@ function billingForm(c, old = null) {
       const refs = await uploadPicked(c, form);
       // Each billing saved gets its own entry, as MoneySection sends each one to updateProjectPayment; the scan goes on the edited one.
       await (old ? saveEdits(c, L.editedBillings(c.payments, old, f, c.cost).map(([p, changes]) => [p, p === old ? { ...changes, ...refs } : changes, L.editedPaymentAudit({ ...p, ...changes })]), 'billing')
-        : addBilling(c, { ...f, ...refs }));
+        : addBilling(c, { ...f, ...refs }, request));
       done(); savedNote();
     } catch (x) { failed(x); save.disabled = false; }
   };
@@ -3886,18 +3912,27 @@ function billingForm(c, old = null) {
 /**
  * ProjectViewModel.addProjectPayment: the billing and its audit entry, against the billings shown now. The project's
  * billingStamp names the last billing added here; when another one was added since this page read the project, the
- * check above it and the saved balance would leave that one out, so the save is refused.
+ * check above it and the saved balance would leave that one out, so the save is refused. A billing from a `request`
+ * (a request for billing) also saves the request with this billing's uuid, as the phone's MoneySection does.
  */
-async function addBilling(c, f) {
+async function addBilling(c, f, request = null) {
   const uid = s.user.uid;
   await runTransaction(db, async t => {
-    const project = await t.get(doc(db, 'projects', c.page.id)), now = Date.now();
+    const [project, asked] = await Promise.all([t.get(doc(db, 'projects', c.page.id)), request && t.get(doc(db, 'records', request.uuid))]), now = Date.now();
     if ((project.get('billingStamp') ?? '') !== (c.project.billingStamp ?? '')) throw new Error('Another billing was just added. Close this form and add this one again.');
+    if (asked && (!asked.exists() || asked.get('isDeleted') === true || asked.get('revision') !== request.revision || asked.get('updatedAt') !== request.updatedAt)) {
+      throw new Error('This billing request was just changed on another device. Close this form and try again.');
+    }
     const assignedUids = project.get('assignedUids') ?? [];
     const payment = L.newPaymentRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now }, f, c.payments, c.cost);
     const audit = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...L.newPaymentAudit(payment) });
     t.set(doc(db, 'records', payment.uuid), payment);
     t.set(doc(db, 'records', audit.uuid), audit);
+    if (asked) {
+      t.update(asked.ref, L.editedRecord(asked.data(), { paymentUuid: payment.uuid }, { uid, now, assignedUids }));
+      const logged = L.auditRecord({ uuid: crypto.randomUUID(), projectUuid: c.page.id, assignedUids, uid, now, user: s.profile.name || s.user.email, ...L.requestAudit(request) });
+      t.set(doc(db, 'records', logged.uuid), logged);
+    }
     // updatedByUid too: the rules refuse a project write still carrying the duplicate guard's.
     t.update(project.ref, { billingStamp: payment.uuid, updatedByUid: uid });
   });
@@ -4213,8 +4248,15 @@ function bindActual(c) {
 /** Which cost the billing % are on, once a variation order moved it; nothing otherwise. */
 const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
 
-function paymentsBody({ project, payments, cost, billed }) {
-  const editable = L.canEdit(project, s.user.uid, s.claims);
+function paymentsBody({ project, payments, cost, billed, of }) {
+  const editable = L.canEdit(project, s.user.uid, s.claims), asked = L.pendingBillingRequests(of('developer_requests'), payments);
+  // Requests for billing logged under Developer requests wait here until a billing is saved from one.
+  const requests = asked.length ? section(`Billing requests (${asked.length})`, 'move_to_inbox', asked.map(r => entry(L.billingRequestText(r), [
+    `Requested: ${L.displayDate(r.dateRequested)}  ·  Received: ${L.displayDate(r.dateReceived)}`,
+    r.datePackaged ? `Packaged: ${L.displayDate(r.datePackaged)}` : 'Not yet packaged',
+  ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
+    + (editable ? `<button class="text-btn entry-edit" data-bill-request="${esc(r.uuid)}">${icon('check_circle', 'sm')}Mark billed</button>` : ''), 'waiting')).join('')
+    + '<p class="muted small">Not yet billed. One counts in the Status of billing once marked billed with its DV No. and scanned DV form.</p>') : '';
   const summary = section('Billing summary', 'payments', `<div class="bill-sum">
     ${kv('Current contract cost', L.formatPhp(cost))}
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word')}
@@ -4222,8 +4264,8 @@ function paymentsBody({ project, payments, cost, billed }) {
     ${kv('Balance', L.formatPhp(cost - billed))}
     </div>${baseNote(project, cost)}
     ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
-  if (!payments.length) return `<div class="stack">${summary}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
-  return `<div class="stack">${summary}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
+  if (!payments.length) return `<div class="stack">${summary}${requests}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
+  return `<div class="stack">${summary}${requests}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
       <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
@@ -4265,7 +4307,7 @@ function documentsBody(c, chip) {
     return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(L.variationTitle(d.documentName), L.variationLines(d), orderExtra(d, editable), '', orderBadge(d))).join(''), 'No variation orders recorded.', add(vo));
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
-  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable);
+  if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable, c.payments);
   if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents), editable);
   const suspensions = documents.filter(L.isSuspension);
   const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
@@ -4297,12 +4339,13 @@ function lettersCard(letters, editable = false) {
 }
 
 /** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Add request and Edit. */
-function requestsCard(requests, now, editable = false) {
+function requestsCard(requests, now, editable = false, payments = []) {
   const add = editable ? `<button class="text-btn" id="request-add">${icon('add_circle', 'sm')}Add request</button>` : '';
   return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
-    const title = L.requestTitle(r);
+    const title = L.requestTitle(r), billed = r.requestType === L.BILLING_REQUEST && payments.find(p => p.uuid && p.uuid === r.paymentUuid);
     return entry(title, [
+      r.requestType === L.BILLING_REQUEST && `${L.billingRequestText(r)} · ${billed ? `Billed, DV ${billed.dvNo}` : 'Not yet billed (under Payments)'}`,
       `Requested: ${L.displayDate(r.dateRequested)}  ·  Received: ${L.displayDate(r.dateReceived)}`,
       r.datePackaged ? `Packaged: ${L.displayDate(r.datePackaged)}` : `Not yet packaged${waiting == null ? '' : ` · ${waiting} days since received`}`,
       title === (r.requestType || '-') && r.details?.trim() && `Details: ${r.details}`, // an order number is in the title instead
@@ -4525,16 +4568,22 @@ function drawAbstractPrint(c) {
     ${section('This billing', 'receipt_long', `<div class="apa-typed" id="apa-typed">${box('covered', 'Period covered', '')}
         ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (lots)') : ''}
         ${housing > 0 ? box('m1', 'Milestone 1 (units)') + box('m2', 'Milestone 2 (units)') : ''}</div>
-      <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>`, 'no-print')}
+      <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>
+      <div class="n-watch" id="apa-warn" role="status"></div>`, 'no-print')}
     <div class="bb-scroll"><div class="bb full land" id="sheet"></div></div>`;
   // A blank or unreadable number is 0 (parseAmount takes no minus sign, so a negative is 0 too).
   const number = text => L.parseAmount(text) ?? 0;
+  let warnings = [];
   const drawSheet = () => {
+    const units = L.abstractUnits(project, L.lotSummary(records).saleable);
+    const period = { covered: typed.covered, lots: number(typed.lots), development: number(typed.development), m1: number(typed.m1), m2: number(typed.m2) };
     document.getElementById('sheet').innerHTML = P.billingAbstractHtml({
-      project, docs: documents, payments, abstract, units: L.abstractUnits(project, L.lotSummary(records).saleable),
-      period: { covered: typed.covered, lots: number(typed.lots), development: number(typed.development), m1: number(typed.m1), m2: number(typed.m2) },
+      project, docs: documents, payments, abstract, units, period,
       signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png',
     });
+    // Billed above the work done is only warned of: the sheet still prints.
+    warnings = L.billingAbstractWarnings(abstract, L.billingAbstract(project, documents, payments, abstract, period, units));
+    document.getElementById('apa-warn').innerHTML = warnings.map(w => `<p>${icon('warning', 'sm')}${esc(w)}</p>`).join('');
   };
   drawSheet();
   const boxes = document.getElementById('apa-typed');
@@ -4543,7 +4592,10 @@ function drawAbstractPrint(c) {
   bindSignatories(c, 'billing');
   const btn = document.getElementById('do-print');
   btn.disabled = false;
-  btn.onclick = () => window.print();
+  btn.onclick = async () => {
+    if (warnings.length && !await ask('The billing is above the actual accomplishment. Print anyway?', { action: 'Print anyway', detail: warnings.join(' ') })) return;
+    window.print();
+  };
 }
 
 /** The monthly form (BlueBookForms.monthlyReport) for `#/p/<id>/print/2026-09`. */
