@@ -1,8 +1,8 @@
 {
-  "versionCode": 317,
-  "versionName": "2.8.37",
-  "releaseNotes": "v2.8.37: The billing abstract prints its own four signatories (Prepared by, Checked by, Reviewed by, Recommending Approval), saved for the project.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.37/NHA_Monitor_v2.8.37_Build317.apk",
-  "apkSha256": "411ac1fe83784269aa4971e1084637cfa6596e88d733f3ca10a34a141b4734dc",
+  "versionCode": 318,
+  "versionName": "2.8.38",
+  "releaseNotes": "v2.8.38: In New abstract, housing construction items take the number of houses this period; the app works out each quantity. Printed abstracts are unchanged.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.38/NHA_Monitor_v2.8.38_Build318.apk",
+  "apkSha256": "141163a9064e059daf6649a7ec3c0618496da499b13af779b59b698adb487de3",
   "isMandatory": false
 }
