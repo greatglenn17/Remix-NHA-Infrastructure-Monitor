@@ -115,7 +115,7 @@ object ProjectAbstracts {
 
     /* The next abstract, made in the app from the one before it, by the sheet's own formulas. web/logic.js has the
        website's copy (isPayLine, abstractCover, nextAbstractProblem, nextAbstractSource, nextAbstractTyped,
-       nextAbstractRows, nextAbstractErrors, nextAbstractFields, nextAbstractNote, quantityText); change both together. */
+       abstractHouseLines, abstractHouses, nextAbstractRows, nextAbstractErrors, nextAbstractFields, nextAbstractNote, quantityText); change both together. */
 
     private fun round4(v: Double) = Math.round(v * 10000) / 10000.0
 
@@ -174,6 +174,24 @@ object ProjectAbstracts {
         val rows = same?.let { rows(it.rowsJson) }.orEmpty()
         if (rows.size != sourceRows.size || rows.indices.any { rows[it].kind != sourceRows[it].kind || rows[it].no != sourceRows[it].no || rows[it].name != sourceRows[it].name }) return emptyMap()
         return rows.indices.filter { isPayLine(rows[it]) && rows[it].period.getOrNull(0) != null }.associateWith { rows[it].period[0]!! }
+    }
+
+    /** The indexes of the pay lines of a Housing Construction part, which the New abstract takes in houses. */
+    fun houseLines(rows: List<AbstractExcel.Row>): List<Int> {
+        var line = ""
+        return rows.indices.filter { i -> if (rows[i].kind == "part") line = accomplishmentLine(rows[i].name); line == ACCOMPLISHMENT_LINES[2] && isPayLine(rows[i]) }
+    }
+
+    /**
+     * [typed] by row index with each house line's houses as its quantity, houses x (QTY / [units], the project's housing
+     * units), at 4 decimals; [back] turns quantities into houses. The rest, and a NaN (a box that is not a number), stay.
+     */
+    fun houses(rows: List<AbstractExcel.Row>, typed: Map<Int, Double>, units: Int, back: Boolean = false): Map<Int, Double> {
+        val lines = houseLines(rows).toSet()
+        return typed.mapValues { (i, v) ->
+            val qty = rows[i].qty ?: 0.0
+            if (i !in lines || !v.isFinite()) v else round4(if (back) v * units / qty else v * qty / units)
+        }
     }
 
     /**

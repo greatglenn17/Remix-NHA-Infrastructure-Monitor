@@ -225,7 +225,8 @@ class ActualAccomplishmentUiTest {
         androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         val filed = mutableStateListOf(first)
         openNewAbstract(filed, "2026-11-20") { filed += it }
-        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed.").assertExists()
+        rule.onNodeWithText("Type only this period's quantity of each item. Previous is the to date of the abstract before it; to date, the amounts and the percentages are computed. " +
+            "Housing construction items take the number of houses this period instead: each house is the item's QTY ÷ 1, the project's housing units.").assertExists()
         inForm("new_abstract_note").assert(hasText("Overall to date 77.77%, from 77.77% as of Nov 13, 2026."))
         inForm("next_done_0").assert(hasText("To date 420"))
         rule.onNodeWithText("520 LOT · Previous 420").assertExists()
@@ -276,8 +277,35 @@ class ActualAccomplishmentUiTest {
         inForm("next_done_8").assert(hasText("To date 46.5"))
     }
 
+    // A housing construction item takes houses: 120 houses of 10,508 sq.m over 370 units is 3,408 sq.m, which is what is saved.
+    @Test fun newAbstract_housingItemsTakeHouses_andSaveTheirQuantities() {
+        val rows = listOf(
+            heading("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", 10508.0, "sq.m", 50.0, listOf(0.0, 0.0, 0.0)),
+            sum("subtotal", "Subtotal (Housing Construction)", 525400.0, 0.0, 0.0), sum("total", "GRAND TOTAL", 525400.0, 0.0, 0.0),
+        )
+        val housing = first.copy(rowsJson = ProjectAbstracts.rowsJson(rows))
+        val filed = mutableStateListOf(housing)
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                ActualAccomplishmentSection(project, emptyList(), filed, "Engr. Sample", { filed += it }, {}, {}, { _, _ -> }, LocalDate.parse("2026-11-20"), units = 370)
+            }
+        }
+        rule.onNodeWithTag("new_abstract").performClick()
+        inForm("next_houses_1").assert(hasText("houses × 28.4 = 0 sq.m"))
+        inForm("next_period_1").performTextReplacement("120")
+        inForm("next_houses_1").assert(hasText("houses × 28.4 = 3,408 sq.m"))
+        inForm("next_done_1").assert(hasText("To date 3,408"))
+        rule.onNodeWithTag("save_new_abstract").performClick()
+        assertEquals(listOf(3408.0, 170400.0, 32.43), ProjectAbstracts.rows(filed.last().rowsJson)[1].period)
+        // Made again for that date, the box starts from the houses it saved.
+        rule.onNodeWithTag("new_abstract").performClick()
+        inForm("next_period_1").assert(hasText("120"))
+    }
+
     // Made again for a date that already has an abstract: the boxes start from that one's quantities, and saving asks first.
     @Test fun newAbstract_ofADateAlreadyFiled_startsFromItsQuantities_andReplacesItAfterAsking() {
+        // As in the test above: on a busy machine this form took over the 60 s idle limit (about 180 s), though it settles.
+        androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         var saved: ProjectAbstract? = null
         openNewAbstract(listOf(first, next(mapOf(0 to 20.0, 8 to 10.5)).copy(id = 2)), "2026-11-20") { saved = it }
         inForm("next_period_0").assert(hasText("20"))

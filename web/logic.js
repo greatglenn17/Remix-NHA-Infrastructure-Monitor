@@ -1966,6 +1966,21 @@ export function nextAbstractTyped(sourceRows, same) {
   return Object.fromEntries(rows.flatMap((r, i) => (isPayLine(r) && r.period?.[0] != null ? [[i, r.period[0]]] : [])));
 }
 
+/** ProjectAbstracts.houseLines: the indexes of the pay lines of a Housing Construction part, which the New abstract takes in houses. */
+export function abstractHouseLines(rows) {
+  let line = '';
+  return rows.flatMap((r, i) => { if (r.kind === 'part') line = accomplishmentLine(r.name); return line === ACCOMPLISHMENT_LINES[2] && isPayLine(r) ? [i] : []; });
+}
+
+/**
+ * ProjectAbstracts.houses: `typed` by row index with each house line's houses as its quantity, houses x
+ * (QTY / `units`, the project's housing units), at 4 decimals; `back` turns quantities into houses. The rest stay.
+ */
+export function abstractHouses(rows, typed, units, back = false) {
+  const houses = new Set(abstractHouseLines(rows));
+  return Object.fromEntries(Object.entries(typed).map(([i, v]) => [i, !houses.has(Number(i)) ? v : round4(back ? v * units / rows[i].qty : v * rows[i].qty / units)]));
+}
+
 /**
  * ProjectAbstracts.nextRows: the rows of the next abstract. `rows` are the source's, `typed` this period's quantity
  * by row index (none typed is no work this period). As on the sheet: PREVIOUS is the source's TO DATE; a pay line's

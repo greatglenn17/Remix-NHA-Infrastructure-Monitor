@@ -327,6 +327,26 @@ class ProjectAbstractsTest {
         assertEquals(listOf(listOf(3.0, 3000.0, 100.0), listOf(0.0, 0.0), listOf(null, 3000.0, 100.0)), listOf(thrice[0].toDate, thrice[0].balance, thrice[1].toDate))
     }
 
+    // web/logic.test.mjs's housing case, figure for figure: each house is the item's QTY / the housing units.
+    @Test fun next_abstract_takes_housing_construction_items_in_houses() {
+        fun head(kind: String, no: String, name: String) = AbstractExcel.Row(kind, no, name, null, "", null, null, none3, none3, none3, none2)
+        val rows = listOf(
+            head("part", "2", "LAND DEVELOPMENT"), line("item", "2.1", "Catch basin", 96.0, "unit", 100.0, listOf(0.0, 0.0, 0.0)),
+            head("part", "3", "HOUSING CONSTRUCTION"), line("item", "3.1", "Soil poisoning", 10508.0, "sq.m", 50.0, listOf(0.0, 0.0, 0.0)),
+            head("group", "3.2", "ROOFING"), line("item", "3.2.1", "Roofing", 18500.0, "sq.m", 10.0, listOf(0.0, 0.0, 0.0)),
+            sum("subtotal", "Subtotal (Housing Construction)", 710400.0, 0.0, 0.0, true),
+        )
+        assertEquals(listOf(3, 5), ProjectAbstracts.houseLines(rows))
+        // 120 houses of soil poisoning is 120 x 10,508 / 370 = 3,408 sq.m; land development stays as typed; a NaN stays one, for nextErrors to name.
+        val typed = ProjectAbstracts.houses(rows, mapOf(1 to 12.0, 3 to 120.0, 5 to 12.5), 370)
+        assertEquals(mapOf(1 to 12.0, 3 to 3408.0, 5 to 625.0), typed)
+        assertEquals(170400.0, ProjectAbstracts.nextRows(rows, typed)[3].period[1])
+        assertEquals(mapOf(1 to 12.0, 3 to 120.0, 5 to 12.5), ProjectAbstracts.houses(rows, typed, 370, back = true)) // a saved abstract's quantities back as houses
+        assertTrue(ProjectAbstracts.houses(rows, mapOf(3 to Double.NaN), 370)[3]!!.isNaN())
+        // A quantity that does not split evenly comes back to the houses typed.
+        assertEquals(mapOf(3 to 7.0), ProjectAbstracts.houses(rows, ProjectAbstracts.houses(rows, mapOf(3 to 7.0), 9), 9, back = true))
+    }
+
     @Test fun next_abstract_continues_the_latest_one_dated_before_it() {
         val first = made("2026-11-13", nextRows, 1)
         val second = made("2026-11-20", ProjectAbstracts.nextRows(nextRows, mapOf(0 to 20.0, 8 to 10.5), 520.0), 2).copy(overallPct = 81.69)

@@ -1687,6 +1687,23 @@ test('the next abstract is made from the one before it: previous is its to date,
   assert.deepEqual([thrice[0].toDate, thrice[0].balance, thrice[1].toDate], [[3, 3000, 100], [0, 0], [null, 3000, 100]]);
 });
 
+test('the next abstract takes housing construction items in houses: each house is QTY / the housing units', () => {
+  const head = (kind, no, name) => ({ kind, no, name, qty: null, amount: null });
+  const item = (no, name, qty, unit, unitCost) => ({ kind: 'item', no, name, qty, unit, unitCost, amount: qty * unitCost, toDate: [0, 0, 0] });
+  const rows = [head('part', '2', 'LAND DEVELOPMENT'), item('2.1', 'Catch basin', 96, 'unit', 100),
+    head('part', '3', 'HOUSING CONSTRUCTION'), item('3.1', 'Soil poisoning', 10508, 'sq.m', 50), head('group', '3.2', 'ROOFING'), item('3.2.1', 'Roofing', 18500, 'sq.m', 10),
+    { kind: 'subtotal', name: 'Subtotal (Housing Construction)', amount: 710400, toDate: [null, 0, 0] }];
+  assert.deepEqual(L.abstractHouseLines(rows), [3, 5]);
+  // 120 houses of soil poisoning is 120 x 10,508 / 370 = 3,408 sq.m; land development stays as typed; a NaN stays one, for nextAbstractErrors to name.
+  const typed = L.abstractHouses(rows, { 1: 12, 3: 120, 5: 12.5 }, 370);
+  assert.deepEqual(typed, { 1: 12, 3: 3408, 5: 625 });
+  assert.equal(L.nextAbstractRows(rows, typed)[3].period[1], 170400);
+  assert.deepEqual(L.abstractHouses(rows, typed, 370, true), { 1: 12, 3: 120, 5: 12.5 }); // a saved abstract's quantities back as houses
+  assert.ok(Number.isNaN(L.abstractHouses(rows, { 3: NaN }, 370)[3]));
+  // A quantity that does not split evenly comes back to the houses typed.
+  assert.deepEqual(L.abstractHouses(rows, L.abstractHouses(rows, { 3: 7 }, 9), 9, true), { 3: 7 });
+});
+
 test('the next abstract continues the latest one dated before it', () => {
   const first = { uuid: 'a', asOf: '2026-11-13', rowsJson: JSON.stringify(NEXT_ROWS), equivUnits: 520, updatedAt: 1 };
   const second = { uuid: 'b', asOf: '2026-11-20', rowsJson: JSON.stringify(L.nextAbstractRows(NEXT_ROWS, { 0: 20, 8: 10.5 }, 520)), equivUnits: 520, updatedAt: 2 };
