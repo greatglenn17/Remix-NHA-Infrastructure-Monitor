@@ -786,8 +786,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lots-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lots-head h2 { margin: 0; font-size: 16px; }
 .lots-head select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px; min-height: 44px; max-width: 100%; }
-.plan-tools { margin: 4px 0 0; }
-.plan-tools .lots-links { display: flex; padding-bottom: 8px; }
+.plan-tools { margin: 4px 0 0; }.plan-tools .lots-links { display: flex; padding-bottom: 8px; }
 .plan-tools .danger { margin: 0 0 0 auto; }
 .lot-sum { margin: 4px 0 0; font-size: 14px; }
 .lot-sites { margin: 12px 0; flex-wrap: wrap; max-width: 100%; } /* many sites wrap instead of widening the page */
@@ -804,8 +803,18 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .lot-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lot-legend .dot { width: 10px; height: 10px; border-radius: 50%; }
 /* The plan viewer (SubdivisionPlanTab): the plan moves and zooms inside a fixed frame, with the zoom bar and lot card over it. */
-.lot-frame { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 4px; } /* the viewer with the picked lot's card over its foot, then the zoom bar */
-.lot-viewer, .lot-card { grid-area: 1 / 1; }
+.lot-frame { display: grid; grid-template-columns: minmax(0, 1fr) auto; margin-top: 4px; } /* the viewer with the picked lot's card over its foot, then one row: the legend and the zoom bar */
+.lot-viewer, .lot-card { grid-area: 1 / 1 / 2 / -1; }
+@media (min-width: 601px) {
+  /* Plan setup beside the scale under the title, in the row's spare room, where its opened tools wrap. Its place on the
+     line comes from the 280px basis, not from what is open, so opening it never moves it. */
+  .lots-head > div { flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 12px; }
+  .lots-head h2 { flex: 1 1 100%; }
+  .lots-head > div > .text-btn { min-height: 44px; } /* the scale, as tall as Plan setup beside it, so their words line up */
+  .lots-head .plan-tools { flex: 1 1 280px; min-width: 0; margin: 0; }
+  .lot-frame .lot-legend { grid-area: 2 / 1; align-self: center; margin: 0 12px 4px 0; }
+  .lot-frame .zoom-bar { grid-area: 2 / 2; }
+}
 .lot-viewer { position: relative; height: min(calc(70vh / var(--zoom)), 720px); min-height: 360px; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; overflow: clip; background: var(--surface-variant); touch-action: none; } /* clip: not a scroll container, so focusing a lot never scrolls the plan away from where clicks are measured */
 .lot-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; cursor: grab; user-select: none; }
 .lot-stage:active { cursor: grabbing; }
@@ -854,7 +863,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .lots-head h2 { margin-bottom: 8px; }
   .lot-sites, .lots-head > div > :not(h2), .lots-head > .lots-links { align-self: flex-start; }
   .lots-head > div > :not(h2), .lots-head > .lots-links, .lot-filters, .lot-count { order: 2; }
-  .lot-legend, .lot-sum, .lots > .plan-tools, #lot-results { order: 3; }
+  .lot-legend, .lot-sum, #lot-results { order: 3; }
   .lot-viewer { box-sizing: border-box; width: 100%; margin-top: 4px; height: auto; aspect-ratio: var(--plan-ar, 4 / 3); min-height: 240px; max-height: calc(70vh / var(--zoom)); } /* the width is set, so a min-height never widens it */
   .lot-card { order: 1; align-self: stretch; margin: 0 0 12px; border: 1px solid var(--outline); border-radius: 8px; }
 }
