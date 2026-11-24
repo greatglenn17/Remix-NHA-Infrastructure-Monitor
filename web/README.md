@@ -129,7 +129,8 @@ is read only.
 - **The plan's own tools** (Progress → Lots; put away while a lot is being drawn) are the phone's plan header and
   plan menu (`bindPlanTools`). The scale sits under the plan's name (on a phone, under the plan with the plan's links
   and the search, so the plan comes first), Find lots beside Add lot, and the rest fold
-  under **Plan setup** beside the scale (not under the plan), which stays open while the page redraws:
+  under **Plan setup** beside the scale (a button that shows `#plan-tools`, a row of outlined buttons under the
+  toolbar), which stays open while the page redraws:
   - **Scale**, for the people who can edit the project (`scaleForm`, `L.planScale`): the number printed after
     "SCALE 1:" (10 to 100000). The areas of the lots nobody typed an area for (blank, the add form's 50, or what the
     last scale gave) are worked out from it, with the app's "Project Edit" audit entry. When the PDF cannot be read

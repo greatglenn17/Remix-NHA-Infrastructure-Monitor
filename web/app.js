@@ -1739,12 +1739,14 @@ function lotsView(c) {
   const k = L.lotStats(site.lots);
   const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option value="${esc(o)}"${o === st[key] ? ' selected' : ''}>${esc(L.shownWord(o))}</option>`).join('')}</select></label>`;
   const legend = `<div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>`;
-  // Plan setup sits under the title beside the scale (user, 2026-11-25), then the search and the plan; the legend shares the zoom bar's row, the totals follow.
+  // One toolbar: the title, the scale and Plan setup, with the plan's links at the right; Plan setup opens its tools as a row of
+  // buttons under it (user, 2026-11-25: buttons, no dead space). Then the search and the plan; the legend shares the zoom bar's row.
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="seg lot-sites" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
-    <div class="lots-head"><div><h2>${title}</h2>${scaleLine}${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}</div>
+    <div class="lots-head"><div><h2>${title}</h2>${scaleLine}${tools ? `<button class="text-btn" id="plan-setup" aria-expanded="${Boolean(st.setup)}" aria-controls="plan-tools">${icon('expand_more', 'sm')}Plan setup</button>` : ''}</div>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}</span></div>
+    ${tools ? `<div class="plan-panel" id="plan-tools" role="group" aria-label="Plan setup"${st.setup ? '' : ' hidden'}>${tools}</div>` : ''}
     <div class="lot-filters">
       <label class="field grow">Search<input type="search" id="lot-q" placeholder="Block, lot, unit (b3-l12)" value="${esc(st.query)}" autocomplete="off"></label>
       <button class="pill" id="lot-filter-toggle" aria-expanded="${Boolean(st.filters)}" aria-controls="lot-filter-set">${icon('filter_list', 'sm')}<span id="lot-filter-n">${filterLabel(st)}</span></button>
@@ -2353,7 +2355,7 @@ function bindPlanTools(c) {
   const st = lotState(c.page), { sites, site } = lotSite(c, st);
   const bind = (id, event, run) => { const el = document.getElementById(id); if (el) el[event] = () => run(el); };
   const act = (el, run, note) => planAct(c, el, run, note);
-  bind('plan-setup', 'ontoggle', el => { st.setup = el.open; });
+  bind('plan-setup', 'onclick', el => { st.setup = !st.setup; el.setAttribute('aria-expanded', st.setup); document.getElementById('plan-tools').hidden = !st.setup; });
   bind('plan-scale', 'onclick', () => scaleForm(c, site));
   bind('plan-turn', 'onclick', el => act(el, () => saveEdit(c, site.plan, L.planTurned(site.plan), 'plan', null)));
   // The print area (setSdpPlanFrame): two clicks on the whole page mark it (bindLots), or the whole page, or the box around the lots.
