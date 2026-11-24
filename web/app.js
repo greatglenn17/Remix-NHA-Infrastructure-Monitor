@@ -162,11 +162,11 @@ function land() {
   to.focus({ preventScroll: true });
 }
 
-/** The open section's link the user can see: the sidebar's (768px and up), else the project's tab. */
-const currentTab = () => [side.querySelector('[aria-current="page"]'), main.querySelector('nav.tabs [aria-current="page"]')].find(e => e?.offsetParent);
+/** The open section's link the user can see: the sidebar's (this very address first, so a Progress view's own link), else the project's tab. */
+const currentTab = () => [side.querySelector(`a[href="${CSS.escape(location.hash)}"]`), side.querySelector('[aria-current="page"]'), main.querySelector('nav.tabs [aria-current="page"]')].find(e => e?.offsetParent);
 
 /**
- * The sidebar (768px and up; style.css): All projects, the open project's five sections under its name, and Users for
+ * The sidebar (768px and up; style.css): All projects, the open project's five sections under its name (Progress's views under it), and Users for
  * the Super Admin. Hidden when signed out and on a print view. Under 768px the project's tab row does this job.
  */
 function drawSide() {
@@ -177,9 +177,13 @@ function drawSide() {
   const at = m ? (SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
   const link = (href, ic, label, key) => `<a href="${href}"${key === at ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
   const name = open?.project?.name || '';
-  const html = `${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
+  // Progress's views (the chips on its page) as links under it, once the project has loaded; the full sidebar only (style.css).
+  const views = open?.project ? progressViews(open.project) : [];
+  const view = at === 'progress' && views.length && (views.find(x => L.chipSlug(x) === m[3]) || (views.includes(open.chips.progress) ? open.chips.progress : views[0]));
+  const sub = views.length ? `<div class="side-sub" role="group" aria-label="Progress">${views.map(x => `<a href="#/p/${esc(m[1])}/progress/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${x}</a>`).join('')}</div>` : '';
+  const html =`${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
     ${m && !open?.error && open?.project !== null ? `<div class="side-group" role="group" aria-label="${esc(name || 'Project')}"><p class="side-name" aria-hidden="true">${esc(name)}</p>
-      ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key)).join('')}</div>` : ''}
+      ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key) + (key === 'progress' ? sub : '')).join('')}</div>` : ''}
     ${admin ? link('#/users', 'manage_accounts', 'Users', 'users') : ''}`;
   // A live redraw (the project's name arriving) keeps focus on the link that had it; a new page lands by itself (land).
   const had = !s.land && side.contains(document.activeElement) && document.activeElement.getAttribute('href');
@@ -1131,6 +1135,8 @@ const CHIPS = {
   progress: ['Weekly', 'Monthly', 'Photos', 'Weather', 'Issues'],
   documents: ['Suspension / Resumption', 'Time Extensions', 'Variation Orders', 'Letters to Contractor', 'Developer Requests', 'Related Files'],
 };
+/** Progress's views for this project: the chips on its page and the links under it in the sidebar. */
+const progressViews = project => (/housing/i.test(project.projectType || '') ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues'] : CHIPS.progress);
 
 function drawProject(page) {
   if (page !== s.page) return;
@@ -1169,8 +1175,7 @@ function drawProject(page) {
     if (L.canAssign(s.claims)) driveForm(c);
   }
 
-  const housing = /housing/i.test(project.projectType || '');
-  const chips = page.section === 'progress' && housing ? ['Weekly', 'Monthly', 'Lots', 'Photos', 'Weather', 'Issues']
+  const chips = page.section === 'progress' ? progressViews(project)
     : page.section === 'documents' && L.canViewAuditLogs(s.claims) ? [...CHIPS.documents, 'Audit log'] : CHIPS[page.section];
   // A chip named in the URL (#/p/<id>/documents/variation-orders) wins, so a reload or a shared link opens it.
   const linked = chips?.find(x => L.chipSlug(x) === page.sub);
