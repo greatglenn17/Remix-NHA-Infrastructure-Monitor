@@ -82,6 +82,7 @@ const main = document.getElementById('app');
 // "What these figures mean" (figuresHelp) on any redraw, whole page or one sheet.
 main.addEventListener('click', e => { if (e.target.closest('[data-figures-help]')) showTermHelp(FIGURE_HELP); });
 const who = document.getElementById('who');
+const side = document.getElementById('side');
 const s = {
   user: null, claims: {}, profile: {}, projects: null, projectsError: null, loaded: {},
   payments: new Map(), docs: new Map(), requests: new Map(), weekly: new Map(), issues: new Map(), unsub: [], unsubPage: [], page: null,
@@ -149,7 +150,7 @@ document.addEventListener('keydown', e => {
  */
 function land() {
   if (!s.land) return;
-  const to = (s.land === 'tab' && main.querySelector('nav.tabs [aria-current="page"]')) || main.querySelector('.print-bar .back') || main.querySelector('h1') || main.querySelector('.back');
+  const to = (s.land === 'tab' && currentTab()) || main.querySelector('.print-bar .back') || main.querySelector('h1') || main.querySelector('.back');
   if (!to) return; // still loading: the next draw lands
   s.land = null;
   const note = document.getElementById('saved');
@@ -159,6 +160,31 @@ function land() {
   if (at && at !== document.body && at !== s.landFrom && at.isConnected) return;
   if (to.tagName === 'H1') to.tabIndex = -1;
   to.focus({ preventScroll: true });
+}
+
+/** The open section's link the user can see: the sidebar's (768px and up), else the project's tab. */
+const currentTab = () => [side.querySelector('[aria-current="page"]'), main.querySelector('nav.tabs [aria-current="page"]')].find(e => e?.offsetParent);
+
+/**
+ * The sidebar (768px and up; style.css): All projects, the open project's five sections under its name, and Users for
+ * the Super Admin. Hidden when signed out and on a print view. Under 768px the project's tab row does this job.
+ */
+function drawSide() {
+  const m = PAGE.exec(location.hash), open = m && s.page?.id === m[1] ? s.page : null;
+  side.hidden = !s.user || m?.[2] === 'print';
+  if (side.hidden) return;
+  const admin = s.claims.role === 'SUPER_ADMIN';
+  const at = m ? (SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
+  const link = (href, ic, label, key) => `<a href="${href}"${key === at ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
+  const name = open?.project?.name || '';
+  const html = `${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
+    ${m && !open?.error && open?.project !== null ? `<div class="side-group" role="group" aria-label="${esc(name || 'Project')}"><p class="side-name" aria-hidden="true">${esc(name)}</p>
+      ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key)).join('')}</div>` : ''}
+    ${admin ? link('#/users', 'manage_accounts', 'Users', 'users') : ''}`;
+  // A live redraw (the project's name arriving) keeps focus on the link that had it; a new page lands by itself (land).
+  const had = !s.land && side.contains(document.activeElement) && document.activeElement.getAttribute('href');
+  drawOnce(side, html);
+  if (had && !side.contains(document.activeElement)) side.querySelector(`a[href="${CSS.escape(had)}"]`)?.focus({ preventScroll: true });
 }
 
 /** Writes `html` into `el` unless it already holds exactly that (drawn here, untouched since), so an alert is read once. */
@@ -231,6 +257,7 @@ onAuthStateChanged(auth, async user => {
   document.body.classList.toggle('signed-out', !user);
   if (!user) {
     who.innerHTML = '';
+    drawSide();
     const after = afterSignUp; afterSignUp = null;
     if (after) return renderSignIn('', after.note, after.email);
     // A failed sign-up signs out too; its form and message stay.
@@ -243,7 +270,7 @@ onAuthStateChanged(auth, async user => {
   who.innerHTML = `
     <span class="email">${esc(user.email)}</span>
     <span class="badge view">${icon(L.isWriter(s.claims) ? 'edit' : 'visibility', 'sm')}${esc(ROLE_LABELS[s.claims.role] || 'No role yet')} · ${L.isWriter(s.claims) ? 'can edit' : 'read only'}</span>
-    ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn" href="#/users">${icon('manage_accounts', 'sm')}<span class="lbl">Users</span></a>` : ''}
+    ${s.claims.role === 'SUPER_ADMIN' ? `<a class="text-btn who-users" href="#/users">${icon('manage_accounts', 'sm')}<span class="lbl">Users</span></a>` : ''}
     <button id="profile" class="text-btn">${icon('person', 'sm')}<span class="lbl">Profile</span></button>
     <button id="out" class="text-btn">${icon('logout', 'sm')}<span class="lbl">Sign out</span></button>`;
   document.getElementById('out').onclick = () => signOut(auth);
@@ -272,6 +299,7 @@ function route() {
   window.scrollTo(0, 0);
   s.land = m && s.page?.id === m[1] ? 'tab' : 'page';
   s.landFrom = document.activeElement;
+  drawSide();
   // The Saved line belongs to the page it was said on; only a save that opens a page itself (New project) carries it over.
   if (!savedNote.keep) document.getElementById('saved').hidden = true;
   savedNote.keep = false;
@@ -1107,6 +1135,7 @@ const CHIPS = {
 function drawProject(page) {
   if (page !== s.page) return;
   if (document.querySelector('dialog.ask[data-question]')) { page.redraw = true; return; }
+  drawSide(); // the project's name, once it has loaded
   const { project: stored, records, error } = page;
   // A page without a heading (an error, a print view) lands on its back link; it keeps focus through a redraw.
   let onBack = document.activeElement?.matches?.('main .back');
@@ -4187,7 +4216,7 @@ function bindActual(c) {
     drawProject(page);
     if (document.activeElement !== document.body) { announce(text); return; }
     const note = document.getElementById('abstract-note');
-    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); note.scrollIntoView({ block: 'nearest' }); } else main.querySelector('nav.tabs [aria-current="page"]')?.focus({ preventScroll: true });
+    if (note && text) { note.tabIndex = -1; note.focus({ preventScroll: true }); note.scrollIntoView({ block: 'nearest' }); } else currentTab()?.focus({ preventScroll: true });
   };
   const failed = x => say(L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.'));
   const actualAfter = abstracts => ({ actualAccomplishment: L.projectActualAfter(abstracts, c.weekly, c.project.actualAccomplishment) });
