@@ -412,18 +412,20 @@ tfoot th { color: var(--text); font-weight: 600; border-bottom: 0; }
 thead .num { font-family: inherit; }
 .pay .pdate { display: none; }
 
-/* Under 1140px a third is narrower than the profile (349px): report and construction beside the profile, then plan and
-   dates beside cost and payments. */
-@media (max-width: 1140px) {
+/* Under 1140px of page a third is narrower than the profile (349px): report and construction beside the profile, then plan and
+   dates beside cost and payments. The sidebar's 80px rail is beside the page here, so the screen is 1220px (980px below). */
+@media (max-width: 1220px) {
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bento > .bento-foot { grid-column: auto; display: flex; flex-direction: column; align-items: stretch; align-self: stretch; }
   .bento-foot > .section:last-child { flex: 1 0 auto; }
   .bento { grid-auto-flow: row dense; } /* the foot fills the cell beside plan and dates, before the full-width Status of billing */
 }
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .bento { grid-template-columns: minmax(0, 1fr); }
   .portfolio { grid-template-columns: 1fr; }
   .pills { justify-content: flex-start; }
+}
+@media (max-width: 900px) {
   .signin { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .hero { padding: 32px 24px; min-height: 200px; border-right: 0; }
   .hero h1 { font-size: 26px; }
@@ -483,6 +485,41 @@ thead .num { font-family: inherit; }
 @media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } }
 @media (max-width: 420px) { .tabs { gap: 0; } .tabs a { padding: 10px 3px; font-size: 13px; } }
 @media (max-width: 340px) { .tabs a { padding: 10px 1px; font-size: 12px; } }
+
+/* Sidebar (app.js drawSide), from 768px: All projects, the open project's sections, Users. It takes the tab row's place;
+   under 768px the tab row stays. An 80px rail (icon over a short name) up to 1439px, 208px with full names from 1440px,
+   so the page keeps the room its layouts were set for (the bento's breakpoints sit 80px later for the rail). */
+#side { display: none; }
+@media screen and (min-width: 768px) {
+  /* The bar is one row of a fixed height (61px with its hairline), so the sidebar can stick right under it. */
+  .appbar-in { max-width: none; height: 60px; padding-top: 0; padding-bottom: 0; flex-wrap: nowrap; }
+  .brand, #who > * { flex: none; } /* the email gives way (below), never the title */
+  .brand b { white-space: nowrap; }
+  #who { min-width: 0; }
+  #who .email { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #who .who-users, main .tabs { display: none; }
+  .shell { display: flex; align-items: flex-start; }
+  .shell main { flex: 1; min-width: 0; }
+  #side:not([hidden]) { display: flex; flex-direction: column; gap: 2px; flex: none; width: 80px; padding: 12px 6px; position: sticky; top: 61px;
+    height: calc(100dvh / var(--zoom) - 61px); overflow-y: auto; scrollbar-width: none; background: var(--bar-bg); border-right: 1px solid var(--border); }
+  #side a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; flex: none; min-height: 56px; padding: 6px 2px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; text-decoration: none; color: var(--text-2); transition: color 150ms ease-out; }
+  #side a:hover { color: var(--text); }
+  #side a[aria-current="page"] { color: var(--text); background: var(--bar-chip); }
+  #side a[aria-current="page"] .icon { color: var(--link); }
+  #side a:focus-visible { outline-offset: -2px; } /* inside the item: the sidebar scrolls in a short window, which clips anything outside */
+  #side a[href="#/users"] { margin-top: auto; } /* at the foot, so it does not move when a project opens */
+  #side .tab-long, .side-name { display: none; }
+  .side-group { display: grid; gap: 2px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+}
+/* 208px and 13px names: the dashboard keeps three columns of cards at 1440px, and "Actual Accomplishment" keeps to one line. */
+@media screen and (min-width: 1440px) {
+  #side:not([hidden]) { width: 208px; padding: 16px 8px; }
+  #side a { flex-direction: row; justify-content: flex-start; gap: 8px; min-height: 44px; padding: 8px; font-size: 13px; text-align: left; }
+  #side .tab-long { display: inline; }
+  #side .tab-short { display: none; }
+  .side-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; padding: 0 8px; margin-bottom: 6px; font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; text-wrap: balance; }
+}
 /* SectionChips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .chips button { font: 400 13px var(--sans); min-height: 40px; padding: 6px 14px; border-radius: 8px; cursor: pointer;

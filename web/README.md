@@ -403,7 +403,13 @@ is read only.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.
-- **Users** (Super Admin only, in the header) is the app's "Manage users & roles": approve a new account, give one of
+- **Sidebar** (`drawSide`, drawn by `route` and again when the open project's name loads): from 768px wide the
+  window has a sidebar under the header with **All projects**, the open project's five sections under its name, and
+  **Users** for the Super Admin. It takes the place of the project's tab row, which stays under 768px (phones). It is
+  an 80px rail of icons over short names up to 1439px and 208px with full names from 1440px, chosen by the window's
+  width alone (no button, nothing remembered). Hidden when signed out and on a print view (`#/p/<id>/print/...`).
+  Every address works as before; only the links to them moved.
+- **Users** (Super Admin only, in the sidebar; in the header under 768px) is the app's "Manage users & roles": approve a new account, give one of
   Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
   `users/{uid}` update, as the app writes it; `syncUserCustomClaims` updates that person's access. A role change asks
   first ("Change Maria Santos to Viewer?"); Approve and "See all projects" apply at once.
@@ -416,7 +422,7 @@ is read only.
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
 - Screens: the dashboard (project count, total cost, status pills, attention filters, search, project cards with their own
-  Work done and Billed; portfolio averages are deliberately not shown) and five project tabs:
+  Work done and Billed; portfolio averages are deliberately not shown) and five project sections (tabs on a phone, sidebar links from 768px):
   - **Summary**: profile, key dates with the revised completion from approved orders, contract
     cost, latest weekly report, open issues, status of payment, and the lots status card (the six
     `SdpSummary` bands) for housing projects.
