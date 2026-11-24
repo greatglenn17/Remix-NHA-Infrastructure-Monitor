@@ -1738,10 +1738,11 @@ function lotsView(c) {
     : `${esc(site.plan.planName || 'Subdivision plan')} <span class="muted">v${esc(site.plan.version ?? 1)}</span>`;
   const k = L.lotStats(site.lots);
   const select = (key, label) => `<label class="field">${label}<select data-lot-filter="${key}">${L.LOT_FILTERS[key].map(o => `<option value="${esc(o)}"${o === st[key] ? ' selected' : ''}>${esc(L.shownWord(o))}</option>`).join('')}</select></label>`;
-  // The plan comes right after its title and its search: the legend, totals and setup tools sit under it.
+  const legend = `<div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>`;
+  // Plan setup sits under the title beside the scale (user, 2026-11-25), then the search and the plan; the legend shares the zoom bar's row, the totals follow.
   return `<section class="card section lots">
     ${sites.length > 1 ? `<div class="seg lot-sites" role="group" aria-label="Site">${sites.map(x => `<button data-lot-site="${esc(x.site)}" aria-pressed="${x === site}">${esc(x.site || 'Main site')}</button>`).join('')}</div>` : ''}
-    <div class="lots-head"><div><h2>${title}</h2>${scaleLine}</div>
+    <div class="lots-head"><div><h2>${title}</h2>${scaleLine}${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}</div>
       <span class="lots-links">${site.plan.pdfFileUrl ? fileLink(site.plan.pdfFileUrl, 'Plan PDF') : ''}
         ${site.plan.pdfFileUrl ? `<a class="text-btn" href="#/p/${esc(c.page.id)}/print/sdp">${icon('print', 'sm')}Print</a>` : ''}${addLot}</span></div>
     <div class="lot-filters">
@@ -1763,10 +1764,8 @@ function lotsView(c) {
     <div class="zoom-bar" id="zoom-bar" role="group" aria-label="Zoom">
       ${ZOOMS.map(([z, label]) => `<button data-zoom="${z}">${label}</button>`).join('')}
       <button data-zoom-step="0.8" aria-label="Zoom out">−</button><b id="zoom-pct">100%</b><button data-zoom-step="1.25" aria-label="Zoom in">+</button>
-      <button data-zoom="reset">Reset</button></div></div>` : emptyLine('No lots drawn on this plan yet.')}
-    <div class="lot-legend">${L.LOT_BANDS.map((b, i) => `<span><i class="dot lot-${i}"></i>${esc(b)}</span>`).join('')}<span><i class="dot lot-n"></i>Not a housing unit</span><span><i class="dot billed"></i>Billed</span></div>
+      <button data-zoom="reset">Reset</button></div>${legend}</div>` : emptyLine('No lots drawn on this plan yet.') + legend}
     <p class="muted lot-sum">${sites.length > 1 ? esc(site.site || 'Main site') : 'This plan'}: ${plural(k.total, 'saleable lot')}, and as marked on ${k.total === 1 ? 'it' : 'them'} ${k.m1} M1 billed, ${k.m2} M2 billed, ${k.notBilled} not billed, ${k.completed} completed. Average progress per lot ${k.avg.toFixed(2)}%, which is not Work done. ${figuresHelp()}</p>
-    ${tools ? `<details class="plan-tools" id="plan-setup"${st.setup ? ' open' : ''}><summary>${icon('expand_more', 'sm')}Plan setup</summary><div class="lots-links">${tools}</div></details>` : ''}
     <div id="lot-results"></div>
   </section>`;
 }
