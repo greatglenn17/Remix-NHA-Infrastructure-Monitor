@@ -177,10 +177,12 @@ function drawSide() {
   const at = m ? (SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
   const link = (href, ic, label, key) => `<a href="${href}"${key === at ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
   const name = open?.project?.name || '';
-  // Progress's views (the chips on its page) as links under it, once the project has loaded; the full sidebar only (style.css).
+  // Progress's views as links under it, once the project has loaded; the full sidebar only, where they take the place of
+  // the chips on its page (style.css), so Issues carries the chip's count of open ones.
   const views = open?.project ? progressViews(open.project) : [];
+  const issues = views.length && L.chipCounts([], [], (open.records || []).filter(r => r.type === 'project_issues')).Issues;
   const view = at === 'progress' && views.length && (views.find(x => L.chipSlug(x) === m[3]) || (views.includes(open.chips.progress) ? open.chips.progress : views[0]));
-  const sub = views.length ? `<div class="side-sub" role="group" aria-label="Progress">${views.map(x => `<a href="#/p/${esc(m[1])}/progress/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${x}</a>`).join('')}</div>` : '';
+  const sub = views.length ? `<div class="side-sub" role="group" aria-label="Progress">${views.map(x => `<a href="#/p/${esc(m[1])}/progress/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${x}${x === 'Issues' && issues ? ` <span class="chip-n">${issues} ${L.CHIP_COUNT_WORDS.Issues}</span>` : ''}</a>`).join('')}</div>` : '';
   const html =`${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
     ${m && !open?.error && open?.project !== null ? `<div class="side-group" role="group" aria-label="${esc(name || 'Project')}"><p class="side-name" aria-hidden="true">${esc(name)}</p>
       ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key) + (key === 'progress' ? sub : '')).join('')}</div>` : ''}
@@ -1211,7 +1213,7 @@ function drawProject(page) {
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
     </nav>`;
   const rest = `
-    ${chips ? `<div class="chips views scroll-row" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
+    ${chips ? `<div class="chips views scroll-row${page.section === 'progress' ? ' in-side' : ''}" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
   const kept = main.firstElementChild;
   if (kept?.classList.contains('ph-keep') && kept.drawn === head) {
