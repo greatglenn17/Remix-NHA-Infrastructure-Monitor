@@ -519,6 +519,8 @@ thead .num { font-family: inherit; }
   #side .tab-long { display: inline; }
   /* Progress's views, indented so their names start under "Progress" (8px padding, 20px icon, 8px gap). */
   .side-sub { display: grid; gap: 2px; }
+  main .chips.in-side { display: none; } /* the links above do the Progress chips' job here */
+  main .chips.in-side + * { margin-top: 12px; } /* the gap under the project header that the chips' margin gave */
   #side .side-sub a { min-height: 36px; padding-left: 36px; font-weight: 500; }
   #side .side-sub a[aria-current] { color: var(--link); font-weight: 600; }
   #side .tab-short { display: none; }
