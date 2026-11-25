@@ -1118,6 +1118,9 @@ test('bar chart suspension: days of no work are put into an item or the whole pr
   const two = { items: [{ name: 'A', amount: 100, bars: [[1, 10]] }, { name: 'B', amount: 300, bars: [[11, 20]] }] };
   assert.deepEqual([5, 10, 15, 20, 40].map(d => L.chartPctOn(two, d)), [12.5, 25, 62.5, 100, 100]);
   assert.equal(L.chartPctOn({ items: [] }, 5), 0);
+  // The sheet's headings: day 1 is the start date, so month 1 of a project started on Jan 5 runs to Feb 3 and month 2 starts on Feb 4.
+  assert.deepEqual([1, 5, 30, 31].map(d => L.chartDayDate('2026-01-05', d)), ['2026-01-05', '2026-01-09', '2026-02-03', '2026-02-04']);
+  assert.equal(L.chartDayDate('', 5), null);
   // A chart holds 120 months: work that would pass them is left where it is.
   const far = made('Far', [3500, 3590]);
   assert.equal(L.insertDays(far, 3400, 3420, 0), far);

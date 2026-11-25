@@ -1579,6 +1579,8 @@ function chartSheet(c, st, can) {
   const v = st.drafts[st.selected], revised = st.selected > 0, months = L.sheetMonths(v, c.project.contractDurationDays, st.months), cells = months * MONTH_CELLS;
   const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
   const edge = k => (k % MONTH_CELLS ? (k % 5 ? '' : ' f') : ' m'); // where a month, or five days, start
+  // The headings are dates: day 1 is the start date, so a month is headed by its 30 days and every fifth day by the date it falls on.
+  const date = day => L.chartDayDate(c.project.dateStarted, day), short = day => L.displayDate(date(day)).replace(/, \d{4}$/, ''), dated = date(1) != null;
   const barRow = (b, i, j, many) => `<div class="wk-row" data-bar="${j}">${[['sm', 'From month'], ['sd', 'Day'], ['em', 'To month'], ['ed', 'Day']].map(([k, label]) =>
     `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
     ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
@@ -1598,8 +1600,8 @@ function chartSheet(c, st, can) {
   };
   return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}">
     <thead><tr><th rowspan="2" class="bc-name">Description</th><th rowspan="2" class="num">Cost (₱)</th><th rowspan="2" class="num">%</th><th rowspan="2" class="num">Days</th>
-      ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}</th>`).join('')}</tr>
-      <tr>${Array.from({ length: cells / 5 }, (_, k) => `<th class="bc-day${edge(k * 5)}" colspan="5">${(k % 6 + 1) * 5}</th>`).join('')}</tr></thead>
+      ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}${dated ? ` · ${short(m * MONTH_CELLS + 1)} – ${L.displayDate(date((m + 1) * MONTH_CELLS))}` : ''}</th>`).join('')}</tr>
+      <tr>${Array.from({ length: cells / 5 }, (_, k) => `<th class="bc-day${edge(k * 5)}" colspan="5">${dated ? short((k + 1) * 5) : (k % 6 + 1) * 5}</th>`).join('')}</tr></thead>
     <tbody>${whole}${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
 }
 
@@ -1668,8 +1670,8 @@ function bindChart(c) {
     let tip = el.querySelector('.bc-tip');
     if (!td || !v) { if (tip) tip.hidden = true; return; }
     if (!tip) { tip = el.appendChild(document.createElement('div')); tip.className = 'bc-tip'; }
-    const day = Number(td.dataset.cell) + 1, at = td.getBoundingClientRect();
-    tip.textContent = `Month ${Math.ceil(day / MONTH_CELLS)}, day ${(day - 1) % MONTH_CELLS + 1} · Project at ${L.chartPctOn(L.draftVersion(v), day).toFixed(2)}%`;
+    const day = Number(td.dataset.cell) + 1, at = td.getBoundingClientRect(), date = L.chartDayDate(project.dateStarted, day);
+    tip.textContent = `${date ? `${L.displayDate(date)} · ` : ''}Month ${Math.ceil(day / MONTH_CELLS)}, day ${(day - 1) % MONTH_CELLS + 1} · Project at ${L.chartPctOn(L.draftVersion(v), day).toFixed(2)}%`;
     tip.hidden = false;
     tip.style.left = `${at.left + at.width / 2}px`;
     tip.style.top = `${at.top}px`;
