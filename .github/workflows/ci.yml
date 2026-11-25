@@ -19,6 +19,9 @@ jobs:
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew testDebugUnitTest
+      # Gradle prints no total, so a drop in the number of tests would go unseen.
+      - name: Count tests
+        run: echo "$(cat app/build/test-results/testDebugUnitTest/*.xml | grep -c '<testcase') tests ran"
 
   web:
     runs-on: ubuntu-latest
