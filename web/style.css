@@ -522,7 +522,7 @@ thead .num { font-family: inherit; }
   #side .tab-long { display: inline; }
   /* Progress's views, indented so their names start under "Progress" (8px padding, 20px icon, 8px gap). */
   .side-sub { display: grid; gap: 2px; }
-  main .chips.in-side { display: none; } /* the links above do the chips' job here (Progress, Documents) */
+  main .chips.in-side { display: none; } /* the links above do the chips' job here (Progress, Documents, Actual Accomplishment) */
   main .chips.in-side + * { margin-top: 12px; } /* the gap under the project header that the chips' margin gave */
   #side .side-sub a { min-height: 36px; padding: 8px 4px 8px 36px; gap: 6px; font-weight: 500; } /* 4px and 6px: "Developer Requests" and its count keep to one line */
   #side .side-sub a[aria-current] { color: var(--link); font-weight: 600; }
@@ -601,6 +601,15 @@ span.file.gone { text-decoration: none; }
 .apa-foot p b { color: var(--text); font-weight: 600; }
 .apa-foot .text-btn.danger { margin: 0; border-color: var(--behind-line); }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
+/* The card's heading row (apaHead): "As of", the control that picks the date, then the view's buttons at the right. */
+.apa-head { flex-wrap: wrap; gap: 8px 12px; padding: 8px 0; }
+.apa-head select, .apa-head input { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 8px 12px; min-height: 44px; }
+.apa-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.apa-head .apa-actions .text-btn { margin: 0; }
+.apa-actions .icon { color: inherit; } /* not the heading icon's blue on the filled button */
+.apa-head + p { margin: 0; } /* the line a save or an upload writes: no room kept for it while it is empty */
+.apa-head + p:not(:empty) { margin-bottom: 8px; }
+@media (max-width: 600px) { .apa-actions { margin-left: 0; } }
 .apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
 /* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (down
    to the 12px floor) and the headings wrap. A narrower card (a tablet, a phone) keeps the 13px type and scrolls sideways. */
@@ -626,7 +635,6 @@ div.apa-part { padding-top: 16px; }
 .apa-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 32px; }
 .apa-pair > * { flex: 1 1 520px; min-width: 0; } /* each takes half the card, so the second one ends at the card's right edge */
 .apa-pair .apa-standing { max-width: none; }
-#monthly-sheet { margin-top: 8px; } /* the Monthly view's card, clear of the date above it */
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
 .apa-standing thead th { white-space: normal; } /* "Plan on" over its date */
@@ -815,8 +823,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .danger { margin: 0 0 0 auto; }
 /* The plan's actions are outlined buttons, and Plan setup opens its tools as one tight row of them under the toolbar,
    Delete plan last in rose (user, 2026-11-25: they must read as buttons, with no dead space). */
-.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
+.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn, .apa-actions .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
+.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover, .apa-actions .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
 .lots-head .lots-links { gap: 8px; }
 .plan-panel { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .plan-panel[hidden] { display: none; }

@@ -273,7 +273,10 @@ is read only.
     (the phone's table ends at TO DATE too). On a laptop or wider (a window of about 1,180px or more) the 15 columns
     fit the page with nothing to scroll: the type follows the card's width (down to a 12px floor) and the headings
     wrap. On a narrower window (a tablet, a phone) the table keeps its 13px type and scrolls sideways inside its card.
-  - **Weekly | Monthly**, a switch at the top of the tab once the project has an abstract. Weekly is the tab as
+  - **Weekly | Monthly**, a switch at the top of the tab once the project has an abstract; from 1440px the two are
+    links under Actual Accomplishment in the sidebar and the switch is hidden. In both, the card's heading row
+    (`apaHead`) holds "As of", the control that picks the date and, in Weekly, Upload abstract (Excel), Undo last save
+    and New abstract at the right. Weekly is the tab as
     described here. **Monthly** (`#/p/<id>/actual/monthly[/<date>]`) is the abstract of a month, computed from the
     filed ones and never saved (`L.monthlyAbstract`, the phone's `ProjectAbstracts.monthly`). Its **As of** date box
     starts at today; changing it moves the address. TO DATE is the latest abstract filed on or before that date:
@@ -410,8 +413,9 @@ is read only.
   for it shows only under 768px), and **Users** for the Super Admin. It takes the place of the project's tab row, which stays under 768px (phones). It is
   an 80px rail of icons over short names up to 1439px and 208px with full names from 1440px, chosen by the window's
   width alone (no button, nothing remembered). At 208px the open section's views (Progress: Weekly, Monthly, Lots for housing, Photos,
-  Weather, Issues, `progressViews`; Documents: its six, `CHIPS.documents`) are indented links under it, each with its
-  chip's count as a number (the words in its tooltip), and the chip row on that page is hidden (it stays under 1440px).
+  Weather, Issues, `progressViews`; Documents: its six, `CHIPS.documents`; Actual Accomplishment: Weekly and Monthly, once
+  the project has an abstract) are indented links under it, each with its
+  chip's count as a number (the words in its tooltip), and the chip row on that page (Actual Accomplishment: its switch) is hidden (it stays under 1440px).
   Only the open section's views show, so the sidebar fits a laptop's window. The audit log is never the Documents view
   remembered: it opens only by its own address. Hidden when signed out and on a print view (`#/p/<id>/print/...`).
   Every address works as before; only the links to them moved.
