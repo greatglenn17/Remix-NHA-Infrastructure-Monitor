@@ -166,26 +166,34 @@ function land() {
 const currentTab = () => [side.querySelector(`a[href="${CSS.escape(location.hash)}"]`), side.querySelector('[aria-current="page"]'), main.querySelector('nav.tabs [aria-current="page"]')].find(e => e?.offsetParent);
 
 /**
- * The sidebar (768px and up; style.css): All projects, the open project's five sections under its name (Progress's views under it), and Users for
- * the Super Admin. Hidden when signed out and on a print view. Under 768px the project's tab row does this job.
+ * The sidebar (768px and up; style.css): All projects, the open project's five sections under its name (the open section's
+ * views under it) and its audit log, and Users for the Super Admin. Hidden when signed out and on a print view. Under 768px the project's tab row does this job.
  */
 function drawSide() {
   const m = PAGE.exec(location.hash), open = m && s.page?.id === m[1] ? s.page : null;
   side.hidden = !s.user || m?.[2] === 'print';
   if (side.hidden) return;
   const admin = s.claims.role === 'SUPER_ADMIN';
-  const at = m ? (SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
+  // The audit log is a view of Documents by its address, and a place of its own here, after Documents.
+  const audits = L.canViewAuditLogs(s.claims), onAudit = audits && m?.[2] === 'documents' && m[3] === 'audit-log';
+  const at = m ? (onAudit ? 'audit' : SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
   const link = (href, ic, label, key) => `<a href="${href}"${key === at ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
   const name = open?.project?.name || '';
-  // Progress's views as links under it, once the project has loaded; the full sidebar only, where they take the place of
-  // the chips on its page (style.css), so Issues carries the chip's count of open ones.
-  const views = open?.project ? progressViews(open.project) : [];
-  const issues = views.length && L.chipCounts([], [], (open.records || []).filter(r => r.type === 'project_issues')).Issues;
-  const view = at === 'progress' && views.length && (views.find(x => L.chipSlug(x) === m[3]) || (views.includes(open.chips.progress) ? open.chips.progress : views[0]));
-  const sub = views.length ? `<div class="side-sub" role="group" aria-label="Progress">${views.map(x => `<a href="#/p/${esc(m[1])}/progress/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${x}${x === 'Issues' && issues ? ` <span class="chip-n">${issues} ${L.CHIP_COUNT_WORDS.Issues}</span>` : ''}</a>`).join('')}</div>` : '';
+  // The open section's views (Progress, Documents) as links under it, once the project has loaded; the full sidebar only,
+  // where they take the place of the chips on its page (style.css), so each carries its chip's count as a number. Only the open
+  // section's, so the sidebar fits a laptop's window without scrolling.
+  const recs = type => (open?.records || []).filter(r => r.type === type);
+  const counts = open?.project ? L.chipCounts(recs('pending_documents'), recs('developer_requests'), recs('project_issues')) : {};
+  const word = x => L.CHIP_COUNT_WORDS[x] || 'waiting'; // in the tooltip and read aloud: the number alone keeps each name to one line
+  const sub = (key, label) => {
+    const list = !open?.project || key !== at ? [] : key === 'progress' ? progressViews(open.project) : CHIPS[key] || [];
+    const view = list.find(x => L.chipSlug(x) === m[3]) || open?.chips[key];
+    return list.length ? `<div class="side-sub" role="group" aria-label="${label}">${list.map(x => `<a href="#/p/${esc(m[1])}/${key}/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${esc(x)}${counts[x] ? ` <span class="chip-n" title="${counts[x]} ${word(x)}">${counts[x]}<span class="sr-only"> ${word(x)}</span></span>` : ''}</a>`).join('')}</div>` : '';
+  };
   const html =`${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
     ${m && !open?.error && open?.project !== null ? `<div class="side-group" role="group" aria-label="${esc(name || 'Project')}"><p class="side-name" aria-hidden="true">${esc(name)}</p>
-      ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key) + (key === 'progress' ? sub : '')).join('')}</div>` : ''}
+      ${SECTIONS.map(([key, label, ic]) => link(`#/p/${esc(m[1])}${key === 'summary' ? '' : `/${key}`}`, ic, label, key) + sub(key, label)).join('')}
+      ${audits ? link(`#/p/${esc(m[1])}/documents/audit-log`, 'history', 'Audit log', 'audit') : ''}</div>` : ''}
     ${admin ? link('#/users', 'manage_accounts', 'Users', 'users') : ''}`;
   // A live redraw (the project's name arriving) keeps focus on the link that had it; a new page lands by itself (land).
   const had = !s.land && side.contains(document.activeElement) && document.activeElement.getAttribute('href');
@@ -1182,12 +1190,14 @@ function drawProject(page) {
   // A chip named in the URL (#/p/<id>/documents/variation-orders) wins, so a reload or a shared link opens it.
   const linked = chips?.find(x => L.chipSlug(x) === page.sub);
   if (linked) page.chips[page.section] = linked;
+  // The audit log opens by its own address (its link in the sidebar), never as the Documents view remembered.
+  else if (page.chips[page.section] === 'Audit log') delete page.chips[page.section];
   const counts = chips ? L.chipCounts(documents, of('developer_requests'), of('project_issues')) : {};
   const chip = chips && (chips.includes(page.chips[page.section]) ? page.chips[page.section]
     : (page.section === 'documents' && chips.find(x => counts[x])) || chips[0]);
   // The opening chip stays put once shown, so a count clearing on a redraw does not switch the view.
-  if (chips) page.chips[page.section] = chip;
-  const body = { progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
+  if (chips) { page.chips[page.section] = chip; drawSide(); } // the view just settled, marked in the sidebar
+  const body ={ progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
   // The heading, back link or tab that had focus stays focused through a live redraw.
   const onHead = document.activeElement?.matches?.('main h1') ? 'h1' : document.activeElement?.matches?.('main .back') ? '.back' : document.activeElement?.matches?.('nav.tabs a') ? `nav.tabs a[href="${CSS.escape(document.activeElement.getAttribute('href'))}"]` : null;
@@ -1213,7 +1223,7 @@ function drawProject(page) {
       <a href="#/p/${esc(page.id)}${key === 'summary' ? '' : `/${key}`}"${page.section === key ? ' aria-current="page"' : ''}>${icon(ic, 'sm')}${label}</a>`).join('')}
     </nav>`;
   const rest = `
-    ${chips ? `<div class="chips views scroll-row${page.section === 'progress' ? ' in-side' : ''}" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
+    ${chips ? `<div class="chips views scroll-row in-side${chip === 'Audit log' ? ' on-audit' : ''}" role="group" aria-label="Show">${chips.map(x => `<button data-chip="${esc(x)}" aria-pressed="${x === chip}">${esc(x)}${counts[x] ? ` <span class="chip-n">${counts[x]} ${L.CHIP_COUNT_WORDS[x] || 'waiting'}</span>` : ''}</button>`).join('')}</div>` : ''}
     ${body(c, chip)}`;
   const kept = main.firstElementChild;
   if (kept?.classList.contains('ph-keep') && kept.drawn === head) {
@@ -2916,8 +2926,8 @@ const issueState = page => (page.issues ||= { query: '', filter: 'All' });
 function issuesView(c) {
   const st = issueState(c.page);
   const add = L.canEdit(c.project, s.user.uid, s.claims) ? `<button class="btn issue-add" id="issue-add">${icon('add_circle', 'sm')}Log issue</button>` : '';
-  return `${add}<label class="field issue-q">Search<input type="search" id="issue-q" placeholder="Search issues or actions taken..." value="${esc(st.query)}" autocomplete="off"></label>
-    <div class="chips" role="group" aria-label="Filter issues">${L.ISSUE_FILTERS.map(f => `<button data-issue-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div>
+  return `<div class="issue-bar">${add}<label class="field issue-q">Search<input type="search" id="issue-q" placeholder="Search issues or actions taken..." value="${esc(st.query)}" autocomplete="off"></label>
+    <div class="chips" role="group" aria-label="Filter issues">${L.ISSUE_FILTERS.map(f => `<button data-issue-filter="${f}" aria-pressed="${f === st.filter}">${f}</button>`).join('')}</div></div>
     <div id="issue-results">${issueResults(c, st)}</div>`;
 }
 
@@ -2941,8 +2951,7 @@ function issueCard(i, now, editable = false) {
       ? `<span class="${overdue ? 'behind' : ''}"> · Target ${esc(L.displayDate(i.targetDate.trim()))}${overdue ? ' (overdue)' : ''}</span>` : ''}</span></p></div>
     ${block(`Action taken${i.actionBy?.trim() ? ` by ${i.actionBy.trim()}` : ''}`, i.actionTaken, 'link')}
     ${block('Remarks / notes', i.remarks)}
-    ${i.loggedBy?.trim() ? `<p class="muted small logged">Logged by: ${esc(i.loggedBy)}</p>` : ''}
-    ${editable ? `<div class="ic-actions"><button class="text-btn" data-edit-issue="${esc(i.uuid)}">${icon('edit', 'sm')}Edit</button></div>` : ''}
+    <div class="ic-foot">${i.loggedBy?.trim() ? `<p class="muted small logged">Logged by: ${esc(i.loggedBy)}</p>` : ''}${editable ? `<div class="ic-actions"><button class="text-btn" data-edit-issue="${esc(i.uuid)}">${icon('edit', 'sm')}Edit</button></div>` : ''}</div>
   </li>`;
 }
 
@@ -4085,9 +4094,8 @@ function actualBody(c) {
   if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
-      ${standingTable(c, shown)}
-      ${unitsTable(c, shown, list)}
-      ${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}
+      <div class="apa-pair"><div>${standingTable(c, shown)}</div>${unitsTable(c, shown, list)}</div>
+      <div class="apa-file">${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}</div>
       <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>
       ${editable ? `<div class="apa-foot"><button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button></div>` : ''}`)}
@@ -4299,8 +4307,8 @@ function paymentsBody({ project, payments, cost, billed, of }) {
     ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word')}
     ${billed > 0 && cost > 0 ? kv('Billed share', L.billedLabel(billed, cost)) : ''}
     ${kv('Balance', L.formatPhp(cost - billed))}
-    </div>${baseNote(project, cost)}
-    ${editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : ''}`);
+    </div>${baseNote(project, cost)}`, '',
+    editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : '');
   if (!payments.length) return `<div class="stack">${summary}${requests}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}${requests}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);

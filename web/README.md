@@ -405,11 +405,15 @@ is read only.
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.
 - **Sidebar** (`drawSide`, drawn by `route` and again when the open project's name loads): from 768px wide the
-  window has a sidebar under the header with **All projects**, the open project's five sections under its name, and
-  **Users** for the Super Admin. It takes the place of the project's tab row, which stays under 768px (phones). It is
+  window has a sidebar under the header with **All projects**, the open project's five sections under its name, its
+  **Audit log** (for those who may read it; the address is still `#/p/<id>/documents/audit-log`, and the Documents chip
+  for it shows only under 768px), and **Users** for the Super Admin. It takes the place of the project's tab row, which stays under 768px (phones). It is
   an 80px rail of icons over short names up to 1439px and 208px with full names from 1440px, chosen by the window's
-  width alone (no button, nothing remembered). At 208px Progress's views (Weekly, Monthly, Lots for housing, Photos,
-  Weather, Issues; `progressViews`) are indented links under Progress, and the chip row on its page is hidden (it stays under 1440px). Hidden when signed out and on a print view (`#/p/<id>/print/...`).
+  width alone (no button, nothing remembered). At 208px the open section's views (Progress: Weekly, Monthly, Lots for housing, Photos,
+  Weather, Issues, `progressViews`; Documents: its six, `CHIPS.documents`) are indented links under it, each with its
+  chip's count as a number (the words in its tooltip), and the chip row on that page is hidden (it stays under 1440px).
+  Only the open section's views show, so the sidebar fits a laptop's window. The audit log is never the Documents view
+  remembered: it opens only by its own address. Hidden when signed out and on a print view (`#/p/<id>/print/...`).
   Every address works as before; only the links to them moved.
 - **Users** (Super Admin only, in the sidebar; in the header under 768px) is the app's "Manage users & roles": approve a new account, give one of
   Engineer Admin, Field Engineer, Viewer or Super Viewer, and turn "See all projects" on or off. Each change is one
