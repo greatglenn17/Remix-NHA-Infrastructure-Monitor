@@ -179,16 +179,19 @@ function drawSide() {
   const at = m ? (onAudit ? 'audit' : SECTIONS.some(x => x[0] === m[2]) ? m[2] : 'summary') : location.hash === '#/users' && admin ? 'users' : 'home';
   const link = (href, ic, label, key) => `<a href="${href}"${key === at ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`;
   const name = open?.project?.name || '';
-  // The open section's views (Progress, Documents) as links under it, once the project has loaded; the full sidebar only,
-  // where they take the place of the chips on its page (style.css), so each carries its chip's count as a number. Only the open
-  // section's, so the sidebar fits a laptop's window without scrolling.
+  // The open section's views (Progress, Documents, Actual Accomplishment) as links under it, once the project has loaded; the
+  // full sidebar only, where they take the place of the chips on its page (style.css), so each carries its chip's count as a
+  // number. Only the open section's, so the sidebar fits a laptop's window without scrolling.
   const recs = type => (open?.records || []).filter(r => r.type === type);
   const counts = open?.project ? L.chipCounts(recs('pending_documents'), recs('developer_requests'), recs('project_issues')) : {};
   const word = x => L.CHIP_COUNT_WORDS[x] || 'waiting'; // in the tooltip and read aloud: the number alone keeps each name to one line
   const sub = (key, label) => {
-    const list = !open?.project || key !== at ? [] : key === 'progress' ? progressViews(open.project) : CHIPS[key] || [];
-    const view = list.find(x => L.chipSlug(x) === m[3]) || open?.chips[key];
-    return list.length ? `<div class="side-sub" role="group" aria-label="${label}">${list.map(x => `<a href="#/p/${esc(m[1])}/${key}/${L.chipSlug(x)}"${x === view ? ' aria-current="true"' : ''}>${esc(x)}${counts[x] ? ` <span class="chip-n" title="${counts[x]} ${word(x)}">${counts[x]}<span class="sr-only"> ${word(x)}</span></span>` : ''}</a>`).join('')}</div>` : '';
+    // Actual Accomplishment's two are its switch's (abstractSwitch): there once the project has an abstract, Weekly at the tab's own address.
+    const actual = key === 'actual', views = actual ? (recs('project_abstracts').length ? ['Weekly', 'Monthly'] : []) : CHIPS[key] || [];
+    const list = !open?.project || key !== at ? [] : key === 'progress' ? progressViews(open.project) : views;
+    const view = actual ? (/^monthly/.test(m[3] || '') ? 'Monthly' : 'Weekly') : list.find(x => L.chipSlug(x) === m[3]) || open?.chips[key];
+    const to = x => (actual ? (x === 'Monthly' ? '/monthly' : '') : `/${L.chipSlug(x)}`);
+    return list.length ? `<div class="side-sub" role="group" aria-label="${label.replace(/<[^>]+>/g, '')}">${list.map(x => `<a href="#/p/${esc(m[1])}/${key}${to(x)}"${x === view ? ' aria-current="true"' : ''}>${esc(x)}${counts[x] ? ` <span class="chip-n" title="${counts[x]} ${word(x)}">${counts[x]}<span class="sr-only"> ${word(x)}</span></span>` : ''}</a>`).join('')}</div>` : '';
   };
   const html =`${link('#/', 'apartment', '<span class="tab-long">All projects</span><span class="tab-short">Projects</span>', 'home')}
     ${m && !open?.error && open?.project !== null ? `<div class="side-group" role="group" aria-label="${esc(name || 'Project')}"><p class="side-name" aria-hidden="true">${esc(name)}</p>
@@ -1261,7 +1264,9 @@ function drawProject(page) {
   if (monthlyAsOf) monthlyAsOf.onchange = () => {
     page.sub = `monthly/${monthlyAsOf.value}`;
     history.replaceState(null, '', `#/p/${page.id}/actual/${page.sub}`);
-    document.getElementById('monthly-sheet').innerHTML = monthlySheet(c, monthlyAsOf.value);
+    const [card, items] = monthlySheet(c, monthlyAsOf.value);
+    document.getElementById('monthly-sheet').innerHTML = card;
+    document.getElementById('monthly-items').innerHTML = items;
   };
   if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
   // The critical-issue alert opens Issues filtered to the ones past their target date.
@@ -4033,8 +4038,8 @@ const keptName = (c, what) => `nha.${what}.${s.user.uid}.${c.page.id}`;
 const kept = (c, what) => { try { return localStorage.getItem(keptName(c, what)); } catch { return null; } };
 const keep = (c, what, value) => { try { if (value == null) localStorage.removeItem(keptName(c, what)); else localStorage.setItem(keptName(c, what), JSON.stringify(value)); } catch { /* nothing is kept */ } };
 
-/** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. */
-const abstractSwitch = monthly => `<div class="chips views" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
+/** The tab's Weekly | Monthly switch, shown once the project has an abstract; each side is an address. The full sidebar has the two as links instead (drawSide). */
+const abstractSwitch = monthly => `<div class="chips views in-side" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
 
 /** An abstract's Target / Actual / +/- table (L.abstractStanding). With a bar chart the target is headed as the plan of the abstract's day, so it is not read as the header's plan for today. */
 function standingTable(c, abstract, caption = '') {
@@ -4059,21 +4064,25 @@ function unitsTable(c, abstract, list) {
  * filed ones and never saved (L.monthlyAbstract). It has no Upload, New abstract, Print billing abstract or Delete.
  */
 function monthlyAbstractBody(c) {
-  const date = c.page.sub === 'monthly' ? today() : c.page.sub.slice('monthly/'.length);
-  return `${abstractSwitch(true)}
-    <div class="toolbar apa-tools"><label class="field">As of<input type="date" id="monthly-as-of" value="${esc(date)}"></label></div>
-    <div id="monthly-sheet">${monthlySheet(c, date)}</div>`;
+  const date = c.page.sub === 'monthly' ? today() : c.page.sub.slice('monthly/'.length), [card, items] = monthlySheet(c, date);
+  return `${abstractSwitch(true)}<div class="stack">
+    <section class="card section">${apaHead('monthly-as-of', `<input type="date" id="monthly-as-of" value="${esc(date)}">`)}<div id="monthly-sheet">${card}</div></section>
+    <div class="stack" id="monthly-items">${items}</div></div>`;
 }
 
-/** What is under the Monthly view's date: why that date has no abstract, or the two it was made from, its standing with Print abstract, and every pay item. */
+/** The heading row of the tab's card: "As of" and the control that picks the date, then the view's buttons at the right, so nothing sits loose above the card. */
+const apaHead = (id, control, actions = '') => `<div class="section-head apa-head">${icon('assignment')}<h2><label for="${id}">As of</label></h2>${control}${actions}</div>`;
+
+/**
+ * What is under the Monthly view's date, as [inside its card, under the card]: why that date has no abstract, or its
+ * standing with the two it was made from and Print abstract in one closing row, then every pay item.
+ */
 function monthlySheet(c, date) {
   const { abstract, to, from, error } = L.monthlyAbstract(c.of('project_abstracts'), date);
-  // The card as the Weekly view's: the table across it, and one closing row with what it was made from and Print abstract.
-  return error ? `<p class="error">${esc(error)}</p>` : `<div class="stack">
-    ${section(`As of ${L.displayDate(date)}`, 'assignment', `<div class="apa-pair"><div>${standingTable(c, abstract)}</div></div>
+  return error ? [`<p class="error">${esc(error)}</p>`, ''] : [`<div class="apa-pair"><div>${standingTable(c, abstract)}</div></div>
       <div class="apa-foot"><p class="muted small">${esc(L.monthlyAbstractNote(to, from))}</p>
-        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/monthly-${esc(date)}">${icon('print', 'sm')}Print abstract</a></div>`)}
-    ${P.abstractItemsHtml(L.abstractRows(abstract.rowsJson))}</div>`;
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/monthly-${esc(date)}">${icon('print', 'sm')}Print abstract</a></div>`,
+    P.abstractItemsHtml(L.abstractRows(abstract.rowsJson))];
 }
 
 /**
@@ -4084,24 +4093,23 @@ function monthlySheet(c, date) {
  */
 function actualBody(c) {
   const { list, shown } = abstractsOf(c), editable = L.canEdit(c.project, s.user.uid, s.claims);
-  const tools = `${list.length ? abstractSwitch(false) : ''}<div class="toolbar apa-tools">
-      ${list.length ? `<label class="field">As of<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select></label>` : ''}
-      ${editable ? `<button class="${list.length ? 'text-btn' : 'btn'}" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : ''}
-      ${editable && list.length ? `<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button>` : ''}
-      ${editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : ''}
-    </div>
-    <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
+  const upload = editable ? `<button class="${list.length ? 'text-btn' : 'btn'}" id="abstract-upload">${icon('upload_file', 'sm')}Upload abstract (Excel)</button><input type="file" accept=".xlsx" id="abstract-file" hidden>` : '';
+  const undo = editable && L.abstractUndoEdit(kept(c, 'abstract-undo'), c.of('project_abstracts')) ? `<button class="text-btn" id="abstract-undo">${icon('history', 'sm')}Undo last save</button>` : '';
+  const note = `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
   if (/^monthly(\/|$)/.test(c.page.sub || '') && list.length) return monthlyAbstractBody(c);
   const units = shown ? unitsTable(c, shown, list) : ''; // beside the standing table, which is then headed too, so the two are level
-  if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
-  return `${tools}<div class="stack">
-    ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
+  if (!shown) return `<div class="toolbar apa-tools">${upload}${undo}</div>${note}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
+  // The date and the buttons are the card's heading row: a toolbar above it left most of its row empty and said the date twice.
+  return `${abstractSwitch(false)}<div class="stack">
+    <section class="card section">${apaHead('abstract-as-of', `<select id="abstract-as-of">${list.map(a => `<option value="${esc(a.asOf)}"${a === shown ? ' selected' : ''}>${esc(L.displayDate(a.asOf))}</option>`).join('')}</select>`,
+      editable ? `<div class="apa-actions">${upload}${undo}<button class="btn" id="abstract-new">${L.keptNextAbstract(kept(c, 'abstract-draft')) ? `${icon('edit', 'sm')}Continue abstract` : `${icon('add_circle', 'sm')}New abstract`}</button></div>` : '')}
+      ${note}
       <div class="apa-pair"><div>${standingTable(c, shown, units && 'In percent')}</div>${units}</div>
       <div class="apa-foot"><p class="muted small">File: <b>${esc(shown.fileName || 'Made in the app')}</b> · ${shown.fileName ? 'Uploaded by' : 'Made by'}: <b>${esc(shown.uploadedBy || '-')}</b></p>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>
-        ${editable ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button>` : ''}</div>`)}
+        ${editable ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button>` : ''}</div></section>
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
 
