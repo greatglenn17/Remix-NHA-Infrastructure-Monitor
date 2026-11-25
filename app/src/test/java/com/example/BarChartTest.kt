@@ -128,6 +128,11 @@ class BarChartTest {
     @Test
     fun json_roundTrips_andJunkIsNoChart() {
         assertEquals(listOf(sanIldefonso), BarChart.parse(BarChart.toJson(listOf(sanIldefonso))))
+        // The website's colours and coloured days pass through as they are; a chart without them has no such keys.
+        val coloured = sanIldefonso.copy(colors = """[{"name":"Suspension No. 1","color":"#FFD966","work":false}]""",
+            items = sanIldefonso.items.mapIndexed { i, item -> if (i == 0) item.copy(marks = "[[1,5,0]]") else item })
+        assertEquals(listOf(coloured), BarChart.parse(BarChart.toJson(listOf(coloured))))
+        assertEquals(false, BarChart.toJson(listOf(sanIldefonso)).contains("colors") || BarChart.toJson(listOf(sanIldefonso)).contains("marks"))
         assertEquals(emptyList<Version>(), BarChart.parse(""))
         assertEquals(emptyList<Version>(), BarChart.parse("not json"))
     }

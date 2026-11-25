@@ -113,7 +113,7 @@ private class BarDraft(from: Pair<Int, Int>? = null, to: Pair<Int, Int>? = null)
     }
 }
 
-private class ItemDraft(name: String, amount: Double, bars: List<BarChart.Bar>) {
+private class ItemDraft(name: String, amount: Double, bars: List<BarChart.Bar>, val marks: String = "") {
     var name by mutableStateOf(name)
     // The Amount box of a revised chart; the text of a Double reads back as the same Double, so an untouched item saves as it was.
     var amountText by mutableStateOf(if (amount > 0) unitsText(amount) else "")
@@ -123,21 +123,21 @@ private class ItemDraft(name: String, amount: Double, bars: List<BarChart.Bar>) 
         bars.forEach { add(BarDraft(BarChart.monthDayOf(it.startDay), BarChart.monthDayOf(it.endDay))) }
         if (isEmpty()) add(BarDraft())
     }
-    fun item() = BarChart.Item(name.trim(), amount, bars.mapNotNull { it.bar() })
+    fun item() = BarChart.Item(name.trim(), amount, bars.mapNotNull { it.bar() }, marks)
     fun valid() = bars.all { it.bar() != null }
 }
 
-private class VersionDraft(label: String, effective: String, items: List<ItemDraft>) {
+private class VersionDraft(label: String, effective: String, items: List<ItemDraft>, val colors: String = "") {
     var label by mutableStateOf(label)
     var effective by mutableStateOf(effective)
     var items by mutableStateOf(items)
-    fun version() = BarChart.Version(label.trim(), effective, items.map { it.item() })
+    fun version() = BarChart.Version(label.trim(), effective, items.map { it.item() }, colors)
 }
 
 /** Items from the Scope of Works, with no bars yet. */
 private fun scopeDrafts(project: Project) = scopeItems(project.scopeOfWork).map { (name, amount, _) -> ItemDraft(name, amount, emptyList()) }
 
-private fun itemDrafts(items: List<BarChart.Item>) = items.map { ItemDraft(it.name, it.amount, it.bars) }
+private fun itemDrafts(items: List<BarChart.Item>) = items.map { ItemDraft(it.name, it.amount, it.bars, it.marks) }
 
 internal const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -151,7 +151,7 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
     val scheme = MaterialTheme.colorScheme
     val drafts = remember {
         mutableStateListOf<VersionDraft>().apply {
-            BarChart.parse(project.barChartJson).forEach { v -> add(VersionDraft(v.label, v.effective, itemDrafts(v.items))) }
+            BarChart.parse(project.barChartJson).forEach { v -> add(VersionDraft(v.label, v.effective, itemDrafts(v.items), v.colors)) }
             if (isEmpty()) add(VersionDraft("Original", project.dateStarted, scopeDrafts(project)))
             // The first chart always runs from the start date, even after the date is corrected.
             first().effective = project.dateStarted
@@ -163,9 +163,11 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
     val start = runCatching { LocalDate.parse(project.dateStarted.trim()) }.getOrNull()
     val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
     val current = ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)
-    // The original chart must total the original contract amount; a revised one the original or the current (after Variation Orders).
+    // The original chart must total the original contract amount; a revised one the original or the current (after Variation
+    // Orders), and the latest revised one ([last]) the current: with a Variation Order the chart in force totals the revised contract.
     // shortcut: any approved VO counts, not only those before the chart's date; match VOs by date if a project needs it.
-    fun totalMatches(i: Int, total: Double) = abs(total - original) < 0.015 || i > 0 && abs(total - current) < 0.015
+    fun totalMatches(i: Int, total: Double, last: Boolean = false) =
+        i > 0 && abs(total - current) < 0.015 || (i == 0 || !last) && abs(total - original) < 0.015
     val errors = drafts.flatMapIndexed { i, d ->
         val date = runCatching { LocalDate.parse(d.effective) }.getOrNull()
         val total = d.items.sumOf { it.amount }
@@ -179,7 +181,7 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
             "${d.label}: name every item".takeIf { i > 0 && d.items.any { it.name.isBlank() } },
             "${d.label}: two items are named ${twice.joinToString()}".takeIf { i > 0 && twice.isNotEmpty() },
             ("${d.label}: the chart totals ${CurrencyFormatter.formatPhp(total)} but the contract amount is " +
-                CurrencyFormatter.formatPhp(if (i > 0) current else original)).takeIf { d.items.isNotEmpty() && !totalMatches(i, total) },
+                CurrencyFormatter.formatPhp(if (i > 0) current else original)).takeIf { d.items.isNotEmpty() && !totalMatches(i, total, i == drafts.lastIndex) },
             "${d.label}: pick the date it takes effect".takeIf { i > 0 && date == null },
             "${d.label}: takes effect before the start date".takeIf { i > 0 && date != null && start != null && date.isBefore(start) },
             "${d.label}: takes effect on or before the previous chart".takeIf {
@@ -256,7 +258,7 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
                 Tab(selected = false, modifier = Modifier.testTag("add_revised_chart"), onClick = {
                     drafts.add(
                         if (drafts.isEmpty()) VersionDraft("Original", project.dateStarted, scopeDrafts(project))
-                        else VersionDraft("Revised No. ${drafts.size}", "", itemDrafts(drafts.last().version().items))
+                        else drafts.last().version().let { VersionDraft("Revised No. ${drafts.size}", "", itemDrafts(it.items), it.colors) }
                     )
                     selected = drafts.lastIndex
                     importNotes = emptyList()

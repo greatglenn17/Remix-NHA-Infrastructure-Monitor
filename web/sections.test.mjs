@@ -648,7 +648,7 @@ test('bar chart print: bars to the day, each month\'s share, the S-curve, the ca
   assert.match(P.barChartSvg({ items: [] }), /^<svg /); // nothing to draw is still a sheet
 
   const project = { name: 'P & Q', location: 'L', contractor: 'C', contractDurationDays: 215, dateStarted: '2024-12-10', completionDateOriginal: '2025-07-12', completionDateRevised: '2026-01-15' };
-  const sheet = index => P.barChartHtml({ project, docs: [], version, index, signatories: P.billingSignatories(project, { name: 'Juan' }) });
+  const sheet = index => P.barChartPages({ project, docs: [], version, index, signatories: P.billingSignatories(project, { name: 'Juan' }) }).join('');
   assert.match(sheet(1), /<div class='period'>Revised No\. 1 &#183; from June 1, 2026<\/div>/);
   assert.match(sheet(0), /<div class='period'>Revised No\. 1<\/div>/);
   assert.match(sheet(0), /CONTRACT PERIOD<\/td><td>: December 10, 2024 - July 12, 2025</);
@@ -657,4 +657,22 @@ test('bar chart print: bars to the day, each month\'s share, the S-curve, the ca
   assert.deepEqual(sheet(1).match(/(Prepared by|Checked by|Reviewed by|Recommending Approval|Approved by):/g), ['Prepared by:', 'Checked by:', 'Reviewed by:', 'Recommending Approval:', 'Approved by:']);
   assert.match(sheet(1), /<b>JUAN<\/b>/);
   assert.ok(sheet(0).includes('>215</text>') && !sheet(1).includes('>215</text>')); // the contract duration under the original's days only
+
+  // The chart's own colours: days 11-15 are a suspension (no work, off the bar), days 26-30 a variation order's work; the legend names them.
+  const coloured = { label: 'Revised No. 2', effective: '2026-07-01', colors: [{ name: 'Suspension <1>', color: '#FFD966', work: false }, { name: 'VO 1', color: '#FF7C80', work: true }],
+    items: [{ name: 'Roads', amount: 1000, bars: [[1, 10], [16, 30], [61, 70]], marks: [[11, 15, 0], [26, 30, 1]] }] };
+  const whole = P.barChartSvg(coloured);
+  assert.match(whole, /<rect x='128\.56' y='10' width='9\.78' height='4' fill='#FFD966'\/>/); // 3 months share 176 mm: a day is 1.956 mm
+  assert.match(whole, /width='9\.78' height='4' fill='#FF7C80'\/>/);
+  assert.ok(whole.includes('>Work</text>') && whole.includes('>Suspension &lt;1&gt; (no work)</text>') && whole.includes('>VO 1</text>'));
+  assert.ok(!svg.includes('>Work</text>')); // no legend on a chart without a colour
+  // Cut into pages of two months: the second page draws month 3 at the first page's scale, with the item columns and the rows under the total again.
+  const pages = P.barChartPages({ project, docs: [], version: coloured, index: 1, per: 2, signatories: P.billingSignatories(project, { name: 'Juan' }) });
+  assert.equal(pages.length, 2);
+  assert.ok(pages[0].includes('Months 1 to 2 &#183; Page 1 of 2') && pages[0].includes('PROJECT TITLE') && !pages[0].includes('Prepared by:'));
+  assert.ok(pages[1].includes('Months 3 to 3 &#183; Page 2 of 2') && !pages[1].includes('PROJECT TITLE') && pages[1].includes('Prepared by:'));
+  assert.ok(pages[0].includes('>1st Month</text>') && !pages[0].includes('>3rd Month</text>') && pages[1].includes('>3rd Month</text>') && !pages[1].includes('>1st Month</text>'));
+  assert.match(pages[1], /<rect x='109' y='10' width='29\.33' height='4' fill='#92D050'\/>/); // days 61-70 start the page
+  assert.ok(pages.every(p => p.includes('>Roads</text>') && p.includes('CUMULATIVE CASHFLOW (PHP)') && p.includes('>Work</text>')));
+  assert.equal(P.barChartPages({ project, docs: [], version: coloured, index: 1, per: 6, signatories: {} }).length, 1); // fewer months than a page holds
 });

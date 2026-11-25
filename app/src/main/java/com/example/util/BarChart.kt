@@ -23,7 +23,8 @@ object BarChart {
         val days: Int get() = (endDay - startDay + 1).coerceAtLeast(0)
     }
 
-    data class Item(val name: String, val amount: Double, val bars: List<Bar>) {
+    /** [marks] is the website's coloured days of the item, kept as its JSON so a save from the phone does not lose them. */
+    data class Item(val name: String, val amount: Double, val bars: List<Bar>, val marks: String = "") {
         val days: Int get() = bars.sumOf { it.days }
 
         /** Share of the item planned done by the end of contract [day], 0 to 1. */
@@ -31,8 +32,11 @@ object BarChart {
             if (days <= 0) 0.0 else bars.sumOf { (minOf(day, it.endDay) - it.startDay + 1).coerceIn(0, it.days) }.toDouble() / days
     }
 
-    /** One approved chart; a revised chart applies from its [effective] date (yyyy-MM-dd). */
-    data class Version(val label: String, val effective: String, val items: List<Item>) {
+    /**
+     * One approved chart; a revised chart applies from its [effective] date (yyyy-MM-dd). [colors] is the chart's own
+     * colours, named and drawn on the website's Bar chart page, kept as their JSON: the phone does not draw them.
+     */
+    data class Version(val label: String, val effective: String, val items: List<Item>, val colors: String = "") {
         val total: Double get() = items.sumOf { it.amount }
         val lastDay: Int get() = items.flatMap { it.bars }.maxOfOrNull { it.endDay } ?: 0
         fun plannedAmount(day: Int): Double = items.sumOf { it.amount * it.plannedShare(day) }
@@ -82,8 +86,8 @@ object BarChart {
                 val bars = it.getJSONArray("bars")
                 Item(it.getString("name"), it.optDouble("amount", 0.0), (0 until bars.length()).map { k ->
                     bars.getJSONArray(k).let { b -> Bar(b.getInt(0), b.getInt(1)) }
-                })
-            })
+                }, it.optJSONArray("marks")?.toString().orEmpty())
+            }, v.optJSONArray("colors")?.toString().orEmpty())
         }.sortedBy { it.effective }
     }.getOrDefault(emptyList())
 
@@ -91,7 +95,8 @@ object BarChart {
         JSONObject().put("label", v.label).put("effective", v.effective).put("items", JSONArray(v.items.map { item ->
             JSONObject().put("name", item.name).put("amount", item.amount)
                 .put("bars", JSONArray(item.bars.map { JSONArray(listOf(it.startDay, it.endDay)) }))
-        }))
+                .apply { if (item.marks.isNotEmpty()) put("marks", JSONArray(item.marks)) }
+        })).apply { if (v.colors.isNotEmpty()) put("colors", JSONArray(v.colors)) }
     }).toString()
 
     /** The chart in force on [date]: the latest one effective by then, else the first. */
