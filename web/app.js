@@ -4068,9 +4068,11 @@ function monthlyAbstractBody(c) {
 /** What is under the Monthly view's date: why that date has no abstract, or the two it was made from, its standing with Print abstract, and every pay item. */
 function monthlySheet(c, date) {
   const { abstract, to, from, error } = L.monthlyAbstract(c.of('project_abstracts'), date);
-  return error ? `<p class="error">${esc(error)}</p>` : `<p class="muted small">${esc(L.monthlyAbstractNote(to, from))}</p><div class="stack">
-    ${section(`As of ${L.displayDate(date)}`, 'assignment', `${standingTable(c, abstract)}
-      <a class="text-btn" href="#/p/${esc(c.page.id)}/print/monthly-${esc(date)}">${icon('print', 'sm')}Print abstract</a>`)}
+  // The card as the Weekly view's: the table across it, and one closing row with what it was made from and Print abstract.
+  return error ? `<p class="error">${esc(error)}</p>` : `<div class="stack">
+    ${section(`As of ${L.displayDate(date)}`, 'assignment', `<div class="apa-pair"><div>${standingTable(c, abstract)}</div></div>
+      <div class="apa-foot"><p class="muted small">${esc(L.monthlyAbstractNote(to, from))}</p>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/monthly-${esc(date)}">${icon('print', 'sm')}Print abstract</a></div>`)}
     ${P.abstractItemsHtml(L.abstractRows(abstract.rowsJson))}</div>`;
 }
 
