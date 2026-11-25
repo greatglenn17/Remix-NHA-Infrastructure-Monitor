@@ -626,6 +626,7 @@ div.apa-part { padding-top: 16px; }
 .apa-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 32px; }
 .apa-pair > * { flex: 1 1 520px; min-width: 0; } /* each takes half the card, so the second one ends at the card's right edge */
 .apa-pair .apa-standing { max-width: none; }
+#monthly-sheet { margin-top: 8px; } /* the Monthly view's card, clear of the date above it */
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
 .apa-standing thead th { white-space: normal; } /* "Plan on" over its date */
