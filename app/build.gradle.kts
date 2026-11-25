@@ -18,8 +18,8 @@ android {
     applicationId = "com.aistudio.nhaconstruction.monitoring.mmcfpg"
     minSdk = 24
     targetSdk = 36
-    versionCode = 321
-    versionName = "2.8.41"
+    versionCode = 322
+    versionName = "2.8.42"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
