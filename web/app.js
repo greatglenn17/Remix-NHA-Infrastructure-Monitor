@@ -306,8 +306,8 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('hashchange', () => s.user && route());
 
-// #/p/<project>[/progress|/actual[/<as-of date>|/monthly[/<date>]]|/payments|/documents|/print/<weekly report>|/drive]
-const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|actual|payments|documents|print|drive)(?:\/(monthly\/[\d-]*|[\w-]+))?)?$/;
+// #/p/<project>[/progress|/chart|/actual[/<as-of date>|/monthly[/<date>]]|/payments|/documents|/print/<weekly report>|/drive]
+const PAGE = /^#\/p\/([\w-]+)(?:\/(progress|chart|actual|payments|documents|print|drive)(?:\/(monthly\/[\d-]*|[\w-]+))?)?$/;
 
 function route() {
   const m = PAGE.exec(location.hash);
@@ -1141,7 +1141,7 @@ const fileLink = (refText, label) => (L.storagePathOf(refText)
   ? `<a class="file" data-file="${esc(refText)}" target="_blank" rel="noopener">${icon(L.isPdf(refText) ? 'picture_as_pdf' : 'attach_file', 'sm')}${esc(label)}</a>`
   : `<span class="file gone">${icon('attach_file', 'sm')}${esc(label)} not uploaded yet</span>`);
 /** ProjectSection: the project screen's five sections. */
-const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['actual', 'Actual<span class="tab-long"> Accomplishment</span>', 'assignment'], // the long half shows where the row has room (style.css)
+const SECTIONS = [['summary', 'Summary', 'dashboard'], ['progress', 'Progress', 'trending_up'], ['chart', '<span class="tab-long">Bar chart</span><span class="tab-short">Chart</span>', 'stacked_line_chart'], ['actual', 'Actual<span class="tab-long"> Accomplishment</span>', 'assignment'], // the long half shows where the row has room (style.css)
   ['payments', 'Payments', 'payments'], ['documents', 'Documents', 'folder_open']];
 /** SectionChips: the views inside Progress (Lots only for housing) and Documents. */
 const CHIPS = {
@@ -1200,12 +1200,14 @@ function drawProject(page) {
     : (page.section === 'documents' && chips.find(x => counts[x])) || chips[0]);
   // The opening chip stays put once shown, so a count clearing on a redraw does not switch the view.
   if (chips) { page.chips[page.section] = chip; drawSide(); } // the view just settled, marked in the sidebar
-  const body ={ progress: progressBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
+  const body ={ progress: progressBody, chart: chartBody, actual: actualBody, payments: paymentsBody, documents: documentsBody }[page.section] || summaryBody;
   const focused = document.activeElement?.dataset?.chip;
   // The heading, back link or tab that had focus stays focused through a live redraw.
   const onHead = document.activeElement?.matches?.('main h1') ? 'h1' : document.activeElement?.matches?.('main .back') ? '.back' : document.activeElement?.matches?.('nav.tabs a') ? `nav.tabs a[href="${CSS.escape(document.activeElement.getAttribute('href'))}"]` : null;
   // The New abstract quantity being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
   const typing = document.activeElement?.dataset?.next ? document.activeElement : null;
+  // The same for the Bar chart sheet's box or button (data-bc).
+  const charting = document.activeElement?.dataset?.bc ? document.activeElement : null;
   // A lot on the plan that had focus: the plan, drawn again once its picture loads, takes it back (bindLots).
   if (document.activeElement?.closest?.('#lot-stage') && page.lots) page.lots.refocus = true;
   // The full header (town, large figures) is the Summary's; the other tabs get a slim one, so their work starts higher.
@@ -1269,12 +1271,12 @@ function drawProject(page) {
     document.getElementById('monthly-items').innerHTML = items;
   };
   if (typing) { const again = main.querySelector(`[data-next="${typing.dataset.next}"]`); again?.focus(); again?.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
+  if (charting) { const again = main.querySelector(`[data-bc="${CSS.escape(charting.dataset.bc)}"]`); again?.focus(); if (again?.type === 'text') again.setSelectionRange(charting.selectionStart, charting.selectionEnd); }
   // The critical-issue alert opens Issues filtered to the ones past their target date.
   main.querySelectorAll('[data-issues]').forEach(a => { a.onclick = () => { page.issues = { query: '', filter: a.dataset.issues }; }; });
   const projectEdit = document.getElementById('project-edit');
   if (projectEdit) projectEdit.onclick = () => projectForm(c);
-  const chartEdit = document.getElementById('chart-edit');
-  if (chartEdit) chartEdit.onclick = () => barChartForm(c);
+  if (document.getElementById('bc-page')) bindChart(c);
   main.querySelectorAll('details[data-fold]').forEach(f => { f.ontoggle = () => { page.folds = { ...page.folds, [f.id]: f.open }; }; });
   const moreAlerts = document.getElementById('more-alerts');
   if (moreAlerts) moreAlerts.ontoggle = () => { page.moreAlerts = moreAlerts.open; };
@@ -1434,155 +1436,9 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
 const curveTable = version => table(['Month', { text: 'Monthly', num: true }, { text: 'Cumulative', num: true }], L.chartMonths(version).map(m =>
   `<tr><td>${m.no}</td><td class="num">${m.monthlyPct.toFixed(2)}%</td><td class="num">${m.cumulativePct.toFixed(2)}%</td></tr>`).join(''));
 
-/**
- * BarChartDialog: the approved bar chart, per Scope of Works item the bar(s) from month and cell to month and cell. A
- * revised chart is added with the date it takes effect; the earlier ones stay. Save writes the project's barChartJson,
- * one revision up, with the app's "Bar Chart" audit entry.
- * Import from Excel fills the selected chart's items and bars from the contractor's workbook (chart-excel.js), as the app does.
- */
-function barChartForm(c) {
-  const { project, documents } = c;
-  const drafts = L.chartDrafts(project);
-  if (!drafts) { tell('Set the start date first', 'The bar chart counts its days from the project\'s start date.'); return; }
-  let selected = drafts.length - 1, notes = [], sheets = []; // what the last import said; the chart sheets of a workbook with several
-  const initial = L.chartJson(drafts);
-  const d = document.createElement('dialog');
-  d.className = 'help edit-form wk-form';
-  d.innerHTML = `<form novalidate>
-    <h2>Approved bar chart</h2>
-    <div class="chips" role="group" aria-label="Chart" data-tabs></div>
-    <p class="muted small">Import the contractor's Excel file, or enter each item's bar as drawn: From month and day, To month and day. A month is 30 days,
-      counted from the start date; the cell labelled 10 is days 6 to 10. The chart must total the contract amount. The target % then follows this chart every day.</p>
-    <label class="field" data-import>Import from Excel (.xlsx)<input type="file" data-file accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
-    <ul class="bc-errors" data-notes aria-live="polite"></ul>
-    <div data-sheets></div>
-    <ul class="bc-errors" data-errors aria-live="polite"></ul>
-    <div class="bc-body" data-body></div>
-    <div class="form-foot"><p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
-  </form>`;
-  const form = d.querySelector('form'), tabs = d.querySelector('[data-tabs]'), body = d.querySelector('[data-body]'), errs = d.querySelector('[data-errors]');
-  const err = d.querySelector('p.error'), save = d.querySelector('.actions .btn');
-  const total = items => items.reduce((t, x) => t + x.amount, 0);
-  const tabName = i => drafts[i].label.trim() || `Chart ${i + 1}`;
-  const barRow = (b, key, many) => `<div class="wk-row" data-bar="${key}">
-    <label class="field n">From month<input data-k="sm" inputmode="numeric" value="${esc(b.sm)}"></label>
-    <label class="field n">Day<input data-k="sd" inputmode="numeric" value="${esc(b.sd)}"></label>
-    <label class="field n">To month<input data-k="em" inputmode="numeric" value="${esc(b.em)}"></label>
-    <label class="field n">Day<input data-k="ed" inputmode="numeric" value="${esc(b.ed)}"></label>
-    ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
-  // What typing changes: the errors, each item's line, the S-curve and the tab's name. The boxes are left alone, so the cursor stays.
-  const drawNumbers = () => {
-    const errors = L.chartErrors(drafts, project, documents);
-    errs.innerHTML = errors.map(e => `<li>${esc(e)}</li>`).join('');
-    save.disabled = errors.length > 0;
-    const v = drafts[selected];
-    if (!v) return;
-    const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
-    body.querySelectorAll('[data-item]').forEach((el, i) => {
-      const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
-      el.querySelector('legend').textContent = made.items[i].name || 'New item';
-      el.querySelector('[data-sum]').textContent = `${L.formatPhp(v.items[i].amount)} · ${(total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3)}% · ${days} c.d.`;
-    });
-    body.querySelector('[data-curve]').innerHTML = curveTable(made);
-    tabs.querySelector(`[data-tab="${selected}"]`).textContent = tabName(selected);
-  };
-  const draw = () => {
-    tabs.innerHTML = drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === selected}">${esc(tabName(i))}</button>`).join('')
-      + `<button type="button" data-add-chart>${icon('add_circle', 'sm')}${drafts.length ? 'Revised chart' : 'Add the chart'}</button>`;
-    const v = drafts[selected];
-    d.querySelector('[data-import]').hidden = !v;
-    // What was read is a plain note; what went wrong, or a bar that is not its Duration, is in the errors' red.
-    d.querySelector('[data-notes]').innerHTML = notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('');
-    d.querySelector('[data-sheets]').innerHTML = !sheets.length ? '' : `<fieldset class="bc-item"><legend>Which sheet?</legend>
-      ${sheets.map((sh, i) => `<button type="button" class="text-btn" data-sheet="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
-        + (L.chartTotalMatches(selected, total(sh.items), project, documents) ? ' · matches the contract' : ''))}</button>`).join('')}
-      <button type="button" class="text-btn" data-sheet="-1">Cancel</button></fieldset>`;
-    body.innerHTML = !v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>' : `
-      <label class="field">Name<input data-label value="${esc(v.label)}"></label>
-      ${selected === 0 ? `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`
-        : `<label class="field">Takes effect on<input type="date" data-effective value="${esc(v.effective)}"></label>
-          <p class="muted small">Draw the revised chart from the start date, with suspended months left empty, as approved.
-            Where the approved revision changes the money, change an item's amount, or add and remove items.</p>`}
-      ${v.items.map((item, i) => `<fieldset class="bc-item" data-item="${i}"><legend></legend>
-        ${selected === 0 ? '' : `<div class="wk-row"><label class="field">Item name<input data-name value="${esc(item.name)}"></label>
-          <label class="field">Amount (₱)<input data-amount inputmode="decimal" placeholder="0.00" value="${item.amount || ''}"></label>
-          <button type="button" class="icon-btn" data-drop-item aria-label="Remove this item">${icon('delete', 'sm')}</button></div>`}
-        <p class="muted small" data-sum></p>
-        ${item.bars.map((b, j) => barRow(b, `${i}:${j}`, item.bars.length > 1)).join('')}
-        <button type="button" class="text-btn wk-add" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></fieldset>`).join('')}
-      ${selected === 0 ? '' : `<button type="button" class="text-btn wk-add" data-add-item>${icon('add_circle', 'sm')}Add item</button>`}
-      <p class="sub">S-curve</p><div data-curve></div>
-      <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button>`;
-    drawNumbers();
-  };
-  body.oninput = e => {
-    const v = drafts[selected], t = e.target;
-    if (t.matches('[data-label]')) v.label = t.value;
-    else if (t.matches('[data-effective]')) v.effective = t.value;
-    else if (t.matches('[data-name]')) v.items[t.closest('[data-item]').dataset.item].name = t.value;
-    // An amount that does not read counts as nothing, which the item's line and the contract total then show.
-    else if (t.matches('[data-amount]')) v.items[t.closest('[data-item]').dataset.item].amount = L.parseAmount(t.value) ?? 0;
-    else if (t.dataset.k) { const [i, j] = t.closest('[data-bar]').dataset.bar.split(':'); v.items[i].bars[j][t.dataset.k] = t.value; }
-    drawNumbers();
-  };
-  const useSheet = sheet => { drafts[selected].items = L.draftItems(sheet.items); notes = L.importNotes(sheet); sheets = []; };
-  form.onchange = async e => {
-    const input = e.target, file = input.matches('[data-file]') && input.files[0], v = drafts[selected];
-    if (!file) return;
-    let found = null;
-    try { if (file.size <= 20 * 1024 * 1024) found = await readChartWorkbook(await file.arrayBuffer()); } catch { /* not a workbook: the note below says so */ }
-    input.value = ''; // so the same file, saved again, can be picked again
-    if (drafts[selected] !== v) return; // another chart was opened meanwhile
-    sheets = [];
-    if (!found) notes = ['That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).'];
-    else if (!found.length) notes = ['No sheet in that file has the ITEM NO. / DESCRIPTION / Amount header with a Month 1 row.'];
-    else if (found.length === 1) useSheet(found[0]);
-    else { notes = []; sheets = found; }
-    draw();
-  };
-  form.onclick = e => {
-    const on = sel => e.target.closest(sel), tab = on('[data-tab]'), drop = on('[data-drop-bar]'), sheet = on('[data-sheet]'), was = drafts[selected];
-    if (tab) selected = +tab.dataset.tab;
-    else if (sheet) { if (sheets[sheet.dataset.sheet]) useSheet(sheets[sheet.dataset.sheet]); else sheets = []; }
-    else if (on('[data-add-chart]')) { drafts.push(drafts.length ? L.revisedDraft(drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); selected = drafts.length - 1; }
-    else if (on('[data-add-bar]')) drafts[selected].items[on('[data-item]').dataset.item].bars.push(L.emptyBar());
-    else if (drop) { const [i, j] = drop.closest('[data-bar]').dataset.bar.split(':'); drafts[selected].items[i].bars.splice(j, 1); }
-    else if (on('[data-add-item]')) drafts[selected].items.push(L.emptyItem());
-    else if (on('[data-drop-item]')) drafts[selected].items.splice(on('[data-item]').dataset.item, 1);
-    // The first chart left always runs from the start date.
-    else if (on('[data-drop-chart]')) { drafts.splice(selected, 1); selected = Math.max(selected - 1, 0); if (drafts[0]) drafts[0].effective = project.dateStarted; }
-    else return;
-    if (drafts[selected] !== was) { notes = []; sheets = []; } // the notes are about the chart that was open
-    draw();
-  };
-  draw();
-  const done = () => { d.close(); d.remove(); };
-  const close = async () => (L.chartJson(drafts) === initial || await ask('Discard your changes to the bar chart?', DISCARD)) && done();
-  d.querySelector('[data-cancel]').onclick = close;
-  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
-  form.onsubmit = async e => {
-    e.preventDefault();
-    if (L.chartErrors(drafts, project, documents).length) return;
-    const json = L.chartJson(drafts);
-    if (json === initial) { done(); return; }
-    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
-    save.disabled = true; err.textContent = '';
-    try {
-      await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.chartAudit(json) }), []]], { barChartJson: json });
-      done(); savedNote();
-    } catch (x) {
-      err.textContent = L.errorText(x, 'This account cannot change this project\'s bar chart.', 'Could not save. Try again.');
-      save.disabled = false;
-    }
-  };
-  document.body.append(named(d));
-  d.showModal();
-}
-
-/** BarChartCard: the chart in force, today's planned % and its S-curve by month; Edit for those who manage the chart. */
+/** BarChartCard: the chart in force, today's planned % and its S-curve by month; Edit, for those who manage the chart, opens the Bar chart page. */
 function barChartCard(project, documents, now, curveOpen) {
-  const edit = L.canEditChart(project, s.user.uid, s.claims) ? `<button class="text-btn" id="chart-edit">${icon('edit', 'sm')}Edit</button>` : '';
+  const edit = L.canEditChart(project, s.user.uid, s.claims) ? `<a class="text-btn" href="#/p/${esc(project.projectUuid)}/chart">${icon('edit', 'sm')}Edit</a>` : '';
   const plan = L.planOn(project, documents, now);
   if (!plan) return section('Approved bar chart', 'stacked_line_chart', emptyLine('No bar chart yet. The target % is typed in each weekly report.'), '', edit);
   const { version, day } = plan, last = L.chartLastDay(version), [month, cell] = L.cellOf(Math.min(Math.max(day, 1), last));
@@ -1614,6 +1470,219 @@ function billingStatusCard(summary, payments, units) {
     <div class="money tiles">${L.billingStatus(payments, units).map(r => `<div><span>${esc(r.label)}</span>${r.units > 0
       ? `<b>${r.units}<small> of ${plural(units, word)} billed</small></b>` : '<b class="word">Not billed yet</b>'}</div>`).join('')}</div>
     ${word === 'lot' ? '' : `<p class="muted small">Counted against the profile's ${plural(units, 'unit')}, not the ${plural(summary.saleable, 'saleable lot')} drawn.</p>`}`);
+}
+
+/* ---------- Bar chart (the Approved bar chart as a sheet: items down, 5-day cells across) ---------- */
+
+const MONTH_CELLS = 6; // a month is six 5-day cells, labelled 5 to 30
+const chartTabName = (st, i) => st.drafts[i].label.trim() || `Chart ${i + 1}`;
+const cellFill = f => (f ? `<i style="left:${f[0] * 100}%;width:${f[1] * 100}%"></i>` : '');
+
+/** The page's drafts (page.chart): the saved charts, or what this browser kept of an unsaved edit of them; null without a start date. */
+function chartState(c) {
+  const base = c.project.barChartJson || '', st = c.page.chart;
+  // The saved chart arriving again (this page's save, or another screen's) is drawn from, unless an edit is open.
+  if (st) { const changed = st.seen !== base; st.seen = base; if (!changed || L.chartJson(st.drafts) !== st.initial) return st; }
+  const saved = L.chartDrafts(c.project);
+  if (!saved) return (c.page.chart = null);
+  const drafts = (L.canEditChart(c.project, s.user.uid, s.claims) && L.keptChart(kept(c, 'chart-draft'), base)) || saved;
+  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0 });
+}
+
+function chartBody(c) {
+  const st = chartState(c), can = L.canEditChart(c.project, s.user.uid, s.claims);
+  const none = !st ? 'Set the project\'s start date first: the bar chart counts its days from it.' : !can && !st.count ? 'No bar chart yet. The target % is typed in each weekly report.' : '';
+  return section('Approved bar chart', 'stacked_line_chart', none ? emptyLine(none) : `<div id="bc-page">${chartPage(c, st, can)}</div>`);
+}
+
+/** The page under its heading: a tab per chart, Import, Print and Save, the open chart's name and date, and its sheet. */
+function chartPage(c, st, can) {
+  const { project } = c, v = st.drafts[st.selected], revised = st.selected > 0;
+  const total = items => items.reduce((t, x) => t + x.amount, 0);
+  return `<div class="bc-tools"><div class="chips" role="group" aria-label="Chart">${st.drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === st.selected}">${esc(chartTabName(st, i))}</button>`).join('')}
+      ${can ? `<button type="button" data-add-chart>${icon('add_circle', 'sm')}${st.drafts.length ? 'Revised chart' : 'Add the chart'}</button>` : ''}</div>
+      ${can && v ? `<button type="button" class="text-btn" data-import>${icon('upload_file', 'sm')}Import Excel</button><input type="file" data-file hidden accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : ''}
+      <a class="text-btn" data-print href="#/p/${esc(project.projectUuid)}/print/chart-${st.selected}">${icon('print', 'sm')}Print</a>
+      ${can ? `<button type="button" class="btn" data-save>${icon('check_circle', 'sm')}Save</button><button type="button" class="text-btn danger" data-discard>${icon('delete', 'sm')}Discard changes</button>` : ''}</div>
+    ${can ? `<p class="muted small">Click or drag across the 5-day cells to draw an item's bar; click a filled cell to clear it. For a bar that starts or ends between the cells, press the item's days
+      and type its From and To month and day. A month is 30 days from the start date. The chart must total the contract amount; the target % then follows this chart every day.
+      What you change is kept in this browser until you save or discard it.</p>` : ''}
+    <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
+    ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
+      + (L.chartTotalMatches(st.selected, total(sh.items), project, c.documents) ? ' · matches the contract' : ''))}</button>`).join('')}<button type="button" class="text-btn" data-pick="-1">Cancel</button></div>` : ''}
+    <ul class="bc-errors" data-errors aria-live="polite"></ul>
+    <p class="error" role="alert" data-failed></p>
+    ${!v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>'
+      : !can ? `<p class="wk-total">${esc(`${v.label} · from ${L.displayDate(v.effective)}`)}</p><div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>` : `
+      <div class="bc-fields"><label class="field">Name<input data-bc="label" data-label value="${esc(v.label)}"></label>
+        ${revised ? `<label class="field">Takes effect on<input type="date" data-bc="effective" data-effective value="${esc(v.effective)}"></label>`
+          : `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`}</div>
+      ${revised ? `<p class="muted small">Draw the revised chart from the start date, with suspended months left empty, as approved.
+        Where the approved revision changes the money, change an item's cost, or add and remove items.</p>` : ''}
+      <div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>
+      <div class="bc-tools">${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
+        <button type="button" class="text-btn" data-bc="add-month" data-add-month>${icon('add_circle', 'sm')}Add month</button>
+        <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${st.drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button></div>`}`;
+}
+
+/** The S-curve under the sheet: the chart's total, then each month's and the cumulative %. */
+function chartFoot(v, months) {
+  const total = v.items.reduce((t, x) => t + x.amount, 0), curve = L.chartMonths(L.draftVersion(v));
+  const line = (label, of) => `<tr><th scope="row" class="bc-name">${label}</th><td colspan="3"></td>${Array.from({ length: months }, (_, m) => `<td class="num m" colspan="${MONTH_CELLS}">${curve[m] ? of(curve[m]).toFixed(2) : ''}</td>`).join('')}</tr>`;
+  return `<tr><th scope="row" class="bc-name">Total</th><td class="num">${esc(L.formatPhp(total))}</td><td class="num">${total > 0 ? '100.000' : ''}</td><td></td><td class="m" colspan="${months * MONTH_CELLS}"></td></tr>
+    ${line('Monthly %', m => m.monthlyPct)}${line('Cumulative %', m => m.cumulativePct)}`;
+}
+
+/**
+ * The open chart as the contractor's sheet: Description, Cost, % and Days, then each month's six 5-day cells with the
+ * bars drawn to the day. Editors get the days as a button that opens the item's bars as From and To month and day,
+ * and on a revised chart the name and cost as boxes.
+ */
+function chartSheet(c, st, can) {
+  const v = st.drafts[st.selected], revised = st.selected > 0, months = L.sheetMonths(v, c.project.contractDurationDays, st.months), cells = months * MONTH_CELLS;
+  const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
+  const barRow = (b, i, j, many) => `<div class="wk-row" data-bar="${j}">${[['sm', 'From month'], ['sd', 'Day'], ['em', 'To month'], ['ed', 'Day']].map(([k, label]) =>
+    `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
+    ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
+  const row = (item, i) => {
+    const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0), name = made.items[i].name || 'New item';
+    return `<tr data-item="${i}"><th scope="row" class="bc-name">${can && revised ? `<span class="bc-edit"><input data-bc="name:${i}" data-name placeholder="Item name" aria-label="Item name" value="${esc(item.name)}">
+        <button type="button" class="icon-btn" data-drop-item aria-label="Remove ${esc(name)}">${icon('delete', 'sm')}</button></span>` : esc(item.name)}</th>
+      <td class="num">${can && revised ? `<input data-bc="amount:${i}" data-amount inputmode="decimal" placeholder="0.00" aria-label="Cost of ${esc(name)}" value="${item.amount || ''}">` : esc(L.formatPhp(item.amount))}</td>
+      <td class="num" data-pct>${(total > 0 ? item.amount / total * 100 : 0).toFixed(3)}</td>
+      <td class="num">${can ? `<button type="button" class="text-btn" data-bc="days:${i}" data-days aria-expanded="${Boolean(st.open[i])}" title="Type the bars to the day" aria-label="${days} days of ${esc(name)}: type the bars to the day">${days}</button>` : days}</td>
+      ${L.cellFills(item.bars, cells).map((f, k) => `<td class="bc-cell${k % MONTH_CELLS ? '' : ' m'}" data-cell="${k}">${cellFill(f)}</td>`).join('')}</tr>
+      ${can && st.open[i] ? `<tr class="bc-exact" data-item="${i}"><td colspan="${4 + cells}"><div class="bc-exact-in"><b>${esc(name)}</b>${item.bars.map((b, j) => barRow(b, i, j, item.bars.length > 1)).join('')}
+        <button type="button" class="text-btn" data-bc="add-bar:${i}" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></div></td></tr>` : ''}`;
+  };
+  return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}">
+    <thead><tr><th rowspan="2" class="bc-name">Description</th><th rowspan="2" class="num">Cost (₱)</th><th rowspan="2" class="num">%</th><th rowspan="2" class="num">Days</th>
+      ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}</th>`).join('')}</tr>
+      <tr>${Array.from({ length: cells }, (_, k) => `<th class="bc-day${k % MONTH_CELLS ? '' : ' m'}">${(k % MONTH_CELLS + 1) * 5}</th>`).join('')}</tr></thead>
+    <tbody>${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
+}
+
+/**
+ * The page's controls. Typing and painting change the drafts and redraw only the figures, so the boxes keep the
+ * cursor; a tab, an import or a row added redraws the page. Save writes `barChartJson` in the phone's shape with the
+ * app's "Bar Chart" audit entry, as the phone's form does; until then the drafts are kept in this browser.
+ */
+function bindChart(c) {
+  const { project, documents, page } = c, st = page.chart, el = document.getElementById('bc-page');
+  const can = L.canEditChart(project, s.user.uid, s.claims), open = () => st.drafts[st.selected];
+  const numbers = () => {
+    const v = open(), errors = can ? L.chartErrors(st.drafts, project, documents) : [], dirty = L.chartJson(st.drafts) !== st.initial;
+    el.querySelector('[data-errors]').innerHTML = errors.map(e => `<li>${esc(e)}</li>`).join('');
+    el.querySelector('[data-print]').hidden = dirty || st.selected >= st.count; // the print page draws the saved chart
+    if (!can) return;
+    el.querySelector('[data-save]').disabled = errors.length > 0 || !dirty;
+    el.querySelector('[data-discard]').hidden = !dirty;
+    keep(c, 'chart-draft', dirty ? L.chartKept(project.barChartJson || '', st.drafts) : null);
+    if (!v) return;
+    const table = el.querySelector('.bc-grid'), months = L.sheetMonths(v, project.contractDurationDays, st.months);
+    if (Number(table.dataset.months) !== months) { sheet(); return; } // a bar typed past the last month drawn, or taken back
+    const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
+    table.querySelectorAll('tbody tr[data-item]:not(.bc-exact)').forEach((tr, i) => {
+      tr.querySelector('[data-pct]').textContent = (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3);
+      tr.querySelector('[data-days]').textContent = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
+      L.cellFills(v.items[i].bars, months * MONTH_CELLS).forEach((f, k) => { const td = tr.children[4 + k], html = cellFill(f); if (td.innerHTML !== html) td.innerHTML = html; });
+    });
+    table.tFoot.innerHTML = chartFoot(v, months);
+    el.querySelector(`[data-tab="${st.selected}"]`).textContent = chartTabName(st, st.selected);
+  };
+  // Drawn again, the box or button that had focus keeps it (they are named by data-bc).
+  const again = draw => {
+    const a = document.activeElement, key = el.contains(a) && a.dataset.bc, at = key && a.type === 'text' ? [a.selectionStart, a.selectionEnd] : null;
+    draw();
+    const b = key && el.querySelector(`[data-bc="${CSS.escape(key)}"]`);
+    if (b) { b.focus(); if (at) b.setSelectionRange(...at); }
+    numbers();
+  };
+  const sheet = () => again(() => { el.querySelector('[data-sheet]').innerHTML = chartSheet(c, st, can); });
+  const redraw = focus => { again(() => { el.innerHTML = chartPage(c, st, can); }); if (focus) el.querySelector(focus)?.focus(); };
+  const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; }; // they are about the chart that was open
+  numbers();
+
+  el.onclick = async e => {
+    const on = sel => e.target.closest(sel), tab = on('[data-tab]'), v = open(), i = on('[data-item]')?.dataset.item;
+    if (tab) { st.selected = Number(tab.dataset.tab); leave(); redraw(`[data-tab="${st.selected}"]`); return; }
+    if (!can) return;
+    if (on('[data-import]')) el.querySelector('[data-file]').click();
+    else if (on('[data-save]')) save();
+    else if (on('[data-discard]')) { if (await ask('Discard your changes to the bar chart?', DISCARD)) { keep(c, 'chart-draft', null); page.chart = null; if (page === s.page) drawProject(page); } }
+    else if (on('[data-pick]')) { const sh = st.sheets[on('[data-pick]').dataset.pick]; st.sheets = []; if (sh) { v.items = L.draftItems(sh.items); st.notes = L.importNotes(sh); st.open = {}; } redraw('[data-import]'); }
+    else if (on('[data-add-chart]')) { st.drafts.push(st.drafts.length ? L.revisedDraft(st.drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); st.selected = st.drafts.length - 1; leave(); redraw(`[data-tab="${st.selected}"]`); }
+    // The first chart left always runs from the start date.
+    else if (on('[data-drop-chart]')) { st.drafts.splice(st.selected, 1); st.selected = Math.max(st.selected - 1, 0); if (st.drafts[0]) st.drafts[0].effective = project.dateStarted; leave(); redraw(st.drafts.length ? `[data-tab="${st.selected}"]` : '[data-add-chart]'); }
+    else if (on('[data-add-month]')) { st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1; sheet(); }
+    else if (on('[data-add-item]')) { v.items.push(L.emptyItem()); sheet(); el.querySelector(`[data-bc="name:${v.items.length - 1}"]`).focus(); }
+    else if (on('[data-drop-item]')) { v.items.splice(i, 1); st.open = {}; sheet(); el.querySelector('[data-add-item]').focus(); }
+    else if (on('[data-days]')) { st.open[i] = !st.open[i]; sheet(); }
+    else if (on('[data-add-bar]')) { v.items[i].bars.push(L.emptyBar()); sheet(); el.querySelector(`[data-bc="bar:${i}:${v.items[i].bars.length - 1}:sm"]`).focus(); }
+    else if (on('[data-drop-bar]')) { v.items[i].bars.splice(on('[data-bar]').dataset.bar, 1); sheet(); el.querySelector(`[data-bc="days:${i}"]`).focus(); }
+  };
+  if (!can) return;
+
+  el.oninput = e => {
+    const v = open(), t = e.target, i = t.closest('[data-item]')?.dataset.item;
+    if (t.matches('[data-label]')) v.label = t.value;
+    else if (t.matches('[data-effective]')) v.effective = t.value;
+    else if (t.matches('[data-name]')) v.items[i].name = t.value;
+    // A cost that does not read counts as nothing, which the item's % and the contract total then show.
+    else if (t.matches('[data-amount]')) v.items[i].amount = L.parseAmount(t.value) ?? 0;
+    else if (t.dataset.k) v.items[i].bars[t.closest('[data-bar]').dataset.bar][t.dataset.k] = t.value;
+    else return;
+    numbers();
+  };
+
+  // Painting: the cell pressed is filled, or cleared if it had any of a bar, and so is each cell of that item dragged over.
+  // mousedown, not click: a touch sends it only for a tap, so scrolling the sheet with a finger paints nothing.
+  let paint = null;
+  const paintAt = e => {
+    const td = e.target.closest?.('.bc-cell'), i = td?.parentElement.dataset.item, item = td && open().items[i];
+    if (!td || (paint && paint.i !== i)) return;
+    const k = Number(td.dataset.cell), had = L.cellFills(item.bars, k + 1)[k];
+    paint ??= { i, on: !had };
+    if (paint.on ? had?.[1] === 1 : !had) return; // already so: nothing to redraw
+    item.bars = L.paintCell(item.bars, k, paint.on);
+    if (st.open[i]) sheet(); else numbers();
+  };
+  el.onmousedown = e => { paint = null; if (e.button === 0 && e.target.closest('.bc-cell')) { e.preventDefault(); paintAt(e); } };
+  el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); };
+  el.onmouseup = el.onmouseleave = () => { paint = null; };
+
+  el.onchange = async e => {
+    const input = e.target, file = input.matches('[data-file]') && input.files[0], v = open();
+    if (!file) return;
+    let found = null;
+    try { if (file.size <= 20 * 1024 * 1024) found = await readChartWorkbook(await file.arrayBuffer()); } catch { /* not a workbook: the note below says so */ }
+    input.value = ''; // so the same file, saved again, can be picked again
+    if (page.chart !== st || open() !== v || !el.isConnected) return; // another chart was opened, or the page drawn again, meanwhile
+    st.sheets = [];
+    if (!found) st.notes = ['That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).'];
+    else if (!found.length) st.notes = ['No sheet in that file has the ITEMS / DESCRIPTION / COST header with a 1st Month row.'];
+    else if (found.length === 1) { v.items = L.draftItems(found[0].items); st.notes = L.importNotes(found[0]); st.open = {}; }
+    else { st.notes = []; st.sheets = found; }
+    redraw('[data-import]');
+  };
+
+  const save = async () => {
+    const failed = el.querySelector('[data-failed]'), button = el.querySelector('[data-save]');
+    if (L.chartErrors(st.drafts, project, documents).length) return;
+    const json = L.chartJson(st.drafts);
+    if (!navigator.onLine) { failed.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
+    button.disabled = true; failed.textContent = '';
+    try {
+      await addRecords(c, [[ids => L.auditRecord({ ...ids, user: s.profile.name || s.user.email, ...L.chartAudit(json) }), []]], { barChartJson: json });
+      Object.assign(st, { initial: json, count: st.drafts.length });
+      keep(c, 'chart-draft', null);
+      savedNote();
+      if (page === s.page && page.section === 'chart') drawProject(page);
+    } catch (x) {
+      failed.textContent = L.errorText(x, 'This account cannot change this project\'s bar chart.', 'Could not save. Try again.');
+      button.disabled = false;
+    }
+  };
 }
 
 /* ---------- Progress (WeeklyReportsTab, MonthlyReportsTab, PhotoGalleryTab) ---------- */

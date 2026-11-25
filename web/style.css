@@ -479,11 +479,12 @@ thead .num { font-family: inherit; }
 .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
 .tabs a[aria-current="page"] .icon { color: var(--link); }
 .tabs a:focus-visible { outline-offset: -3px; } /* inside the tab: the row scrolls sideways and clips anything outside, and the tab's last pixel sits on the row's border */
-/* The five labels share the row so Documents never hides off the edge: "Actual" alone and no icons where the row is short, tighter still on a phone. */
-@media (max-width: 900px) { .tabs .tab-long { display: none; } }
+/* The six labels share the row so Documents never hides off the edge: "Actual" and "Chart" alone and no icons where the row is short, tighter still on a phone. */
+.tabs .tab-short { display: none; }
+@media (max-width: 900px) { .tabs .tab-long { display: none; } .tabs .tab-short { display: inline; } }
 @media (max-width: 720px) { .tabs a .icon { display: none; } }
 @media (max-width: 600px) { .tabs a { flex: 1 0 auto; justify-content: center; padding: 10px 6px; } }
-@media (max-width: 420px) { .tabs { gap: 0; } .tabs a { padding: 10px 3px; font-size: 13px; } }
+@media (max-width: 420px) { .tabs { gap: 0; } .tabs a { padding: 10px 2px; font-size: 12px; } }
 @media (max-width: 340px) { .tabs a { padding: 10px 1px; font-size: 12px; } }
 
 /* Sidebar (app.js drawSide), from 768px: All projects, the open project's sections, Users. It takes the tab row's place;
@@ -1001,15 +1002,41 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .wk-row .icon-btn { margin-left: auto; }
 .wk-add { justify-self: start; margin-top: -6px; }
 .wk-total { margin: 0; font-weight: 600; }
-.bc-body { display: grid; gap: 14px; }
 .bc-errors { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; color: var(--behind); font-size: 13px; }
-.bc-errors:empty { display: none; }
-.bc-item { display: grid; gap: 8px; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--border); border-radius: 8px; }
-.bc-item legend { padding: 0 4px; font-weight: 600; }
-.bc-item p { margin: 0; }
-.bc-item .wk-row { padding: 0; border: 0; }
-.bc-item .wk-row .field.n { flex: 1 1 56px; min-width: 0; } /* the four boxes of a bar stay on one line on a phone */
-.bc-item .wk-add { margin-top: 0; }
+.bc-errors:empty, #bc-page .error:empty { display: none; }
+/* The Bar chart page: the chart as the contractor's sheet. The Description column stays put while the months scroll under it. */
+#bc-page { display: grid; gap: 10px; }
+#bc-page > p { margin: 0; }
+.bc-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bc-tools .chips { margin: 0 auto 0 0; }
+.bc-tools .chips button { display: inline-flex; align-items: center; gap: 6px; }
+.bc-tools [hidden] { display: none; } /* Print while an edit is open, Discard while none is */
+.bc-fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.bc-grid { width: auto; border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--outline); border-left: 1px solid var(--outline); } /* separate: a sticky cell keeps its borders */
+.bc-grid th, .bc-grid td { padding: 4px 8px; vertical-align: middle; white-space: nowrap; border-width: 0 1px 1px 0; }
+.bc-grid thead th { text-align: center; }
+.bc-grid .bc-name { position: sticky; left: 0; z-index: 1; min-width: 240px; max-width: 320px; white-space: normal; text-align: left; font-weight: 400; }
+.bc-grid tbody .bc-name, .bc-grid tfoot .bc-name { background: var(--surface-solid); }
+@media (max-width: 600px) { .bc-grid .bc-name { position: static; min-width: 170px; } } /* a phone has no room to hold a column still */
+.bc-grid tfoot .bc-name, .bc-grid tfoot td { font-weight: 600; }
+.bc-grid .m { box-shadow: inset 1px 0 0 var(--text-2); } /* where a month starts */
+.bc-grid .bc-day { min-width: 20px; padding: 2px 0; font-size: 10px; font-weight: 400; letter-spacing: 0; }
+.bc-grid .bc-cell { position: relative; height: 34px; padding: 0; }
+.bc-grid.can .bc-cell { cursor: cell; }
+.bc-grid.can .bc-cell:hover { background: var(--primary-container); }
+.bc-grid .bc-cell i { position: absolute; top: 7px; bottom: 7px; background: #92D050; } /* the print sheet's green */
+.bc-grid input { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+.bc-grid input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.bc-grid [data-name] { flex: 1; min-width: 150px; }
+.bc-grid [data-amount] { width: 130px; text-align: right; }
+.bc-grid [data-days] { min-height: 32px; padding: 2px 10px; }
+.bc-edit { display: flex; align-items: center; gap: 2px; }
+.bc-exact td { background: var(--field); }
+.bc-exact-in { position: sticky; left: 8px; display: flex; flex-wrap: wrap; align-items: end; gap: 8px; width: fit-content; max-width: min(100%, 80vw); }
+.bc-exact-in > b { align-self: center; white-space: normal; }
+.bc-exact-in .wk-row { padding: 0; border: 0; flex-wrap: nowrap; }
+.bc-exact-in .wk-row .field.n { flex: 0 0 84px; }
+.bc-exact-in input { width: 100%; }
 .order-fields fieldset, fieldset.lot-billing { margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 8px; }
 .order-fields legend, .lot-billing legend { padding: 0 4px; font-size: 13px; color: var(--text-2); }
 .field textarea, .field select { font: 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 11px 12px; width: 100%; min-height: 44px; resize: vertical; }
