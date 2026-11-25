@@ -221,8 +221,6 @@ class ActualAccomplishmentUiTest {
     // "New abstract" on a small phone: only this period's quantities are typed; the to date and the overall follow, and Save files the record.
     @Config(qualifiers = "w360dp-h640dp")
     @Test fun newAbstract_typedQuantitiesGiveTheToDateAndTheOverall_andSaveFilesIt() {
-        // On a busy machine one scroll step of this form took longer than the 60 s idle limit; with a longer one the test passes in about 80 s.
-        androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         val filed = mutableStateListOf(first)
         openNewAbstract(filed, "2026-11-20") { filed += it }
         // No housing units: nothing is in houses, so the form does not speak of them.
@@ -323,8 +321,6 @@ class ActualAccomplishmentUiTest {
 
     // Made again for a date that already has an abstract: the boxes start from that one's quantities, and saving asks first.
     @Test fun newAbstract_ofADateAlreadyFiled_startsFromItsQuantities_andReplacesItAfterAsking() {
-        // As in the test above: on a busy machine this form took over the 60 s idle limit (about 180 s), though it settles.
-        androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
         var saved: ProjectAbstract? = null
         openNewAbstract(listOf(first, next(mapOf(0 to 20.0, 8 to 10.5)).copy(id = 2)), "2026-11-20") { saved = it }
         inForm("next_period_0").assert(hasText("20"))
