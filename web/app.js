@@ -4789,21 +4789,21 @@ function drawProfilePrint({ page, project, documents }) {
 /**
  * The bar chart / S-curve with cash flow of one chart (Print on the Bar chart page and the Summary's card) for
  * `#/p/<id>/print/chart-<n>`, 0 the original: the office's sheet less its PERT/CPM network, which the app has no data
- * for. A long chart is cut into A4 landscape pages of as many months as picked here (kept in this browser), so a day
- * stays wide enough to read. Website only. Its signers are the billing abstract's four, and Approved by is a line to sign.
+ * for. It prints on A3 landscape (the A4 sheet enlarged to the page), cut into pages of as many months as picked here
+ * (eight unless picked, kept in this browser), so a day stays wide enough to read. Website only. Its signers are the billing abstract's four, and Approved by is a line to sign.
  */
 function drawChartPrint(c) {
   const { page, project, documents } = c, versions = L.chartVersions(project.barChartJson), index = Number(page.sub.slice(6)), version = versions[index];
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/chart">${icon('arrow_back', 'sm')}Bar chart</a>`;
   if (!version) { drawOnce(main, `${back}<p class="muted" role="alert">This bar chart was removed or does not exist.</p>`); return; }
-  const name = i => versions[i].label || `Chart ${i + 1}`, choices = [3, 4, 6, 8, 12, 0], asked = Number(kept(c, 'chart-per') ?? 6), per = choices.includes(asked) ? asked : 6;
+  const name = i => versions[i].label || `Chart ${i + 1}`, choices = [3, 4, 6, 8, 12, 0], asked = Number(kept(c, 'chart-per') ?? 8), per = choices.includes(asked) ? asked : 8;
   const sheets = P.barChartPages({ project, docs: documents, version, index, per, signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png' });
   document.title = `Bar Chart - ${name(index)}`; // the file name "Save as PDF" offers
-  main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+  main.innerHTML = `<style>@page { size: A3 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <div class="print-opts no-print">${versions.length > 1 ? `<div class="chips" role="group" aria-label="Chart">${versions.map((_, i) => `<button type="button" data-chart="${i}" aria-pressed="${i === index}">${esc(name(i))}</button>`).join('')}</div>` : ''}
       <label class="field row">Months on a page<select id="chart-per">${choices.map(n => `<option value="${n}"${n === per ? ' selected' : ''}>${n || 'All on one page'}</option>`).join('')}</select></label>
-      <p class="muted print-note">A4 landscape, ${sheets.length === 1 ? 'one page' : `${sheets.length} pages to lay side by side`}. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p></div>
-    <div class="bb-scroll">${sheets.map(html => `<div class="bb full land">${html}</div>`).join('')}</div>`;
+      <p class="muted print-note">A3 landscape, ${sheets.length === 1 ? 'one page' : `${sheets.length} pages to lay side by side`}. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p></div>
+    <div class="bb-scroll">${sheets.map(html => `<div class="bb full land a3">${html}</div>`).join('')}</div>`;
   main.querySelectorAll('[data-chart]').forEach(b => { b.onclick = () => { location.hash = `#/p/${page.id}/print/chart-${b.dataset.chart}`; }; });
   document.getElementById('chart-per').onchange = e => { keep(c, 'chart-per', Number(e.target.value)); drawChartPrint(c); document.getElementById('chart-per').focus(); };
   bindSignatories(c, 'billing');
