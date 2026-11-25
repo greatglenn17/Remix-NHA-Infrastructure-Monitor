@@ -1451,8 +1451,8 @@ function barChartForm(c) {
   d.innerHTML = `<form novalidate>
     <h2>Approved bar chart</h2>
     <div class="chips" role="group" aria-label="Chart" data-tabs></div>
-    <p class="muted small">Import the contractor's Excel file, or enter each item's bar as drawn: From month and cell, To month and cell. A month is 30 days;
-      its cells are 5, 10, 15, 20, 25 and 30, counted from the start date. The chart must total the contract amount. The target % then follows this chart every day.</p>
+    <p class="muted small">Import the contractor's Excel file, or enter each item's bar as drawn: From month and day, To month and day. A month is 30 days,
+      counted from the start date; the cell labelled 10 is days 6 to 10. The chart must total the contract amount. The target % then follows this chart every day.</p>
     <label class="field" data-import>Import from Excel (.xlsx)<input type="file" data-file accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
     <ul class="bc-errors" data-notes aria-live="polite"></ul>
     <div data-sheets></div>
@@ -1465,12 +1465,11 @@ function barChartForm(c) {
   const err = d.querySelector('p.error'), save = d.querySelector('.actions .btn');
   const total = items => items.reduce((t, x) => t + x.amount, 0);
   const tabName = i => drafts[i].label.trim() || `Chart ${i + 1}`;
-  const cells = cur => ['', 5, 10, 15, 20, 25, 30].map(n => `<option${String(n) === cur ? ' selected' : ''}>${n}</option>`).join('');
   const barRow = (b, key, many) => `<div class="wk-row" data-bar="${key}">
     <label class="field n">From month<input data-k="sm" inputmode="numeric" value="${esc(b.sm)}"></label>
-    <label class="field n">Cell<select data-k="sc">${cells(b.sc)}</select></label>
+    <label class="field n">Day<input data-k="sd" inputmode="numeric" value="${esc(b.sd)}"></label>
     <label class="field n">To month<input data-k="em" inputmode="numeric" value="${esc(b.em)}"></label>
-    <label class="field n">Cell<select data-k="ec">${cells(b.ec)}</select></label>
+    <label class="field n">Day<input data-k="ed" inputmode="numeric" value="${esc(b.ed)}"></label>
     ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
   // What typing changes: the errors, each item's line, the S-curve and the tab's name. The boxes are left alone, so the cursor stays.
   const drawNumbers = () => {
@@ -1482,6 +1481,7 @@ function barChartForm(c) {
     const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
     body.querySelectorAll('[data-item]').forEach((el, i) => {
       const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
+      el.querySelector('legend').textContent = made.items[i].name || 'New item';
       el.querySelector('[data-sum]').textContent = `${L.formatPhp(v.items[i].amount)} · ${(total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3)}% · ${days} c.d.`;
     });
     body.querySelector('[data-curve]').innerHTML = curveTable(made);
@@ -1502,11 +1502,16 @@ function barChartForm(c) {
       <label class="field">Name<input data-label value="${esc(v.label)}"></label>
       ${selected === 0 ? `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`
         : `<label class="field">Takes effect on<input type="date" data-effective value="${esc(v.effective)}"></label>
-          <p class="muted small">Draw the revised chart from the start date, with suspended months left empty, as approved.</p>`}
-      ${v.items.map((item, i) => `<fieldset class="bc-item" data-item="${i}"><legend>${esc(item.name)}</legend>
+          <p class="muted small">Draw the revised chart from the start date, with suspended months left empty, as approved.
+            Where the approved revision changes the money, change an item's amount, or add and remove items.</p>`}
+      ${v.items.map((item, i) => `<fieldset class="bc-item" data-item="${i}"><legend></legend>
+        ${selected === 0 ? '' : `<div class="wk-row"><label class="field">Item name<input data-name value="${esc(item.name)}"></label>
+          <label class="field">Amount (₱)<input data-amount inputmode="decimal" placeholder="0.00" value="${item.amount || ''}"></label>
+          <button type="button" class="icon-btn" data-drop-item aria-label="Remove this item">${icon('delete', 'sm')}</button></div>`}
         <p class="muted small" data-sum></p>
         ${item.bars.map((b, j) => barRow(b, `${i}:${j}`, item.bars.length > 1)).join('')}
         <button type="button" class="text-btn wk-add" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></fieldset>`).join('')}
+      ${selected === 0 ? '' : `<button type="button" class="text-btn wk-add" data-add-item>${icon('add_circle', 'sm')}Add item</button>`}
       <p class="sub">S-curve</p><div data-curve></div>
       <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button>`;
     drawNumbers();
@@ -1515,6 +1520,9 @@ function barChartForm(c) {
     const v = drafts[selected], t = e.target;
     if (t.matches('[data-label]')) v.label = t.value;
     else if (t.matches('[data-effective]')) v.effective = t.value;
+    else if (t.matches('[data-name]')) v.items[t.closest('[data-item]').dataset.item].name = t.value;
+    // An amount that does not read counts as nothing, which the item's line and the contract total then show.
+    else if (t.matches('[data-amount]')) v.items[t.closest('[data-item]').dataset.item].amount = L.parseAmount(t.value) ?? 0;
     else if (t.dataset.k) { const [i, j] = t.closest('[data-bar]').dataset.bar.split(':'); v.items[i].bars[j][t.dataset.k] = t.value; }
     drawNumbers();
   };
@@ -1540,6 +1548,8 @@ function barChartForm(c) {
     else if (on('[data-add-chart]')) { drafts.push(drafts.length ? L.revisedDraft(drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); selected = drafts.length - 1; }
     else if (on('[data-add-bar]')) drafts[selected].items[on('[data-item]').dataset.item].bars.push(L.emptyBar());
     else if (drop) { const [i, j] = drop.closest('[data-bar]').dataset.bar.split(':'); drafts[selected].items[i].bars.splice(j, 1); }
+    else if (on('[data-add-item]')) drafts[selected].items.push(L.emptyItem());
+    else if (on('[data-drop-item]')) drafts[selected].items.splice(on('[data-item]').dataset.item, 1);
     // The first chart left always runs from the start date.
     else if (on('[data-drop-chart]')) { drafts.splice(selected, 1); selected = Math.max(selected - 1, 0); if (drafts[0]) drafts[0].effective = project.dateStarted; }
     else return;
@@ -1582,7 +1592,8 @@ function barChartCard(project, documents, now, curveOpen) {
     ${kv('Planned as of today', `${plan.plannedPct.toFixed(2)}%${day >= 1 && day <= last ? ` · Month ${month}, cell ${cell}` : ''}`)}
     ${kv('Chart length', `${last} calendar days`)}
     ${plan.versions.filter(v => v !== version).map(v => kv('Also on file', inForce(v))).join('')}
-    <details class="curve" id="chart-curve"${curveOpen ? ' open' : ''}><summary>${icon('expand_more', 'sm')}S-curve · ${plural(L.chartMonths(version).length, 'month')}</summary>${curveTable(version)}</details>`, '', edit);
+    <details class="curve" id="chart-curve"${curveOpen ? ' open' : ''}><summary>${icon('expand_more', 'sm')}S-curve · ${plural(L.chartMonths(version).length, 'month')}</summary>${curveTable(version)}</details>`, '',
+    `<a class="text-btn" href="#/p/${esc(project.projectUuid)}/print/chart-${plan.versions.indexOf(version)}">${icon('print', 'sm')}Print</a>${edit}`);
 }
 
 /** ConstructionCard: saleable lots by progress band in the lot map's colours; nothing without saleable lots. */
@@ -4534,6 +4545,7 @@ async function drawPrint(c) {
   if (/^\d{4}-\d{2}$/.test(c.page.sub || '')) return drawMonthlyPrint(c);
   if (c.page.sub === 'sdp') return drawSdpPrint(c);
   if (c.page.sub === 'profile') return drawProfilePrint(c);
+  if (/^chart-\d+$/.test(c.page.sub || '')) return drawChartPrint(c);
   if (/^apa-/.test(c.page.sub || '')) return drawAbstractPrint(c);
   if (/^(abstract|monthly)-/.test(c.page.sub || '')) return drawActualAbstractPrint(c);
   const { page, project, of, documents, weekly } = c;
@@ -4579,6 +4591,30 @@ function drawProfilePrint({ page, project, documents }) {
       preparer: { name: s.profile.name || '', title: s.profile.title || '', office: s.profile.office || 'Bulacan District Office' },
     })}</div></div>`;
   document.getElementById('do-print').onclick = () => window.print();
+}
+
+/**
+ * The bar chart / S-curve with cash flow of one chart (Print on the Summary's Approved bar chart card) for
+ * `#/p/<id>/print/chart-<n>`, 0 the original: the office's sheet less its PERT/CPM network, which the app has no data
+ * for. Website only. Its signers are the billing abstract's four, and Approved by is a line to sign.
+ */
+function drawChartPrint(c) {
+  const { page, project, documents } = c, versions = L.chartVersions(project.barChartJson), index = Number(page.sub.slice(6)), version = versions[index];
+  const back = `<a class="text-btn back" href="#/p/${esc(page.id)}">${icon('arrow_back', 'sm')}Summary</a>`;
+  if (!version) { drawOnce(main, `${back}<p class="muted" role="alert">This bar chart was removed or does not exist.</p>`); return; }
+  const name = i => versions[i].label || `Chart ${i + 1}`;
+  document.title = `Bar Chart - ${name(index)}`; // the file name "Save as PDF" offers
+  main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+    <p class="muted no-print print-note">A4 landscape. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p>
+    ${versions.length > 1 ? `<div class="chips no-print" role="group" aria-label="Chart">${versions.map((_, i) => `<button type="button" data-chart="${i}" aria-pressed="${i === index}">${esc(name(i))}</button>`).join('')}</div>` : ''}
+    <div class="bb-scroll"><div class="bb full land" id="sheet">${P.barChartHtml({
+      project, docs: documents, version, index, signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png',
+    })}</div></div>`;
+  main.querySelectorAll('[data-chart]').forEach(b => { b.onclick = () => { location.hash = `#/p/${page.id}/print/chart-${b.dataset.chart}`; }; });
+  bindSignatories(c, 'billing');
+  const btn = document.getElementById('do-print');
+  btn.disabled = false;
+  btn.onclick = () => window.print();
 }
 
 /**

@@ -7,8 +7,11 @@ import java.util.zip.ZipInputStream
 
 /**
  * Reads the contractor's bar chart with cash flow from its Excel file (.xlsx): under the "ITEM NO. / DESCRIPTION /
- * Amount / Duration" header, each item row with an amount, and its bar as the filled (yellow) cells from "Month 1"
- * on, 6 cells of 5 days a month. The cash flow rows are worked out again from the bars, so they are not read.
+ * Amount / Duration" header (or the office's "ITEMS / DESCRIPTION / COST (PHP) / NO. OF DAYS"), each item row with an
+ * amount, and its bar as the filled cells from "Month 1" ("1st Month") on, 6 cells of 5 days a month. Where a bar's
+ * stretches hold the month's share of the item, as the office's sheet does, the shares give their days and the other
+ * colours on the row (the suspensions) are not bars. The cash flow rows are worked out again from the bars, so they
+ * are not read. Change both when the website's reader (web/chart-excel.js) changes.
  */
 object BarChartExcel {
     /** One sheet read as a chart; [durations] is the Duration column, to check the bars against. */
@@ -71,13 +74,15 @@ object BarChartExcel {
         val merges = mutableListOf<IntArray>()
         val cells = cells(xml, strings, merges)
         fun find(test: (String) -> Boolean) = cells.entries.filter { test(it.value.text) }.minByOrNull { it.key.first * 100000 + it.key.second }?.key
-        val header = find { it.equals("ITEM NO.", ignoreCase = true) } ?: return null
-        fun column(prefix: String) = cells.entries.firstOrNull { it.key.first == header.first && it.value.text.startsWith(prefix, ignoreCase = true) }?.key?.second
+        // The headings vary by project: "ITEM NO." or "ITEMS", "Amount" or "COST (PHP)", "Month 1" or "1st Month", and the total's row.
+        val header = find { HEADER.matches(it) } ?: return null
+        fun column(vararg prefixes: String) = cells.entries
+            .filter { it.key.first == header.first && prefixes.any { p -> it.value.text.startsWith(p, ignoreCase = true) } }.minOfOrNull { it.key.second }
         val descCol = column("DESCRIPTION") ?: return null
-        val amountCol = column("Amount") ?: return null
-        val durationCol = column("Duration")
-        val dayCol = find { it.equals("Month 1", ignoreCase = true) }?.second ?: return null
-        val end = cells.entries.filter { it.key.first > header.first && it.value.text.startsWith("TOTAL PROJECT COST", ignoreCase = true) }
+        val amountCol = column("Amount", "Cost") ?: return null
+        val durationCol = column("Duration", "No. of Days")
+        val dayCol = find { it.equals("Month 1", ignoreCase = true) || it.equals("1st Month", ignoreCase = true) }?.second ?: return null
+        val end = cells.entries.filter { it.key.first > header.first && TOTAL.containsMatchIn(it.value.text) }
             .minOfOrNull { it.key.first } ?: Int.MAX_VALUE
         val lastCol = cells.keys.maxOfOrNull { it.second } ?: dayCol
 
@@ -93,10 +98,39 @@ object BarChartExcel {
             // A bar is often merged cells, its colour on the first one only.
             merges.filter { it[0] == row && it[1] >= dayCol && cells[row to it[1]]?.style in filled }
                 .forEach { m -> (m[1]..m[3]).forEach { days += it - dayCol } }
-            items += BarChart.Item(desc, Math.round(amount * 100) / 100.0, runs(days.toList()))
-            durationCol?.let { cells[row to it]?.text?.toDoubleOrNull()?.toInt() }?.let { durations[desc] = it }
+            val said = durationCol?.let { cells[row to it]?.text?.toDoubleOrNull()?.toInt() }
+            // A filled cell holding a number starts a stretch of the bar: the cell, or the merged cells it leads.
+            val stretches = (dayCol..lastCol).mapNotNull { col ->
+                val cell = cells[row to col]?.takeIf { it.style in filled } ?: return@mapNotNull null
+                val share = cell.text.toDoubleOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
+                Triple(col - dayCol, (merges.firstOrNull { it[0] == row && it[1] == col }?.get(3) ?: col) - dayCol, share)
+            }
+            items += BarChart.Item(desc, Math.round(amount * 100) / 100.0, if (stretches.isEmpty()) runs(days.toList()) else shareBars(stretches, said ?: 0))
+            said?.let { durations[desc] = it }
         }
         return Sheet(name, items, durations)
+    }
+
+    private val HEADER = Regex("""items?( no\.?)?""", RegexOption.IGNORE_CASE)
+    private val TOTAL = Regex("""^(grand )?total\b""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Bars from a row's [stretches] (first cell, last cell, share of the item) when the sheet writes each month's share in
+     * the bar: a stretch's days are its part of [duration] (the cells only round them: 21 days are drawn as 4 cells), counted
+     * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
+     */
+    private fun shareBars(stretches: List<Triple<Int, Int, Double>>, duration: Int): List<BarChart.Bar> {
+        val sum = stretches.sumOf { it.third }
+        val bars = mutableListOf<BarChart.Bar>()
+        for ((first, last, share) in stretches) {
+            val days = if (duration > 0) Math.round(share / sum * duration).toInt() else (last - first + 1) * BarChart.CELL_DAYS
+            if (days <= 0) continue
+            val end = minOf(first * BarChart.CELL_DAYS + days, (last / BarChart.CELLS_PER_MONTH + 1) * BarChart.MONTH_DAYS)
+            val start = maxOf(end - days + 1, 1)
+            if (bars.isNotEmpty() && bars.last().endDay + 1 >= start) bars[bars.lastIndex] = bars.last().copy(endDay = end)
+            else bars += BarChart.Bar(start, end)
+        }
+        return bars
     }
 
     /** Consecutive cells (0 = Month 1's first) as bars in contract days. */

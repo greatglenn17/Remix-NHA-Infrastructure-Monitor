@@ -1,9 +1,11 @@
 // BarChartExcel for the website: reads the contractor's bar chart with cash flow from its Excel file (.xlsx). Under the
-// "ITEM NO. / DESCRIPTION / Amount / Duration" header, each item row with an amount, and its bar as the filled (yellow)
-// cells from "Month 1" on, 6 cells of 5 days a month. The cash flow rows are worked out again from the bars, so they
-// are not read. Change both when the phone's reader (util/BarChartExcel.kt) changes.
+// "ITEM NO. / DESCRIPTION / Amount / Duration" header (or the office's "ITEMS / DESCRIPTION / COST (PHP) / NO. OF DAYS"),
+// each item row with an amount, and its bar as the filled cells from "Month 1" ("1st Month") on, 6 cells of 5 days a
+// month. Where a bar's stretches hold the month's share of the item, as the office's sheet does, the shares give their
+// days and the other colours on the row (the suspensions) are not bars. The cash flow rows are worked out again from the
+// bars, so they are not read. Change both when the phone's reader (util/BarChartExcel.kt) changes.
 
-const CELL_DAYS = 5, MAX_BYTES = 20 * 1024 * 1024;
+const CELL_DAYS = 5, MONTH_CELLS = 6, MAX_BYTES = 20 * 1024 * 1024;
 
 export class NotAnExcelFile extends Error {
   constructor() { super('Not an Excel workbook (.xlsx)'); }
@@ -57,6 +59,24 @@ function runs(cells) {
   return bars;
 }
 
+/**
+ * Bars from a row's `stretches` ([first cell, last cell, share of the item]) when the sheet writes each month's share in
+ * the bar: a stretch's days are its part of `duration` (the cells only round them: 21 days are drawn as 4 cells), counted
+ * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
+ */
+function shareBars(stretches, duration) {
+  const sum = stretches.reduce((t, s) => t + s[2], 0), bars = [];
+  for (const [first, last, share] of stretches) {
+    const days = duration > 0 ? Math.round(share / sum * duration) : (last - first + 1) * CELL_DAYS;
+    if (days <= 0) continue;
+    const monthEnd = (Math.floor(last / MONTH_CELLS) + 1) * MONTH_CELLS * CELL_DAYS;
+    const end = Math.min(first * CELL_DAYS + days, monthEnd), start = Math.max(end - days + 1, 1);
+    if (bars.length && bars.at(-1)[1] + 1 >= start) bars.at(-1)[1] = end;
+    else bars.push([start, end]);
+  }
+  return bars;
+}
+
 /** A sheet's cells (row * 100000 + column -> { row, col, style, text }) and its merged ranges as [row1, col1, row2, col2]. */
 export function sheetCells(xml, strings) {
   const cells = new Map(), merges = [];
@@ -82,19 +102,22 @@ export function sheetCells(xml, strings) {
   return { cells, merges };
 }
 
+const HEADER = /^items?( no\.?)?$/i, TOTAL = /^(grand )?total\b/i;
+
 /** One sheet as a chart: its items with their bars, and the Duration column to check the bars against; null when it is not laid out as one. */
 function sheetChart(name, xml, strings, filled) {
   const key = (row, col) => row * 100000 + col;
   const { cells, merges } = sheetCells(xml, strings);
   const all = [...cells.values()].sort((a, b) => key(a.row, a.col) - key(b.row, b.col));
   const same = (text, other) => text.toLowerCase() === other.toLowerCase(), starts = (text, prefix) => text.toLowerCase().startsWith(prefix.toLowerCase());
-  const header = all.find(c => same(c.text, 'ITEM NO.'));
+  // The headings vary by project: "ITEM NO." or "ITEMS", "Amount" or "COST (PHP)", "Month 1" or "1st Month", and the total's row.
+  const header = all.find(c => HEADER.test(c.text));
   if (!header) return null;
-  const column = prefix => all.find(c => c.row === header.row && starts(c.text, prefix))?.col;
-  const descCol = column('DESCRIPTION'), amountCol = column('Amount'), durationCol = column('Duration');
-  const dayCol = all.find(c => same(c.text, 'Month 1'))?.col;
+  const column = (...prefixes) => all.find(c => c.row === header.row && prefixes.some(p => starts(c.text, p)))?.col;
+  const descCol = column('DESCRIPTION'), amountCol = column('Amount', 'Cost'), durationCol = column('Duration', 'No. of Days');
+  const dayCol = all.find(c => same(c.text, 'Month 1') || same(c.text, '1st Month'))?.col;
   if (descCol == null || amountCol == null || dayCol == null) return null;
-  const end = all.find(c => c.row > header.row && starts(c.text, 'TOTAL PROJECT COST'))?.row ?? Infinity;
+  const end = all.find(c => c.row > header.row && TOTAL.test(c.text))?.row ?? Infinity;
   const lastCol = all.reduce((n, c) => Math.max(n, c.col), dayCol);
   const at = (row, col) => cells.get(key(row, col));
   const isFilled = (row, col) => { const c = at(row, col); return c != null && filled.has(c.style); };
@@ -107,8 +130,15 @@ function sheetChart(name, xml, strings, filled) {
     for (let col = dayCol; col <= lastCol; col++) if (isFilled(row, col)) days.add(col - dayCol);
     // A bar is often merged cells, its colour on the first one only.
     for (const [r1, c1, , c2] of merges) if (r1 === row && c1 >= dayCol && isFilled(row, c1)) for (let col = c1; col <= c2; col++) days.add(col - dayCol);
-    items.push({ name: desc, amount: Math.round(amount * 100) / 100, bars: runs([...days].sort((a, b) => a - b)) });
     const said = durationCol == null ? null : number(at(row, durationCol)?.text);
+    // A filled cell holding a number starts a stretch of the bar: the cell, or the merged cells it leads.
+    const stretches = [];
+    for (let col = dayCol; col <= lastCol; col++) {
+      const share = number(at(row, col)?.text);
+      if (share > 0 && isFilled(row, col)) stretches.push([col - dayCol, (merges.find(([r1, c1]) => r1 === row && c1 === col)?.[3] ?? col) - dayCol, share]);
+    }
+    const bars = stretches.length ? shareBars(stretches, Math.trunc(said ?? 0)) : runs([...days].sort((a, b) => a - b));
+    items.push({ name: desc, amount: Math.round(amount * 100) / 100, bars });
     if (said != null) durations[desc] = Math.trunc(said);
   }
   return { name, items, durations };

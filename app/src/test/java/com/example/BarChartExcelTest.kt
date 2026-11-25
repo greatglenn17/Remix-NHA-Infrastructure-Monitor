@@ -14,20 +14,23 @@ import org.robolectric.RobolectricTestRunner
 // A workbook laid out like the contractor's bar chart: header, Month row, item rows with yellow cells, then the total.
 @RunWith(RobolectricTestRunner::class)
 class BarChartExcelTest {
-    private fun xlsx(sheet: String): ByteArray {
+    private val strings = """<sst><si><t>ITEM NO.</t></si><si><t>DESCRIPTION</t></si><si><t>Amount (Php)</t></si>
+                <si><t>Duration (C.D)</t></si><si><t>Month 1</t></si><si><r><t>Mobili</t></r><r><t>zation</t></r></si>
+                <si><t>Earthworks</t></si><si><t>TOTAL PROJECT COST</t></si></sst>"""
+
+    private fun xlsx(sheet: String, strings: String = this.strings): ByteArray {
         val parts = mapOf(
             "xl/workbook.xml" to """<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>
                 <sheet name="Notes" sheetId="1" r:id="rId1"/><sheet name="Revised" sheetId="2" r:id="rId2"/></sheets></workbook>""",
             "xl/_rels/workbook.xml.rels" to """<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/>
                 <Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>""",
-            "xl/sharedStrings.xml" to """<sst><si><t>ITEM NO.</t></si><si><t>DESCRIPTION</t></si><si><t>Amount (Php)</t></si>
-                <si><t>Duration (C.D)</t></si><si><t>Month 1</t></si><si><r><t>Mobili</t></r><r><t>zation</t></r></si>
-                <si><t>Earthworks</t></si><si><t>TOTAL PROJECT COST</t></si></sst>""",
-            // fill 2 yellow, fill 3 white; xf 1 -> yellow, xf 2 -> white
-            "xl/styles.xml" to """<styleSheet><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+            "xl/sharedStrings.xml" to strings,
+            // fill 2 yellow, fill 3 white, fill 4 red; xf 1 -> yellow, xf 2 -> white, xf 3 -> red
+            "xl/styles.xml" to """<styleSheet><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
                 <fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/></patternFill></fill>
-                <fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/></patternFill></fill></fills>
-                <cellXfs count="3"><xf fillId="0"/><xf fillId="2"/><xf fillId="3"/></cellXfs></styleSheet>""",
+                <fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/></patternFill></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill></fills>
+                <cellXfs count="4"><xf fillId="0"/><xf fillId="2"/><xf fillId="3"/><xf fillId="4"/></cellXfs></styleSheet>""",
             "xl/worksheets/sheet1.xml" to """<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>hello</t></is></c></row></sheetData></worksheet>""",
             "xl/worksheets/sheet2.xml" to sheet,
         )
@@ -59,6 +62,33 @@ class BarChartExcelTest {
         assertEquals(listOf(BarChart.Bar(11, 40)), items[1].bars)
         assertEquals(4000.5, items.sumOf { it.amount }, 0.0)
         assertEquals(mapOf("Mobilization" to 10, "Earthworks" to 30), sheets.single().durations)
+    }
+
+    // The office's sheet: B items, C description, F cost, I no. of days, J.. the day cells (J = 1st Month, days 1-5). A bar's
+    // stretch holds the month's share of the item in its first cell; the red cells are a suspension.
+    private val office = """<worksheet><sheetData>
+        <row r="49"><c r="B49" t="s"><v>0</v></c><c r="C49" t="s"><v>1</v></c><c r="F49" t="s"><v>2</v></c><c r="I49" t="s"><v>3</v></c><c r="J49" t="s"><v>4</v></c></row>
+        <row r="50"><c r="J50"><v>5</v></c><c r="K50"><v>10</v></c></row>
+        <row r="51"><c r="C51" t="s"><v>5</v></c><c r="F51"><v>2000</v></c><c r="I51"><v>45</v></c>
+            <c r="N51" s="1"><v>0.10</v></c><c r="O51" s="1"/><c r="P51" s="3"/><c r="Q51" s="3"/>
+            <c r="R51" s="1"><v>0.21</v></c><c r="V51" s="1"><v>0.14</v></c><c r="AZ51"><v>0.45</v></c></row>
+        <row r="52"><c r="C52" t="s"><v>6</v></c><c r="P52" s="3"/></row>
+        <row r="53"><c r="C53" t="s"><v>7</v></c><c r="F53"><v>500</v></c><c r="I53"><v>5</v></c><c r="Y53" s="1"><v>0.05</v></c><c r="AZ53"><v>0.05</v></c></row>
+        <row r="54"><c r="B54" t="s"><v>8</v></c><c r="F54"><v>2500</v></c></row>
+        <row r="55"><c r="B55" t="s"><v>9</v></c><c r="F55"><v>1</v></c><c r="J55" s="1"><v>0.1</v></c></row>
+        </sheetData><mergeCells><mergeCell ref="N51:O51"/><mergeCell ref="R51:U51"/><mergeCell ref="V51:X51"/></mergeCells></worksheet>"""
+
+    @Test fun readsTheOfficeLayout_daysFromTheSharesWrittenInABar() {
+        val sheet = BarChartExcel.read(xlsx(office, """<sst><si><t>ITEMS</t></si><si><t>DESCRIPTION</t></si><si><t>COST (PHP)</t></si><si><t>NO. OF DAYS</t></si>
+            <si><t>1st Month</t></si><si><t>SITE PREPARATIONS</t></si><si><t>LAND DEVELOPMENT</t></si><si><t>TURNOVER</t></si><si><t>GRAND TOTAL</t></si>
+            <si><t>MONTHLY ACCOMPLISHMENT</t></si></sst>""").inputStream()).single()
+        // 45 days as 10, 21 and 14: N-O is cells 25-30 of month 1, days 21-30; R-U is drawn as 20 days from day 41, so its 21
+        // end with month 2, days 40-60; V-X follows from day 61 for 14 days, one bar with the stretch before it.
+        assertEquals(listOf(
+            BarChart.Item("SITE PREPARATIONS", 2000.0, listOf(BarChart.Bar(21, 30), BarChart.Bar(40, 74))),
+            BarChart.Item("TURNOVER", 500.0, listOf(BarChart.Bar(76, 80))) // the heading above it has no cost; the rows from the total on are not items
+        ), sheet.items)
+        assertEquals(mapOf("SITE PREPARATIONS" to 45, "TURNOVER" to 5), sheet.durations)
     }
 
     @Test fun refusesWhatIsNotAWorkbook() {

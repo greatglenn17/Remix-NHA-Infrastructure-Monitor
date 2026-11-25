@@ -2538,10 +2538,11 @@ export const deletedProject = (project, { uid, now }) => ({ projectUuid: project
 /** MANAGE_BAR_CHART (the Super Admin and Engineer Admins) on a project the account can edit, as firestore.rules allows. */
 export const canEditChart = canDeleteProject;
 
-const EMPTY_BAR = () => ({ sm: '', sc: '', em: '', ec: '' });
+const EMPTY_BAR = () => ({ sm: '', sd: '', em: '', ed: '' });
 
 /**
- * BarChartDialog's drafts: the saved charts as the form edits them, each bar as its From and To month and cell, or
+ * BarChartDialog's drafts: the saved charts as the form edits them, each bar as its From and To month and day (a
+ * month is 30 days; a revised chart's bars start and end between the 5-day cells where work stopped and resumed), or
  * one "Original" chart of the Scope of Works items with an empty bar each. The first chart always runs from the
  * start date. Null without a start date: the chart counts its days from it.
  */
@@ -2555,26 +2556,29 @@ export function chartDrafts(project) {
 
 /** itemDrafts: a chart's items (saved, from the scope, or read from an Excel sheet) as the form edits them, an item with no bar getting an empty one. */
 export function draftItems(list) {
-  const bar = ([a, b]) => { const [sm, sc] = cellOf(a), [em, ec] = cellOf(b); return { sm: String(sm), sc: String(sc), em: String(em), ec: String(ec) }; };
+  const monthDay = day => [Math.floor((day - 1) / MONTH_DAYS) + 1, (day - 1) % MONTH_DAYS + 1].map(String);
+  const bar = ([a, b]) => { const [sm, sd] = monthDay(a), [em, ed] = monthDay(b); return { sm, sd, em, ed }; };
   return list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()] }));
 }
 
 /** The "+ Revised chart" tab: the next chart starts as a copy of the last one, with no date yet. */
 export const revisedDraft = drafts => ({ label: `Revised No. ${drafts.length}`, effective: '', items: drafts.at(-1).items.map(i => ({ ...i, bars: i.bars.map(b => ({ ...b })) })) });
 export const emptyBar = EMPTY_BAR;
+/** "Add item" on a revised chart: an item the approved revision adds, to be named, priced and drawn. */
+export const emptyItem = () => ({ name: '', amount: 0, bars: [EMPTY_BAR()] });
 
-/** BarDraft.bar: the bar in contract days, or null when a box is not a month (1+) and a cell (5, 10 … 30), or it ends before it starts. */
+/** BarDraft.bar: the bar in contract days, or null when a box is not a month (1+) and a day (1 to 30), or it ends before it starts. */
 export function draftBar(b) {
   const whole = t => (/^\d+$/.test(String(t).trim()) && Number(t) >= 1 ? Number(t) : null);
-  const cell = t => { const n = whole(t); return n != null && n <= MONTH_DAYS && n % CELL_DAYS === 0 ? n : null; };
-  const sm = whole(b.sm), sc = cell(b.sc), em = whole(b.em), ec = cell(b.ec);
-  if ([sm, sc, em, ec].includes(null)) return null;
-  const bar = [(sm - 1) * MONTH_DAYS + sc - CELL_DAYS + 1, (em - 1) * MONTH_DAYS + ec];
+  const day = t => { const n = whole(t); return n != null && n <= MONTH_DAYS ? n : null; };
+  const sm = whole(b.sm), sd = day(b.sd), em = whole(b.em), ed = day(b.ed);
+  if ([sm, sd, em, ed].includes(null)) return null;
+  const bar = [(sm - 1) * MONTH_DAYS + sd, (em - 1) * MONTH_DAYS + ed];
   return barDays(bar) > 0 ? bar : null;
 }
 
 /** VersionDraft.version: the chart as saved; a bar that does not read is left out (chartErrors names its item). */
-export const draftVersion = d => ({ label: d.label.trim(), effective: d.effective, items: d.items.map(i => ({ name: i.name, amount: i.amount, bars: i.bars.map(draftBar).filter(Boolean) })) });
+export const draftVersion = d => ({ label: d.label.trim(), effective: d.effective, items: d.items.map(i => ({ name: String(i.name).trim(), amount: i.amount, bars: i.bars.map(draftBar).filter(Boolean) })) });
 
 /** BarChart.toJson for the drafts, keys in the phone's order; no chart at all is blank, which removes it. */
 export const chartJson = drafts => (drafts.length ? JSON.stringify(drafts.map(draftVersion)) : '');
@@ -2583,6 +2587,8 @@ export const chartJson = drafts => (drafts.length ? JSON.stringify(drafts.map(dr
  * BarChartDialog's errors, which keep Save off. The original chart must total the original contract amount, a revised
  * one the original or the current (after Variation Orders); a revised chart takes effect after the start date and
  * after the chart before it. A chart with no items (no Scope of Works, and nothing imported) is refused here.
+ * A revised chart's items can be renamed, added and removed, so each needs a name of its own: a Partial suspension
+ * and the item targets go by name. The original is not checked, as its names cannot be typed.
  */
 export function chartErrors(drafts, project, docs) {
   const start = isoDay(project.dateStarted), original = originalCost(project), current = currentCost(project, docs);
@@ -2590,14 +2596,17 @@ export function chartErrors(drafts, project, docs) {
     const name = d.label.trim() || `Chart ${i + 1}`, date = isoDay(d.effective), total = d.items.reduce((t, x) => t + x.amount, 0);
     const matches = chartTotalMatches(i, total, project, docs);
     const bad = d.items.filter(x => !x.bars.every(draftBar));
+    const names = d.items.map(x => String(x.name).trim()), twice = [...new Set(names.filter((n, k) => n && names.indexOf(n) !== k))];
     return [
       !d.label.trim() && `${name}: enter a name`,
-      !d.items.length && `${name}: import the Excel file, or add the Scope of Works items to the project first`,
+      !d.items.length && `${name}: ${i > 0 ? 'add an item, or import the Excel file' : 'import the Excel file, or add the Scope of Works items to the project first'}`,
+      i > 0 && names.includes('') && `${name}: name every item`,
+      i > 0 && twice.length && `${name}: two items are named ${twice.join(', ')}`,
       d.items.length && !matches && `${name}: the chart totals ${formatPhp(total)} but the contract amount is ${formatPhp(i > 0 ? current : original)}`,
       i > 0 && date == null && `${name}: pick the date it takes effect`,
       i > 0 && date != null && start != null && date < start && `${name}: takes effect before the start date`,
       i > 0 && date != null && drafts[i - 1].effective >= d.effective && `${name}: takes effect on or before the previous chart`,
-      bad.length && `${name}: check the bars of ${bad.map(x => x.name).join(', ')} (month 1+, cell 5, 10 … 30)`,
+      bad.length && `${name}: check the bars of ${bad.map(x => String(x.name).trim() || 'New item').join(', ')} (month 1+, day 1 to 30)`,
     ].filter(Boolean);
   });
 }

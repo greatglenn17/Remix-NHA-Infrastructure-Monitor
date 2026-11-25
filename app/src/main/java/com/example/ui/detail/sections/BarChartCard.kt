@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.StackedLineChart
 import androidx.compose.material3.*
@@ -22,12 +23,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
+import com.example.data.model.unitsText
 import com.example.ui.components.DateField
 import com.example.ui.components.LongForm
 import com.example.ui.theme.figures
 import com.example.util.BarChart
 import com.example.util.BarChartExcel
 import com.example.util.ContractCost
+import com.example.util.FormValidation
 import com.example.util.ProjectSchedule
 import com.example.utils.CurrencyFormatter
 import java.time.LocalDate
@@ -96,26 +99,31 @@ private fun MonthTable(version: BarChart.Version) {
 
 private class BarDraft(from: Pair<Int, Int>? = null, to: Pair<Int, Int>? = null) {
     var startMonth by mutableStateOf(from?.first?.toString().orEmpty())
-    var startCell by mutableStateOf(from?.second?.toString().orEmpty())
+    var startDay by mutableStateOf(from?.second?.toString().orEmpty())
     var endMonth by mutableStateOf(to?.first?.toString().orEmpty())
-    var endCell by mutableStateOf(to?.second?.toString().orEmpty())
+    var endDay by mutableStateOf(to?.second?.toString().orEmpty())
 
-    /** The bar in contract days, or null when a field is not a month (1+) and cell (5, 10 … 30), or it ends before it starts. */
+    /** The bar in contract days, or null when a field is not a month (1+) and day (1 to 30), or it ends before it starts. */
     fun bar(): BarChart.Bar? {
-        fun cell(text: String) = text.trim().toIntOrNull()?.takeIf { it in BarChart.CELL_DAYS..BarChart.MONTH_DAYS && it % BarChart.CELL_DAYS == 0 }
+        fun day(text: String) = text.trim().toIntOrNull()?.takeIf { it in 1..BarChart.MONTH_DAYS }
         val sm = startMonth.trim().toIntOrNull()?.takeIf { it >= 1 } ?: return null
         val em = endMonth.trim().toIntOrNull()?.takeIf { it >= 1 } ?: return null
-        val bar = BarChart.Bar(BarChart.cellStart(sm, cell(startCell) ?: return null), BarChart.cellEnd(em, cell(endCell) ?: return null))
+        val bar = BarChart.Bar((sm - 1) * BarChart.MONTH_DAYS + (day(startDay) ?: return null), (em - 1) * BarChart.MONTH_DAYS + (day(endDay) ?: return null))
         return bar.takeIf { it.days > 0 }
     }
 }
 
-private class ItemDraft(val name: String, val amount: Double, bars: List<BarChart.Bar>) {
+private class ItemDraft(name: String, amount: Double, bars: List<BarChart.Bar>) {
+    var name by mutableStateOf(name)
+    // The Amount box of a revised chart; the text of a Double reads back as the same Double, so an untouched item saves as it was.
+    var amountText by mutableStateOf(if (amount > 0) unitsText(amount) else "")
+    /** An amount that does not read counts as nothing, which the item's line and the contract total then show. */
+    val amount: Double get() = FormValidation.parseAmount(amountText) ?: 0.0
     val bars: SnapshotStateList<BarDraft> = mutableStateListOf<BarDraft>().apply {
-        bars.forEach { add(BarDraft(BarChart.cellOf(it.startDay), BarChart.cellOf(it.endDay))) }
+        bars.forEach { add(BarDraft(BarChart.monthDayOf(it.startDay), BarChart.monthDayOf(it.endDay))) }
         if (isEmpty()) add(BarDraft())
     }
-    fun item() = BarChart.Item(name, amount, bars.mapNotNull { it.bar() })
+    fun item() = BarChart.Item(name.trim(), amount, bars.mapNotNull { it.bar() })
     fun valid() = bars.all { it.bar() != null }
 }
 
@@ -134,8 +142,9 @@ private fun itemDrafts(items: List<BarChart.Item>) = items.map { ItemDraft(it.na
 internal const val XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 /**
- * Enter the approved bar chart: per Scope of Works item, the bar(s) from month and cell to month and cell,
- * as drawn on the chart. A revised chart is added with the date it takes effect; the earlier ones stay.
+ * Enter the approved bar chart: per Scope of Works item, the bar(s) from month and day to month and day,
+ * as drawn on the chart (a revised chart's bars start and end between the 5-day cells, where work stopped and
+ * resumed). A revised chart is added with the date it takes effect; the earlier ones stay.
  */
 @Composable
 internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, onDismiss: () -> Unit, onSave: (String) -> Unit) {
@@ -160,8 +169,15 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
     val errors = drafts.flatMapIndexed { i, d ->
         val date = runCatching { LocalDate.parse(d.effective) }.getOrNull()
         val total = d.items.sumOf { it.amount }
+        // A revised chart's items can be renamed, added and removed, so each needs a name of its own: a Partial
+        // suspension and the item targets go by name. The original is not checked, as its names cannot be typed.
+        val twice = d.items.map { it.name.trim() }.filter { it.isNotEmpty() }.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
         listOfNotNull(
             "${d.label}: enter a name".takeIf { d.label.isBlank() },
+            ("${d.label}: " + if (i > 0) "add an item, or import the Excel file" else "import the Excel file, or add the Scope of Works items to the project first")
+                .takeIf { d.items.isEmpty() },
+            "${d.label}: name every item".takeIf { i > 0 && d.items.any { it.name.isBlank() } },
+            "${d.label}: two items are named ${twice.joinToString()}".takeIf { i > 0 && twice.isNotEmpty() },
             ("${d.label}: the chart totals ${CurrencyFormatter.formatPhp(total)} but the contract amount is " +
                 CurrencyFormatter.formatPhp(if (i > 0) current else original)).takeIf { d.items.isNotEmpty() && !totalMatches(i, total) },
             "${d.label}: pick the date it takes effect".takeIf { i > 0 && date == null },
@@ -170,7 +186,7 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
                 i > 0 && date != null && drafts[i - 1].effective.let { prev -> prev >= d.effective }
             },
             d.items.filter { !it.valid() }.takeIf { it.isNotEmpty() }
-                ?.let { bad -> "${d.label}: check the bars of ${bad.joinToString { it.name }} (month 1+, cell 5, 10 … 30)" }
+                ?.let { bad -> "${d.label}: check the bars of ${bad.joinToString { it.name.trim().ifEmpty { "New item" } }} (month 1+, day 1 to 30)" }
         )
     }
     // Reading an Excel file: its sheets laid out as a bar chart, to pick from when more than one.
@@ -249,8 +265,8 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
         }
     ) {
         Text(
-            "Import the contractor's Excel file, or enter each item's bar as drawn: From month and cell, To month and cell. " +
-                "A month is 30 days; its cells are 5, 10, 15, 20, 25 and 30, counted from the start date. " +
+            "Import the contractor's Excel file, or enter each item's bar as drawn: From month and day, To month and day. " +
+                "A month is 30 days, counted from the start date; the cell labelled 10 is days 6 to 10. " +
                 "The chart must total the contract amount. The target % then follows this chart every day.",
             style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
         )
@@ -269,12 +285,19 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
         } else {
             DateField("Takes effect on", draft.effective, { draft.effective = it })
             Text(
-                "Draw the revised chart from the start date, with suspended months left empty, as approved.",
+                "Draw the revised chart from the start date, with suspended months left empty, as approved. " +
+                    "Where the approved revision changes the money, change an item's amount, or add and remove items.",
                 style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant
             )
         }
-        if (draft.items.isEmpty()) Text("Import the Excel file, or add the Scope of Works items to the project first.", style = MaterialTheme.typography.bodySmall, color = scheme.error)
-        draft.items.forEach { item -> ItemBars(item, draft.items.sumOf { it.amount }) }
+        val revised = selected > 0
+        draft.items.forEachIndexed { i, item ->
+            ItemBars(item, draft.items.sumOf { it.amount }, i, onRemove = { draft.items = draft.items - item }.takeIf { revised })
+        }
+        if (revised) TextButton(onClick = { draft.items = draft.items + ItemDraft("", 0.0, emptyList()) }, modifier = Modifier.testTag("add_chart_item")) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Text("Add item")
+        }
         MonthTable(draft.version())
         TextButton(
             onClick = { drafts.removeAt(selected); selected = (selected - 1).coerceAtLeast(0) },
@@ -285,11 +308,28 @@ internal fun BarChartDialog(project: Project, documents: List<PendingDocument>, 
 }
 
 @Composable
-private fun ItemBars(item: ItemDraft, total: Double) {
+private fun ItemBars(item: ItemDraft, total: Double, index: Int, onRemove: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
     Surface(color = scheme.surfaceVariant, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+            // A revised chart's item: its name and amount as approved, and Remove; the original keeps the Scope of Works'.
+            if (onRemove == null) Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+            else {
+                OutlinedTextField(
+                    item.name, { item.name = it }, label = { Text("Item name") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("item_${index}_name")
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(
+                        item.amountText, { item.amountText = it }, label = { Text("Amount (₱)") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f).testTag("item_${index}_amount")
+                    )
+                    IconButton(onClick = onRemove, modifier = Modifier.testTag("item_${index}_remove")) {
+                        Icon(Icons.Default.Delete, contentDescription = "Remove item")
+                    }
+                }
+            }
             val days = item.bars.mapNotNull { it.bar() }.sumOf { it.days }
             Field(
                 "Amount · weight · duration",
@@ -304,9 +344,9 @@ private fun ItemBars(item: ItemDraft, total: Double) {
                         modifier = Modifier.weight(1f).testTag("bar_${item.name}_${i}_$tag")
                     )
                     Num("From", bar.startMonth, "sm") { bar.startMonth = it }
-                    Num("cell", bar.startCell, "sc") { bar.startCell = it }
+                    Num("day", bar.startDay, "sd") { bar.startDay = it }
                     Num("To", bar.endMonth, "em") { bar.endMonth = it }
-                    Num("cell", bar.endCell, "ec") { bar.endCell = it }
+                    Num("day", bar.endDay, "ed") { bar.endDay = it }
                     if (item.bars.size > 1) IconButton(onClick = { item.bars.removeAt(i) }) {
                         Icon(Icons.Default.Close, contentDescription = "Remove bar")
                     }
