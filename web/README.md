@@ -338,22 +338,33 @@ is read only.
   check on an edit, as on the phone.
 - **Bar chart** (`#/p/<id>/chart`, the section after Progress; website only, where the phone has a form) is the
   approved bar chart as the contractor's sheet (`chartBody`, `chartSheet`): a tab per chart, and per item its
-  Description, Cost, % and Days, then each month's six 5-day cells with the bars drawn to the day, and under them the
-  total and each month's and the cumulative %. Anyone who can open the project sees it. The Super Admin and an
-  Engineer Admin who can edit the project (the app's MANAGE_BAR_CHART roles and the rules: `L.canEditChart`) edit it
-  there, and **Edit** on the Summary's Approved bar chart card opens it: a click or a drag across an item's cells
-  fills them, or clears them when the first one pressed had any of a bar (`L.paintCell`; a touch paints on a tap
-  only, so a finger can scroll the sheet); an item's **Days** opens its bar(s) as From month and day, To month and
-  day (a month is 30 days from the start date; the bars are kept to the day, as a revised chart's start and end
-  between the 5-day cells where work stopped and resumed); **Add month** draws one more month, and **Revised chart**
-  adds a chart. A revised chart's items also take a name and a cost in the sheet, with **Add item** and a remove
-  button on each, for a revision that changes the money; the original keeps the Scope of Works' (or the Excel
-  file's). The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised
-  chart's date, bars that read, and on a revised chart a name of its own for every item (a Partial suspension and
-  the item targets go by name). Save writes `barChartJson` in the phone's shape (`L.chartJson`), one revision up,
-  with the app's "Bar Chart" audit entry; deleting the only chart removes it. Until Save or **Discard changes**, an
-  edit is kept in the browser (`L.chartKept`, for the chart it was made from only), so it survives a reload, and
-  Print waits for the save, as it draws the saved chart.
+  Description, Cost, % and Days, then each month's 30 day cells (a line and a label every five), and under them the
+  total and each month's and the cumulative accomplishment (%) and cash flow, which follow every change at once.
+  Anyone who can open the project sees it. The Super Admin and an Engineer Admin who can edit the project (the app's
+  MANAGE_BAR_CHART roles and the rules: `L.canEditChart`) edit it there, and **Edit** on the Summary's Approved bar
+  chart card opens it: **Paint with** picks Work, one of the chart's colours or Erase, and a click on a day, or a
+  drag across an item's row, paints the days from the one pressed to the one under the pointer, or clears them when
+  the first already had what is picked (`L.paintDays`; a touch paints on a tap only, so a finger can scroll the
+  sheet); an item's **Days** opens its bar(s) as From month and day, To month and day (a month is 30 days from the
+  start date); **Add month** draws one more month, and **Revised chart** adds a chart. A revised chart's items also
+  take a name and a cost in the sheet, with **Add item** and a remove button on each, for a revision that changes
+  the money; the original keeps the Scope of Works' (or the Excel file's).
+  **Colours** are the chart's own (`colors` on a version, `marks` of [from day, to day, colour] on an item, saved
+  only where there are any; the phone keeps them through its own saves and does not draw them). **Add colour** makes
+  one, to be named by whoever draws the chart (a suspension, a time extension, a variation order), recoloured, and
+  said to be days of work or not: an item's cost is spread over its bar, so the days of a colour with no work leave
+  the bar and those of a colour of work join it (`L.dayFills` is what each day shows, `L.colorWork` and
+  `L.dropColor` the tick and the removal). A revised chart starts with the colours and coloured days of the chart
+  before it. Nothing about them is read from the Documents. The legend is under the sheet and on the print.
+  The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised chart's date,
+  bars that read, on a revised chart a name of its own for every item (a Partial suspension and the item targets go
+  by name), and a name for every colour. The original chart totals the original contract, a revised one the original
+  or the current, and the latest revised one the current: with an approved Variation Order the chart in force must
+  total the revised contract (the phone's form has the same rule). The line under the sheet says how the open
+  chart's total stands against it (`L.chartTotalNote`). Save writes `barChartJson` in the phone's shape
+  (`L.chartJson`), one revision up, with the app's "Bar Chart" audit entry; deleting the only chart removes it.
+  Until Save or **Discard changes**, an edit is kept in the browser (`L.chartKept`, for the chart it was made from
+  only), so it survives a reload, and Print waits for the save, as it draws the saved chart.
   **Import from Excel (.xlsx)** is the app's import (`chart-excel.js`, the port of `util/BarChartExcel.kt`; change
   both together): it reads the contractor's workbook in the browser, nothing is uploaded, and replaces the open
   chart's items with the sheet's items and their bars from the coloured cells. The headings vary by project, so it
@@ -364,11 +375,14 @@ is read only.
   asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused.
 - **Print** on that page and on the Summary's card, for anyone who can open the project, opens `#/p/<id>/print/chart-<n>` (0 the original;
   the chart in force first, the others by the chips above the sheet): the office's bar chart / S-curve with cash
-  flow on a landscape A4 (`P.barChartHtml`, website only), without its PERT/CPM network, which the app has no data
-  for. The chart is one SVG (`P.barChartSvg`): each item's cost, share and days, its bars to the day on 30-day months
-  of 5-day cells with each month's share of the project on them, the S-curve over the bars, and the monthly and
-  cumulative accomplishment and cash flow under the total. A revised chart's suspension periods are left blank, not
-  coloured with a legend. Its signers are the billing abstract's four (**Signatories**) and an Approved by line.
+  flow on landscape A4 (`P.barChartPages`, website only), without its PERT/CPM network, which the app has no data
+  for. A long chart is cut into pages to lay side by side: **Months on a page** (3 to 12, or all on one page; six
+  unless picked, kept in the browser) sets how many months each holds, all at the same scale, with the item columns
+  and the rows under the total on every page, the project's details on the first and the signers on the last. A
+  page's chart is one SVG (`P.barChartSvg`): each item's cost, share and days, its days of work in green and its
+  coloured days in the chart's colours on 30-day months of 5-day cells with each month's share of the project on
+  them, the S-curve over the bars, the monthly and cumulative accomplishment and cash flow under the total, and the
+  legend of the colours. Its signers are the billing abstract's four (**Signatories**) and an Approved by line.
 - **Delete project** in that form, for the Super Admin and an Engineer Admin who can edit the project (the app's
   DELETE_PROJECT roles, on a project that is not view-only: `L.canDeleteProject`). It asks first, then marks the
   project document deleted the way a phone uploads a delete (`L.deletedProject`); the document and its records stay
@@ -466,8 +480,8 @@ is read only.
     status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
-  - **Bar chart**: the approved bar chart as a sheet, items down and 5-day cells across, drawn to the day, with the
-    S-curve's monthly and cumulative %; those who manage the chart edit it there (above).
+  - **Bar chart**: the approved bar chart as a sheet, items down and a cell a day across, with the chart's own
+    colours and the monthly and cumulative % and cash flow; those who manage the chart edit it there (above).
   - **Actual Accomplishment**: the uploaded abstracts of the actual work, every pay item as in Excel (see above).
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to

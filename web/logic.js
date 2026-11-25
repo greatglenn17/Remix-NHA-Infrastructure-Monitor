@@ -2542,14 +2542,14 @@ const EMPTY_BAR = () => ({ sm: '', sd: '', em: '', ed: '' });
 
 /**
  * BarChartDialog's drafts: the saved charts as the form edits them, each bar as its From and To month and day (a
- * month is 30 days; a revised chart's bars start and end between the 5-day cells where work stopped and resumed), or
- * one "Original" chart of the Scope of Works items with an empty bar each. The first chart always runs from the
- * start date. Null without a start date: the chart counts its days from it.
+ * month is 30 days), with the chart's own colours and each item's coloured days, or one "Original" chart of the Scope
+ * of Works items with an empty bar each. The first chart always runs from the start date. Null without a start date:
+ * the chart counts its days from it.
  */
 export function chartDrafts(project) {
   if (isoDay(project.dateStarted) == null) return null;
-  const saved = chartVersions(project.barChartJson).map(v => ({ label: String(v.label ?? ''), effective: String(v.effective ?? ''), items: draftItems(v.items || []) }));
-  const drafts = saved.length ? saved : [{ label: 'Original', effective: '', items: draftItems(scopeItems(project.scopeOfWork)) }];
+  const saved = chartVersions(project.barChartJson).map(v => ({ label: String(v.label ?? ''), effective: String(v.effective ?? ''), colors: chartColors(v), items: draftItems(v.items || []) }));
+  const drafts = saved.length ? saved : [{ label: 'Original', effective: '', colors: [], items: draftItems(scopeItems(project.scopeOfWork)) }];
   drafts[0].effective = project.dateStarted;
   return drafts;
 }
@@ -2558,14 +2558,28 @@ export function chartDrafts(project) {
 export function draftItems(list) {
   const monthDay = day => [Math.floor((day - 1) / MONTH_DAYS) + 1, (day - 1) % MONTH_DAYS + 1].map(String);
   const bar = ([a, b]) => { const [sm, sd] = monthDay(a), [em, ed] = monthDay(b); return { sm, sd, em, ed }; };
-  return list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()] }));
+  return list.map(i => ({ name: i.name, amount: Number(i.amount) || 0, bars: (i.bars || []).length ? i.bars.map(bar) : [EMPTY_BAR()], marks: itemMarks(i) }));
 }
 
+const NEW_COLOURS = ['#FFD966', '#FF7C80', '#9DC3E6', '#C9A0DC', '#F4B183', '#7FD1C7'], LAST_DAY = 120 * MONTH_DAYS;
+
+/**
+ * A chart's own colours, website only: each is named by whoever draws the chart (a suspension, a time extension, a
+ * variation order), with whether work is done on its days. Nothing here is read from the Documents. A colour that is
+ * not #RRGGBB is replaced, as it goes into the page's and the print's styles.
+ */
+export const chartColors = v => (Array.isArray(v?.colors) ? v.colors : []).map(c => ({ name: String(c?.name ?? ''), color: /^#[0-9a-f]{6}$/i.test(c?.color) ? c.color : NEW_COLOURS[0], work: c?.work === true }));
+/** "Add colour": the next of six colours, to be named; no work is done on its days until that is ticked. */
+export const newColor = colors => ({ name: '', color: NEW_COLOURS[colors.length % NEW_COLOURS.length], work: false });
+/** An item's coloured days, [from day, to day, colour index]; anything else in the JSON is dropped. */
+const itemMarks = i => (Array.isArray(i?.marks) ? i.marks : []).filter(m => Array.isArray(m) && m.length === 3 && m.every(Number.isInteger) && m[0] >= 1 && m[0] <= m[1] && m[1] <= LAST_DAY && m[2] >= 0).map(m => [...m]);
+
 /** The "+ Revised chart" tab: the next chart starts as a copy of the last one, with no date yet. */
-export const revisedDraft = drafts => ({ label: `Revised No. ${drafts.length}`, effective: '', items: drafts.at(-1).items.map(i => ({ ...i, bars: i.bars.map(b => ({ ...b })) })) });
+export const revisedDraft = drafts => ({ label: `Revised No. ${drafts.length}`, effective: '', colors: drafts.at(-1).colors.map(c => ({ ...c })),
+  items: drafts.at(-1).items.map(i => ({ ...i, bars: i.bars.map(b => ({ ...b })), marks: i.marks.map(m => [...m]) })) });
 export const emptyBar = EMPTY_BAR;
 /** "Add item" on a revised chart: an item the approved revision adds, to be named, priced and drawn. */
-export const emptyItem = () => ({ name: '', amount: 0, bars: [EMPTY_BAR()] });
+export const emptyItem = () => ({ name: '', amount: 0, bars: [EMPTY_BAR()], marks: [] });
 
 /** BarDraft.bar: the bar in contract days, or null when a box is not a month (1+) and a day (1 to 30), or it ends before it starts. */
 export function draftBar(b) {
@@ -2577,57 +2591,104 @@ export function draftBar(b) {
   return barDays(bar) > 0 ? bar : null;
 }
 
-/**
- * A click on the Bar chart page's sheet: an item's draft bars with the 5-day `cell` (0 is days 1 to 5) filled or
- * cleared. Bars that touch become one; a bar that does not read is dropped, as saving would.
- */
-export function paintCell(bars, cell, on) {
-  const a = cell * CELL_DAYS + 1, b = a + CELL_DAYS - 1, out = [];
-  const kept = bars.map(draftBar).filter(Boolean).flatMap(([s, e]) => (on ? [[s, e]] : [[s, Math.min(e, a - 1)], [Math.max(s, b + 1), e]].filter(x => x[0] <= x[1])));
-  for (const x of [...kept, ...(on ? [[a, b]] : [])].sort((p, q) => p[0] - q[0])) {
-    if (out.length && out.at(-1)[1] + 1 >= x[0]) out.at(-1)[1] = Math.max(out.at(-1)[1], x[1]);
-    else out.push(x);
+// Day ranges [from, to, colour?]: `cutDays` takes days a to b out of them, `joinDays` makes one of those that touch (and share a colour).
+const cutDays = (ranges, a, b) => ranges.flatMap(([s, e, ...k]) => [[s, Math.min(e, a - 1), ...k], [Math.max(s, b + 1), e, ...k]].filter(x => x[0] <= x[1]));
+function joinDays(ranges) {
+  const out = [];
+  for (const x of [...ranges].sort((p, q) => p[0] - q[0])) {
+    if (out.length && out.at(-1)[1] + 1 >= x[0] && out.at(-1)[2] === x[2]) out.at(-1)[1] = Math.max(out.at(-1)[1], x[1]);
+    else out.push([...x]);
   }
-  return draftItems([{ bars: out }])[0].bars;
+  return out;
 }
 
-/** The sheet's row of an item: for each of `cells` 5-day cells, null or the [left, width] share of it the draft bars cover (a bar can start or end inside a cell). */
-export function cellFills(bars, cells) {
-  const days = bars.map(draftBar).filter(Boolean);
-  return Array.from({ length: cells }, (_, c) => {
-    const a = c * CELL_DAYS + 1, b = a + CELL_DAYS - 1, hit = days.filter(([s, e]) => s <= b && e >= a);
-    if (!hit.length) return null;
-    const s = Math.max(a, Math.min(...hit.map(x => x[0]))), e = Math.min(b, Math.max(...hit.map(x => x[1])));
-    return [(s - a) / CELL_DAYS, (e - s + 1) / CELL_DAYS];
+/**
+ * A click or drag on the Bar chart page's sheet: the draft `item` with days `a` to `b` painted with `tool`: 'work'
+ * (the plain bar), 'erase', or the index of one of the chart's `colors`. The item's cost is spread over its bar, so
+ * the days of a colour work is done on join the bar, and those of a colour with no work leave it. Bars that touch
+ * become one; a bar that does not read is dropped, as saving would.
+ */
+export function paintDays(item, a, b, tool, colors) {
+  const works = tool === 'work' || colors[tool]?.work === true;
+  const bars = joinDays([...cutDays(item.bars.map(draftBar).filter(Boolean), a, b), ...(works ? [[a, b]] : [])]);
+  return { ...item, bars: draftItems([{ bars }])[0].bars, marks: joinDays([...cutDays(item.marks, a, b), ...(colors[tool] ? [[a, b, tool]] : [])]) };
+}
+
+/**
+ * What each of an item's first `days` days shows, on the sheet and on the print: null, 'work' (the plain bar) or a
+ * colour's index. `item` is as saved (bars in contract days). A coloured day shows only where it agrees with the bar:
+ * on it for a colour work is done on, off it for one with no work (the bar may have been typed again since).
+ */
+export function dayFills(item, colors, days) {
+  const out = Array(days).fill(null);
+  const put = (a, b, value, on) => { for (let d = Math.max(a, 1); d <= Math.min(b, days); d++) if (on == null || (out[d - 1] === 'work') === on) out[d - 1] = value; };
+  for (const [a, b] of item.bars || []) put(a, b, 'work');
+  for (const [a, b, k] of itemMarks(item)) if (colors[k]) put(a, b, k, colors[k].work);
+  return out;
+}
+
+/** The coloured days an item shows, as saved: runs of a colour from dayFills. */
+function shownMarks(item, colors) {
+  const out = [];
+  dayFills(item, colors, Math.max(0, ...itemMarks(item).map(m => m[1]))).forEach((k, d) => {
+    if (!Number.isInteger(k)) return;
+    if (out.length && out.at(-1)[2] === k && out.at(-1)[1] === d) out.at(-1)[1] = d + 1;
+    else out.push([d + 1, d + 1, k]);
   });
+  return out;
 }
 
-/** The months the sheet draws for a chart draft: to its last bar, the contract duration and `asked` (Add month), 1 to 120. */
+/** "Work is done on these days" ticked or cleared for colour `k`: its days join or leave each item's bar, as painting them again would. */
+export function colorWork(draft, k, work) {
+  const shown = draftVersion(draft).items, colors = draft.colors.map((c, j) => (j === k ? { ...c, work } : c));
+  return { ...draft, colors, items: draft.items.map((item, i) => { const marks = shown[i].marks || []; return marks.filter(m => m[2] === k).reduce((it, [a, b]) => paintDays(it, a, b, k, colors), { ...item, marks }); }) };
+}
+
+/** A colour removed: its days go back to what is under them (the plain bar, or nothing), and the colours after it move up. */
+export const dropColor = (draft, k) => ({ ...draft, colors: draft.colors.filter((_, j) => j !== k),
+  items: draft.items.map(i => ({ ...i, marks: i.marks.filter(m => m[2] !== k).map(([a, b, j]) => [a, b, j > k ? j - 1 : j]) })) });
+
+/** The last contract day a saved chart draws: its last bar, or a coloured day after it. */
+export const chartSpan = v => Math.max(chartLastDay(v), ...(v.items || []).flatMap(i => itemMarks(i).map(m => m[1])));
+
+/** The months the sheet draws for a chart draft: to its last bar or coloured day, the contract duration and `asked` (Add month), 1 to 120. */
 export const sheetMonths = (draft, durationDays, asked = 0) =>
-  Math.min(120, Math.max(1, asked, Math.ceil((Number(durationDays) || 0) / MONTH_DAYS), Math.ceil(chartLastDay(draftVersion(draft)) / MONTH_DAYS)));
+  Math.min(120, Math.max(1, asked, Math.ceil((Number(durationDays) || 0) / MONTH_DAYS), Math.ceil(chartSpan(draftVersion(draft)) / MONTH_DAYS)));
 
 /**
  * The Bar chart page's unsaved drafts as the browser keeps them (with the saved chart they were made from), and
- * back: null unless they were made from the chart saved now (`base`) and still have the drafts' shape.
+ * back: null unless they were made from the chart saved now (`base`) and still have the drafts' shape. Colours and
+ * coloured days are read as a saved chart's are, so drafts kept before there were colours come back with none.
  */
 export const chartKept = (base, drafts) => ({ base, drafts });
 export function keptChart(kept, base) {
   const d = keptObject(kept), text = v => typeof v === 'string';
   const ok = d && d.base === base && Array.isArray(d.drafts) && d.drafts.every(v => v && text(v.label) && text(v.effective) && Array.isArray(v.items)
     && v.items.every(i => i && text(i.name) && Number.isFinite(i.amount) && Array.isArray(i.bars) && i.bars.every(b => b && ['sm', 'sd', 'em', 'ed'].every(k => text(b[k])))));
-  return ok ? d.drafts : null;
+  return ok ? d.drafts.map(v => ({ ...v, colors: chartColors(v), items: v.items.map(i => ({ ...i, marks: itemMarks(i) })) })) : null;
 }
 
-/** VersionDraft.version: the chart as saved; a bar that does not read is left out (chartErrors names its item). */
-export const draftVersion = d => ({ label: d.label.trim(), effective: d.effective, items: d.items.map(i => ({ name: String(i.name).trim(), amount: i.amount, bars: i.bars.map(draftBar).filter(Boolean) })) });
+/**
+ * VersionDraft.version: the chart as saved; a bar that does not read is left out (chartErrors names its item). The
+ * colours and the coloured days that show (`colors`, and `marks` on an item) are saved only where there are any, so a
+ * chart without them is the JSON the phone writes.
+ */
+export function draftVersion(d) {
+  const colors = d.colors.map(c => ({ name: c.name.trim(), color: c.color, work: c.work }));
+  return { label: d.label.trim(), effective: d.effective, items: d.items.map(i => {
+    const bars = i.bars.map(draftBar).filter(Boolean), marks = shownMarks({ bars, marks: i.marks }, colors);
+    return { name: String(i.name).trim(), amount: i.amount, bars, ...(marks.length && { marks }) };
+  }), ...(colors.length && { colors }) };
+}
 
 /** BarChart.toJson for the drafts, keys in the phone's order; no chart at all is blank, which removes it. */
 export const chartJson = drafts => (drafts.length ? JSON.stringify(drafts.map(draftVersion)) : '');
 
 /**
  * BarChartDialog's errors, which keep Save off. The original chart must total the original contract amount, a revised
- * one the original or the current (after Variation Orders); a revised chart takes effect after the start date and
- * after the chart before it. A chart with no items (no Scope of Works, and nothing imported) is refused here.
+ * one the original or the current (after Variation Orders), and the latest revised one the current: with a Variation
+ * Order the chart in force totals the revised contract. A revised chart takes effect after the start date and after
+ * the chart before it. A chart with no items (no Scope of Works, and nothing imported) is refused here.
  * A revised chart's items can be renamed, added and removed, so each needs a name of its own: a Partial suspension
  * and the item targets go by name. The original is not checked, as its names cannot be typed.
  */
@@ -2635,7 +2696,7 @@ export function chartErrors(drafts, project, docs) {
   const start = isoDay(project.dateStarted), original = originalCost(project), current = currentCost(project, docs);
   return drafts.flatMap((d, i) => {
     const name = d.label.trim() || `Chart ${i + 1}`, date = isoDay(d.effective), total = d.items.reduce((t, x) => t + x.amount, 0);
-    const matches = chartTotalMatches(i, total, project, docs);
+    const matches = chartTotalMatches(i, total, project, docs, i === drafts.length - 1);
     const bad = d.items.filter(x => !x.bars.every(draftBar));
     const names = d.items.map(x => String(x.name).trim()), twice = [...new Set(names.filter((n, k) => n && names.indexOf(n) !== k))];
     return [
@@ -2644,6 +2705,7 @@ export function chartErrors(drafts, project, docs) {
       i > 0 && names.includes('') && `${name}: name every item`,
       i > 0 && twice.length && `${name}: two items are named ${twice.join(', ')}`,
       d.items.length && !matches && `${name}: the chart totals ${formatPhp(total)} but the contract amount is ${formatPhp(i > 0 ? current : original)}`,
+      d.colors.some(x => !x.name.trim()) && `${name}: name every colour`,
       i > 0 && date == null && `${name}: pick the date it takes effect`,
       i > 0 && date != null && start != null && date < start && `${name}: takes effect before the start date`,
       i > 0 && date != null && drafts[i - 1].effective >= d.effective && `${name}: takes effect on or before the previous chart`,
@@ -2652,9 +2714,22 @@ export function chartErrors(drafts, project, docs) {
   });
 }
 
-/** totalMatches: chart `i` totals the original contract amount, or for a revised one the current (after Variation Orders). */
-export const chartTotalMatches = (i, total, project, docs) =>
-  Math.abs(total - originalCost(project)) < 0.015 || (i > 0 && Math.abs(total - currentCost(project, docs)) < 0.015);
+/** totalMatches: chart `i` totals the original contract amount, or for a revised one the current (after Variation Orders); the `last` revised chart only the current. */
+export const chartTotalMatches = (i, total, project, docs, last = false) =>
+  (i > 0 && Math.abs(total - currentCost(project, docs)) < 0.015) || ((i === 0 || !last) && Math.abs(total - originalCost(project)) < 0.015);
+
+/**
+ * The line under the sheet: the chart's total against the contract it must equal, the original chart's against the
+ * original contract and a revised chart's against the revised contract (the original plus the approved Variation
+ * Orders). `ok` is false where they differ; an earlier revised chart that still totals the original is saved, and told so here.
+ */
+export function chartTotalNote(i, total, project, docs) {
+  const original = originalCost(project), current = currentCost(project, docs), varied = Math.abs(current - original) >= 0.015;
+  const want = i > 0 ? current : original, gap = total - want, ok = Math.abs(gap) < 0.015;
+  const what = `the ${i === 0 ? 'original ' : varied ? 'revised ' : ''}contract (${formatPhp(want)})`;
+  return { ok, text: `Chart total ${formatPhp(total)}: ${ok ? `equals ${what}` : `${formatPhp(Math.abs(gap))} ${gap > 0 ? 'more' : 'less'} than ${what}`}.${
+    !ok && i > 0 && Math.abs(total - original) < 0.015 ? ' It still equals the original contract.' : ''}` };
+}
 
 /** useSheet's notes on an imported sheet (chart-excel.js): what was read, then each item whose bars do not cover the days its Duration column says. */
 export const importNotes = sheet => [`Read ${sheet.items.length} items from the sheet "${sheet.name}".`, ...sheet.items.flatMap(item => {

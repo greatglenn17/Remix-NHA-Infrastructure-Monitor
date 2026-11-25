@@ -570,18 +570,23 @@ const CHART_ROWS = ['MONTHLY ACCOMPLISHMENT', 'CUMULATIVE ACCOMPLISHMENT', 'MONT
 
 /**
  * One chart `version` drawn as the office's sheet, in millimetres across a landscape A4: each item's cost, share of the
- * total and days, its bars to the day over a grid of 30-day months in 5-day cells with each month's share of the project
- * written on them, the S-curve over the bars, and under the total the monthly and cumulative accomplishment and cash
- * flow. An SVG, so the bars and the curve line up with the grid and print without the browser's background setting.
+ * total and days, its days of work in green and its coloured days in the chart's own colours (L.dayFills) over a grid
+ * of 30-day months in 5-day cells, with each month's share of the project written on them, the S-curve over the bars,
+ * and under the total the monthly and cumulative accomplishment and cash flow, then what the colours stand for. An
+ * SVG, so the bars and the curve line up with the grid and print without the browser's background setting.
  * `duration` is the total's days, the contract's (the bars' days overlap, so they do not add up to it); blank without one.
- * shortcut: the suspension periods of a revised chart are left blank, not coloured with a legend as the office draws them.
+ * A long chart is cut into pages: `per` months are drawn from month `from` (0 is the first), every page at the same
+ * scale with the item columns and the rows under the total again. Without `per` the whole chart is one sheet.
  */
-export function barChartSvg(version, duration) {
-  const items = version.items || [], total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0);
-  const months = L.chartMonths(version), count = Math.max(months.length, 1);
+export function barChartSvg(version, duration, { from = 0, per } = {}) {
+  const items = version.items || [], total = items.reduce((t, i) => t + (Number(i.amount) || 0), 0), colors = L.chartColors(version);
+  const curved = L.chartMonths(version), all = Math.max(curved.length, Math.ceil(L.chartSpan(version) / 30));
+  // A month after the last bar (coloured days only) has no work in it.
+  const months = Array.from({ length: all }, (_, k) => curved[k] ?? { no: k + 1, monthlyPct: 0, cumulativePct: curved.at(-1)?.cumulativePct ?? 0 }).slice(from, per ? from + per : undefined);
+  const count = per || Math.max(months.length, 1), first = from * 30 + 1, last = (from + months.length) * 30;
   const W = 285, COLS = [0, 10, 62, 86, 99, 109], left = COLS[5], mw = (W - left) / count, dw = mw / 30;
   const HEAD = 9, ROW = 6, FOOT = 5, bottom = HEAD + items.length * ROW, foot = bottom + ROW, H = foot + CHART_ROWS.length * FOOT;
-  const f = n => Number(n.toFixed(2));
+  const f = n => Number(n.toFixed(2)), dayX = day => left + (day - first) * dw;
   // Text is not measured here: one wider than its `room` is squeezed into it.
   const text = (x, y, value, { anchor = 'middle', size = 2, bold = false, room = 0 } = {}) => {
     const fits = !room || String(value).length * size * (bold ? 0.65 : 0.55) <= room;
@@ -590,20 +595,30 @@ export function barChartSvg(version, duration) {
   const line = (x1, y1, x2, y2, width = 0.15) => `<line x1='${f(x1)}' y1='${f(y1)}' x2='${f(x2)}' y2='${f(y2)}' stroke='#000' stroke-width='${width}'/>`;
   const mid = k => (COLS[k] + COLS[k + 1]) / 2;
   const itemDays = i => (i.bars || []).reduce((n, [a, b]) => n + Math.max(0, b - a + 1), 0);
+  const fill = k => (k === 'work' ? '#92D050' : colors[k].color);
 
   const head = ['ITEMS', 'DESCRIPTION', 'COST (PHP)', 'PERCENT (%)', 'NO. OF DAYS'].map((h, k) => text(mid(k), 5.3, h, { size: 1.9, bold: true, room: COLS[k + 1] - COLS[k] - 1 })).join('')
     + months.map((m, k) => text(left + (k + 0.5) * mw, 3.3, mw >= 14 ? `${ordinal(m.no)} Month` : m.no, { size: 1.9, bold: true })
       + (mw >= 15 ? [5, 10, 15, 20, 25, 30].map((d, j) => text(left + k * mw + (j + 0.5) * mw / 6, 7.7, d, { size: 1.5 })).join('') : '')).join('');
   const rows = items.map((item, i) => {
     const y = HEAD + i * ROW, days = itemDays(item), amount = Number(item.amount) || 0, base = y + 4;
-    const bars = (item.bars || []).map(([a, b]) => `<rect x='${f(left + (a - 1) * dw)}' y='${f(y + 1)}' width='${f((b - a + 1) * dw)}' height='${ROW - 2}' fill='#92D050'/>`).join('');
+    // A rectangle for each run of days that show the same thing on this page.
+    let bars = '';
+    const fills = L.dayFills(item, colors, last);
+    for (let d = first; d <= last; d++) {
+      const k = fills[d - 1];
+      if (k == null) continue;
+      let e = d;
+      while (e < last && fills[e] === k) e++;
+      bars += `<rect x='${f(dayX(d))}' y='${f(y + 1)}' width='${f((e - d + 1) * dw)}' height='${ROW - 2}' fill='${fill(k)}'/>`;
+      d = e;
+    }
     // Each month's share of the project, over the item's days in that month.
-    const shares = months.map((_, k) => {
-      const from = k * 30 + 1, to = from + 29, parts = (item.bars || []).map(([a, b]) => [Math.max(a, from), Math.min(b, to)]).filter(([a, b]) => b >= a);
+    const shares = months.map(m => {
+      const a0 = (m.no - 1) * 30 + 1, b0 = a0 + 29, parts = (item.bars || []).map(([a, b]) => [Math.max(a, a0), Math.min(b, b0)]).filter(([a, b]) => b >= a);
       const inMonth = parts.reduce((n, [a, b]) => n + b - a + 1, 0);
       if (!inMonth || !days || total <= 0) return '';
-      const x1 = left + (parts[0][0] - 1) * dw, x2 = left + parts.at(-1)[1] * dw;
-      return text((x1 + x2) / 2, y + 3.6, pct(amount / total * inMonth / days * 100), { size: 1.5 });
+      return text((dayX(parts[0][0]) + dayX(parts.at(-1)[1] + 1)) / 2, y + 3.6, pct(amount / total * inMonth / days * 100), { size: 1.5 });
     }).join('');
     return text(mid(0), base, i + 1) + text(COLS[1] + 1, base, item.name, { anchor: 'start', room: COLS[2] - COLS[1] - 2 }) + text(COLS[3] - 1, base, money(amount), { anchor: 'end', room: COLS[3] - COLS[2] - 2 })
       + text(COLS[4] - 1, base, pct(total > 0 ? amount / total * 100 : 0), { anchor: 'end' }) + text(mid(4), base, days) + bars + shares;
@@ -613,34 +628,46 @@ export function barChartSvg(version, duration) {
   const figures = [m => pct(m.monthlyPct), m => pct(m.cumulativePct), m => money(m.monthlyPct / 100 * total), m => money(m.cumulativePct / 100 * total)];
   const footer = CHART_ROWS.map((label, r) => text(left - 1.5, foot + r * FOOT + 3.4, label, { anchor: 'end', size: 1.9, bold: true })
     + months.map((m, k) => text(left + (k + 0.5) * mw, foot + r * FOOT + 3.4, figures[r](m), { size: 1.7, room: mw - 1 })).join('')).join('');
-  const curve = `<polyline fill='none' stroke='#1D6FB8' stroke-width='0.5' points='${[[0, 0], ...months.map((m, k) => [k + 1, m.cumulativePct])].map(([k, p]) => `${f(left + k * mw)},${f(bottom - p / 100 * (bottom - HEAD))}`).join(' ')}'/>`;
+  // The curve enters a later page at the cumulative % the month before it ended on.
+  const curve = `<polyline fill='none' stroke='#1D6FB8' stroke-width='0.5' points='${[[0, from ? curved[from - 1]?.cumulativePct ?? months[0]?.cumulativePct ?? 0 : 0], ...months.map((m, k) => [k + 1, m.cumulativePct])]
+    .map(([k, p]) => `${f(left + k * mw)},${f(bottom - p / 100 * (bottom - HEAD))}`).join(' ')}'/>`;
+  // What the colours stand for, under the sheet: a square and the name its maker gave it.
+  let lx = 0;
+  const key = (color, name) => { const x = lx; lx += 5 + name.length * 1.15 + 4; return `<rect x='${f(x)}' y='${f(H + 1.5)}' width='4' height='3' fill='${color}' stroke='#000' stroke-width='0.1'/>${text(x + 5, H + 3.9, name, { anchor: 'start' })}`; };
+  const legend = colors.length ? key('#92D050', 'Work') + colors.map(c => key(c.color, `${c.name}${c.work ? '' : ' (no work)'}`)).join('') : '';
 
   const across = [HEAD, ...items.map((_, i) => HEAD + (i + 1) * ROW), foot, ...CHART_ROWS.map((_, r) => foot + (r + 1) * FOOT)].map(y => line(0, y, W, y)).join('') + line(left, 5, W, 5);
   const down = COLS.slice(1, 5).map(x => line(x, 0, x, foot)).join('') + Array.from({ length: count }, (_, k) => line(left + k * mw, 0, left + k * mw, H, 0.3)
     + [1, 2, 3, 4, 5].map(j => line(left + k * mw + j * mw / 6, 5, left + k * mw + j * mw / 6, bottom, 0.08)).join('')).join('');
-  return `<svg class='chart' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${f(H)}' font-family='Arial, Helvetica, sans-serif' role='img' aria-label='Bar chart, S-curve and cash flow'>
-    ${rows}${across}${down}<rect x='0' y='0' width='${W}' height='${f(H)}' fill='none' stroke='#000' stroke-width='0.3'/>${head}${totals}${footer}${curve}</svg>`;
+  return `<svg class='chart' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${W} ${f(H + (legend ? 6 : 0))}' font-family='Arial, Helvetica, sans-serif' role='img' aria-label='Bar chart, S-curve and cash flow'>
+    ${rows}${across}${down}<rect x='0' y='0' width='${W}' height='${f(H)}' fill='none' stroke='#000' stroke-width='0.3'/>${head}${totals}${footer}${curve}${legend}</svg>`;
 }
 
 /**
- * The sheet of one chart (`index` 0 is the original): the banner, the title with the chart's name, the project and its
- * contract, the chart (barChartSvg; the total's days are the contract duration on the original, and left blank on a
- * revised chart, whose working days the orders may have changed) and five signers: the billing abstract's four (billingSignatories) and Approved by,
- * who is not kept on the project, so only the line is printed.
+ * The sheets of one chart (`index` 0 is the original), each an A4 landscape page of `per` months (all of them on one
+ * sheet without it): the banner, the title with the chart's name, the project and its contract on the first, the
+ * chart on each (barChartSvg; the total's days are the contract duration on the original, and left blank on a revised
+ * chart, whose working days the orders may have changed) and on the last five signers: the billing abstract's four
+ * (billingSignatories) and Approved by, who is not kept on the project, so only the line is printed.
  */
-export function barChartHtml({ project, docs, version, index, signatories, banner }) {
+export function barChartPages({ project, docs, version, index, signatories, banner, per }) {
   const info = (label, value, label2, value2) => `<tr><td class='pl'>${label}</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>${label2}</td><td>: ${esc(value2)}</td></tr>`;
   const cost = (version.items || []).reduce((t, i) => t + (Number(i.amount) || 0), 0);
   const end = index > 0 ? L.revisedCompletion(project, docs) ?? L.effectiveCompletion(project) : project.completionDateOriginal;
-  return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
+  const months = Math.max(1, Math.ceil(L.chartSpan(version) / 30)), each = per > 0 && per < months ? per : months, pages = Math.ceil(months / each);
+  const name = `${esc(version.label || `Chart ${index + 1}`)}${index > 0 ? ` &#183; from ${esc(longDate(version.effective))}` : ''}`;
+  return Array.from({ length: pages }, (_, p) => {
+    const part = pages > 1 ? ` &#183; Months ${p * each + 1} to ${Math.min((p + 1) * each, months)} &#183; Page ${p + 1} of ${pages}` : '';
+    return `${p ? `<div class='period'>BAR CHART/S-CURVE WITH CASH FLOW &#183; ${name}${part}</div>` : `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
     <h1>BAR CHART/S-CURVE WITH CASH FLOW</h1>
-    <div class='period'>${esc(version.label || `Chart ${index + 1}`)}${index > 0 ? ` &#183; from ${esc(longDate(version.effective))}` : ''}</div>
+    <div class='period'>${name}${part}</div>
     <table class='apa-info'>
       ${info('PROJECT TITLE', project.name, 'CONTRACT COST', peso(cost))}
       ${info('LOCATION', project.location, 'CONTRACT DURATION', `${project.contractDurationDays ?? 0} calendar days`)}
       ${info('CONTRACTOR', project.contractor, 'CONTRACT PERIOD', `${longDate(project.dateStarted)} - ${longDate(end)}`)}
-    </table>
-    ${barChartSvg(version, index > 0 ? null : project.contractDurationDays)}
-    <div class='keep'>${signRow({ ...signatories, approvedName: '', approvedPosition: '', approvedOffice: '' },
-    [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval:', 'recommended'], ['Approved by:', 'approved']])}</div>`;
+    </table>`}
+    ${barChartSvg(version, index > 0 ? null : project.contractDurationDays, pages > 1 ? { from: p * each, per: each } : {})}
+    ${p === pages - 1 ? `<div class='keep'>${signRow({ ...signatories, approvedName: '', approvedPosition: '', approvedOffice: '' },
+    [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval:', 'recommended'], ['Approved by:', 'approved']])}</div>` : ''}`;
+  });
 }

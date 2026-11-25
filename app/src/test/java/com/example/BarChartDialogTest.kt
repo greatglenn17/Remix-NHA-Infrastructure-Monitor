@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.example.data.model.AppThemeMode
+import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.ui.detail.sections.BarChartDialog
 import com.example.ui.theme.NHATheme
@@ -46,6 +47,30 @@ class BarChartDialogTest {
 
     private fun type(tag: String, text: String) = rule.onNodeWithTag(tag).performScrollTo().performTextReplacement(text)
     private fun errors(text: String) = rule.onAllNodesWithText(text, substring = true)
+
+    @Test fun chartColouredOnTheWebsite_keepsItsColoursAndColouredDays_whenThePhoneSavesIt() {
+        val colors = """[{"name":"Suspension No. 1","color":"#FFD966","work":false}]"""
+        val coloured = BarChart.toJson(listOf(BarChart.Version("Original", "2026-01-05", items),
+            BarChart.Version("Revised No. 1", "2026-06-01", listOf(items[0].copy(marks = "[[241,270,0]]"), items[1]), colors)))
+        var saved: String? = null
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { BarChartDialog(project.copy(barChartJson = coloured), emptyList(), {}, { saved = it }) } }
+        // A cost changed and put back is still a save of the form's own drafts.
+        type("item_1_amount", "1")
+        type("item_1_amount", "2,000,000.50")
+        rule.onNodeWithTag("save_bar_chart").assertIsEnabled().performClick()
+        assertEquals(coloured, saved)
+    }
+
+    @Test fun withAVariationOrder_theLatestRevisedChartMustTotalTheRevisedContract() {
+        val vo = PendingDocument(projectId = 1, documentName = "Variation Order No. 1 (Additive) - PHP 500,000.00", status = "Approved", remarks = "")
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { BarChartDialog(project, listOf(vo), {}, {}) } }
+        // The revised chart still totals the original contract, which the Variation Order has raised.
+        errors("the chart totals").assertCountEquals(1)
+        rule.onNodeWithTag("save_bar_chart").assertIsNotEnabled()
+        type("item_1_amount", "2,500,000.50")
+        errors("the chart totals").assertCountEquals(0)
+        rule.onNodeWithTag("save_bar_chart").assertIsEnabled()
+    }
 
     @Test fun revisedChart_itemsTakeAnAmountAndName_andCanBeAddedAndRemoved() {
         var saved: String? = null

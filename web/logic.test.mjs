@@ -1031,31 +1031,65 @@ test('delete project: the Super Admin, or an Engineer Admin assigned to it, and 
     { projectUuid: 'p1', isDeleted: true, updatedAt: 1794292093231, updatedByUid: 'u1' });
 });
 
-test('bar chart sheet: a 5-day cell is filled or cleared, bars that touch join, and a kept draft comes back only for the chart it was made from', () => {
+test('bar chart sheet: days are painted as work, in a colour or cleared, bars that touch join, and a kept draft comes back only for the chart it was made from', () => {
   const none = [{ sm: '', sd: '', em: '', ed: '' }], bar = (sm, sd, em, ed) => ({ sm: String(sm), sd: String(sd), em: String(em), ed: String(ed) });
-  // Cell 0 is days 1 to 5; cell 6 is the first of Month 2. A cell next to a bar lengthens it; one apart starts another.
-  const first = L.paintCell(none, 0, true);
-  assert.deepEqual(first, [bar(1, 1, 1, 5)]);
-  assert.deepEqual(L.paintCell(first, 1, true), [bar(1, 1, 1, 10)]);
-  assert.deepEqual(L.paintCell(first, 6, true), [bar(1, 1, 1, 5), bar(2, 1, 2, 5)]);
-  assert.deepEqual(L.paintCell(L.paintCell(first, 2, true), 1, true), [bar(1, 1, 1, 15)]);
-  // Clearing a cell in the middle splits the bar; a bar that ends inside a cell keeps its days outside the cell cleared.
-  assert.deepEqual(L.paintCell([bar(1, 1, 1, 15)], 1, false), [bar(1, 1, 1, 5), bar(1, 11, 1, 15)]);
-  assert.deepEqual(L.paintCell([bar(1, 4, 1, 12)], 1, false), [bar(1, 4, 1, 5), bar(1, 11, 1, 12)]);
-  assert.deepEqual(L.paintCell([bar(1, 4, 1, 12)], 0, true), [bar(1, 1, 1, 12)]);
-  assert.deepEqual(L.paintCell(first, 0, false), none); // the last cell cleared leaves the empty bar the form starts with
-  assert.deepEqual(L.paintCell([bar(1, 1, 1, 5), bar(9, 9, 1, 1)], 0, false), none); // a bar that does not read is dropped
-  // What the sheet draws: the share of each cell the bars cover.
-  assert.deepEqual(L.cellFills([bar(1, 4, 1, 12)], 4), [[0.6, 0.4], [0, 1], [0, 0.4], null]);
-  assert.deepEqual(L.cellFills(none, 2), [null, null]);
-  // Months drawn: to the last bar, the contract duration, or what Add month asked for.
-  const draft = { label: 'Original', effective: '2026-01-05', items: [{ name: 'A', amount: 1, bars: [bar(1, 1, 3, 2)] }] };
-  assert.deepEqual([L.sheetMonths(draft, 0), L.sheetMonths(draft, 240), L.sheetMonths(draft, 240, 9), L.sheetMonths({ ...draft, items: [] }, '')], [3, 8, 9, 1]);
-  assert.equal(L.sheetMonths({ ...draft, items: [{ name: 'A', amount: 1, bars: [bar(1, 1, 9999, 1)] }] }, 0), 120);
+  const item = (bars = none, marks = []) => ({ name: 'A', amount: 1, bars, marks });
+  // The chart's own colours: one for days with no work (a suspension), one for days of work (a variation order).
+  const colors = [{ name: 'Suspension No. 1', color: '#FFD966', work: false }, { name: 'Variation Order No. 1', color: '#FF7C80', work: true }];
+  // Work: a day next to a bar lengthens it; one apart starts another; a month is 30 days.
+  const first = L.paintDays(item(), 1, 5, 'work', colors);
+  assert.deepEqual(first, item([bar(1, 1, 1, 5)]));
+  assert.deepEqual(L.paintDays(first, 6, 6, 'work', colors).bars, [bar(1, 1, 1, 6)]);
+  assert.deepEqual(L.paintDays(first, 31, 35, 'work', colors).bars, [bar(1, 1, 1, 5), bar(2, 1, 2, 5)]);
+  // Erase: a day in the middle splits the bar; the last day cleared leaves the empty bar the form starts with; a bar that does not read is dropped.
+  assert.deepEqual(L.paintDays(item([bar(1, 1, 1, 15)]), 7, 7, 'erase', colors).bars, [bar(1, 1, 1, 6), bar(1, 8, 1, 15)]);
+  assert.deepEqual(L.paintDays(first, 1, 5, 'erase', colors), item());
+  assert.deepEqual(L.paintDays(item([bar(1, 1, 1, 5), bar(9, 9, 1, 1)]), 1, 5, 'erase', colors).bars, none);
+  // A colour with no work takes its days off the bar, so they carry no cost; a colour of work puts them on it.
+  const drawn = L.paintDays(L.paintDays(item([bar(1, 1, 1, 10)]), 4, 6, 0, colors), 9, 12, 1, colors);
+  assert.deepEqual(drawn, item([bar(1, 1, 1, 3), bar(1, 7, 1, 12)], [[4, 6, 0], [9, 12, 1]]));
+  const draft = { label: 'Revised No. 1', effective: '2026-06-01', colors, items: [drawn] };
+  const saved = L.draftVersion(draft);
+  assert.deepEqual(saved, { label: 'Revised No. 1', effective: '2026-06-01', items: [{ name: 'A', amount: 1, bars: [[1, 3], [7, 12]], marks: [[4, 6, 0], [9, 12, 1]] }], colors });
+  assert.deepEqual(L.dayFills(saved.items[0], colors, 13), ['work', 'work', 'work', 0, 0, 0, 'work', 'work', 1, 1, 1, 1, null]);
+  // Work painted over coloured days takes the colour off; a coloured day shows only where it agrees with the bar typed since.
+  assert.deepEqual(L.paintDays(drawn, 4, 12, 'work', colors), item([bar(1, 1, 1, 12)]));
+  assert.deepEqual(L.draftVersion({ ...draft, items: [{ ...drawn, bars: [bar(1, 1, 1, 5)] }] }).items[0], { name: 'A', amount: 1, bars: [[1, 5]], marks: [[6, 6, 0]] });
+  // Saved and opened again it is the same draft; a chart with no colour is saved without the keys, as the phone writes it.
+  const project = { dateStarted: '2026-01-05', scopeOfWork: '', barChartJson: JSON.stringify([{ ...saved, effective: '2026-01-05' }]) };
+  assert.deepEqual(L.chartDrafts(project), [{ ...draft, effective: '2026-01-05' }]);
+  assert.equal(L.chartJson([{ label: 'Original', effective: '2026-01-05', colors: [], items: [first] }]), '[{"label":"Original","effective":"2026-01-05","items":[{"name":"A","amount":1,"bars":[[1,5]]}]}]');
+  // Anything else in the JSON is not a colour or a coloured day: a colour goes into a style, so only #RRGGBB is kept.
+  assert.deepEqual(L.chartColors({ colors: [{ name: 7, color: 'red;x:url(//e)', work: 'yes' }, null] }), [{ name: '7', color: '#FFD966', work: false }, { name: '', color: '#FFD966', work: false }]);
+  assert.deepEqual(L.dayFills({ bars: [[1, 2]], marks: [[2, 1, 0], [3, 4, 9], 'x', [3, 4, 0, 0], [5, 99999, 0], [3, 3, 0]] }, colors, 4), ['work', 'work', 0, null]);
+  // A colour is added unnamed, which keeps Save off; the revised chart copies the colours and the coloured days.
+  assert.deepEqual([L.newColor([]), L.newColor(colors)], [{ name: '', color: '#FFD966', work: false }, { name: '', color: '#9DC3E6', work: false }]);
+  const two = [{ ...draft, label: 'Original', effective: '2026-01-05' }, L.revisedDraft([draft])];
+  assert.deepEqual([two[1].colors, two[1].items[0].marks], [colors, drawn.marks]);
+  assert.notEqual(two[1].colors[0], colors[0]);
+  two[1].colors.push(L.newColor(two[1].colors));
+  assert.ok(L.chartErrors(two, { dateStarted: '2026-01-05', contractCostOriginal: 1 }, []).includes('Revised No. 1: name every colour'));
+  // "Work is done on these days" ticked: the suspension's days join the bar; the colour removed, they are plain work and the next colour moves up.
+  const worked = L.colorWork(draft, 0, true);
+  assert.deepEqual(L.draftVersion(worked).items[0], { name: 'A', amount: 1, bars: [[1, 12]], marks: [[4, 6, 0], [9, 12, 1]] });
+  assert.deepEqual(L.draftVersion(L.colorWork(worked, 0, false)), saved);
+  assert.deepEqual(L.draftVersion(L.dropColor(worked, 0)), { ...saved, items: [{ name: 'A', amount: 1, bars: [[1, 12]], marks: [[9, 12, 0]] }], colors: [colors[1]] });
+  // Months drawn: to the last bar or coloured day, the contract duration, or what Add month asked for.
+  const plain = { label: 'Original', effective: '2026-01-05', colors: [], items: [item([bar(1, 1, 3, 2)])] };
+  assert.deepEqual([L.sheetMonths(plain, 0), L.sheetMonths(plain, 240), L.sheetMonths(plain, 240, 9), L.sheetMonths({ ...plain, items: [] }, '')], [3, 8, 9, 1]);
+  assert.equal(L.sheetMonths({ ...plain, items: [item([bar(1, 1, 9999, 1)])] }, 0), 120);
+  assert.equal(L.sheetMonths({ ...plain, colors, items: [item([bar(1, 1, 3, 2)], [[100, 125, 0]])] }, 0), 5);
   // The kept draft: back as the drafts when made from the chart saved now; not for another chart, or anything else in the box.
   const kept = JSON.stringify(L.chartKept('[saved]', [draft]));
   assert.deepEqual(L.keptChart(kept, '[saved]'), [draft]);
+  assert.deepEqual(L.keptChart('{"base":"","drafts":[{"label":"x","effective":"","items":[{"name":"A","amount":1,"bars":[]}]}]}', ''), [{ label: 'x', effective: '', colors: [], items: [{ name: 'A', amount: 1, bars: [], marks: [] }] }]); // kept before there were colours
   assert.deepEqual([L.keptChart(kept, '[other]'), L.keptChart(null, ''), L.keptChart('{"base":"","drafts":[{"label":"x"}]}', ''), L.keptChart('{"base":"","drafts":[{"label":"x","effective":"","items":[{"name":"A","amount":1,"bars":[{"sm":1}]}]}]}', '')], [null, null, null, null]);
+  // The line under the sheet: the original against the original contract, a revised chart against the revised contract after a Variation Order.
+  const priced = { scopeOfWork: '', contractCostOriginal: 5000000 }, vo = [{ documentName: 'Variation Order No. 1 (Additive) - PHP 500,000.00', status: 'Approved' }];
+  assert.deepEqual(L.chartTotalNote(0, 5000000, priced, vo), { ok: true, text: 'Chart total ₱5,000,000.00: equals the original contract (₱5,000,000.00).' });
+  assert.deepEqual(L.chartTotalNote(1, 5500000, priced, vo), { ok: true, text: 'Chart total ₱5,500,000.00: equals the revised contract (₱5,500,000.00).' });
+  assert.deepEqual(L.chartTotalNote(1, 5000000, priced, vo), { ok: false, text: 'Chart total ₱5,000,000.00: ₱500,000.00 less than the revised contract (₱5,500,000.00). It still equals the original contract.' });
+  assert.deepEqual(L.chartTotalNote(1, 5600000, priced, []), { ok: false, text: 'Chart total ₱5,600,000.00: ₱600,000.00 more than the contract (₱5,000,000.00).' });
 });
 
 test('bar chart editor: drafts from the scope or the saved chart, bars as month and day, the errors and what is saved', () => {
@@ -1063,8 +1097,8 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   const project = { projectUuid: 'p1', assignedUids: ['u1'], dateStarted: '2026-01-05', scopeOfWork: scope, contractCostOriginal: 5000000, barChartJson: '' };
   // No chart yet: one "Original" chart of the scope items from the start date, each with an empty bar; nothing to save until the bars read.
   const fresh = L.chartDrafts(project);
-  assert.deepEqual(fresh, [{ label: 'Original', effective: '2026-01-05', items: [
-    { name: 'Land development', amount: 3000000, bars: [{ sm: '', sd: '', em: '', ed: '' }] }, { name: 'Housing units', amount: 2000000, bars: [{ sm: '', sd: '', em: '', ed: '' }] }] }]);
+  assert.deepEqual(fresh, [{ label: 'Original', effective: '2026-01-05', colors: [], items: [
+    { name: 'Land development', amount: 3000000, bars: [{ sm: '', sd: '', em: '', ed: '' }], marks: [] }, { name: 'Housing units', amount: 2000000, bars: [{ sm: '', sd: '', em: '', ed: '' }], marks: [] }] }]);
   assert.deepEqual(L.chartErrors(fresh, project, []), ['Original: check the bars of Land development, Housing units (month 1+, day 1 to 30)']);
   assert.equal(L.chartDrafts({ ...project, dateStarted: '' }), null);
   // A bar: From month 1 day 1 is day 1; To month 8 day 30 is day 240. A revised chart's bars start and end on any day.
@@ -1098,6 +1132,10 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   const vo = [{ documentName: 'Variation Order No. 1 (Additive) - PHP 500,000.00', status: 'Approved' }];
   two[1].label = 'Revised No. 1';
   assert.deepEqual(L.chartErrors(two, saved, vo), []);
+  // With the Variation Order the latest revised chart must total the revised contract, not the original; one before it may still total the original.
+  const stale = [two[0], { ...two[1], items: two[0].items }];
+  assert.deepEqual(L.chartErrors(stale, saved, vo), ['Revised No. 1: the chart totals ₱5,000,000.00 but the contract amount is ₱5,500,000.00']);
+  assert.deepEqual(L.chartErrors([...stale, { ...two[1], label: 'Revised No. 2', effective: '2026-09-01' }], saved, vo), []);
   // A revised chart's items can be renamed, added and removed: each needs a name of its own, and the chart an item.
   two[1].items.push({ ...L.emptyItem(), bars: [{ sm: '1', sd: '1', em: '1', ed: '30' }] });
   assert.deepEqual(L.chartErrors(two, saved, vo), ['Revised No. 1: name every item']);
@@ -1111,14 +1149,14 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   assert.deepEqual(L.chartErrors([two[0], { ...two[1], items: [] }], saved, vo), ['Revised No. 1: add an item, or import the Excel file']);
   // The original's names are not typed, so two of a name from an Excel file do not keep Save off.
   assert.deepEqual(L.chartErrors([{ ...two[0], items: [two[0].items[0], { ...two[0].items[1], name: 'Land development' }] }], saved, []), []);
-  assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: import the Excel file, or add the Scope of Works items to the project first']);
+  assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', colors: [], items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: import the Excel file, or add the Scope of Works items to the project first']);
   // An imported sheet (chart-excel.js) replaces a chart's items; its notes say what was read and where a bar is not its Duration.
   const sheet = { name: 'Revised', items: [{ name: 'Mobilization', amount: 1000, bars: [[1, 10], [41, 45]] }, { name: 'Earthworks', amount: 3000.5, bars: [[11, 40]] }, { name: 'Turnover', amount: 999.5, bars: [] }],
     durations: { Mobilization: 10, Earthworks: 30 } };
   assert.deepEqual(L.draftItems(sheet.items), [
-    { name: 'Mobilization', amount: 1000, bars: [{ sm: '1', sd: '1', em: '1', ed: '10' }, { sm: '2', sd: '11', em: '2', ed: '15' }] },
-    { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sd: '11', em: '2', ed: '10' }] },
-    { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sd: '', em: '', ed: '' }] }]);
+    { name: 'Mobilization', amount: 1000, bars: [{ sm: '1', sd: '1', em: '1', ed: '10' }, { sm: '2', sd: '11', em: '2', ed: '15' }], marks: [] },
+    { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sd: '11', em: '2', ed: '10' }], marks: [] },
+    { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sd: '', em: '', ed: '' }], marks: [] }]);
   assert.deepEqual(L.importNotes(sheet), ['Read 3 items from the sheet "Revised".', 'Mobilization: the bar covers 15 days but its Duration says 10.']);
   assert.deepEqual([[0, 5000000], [0, 5500000], [1, 5500000], [1, 5000000], [1, 5200000]].map(([i, total]) => L.chartTotalMatches(i, total, project, vo)), [true, false, true, true, false]);
   assert.equal(L.chartJson([]), '');
