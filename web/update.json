@@ -1,8 +1,8 @@
 {
-  "versionCode": 323,
-  "versionName": "2.8.43",
-  "releaseNotes": "v2.8.43: Bar chart bars are set by month and day, a revised chart's items take a new name and amount, and the Excel import reads the office layout.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.43/NHA_Monitor_v2.8.43_Build323.apk",
-  "apkSha256": "2179f52c894bdac2f03bbe6d23ef422af2c5de6494a4f52b14d5b9bc8044f16d",
-  "isMandatory": false
+  "versionCode": 324,
+  "versionName": "2.8.44",
+  "releaseNotes": "v2.8.44: Bar chart colours drawn on the website are kept when the chart is saved from the phone, and with a Variation Order the latest revised chart must total the revised contract.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.44/NHA_Monitor_v2.8.44_Build324.apk",
+  "apkSha256": "fe5c6996e5902422dc10ce352a5412b9cbe1394c4a62b06db39b916abb42a1bf",
+  "isMandatory": true
 }
