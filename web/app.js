@@ -4037,9 +4037,9 @@ const keep = (c, what, value) => { try { if (value == null) localStorage.removeI
 const abstractSwitch = monthly => `<div class="chips views" role="group" aria-label="Show">${['Weekly', 'Monthly'].map(x => `<button data-abstracts="${x}" aria-pressed="${(x === 'Monthly') === monthly}">${x}</button>`).join('')}</div>`;
 
 /** An abstract's Target / Actual / +/- table (L.abstractStanding). With a bar chart the target is headed as the plan of the abstract's day, so it is not read as the header's plan for today. */
-function standingTable(c, abstract) {
+function standingTable(c, abstract, caption = '') {
   const figure = v => (v == null ? '-' : pct(v)), planned = L.plannedTarget(c.project, c.documents, abstract.asOf) != null;
-  return `<div class="scroll"><table class="grid-table apa-standing"><thead><tr><td></td><th class="num">${planned ? `Plan on ${esc(L.displayDate(abstract.asOf)).replace(' ', '&nbsp;')}` : 'Target'}</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
+  return `<div class="scroll"><table class="grid-table apa-standing">${caption ? `<caption>${caption}</caption>` : ''}<thead><tr><td></td><th class="num">${planned ? `Plan on ${esc(L.displayDate(abstract.asOf)).replace(' ', '&nbsp;')}` : 'Target'}</th><th class="num">Actual</th><th class="num">+/-</th></tr></thead>
     <tbody>${L.abstractStanding(c.project, c.documents, abstract).map(r => `<tr><th scope="row">${esc(r.name)}</th><td class="num">${figure(r.target)}</td><td class="num">${figure(r.actual)}</td><td class="num">${L.standingDiffText(r.diff)}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted small">${planned ? '' : 'Target: the project\'s target; it has no approved bar chart. '}${figuresHelp()}</p>`;
 }
@@ -4091,10 +4091,11 @@ function actualBody(c) {
     <p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
   if (/^monthly(\/|$)/.test(c.page.sub || '') && list.length) return monthlyAbstractBody(c);
+  const units = shown ? unitsTable(c, shown, list) : ''; // beside the standing table, which is then headed too, so the two are level
   if (!shown) return `${tools}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
-      <div class="apa-pair"><div>${standingTable(c, shown)}</div>${unitsTable(c, shown, list)}</div>
+      <div class="apa-pair"><div>${standingTable(c, shown, units && 'In percent')}</div>${units}</div>
       <div class="apa-file">${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}</div>
       <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
         <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>
@@ -4302,12 +4303,12 @@ function paymentsBody({ project, payments, cost, billed, of }) {
   ], (r.requestFileUrl ? fileLink(r.requestFileUrl, 'Request letter') : '')
     + (editable ? `<button class="text-btn entry-edit" data-bill-request="${esc(r.uuid)}">${icon('check_circle', 'sm')}Mark billed</button>` : ''), 'waiting')).join('')
     + '<p class="muted small">Not yet billed. One counts in the Status of billing once marked billed with its DV No. and scanned DV form.</p>') : '';
-  const summary = section('Billing summary', 'payments', `<div class="bill-sum">
-    ${kv('Current contract cost', L.formatPhp(cost))}
-    ${kv('Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word')}
-    ${billed > 0 && cost > 0 ? kv('Billed share', L.billedLabel(billed, cost)) : ''}
-    ${kv('Balance', L.formatPhp(cost - billed))}
-    </div>${baseNote(project, cost)}`, '',
+  const figures = [['Current contract cost', L.formatPhp(cost)], ['Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word'],
+    ...(billed > 0 && cost > 0 ? [['Billed share', L.billedLabel(billed, cost)]] : []), ['Balance', L.formatPhp(cost - billed)]];
+  // A one-row table from 900px; under it the same figures as label-and-amount rows, which fit a phone (style.css shows one of the two).
+  const summary = section('Billing summary', 'payments', `<div class="bill-sum">${figures.map(f => kv(...f)).join('')}</div>
+    <div class="bill-table">${table(figures.map(([text]) => ({ text, num: 1 })), `<tr>${figures.map(([, v, cls]) => `<td class="num${cls ? ` ${cls}` : ''}">${esc(v)}</td>`).join('')}</tr>`)}</div>
+    ${baseNote(project, cost)}`, '',
     editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : '');
   if (!payments.length) return `<div class="stack">${summary}${requests}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
   return `<div class="stack">${summary}${requests}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {

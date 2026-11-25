@@ -662,13 +662,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 
 /* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
 .bill-sum, .apa-file { max-width: 560px; }
-/* From 900px the summary's figures are one row, each label over its amount, not a column with the right half empty. */
-@media (min-width: 900px) {
-  .bill-sum { max-width: none; display: flex; flex-wrap: wrap; gap: 4px 48px; margin-bottom: 8px; }
-  .bill-sum .kv { display: block; padding: 0; }
-  .bill-sum .kv span { display: block; }
-  .bill-sum .kv b { font-size: 18px; }
-}
+/* From 900px the summary is a one-row table across the card (user, 2026-11-25); under it, label-and-amount rows: four amounts do not fit a phone. */
+.bill-table { display: none; margin-bottom: 8px; }
+.bill-table table { table-layout: fixed; }
+.bill-table td { font-size: 15px; font-weight: 600; }
+.bill-table td.word { font-weight: 400; color: var(--text-2); }
+@media (min-width: 900px) { .bill-sum { display: none; } .bill-table { display: block; } }
 .kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
 .pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
