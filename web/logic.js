@@ -149,6 +149,12 @@ export function cellOf(day) {
   return [Math.floor(d / MONTH_DAYS) + 1, (Math.floor((d % MONTH_DAYS) / CELL_DAYS) + 1) * CELL_DAYS];
 }
 
+/** The planned accomplishment (%) of a chart by the end of contract `day`, each item's amount spread evenly over its bars' days: the S-curve to the day. */
+export function chartPctOn(v, day) {
+  const total = chartTotal(v);
+  return total <= 0 ? 0 : (v.items || []).reduce((t, i) => t + (Number(i.amount) || 0) * plannedShare(i, day), 0) / total * 100;
+}
+
 /** BarChart.months: the S-curve, Month 1 to the month holding the last bar, as monthly and cumulative %. */
 export function chartMonths(v) {
   const total = chartTotal(v), count = Math.ceil(chartLastDay(v) / MONTH_DAYS);

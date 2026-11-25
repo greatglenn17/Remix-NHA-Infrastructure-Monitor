@@ -1114,6 +1114,10 @@ test('bar chart suspension: days of no work are put into an item or the whole pr
   assert.deepEqual(L.suspendDays(suspended, 41, 70, 'erase'), items);
   // Erasing on the Whole project row never takes work out: an item that works on those days is left as it is.
   assert.deepEqual(saved(L.suspendDays(suspended, 31, 40, 'erase')), [['Done', [[1, 30]], []], ['Running', [[20, 40], [71, 110]], [[41, 70, 0]]], ['Later', [[110, 140]], [[31, 60, 0]]]]);
+  // Pointing at a day: the project's planned % by the end of it. A is a quarter of the money over days 1 to 10, B the rest over 11 to 20.
+  const two = { items: [{ name: 'A', amount: 100, bars: [[1, 10]] }, { name: 'B', amount: 300, bars: [[11, 20]] }] };
+  assert.deepEqual([5, 10, 15, 20, 40].map(d => L.chartPctOn(two, d)), [12.5, 25, 62.5, 100, 100]);
+  assert.equal(L.chartPctOn({ items: [] }, 5), 0);
   // A chart holds 120 months: work that would pass them is left where it is.
   const far = made('Far', [3500, 3590]);
   assert.equal(L.insertDays(far, 3400, 3420, 0), far);

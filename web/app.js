@@ -1538,7 +1538,8 @@ function chartPage(c, st, can) {
       Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
       Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: on the Whole project row
       every item gets an empty day there, on an item's row that item only, and the later work moves a day. Click once for each column you need. Remove column takes a day out
-      the same way, where nothing works on it. Undo takes back the last column added or removed, or the last days painted, one at a time. An item's cost is spread over its days of work, so the percentages and the
+      the same way, where nothing works on it. Undo takes back the last column added or removed, or the last days painted, one at a time.
+      Point at a day to see where the project is planned to be by the end of it. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1661,6 +1662,22 @@ function bindChart(c) {
   const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; st.colNote = ''; st.undo = []; }; // they are about the chart that was open
   numbers();
 
+  // Pointing at a day shows where the project is planned to be by the end of it: the cumulative %, to the day.
+  const tipAt = e => {
+    const td = e.target.closest?.('.bc-cell'), v = open();
+    let tip = el.querySelector('.bc-tip');
+    if (!td || !v) { if (tip) tip.hidden = true; return; }
+    if (!tip) { tip = el.appendChild(document.createElement('div')); tip.className = 'bc-tip'; }
+    const day = Number(td.dataset.cell) + 1, at = td.getBoundingClientRect();
+    tip.textContent = `Month ${Math.ceil(day / MONTH_CELLS)}, day ${(day - 1) % MONTH_CELLS + 1} · Project at ${L.chartPctOn(L.draftVersion(v), day).toFixed(2)}%`;
+    tip.hidden = false;
+    tip.style.left = `${at.left + at.width / 2}px`;
+    tip.style.top = `${at.top}px`;
+  };
+  const untip = () => { const tip = el.querySelector('.bc-tip'); if (tip) tip.hidden = true; };
+  el.onmouseover = tipAt;
+  el.onmouseleave = untip;
+
   el.onclick = async e => {
     const on = sel => e.target.closest(sel), tab = on('[data-tab]'), v = open(), i = on('[data-item]')?.dataset.item;
     if (tab) { st.selected = Number(tab.dataset.tab); leave(); redraw(`[data-tab="${st.selected}"]`); return; }
@@ -1752,8 +1769,9 @@ function bindChart(c) {
     e.preventDefault();
     if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else { paintAt(e); if (paint) undoable(paint.items); }
   };
-  el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); };
-  el.onmouseup = el.onmouseleave = () => { paint = null; };
+  el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); tipAt(e); };
+  el.onmouseup = () => { paint = null; };
+  el.onmouseleave = () => { paint = null; untip(); };
 
   el.onchange = async e => {
     const input = e.target, file = input.matches('[data-file]') && input.files[0], v = open();
