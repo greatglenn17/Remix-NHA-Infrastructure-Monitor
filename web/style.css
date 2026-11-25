@@ -595,8 +595,11 @@ span.file.gone { text-decoration: none; }
 .apa-tools { align-items: end; margin-bottom: 6px; }
 .apa-tools .text-btn.danger { margin: 0 0 0 auto; } /* the New abstract form's Discard */
 /* Delete sits at the foot of the abstract it deletes, under a hairline, never on the New abstract row. */
-.apa-foot { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
-.apa-foot .text-btn.danger { margin: 0 -8px 0 0; }
+/* The card's one closing row: where the abstract came from, then the two prints and Delete as outlined buttons at the right. */
+.apa-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.apa-foot p { flex: 1 1 240px; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.apa-foot p b { color: var(--text); font-weight: 600; }
+.apa-foot .text-btn.danger { margin: 0; border-color: var(--behind-line); }
 .apa-tools + p { min-height: 16px; margin-bottom: 12px; }
 .apa-part { padding: 0 16px; min-width: 0; container-type: inline-size; } /* min-width: a table too wide scrolls inside its card instead of widening the page */
 /* On a laptop or wider the 15 columns fit their card with nothing to scroll: the type follows the card's width (down
@@ -621,7 +624,8 @@ div.apa-part { padding-top: 16px; }
 /* The tab's target / actual / advance or slippage table, and the boxes typed above the printed billing abstract. */
 /* The standing and the lots-and-units tables side by side where both fit, not one over the other with the right half empty. */
 .apa-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 32px; }
-.apa-pair > * { flex: 0 1 520px; min-width: 0; }
+.apa-pair > * { flex: 1 1 520px; min-width: 0; } /* each takes half the card, so the second one ends at the card's right edge */
+.apa-pair .apa-standing { max-width: none; }
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
 .apa-standing thead th { white-space: normal; } /* "Plan on" over its date */
@@ -661,7 +665,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .month > p { margin-bottom: 12px; }
 
 /* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
-.bill-sum, .apa-file { max-width: 560px; }
+.bill-sum { max-width: 560px; }
 /* From 900px the summary is a one-row table across the card (user, 2026-11-25); under it, label-and-amount rows: four amounts do not fit a phone. */
 .bill-table { display: none; margin-bottom: 8px; }
 .bill-table table { table-layout: fixed; }
@@ -810,8 +814,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .danger { margin: 0 0 0 auto; }
 /* The plan's actions are outlined buttons, and Plan setup opens its tools as one tight row of them under the toolbar,
    Delete plan last in rose (user, 2026-11-25: they must read as buttons, with no dead space). */
-.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
+.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
+.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
 .lots-head .lots-links { gap: 8px; }
 .plan-panel { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .plan-panel[hidden] { display: none; }

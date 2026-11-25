@@ -4096,10 +4096,10 @@ function actualBody(c) {
   return `${tools}<div class="stack">
     ${section(`As of ${L.displayDate(shown.asOf)}`, 'assignment', `
       <div class="apa-pair"><div>${standingTable(c, shown, units && 'In percent')}</div>${units}</div>
-      <div class="apa-file">${kv('File', shown.fileName || 'Made in the app')}${kv(shown.fileName ? 'Uploaded by' : 'Made by', shown.uploadedBy)}</div>
-      <div class="lots-links"><a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
-        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a></div>
-      ${editable ? `<div class="apa-foot"><button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button></div>` : ''}`)}
+      <div class="apa-foot"><p class="muted small">File: <b>${esc(shown.fileName || 'Made in the app')}</b> · ${shown.fileName ? 'Uploaded by' : 'Made by'}: <b>${esc(shown.uploadedBy || '-')}</b></p>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/abstract-${esc(shown.asOf)}">${icon('print', 'sm')}Print abstract</a>
+        <a class="text-btn" href="#/p/${esc(c.page.id)}/print/apa-${esc(shown.asOf)}">${icon('print', 'sm')}Print billing abstract</a>
+        ${editable ? `<button class="text-btn danger" id="abstract-delete">${icon('delete', 'sm')}Delete this abstract</button>` : ''}</div>`)}
     ${P.abstractItemsHtml(L.abstractRows(shown.rowsJson))}</div>`;
 }
 
