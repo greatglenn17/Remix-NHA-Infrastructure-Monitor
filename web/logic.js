@@ -2648,6 +2648,54 @@ export function colorWork(draft, k, work) {
 export const dropColor = (draft, k) => ({ ...draft, colors: draft.colors.filter((_, j) => j !== k),
   items: draft.items.map(i => ({ ...i, marks: i.marks.filter(m => m[2] !== k).map(([a, b, j]) => [a, b, j > k ? j - 1 : j]) })) });
 
+// Day ranges from day `from` on moved by `n` days; one that spans `from` is cut there and its later part moved.
+const shiftDays = (ranges, from, n) => ranges.flatMap(([s, e, ...k]) => (s >= from ? [[s + n, e + n, ...k]] : e < from ? [[s, e, ...k]] : [[s, from - 1, ...k], [from + n, e + n, ...k]]));
+const itemBars = item => item.bars.map(draftBar).filter(Boolean);
+const withDays = (item, bars, marks) => ({ ...item, bars: draftItems([{ bars }])[0].bars, marks });
+
+/**
+ * A suspension drawn on a draft item: days `a` to `b` are put in as days of colour `k` (one with no work), and the
+ * item's work and coloured days from day `a` on move later by as many days, so no day of work is lost. With no `k`
+ * the days put in are left blank (an empty month). The item is left as it is where that would pass the last day a
+ * chart holds.
+ */
+export function insertDays(item, a, b, k) {
+  const n = b - a + 1, bars = itemBars(item);
+  if (Math.max(b, ...bars.map(x => x[1]), ...item.marks.map(m => m[1])) + n > LAST_DAY) return item;
+  return withDays(item, shiftDays(bars, a, n), joinDays([...shiftDays(item.marks, a, n), ...(k == null ? [] : [[a, b, k]])]));
+}
+
+/**
+ * insertDays taken back: days `a` to `b` are taken out of the item and what is after them moves earlier. Null where
+ * the item works on one of those days: no day of work is taken out this way.
+ */
+export function removeDays(item, a, b) {
+  const n = b - a + 1, bars = itemBars(item);
+  if (bars.some(([s, e]) => s <= b && e >= a)) return null;
+  return withDays(item, joinDays(shiftDays(bars, b + 1, -n)), joinDays(shiftDays(cutDays(item.marks, a, b), b + 1, -n)));
+}
+
+/**
+ * The sheet's Whole project row, a suspension of every item: painted with a colour of no work (`tool` is its index),
+ * days `a` to `b` are put into each item that still has work on or after day `a` (insertDays); with 'erase' they are
+ * taken out of each item that does not work on them (removeDays). With no `tool` the days put in are blank: the +
+ * on a month's heading, an empty month.
+ */
+export const suspendDays = (items, a, b, tool) => items.map(i => (tool === 'erase' ? removeDays(i, a, b) ?? i : itemBars(i).some(x => x[1] >= a) ? insertDays(i, a, b, tool) : i));
+
+/** What the Whole project row shows on each of `days` days: the colour of no work that an item has there, or null. `version` is as saved. */
+export function suspendedFills(version, colors, days) {
+  const out = Array(days).fill(null);
+  for (const item of version.items) dayFills(item, colors, days).forEach((k, d) => { if (Number.isInteger(k) && !colors[k].work) out[d] ??= k; });
+  return out;
+}
+
+/** The months (from 0) of a draft chart's items that can be taken out: no item has a day of work or a coloured day in one, and an item has one after it. */
+export function emptyMonths(items) {
+  const used = items.flatMap(i => [...itemBars(i), ...i.marks]), months = Math.ceil(Math.max(0, ...used.map(x => x[1])) / MONTH_DAYS);
+  return Array.from({ length: months }, (_, m) => m).filter(m => !used.some(([s, e]) => s <= (m + 1) * MONTH_DAYS && e > m * MONTH_DAYS));
+}
+
 /** The last contract day a saved chart draws: its last bar, or a coloured day after it. */
 export const chartSpan = v => Math.max(chartLastDay(v), ...(v.items || []).flatMap(i => itemMarks(i).map(m => m[1])));
 

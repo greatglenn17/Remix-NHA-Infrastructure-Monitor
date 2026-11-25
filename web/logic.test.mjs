@@ -1092,6 +1092,42 @@ test('bar chart sheet: days are painted as work, in a colour or cleared, bars th
   assert.deepEqual(L.chartTotalNote(1, 5600000, priced, []), { ok: false, text: 'Chart total ₱5,600,000.00: ₱600,000.00 more than the contract (₱5,000,000.00).' });
 });
 
+test('bar chart suspension: days of no work are put into an item or the whole project, the later work moves, and taking them out moves it back', () => {
+  const made = (name, ...bars) => L.draftItems([{ name, amount: 1, bars }])[0];
+  const colors = [{ name: 'Suspension No. 1', color: '#FFD966', work: false }];
+  const saved = items => L.draftVersion({ label: 'Revised No. 1', effective: '2026-06-01', colors, items }).items.map(i => [i.name, i.bars, i.marks ?? []]);
+  // One item: days 41 to 70 are the suspension, so the 40 days of work left start on day 71; its 61 days of work are still 61.
+  const running = L.insertDays(made('Running', [20, 80]), 41, 70, 0);
+  assert.deepEqual(saved([running]), [['Running', [[20, 40], [71, 110]], [[41, 70, 0]]]]);
+  // A second suspension inside the first's later work moves that again, and the first suspension stays where it is.
+  assert.deepEqual(saved([L.insertDays(running, 81, 90, 0)]), [['Running', [[20, 40], [71, 80], [91, 120]], [[41, 70, 0], [81, 90, 0]]]]);
+  // Taken out, the work is back as it was; days the item works on are not taken out this way.
+  assert.deepEqual(L.removeDays(running, 41, 70), made('Running', [20, 80]));
+  assert.equal(L.removeDays(running, 35, 70), null);
+  // The whole project: an item finished before the suspension is left alone; one under way is cut; one not started moves whole.
+  const items = [made('Done', [1, 30]), made('Running', [20, 80]), made('Later', [90, 120])];
+  const suspended = L.suspendDays(items, 41, 70, 0);
+  assert.deepEqual(saved(suspended), [['Done', [[1, 30]], []], ['Running', [[20, 40], [71, 110]], [[41, 70, 0]]], ['Later', [[120, 150]], [[41, 70, 0]]]]);
+  const version = L.draftVersion({ label: 'Revised No. 1', effective: '2026-06-01', colors, items: suspended });
+  assert.deepEqual(L.suspendedFills(version, colors, 72).slice(38), [null, null, ...Array(30).fill(0), null, null]); // what the Whole project row shows
+  assert.equal(L.sheetMonths({ label: 'R', effective: '', colors, items: suspended }, 120), 5); // the months follow the work moved later
+  assert.deepEqual(L.suspendDays(suspended, 41, 70, 'erase'), items);
+  // Erasing on the Whole project row never takes work out: an item that works on those days is left as it is.
+  assert.deepEqual(saved(L.suspendDays(suspended, 31, 40, 'erase')), [['Done', [[1, 30]], []], ['Running', [[20, 40], [71, 110]], [[41, 70, 0]]], ['Later', [[110, 140]], [[31, 60, 0]]]]);
+  // A chart holds 120 months: work that would pass them is left where it is.
+  const far = made('Far', [3500, 3590]);
+  assert.equal(L.insertDays(far, 3400, 3420, 0), far);
+  // An empty month put before month 2 (the + on its heading): the later work moves a month and the days put in have no colour.
+  const gap = L.suspendDays(items, 31, 60, null);
+  assert.deepEqual(saved(gap), [['Done', [[1, 30]], []], ['Running', [[20, 30], [61, 110]], []], ['Later', [[120, 150]], []]]);
+  // Month 2 is now empty and can be taken out, which moves the work back; a month with work or a coloured day in it cannot.
+  assert.deepEqual(L.emptyMonths(gap), [1]);
+  assert.deepEqual(L.suspendDays(gap, 31, 60, 'erase'), items);
+  assert.deepEqual(L.emptyMonths(items), []);
+  assert.deepEqual(L.emptyMonths([made('Late', [61, 90])]), [0, 1]);
+  assert.deepEqual(L.emptyMonths([L.insertDays(made('Late', [31, 60]), 31, 60, 0)]), [0]); // month 2 is a suspension, not empty
+});
+
 test('bar chart editor: drafts from the scope or the saved chart, bars as month and day, the errors and what is saved', () => {
   const scope = JSON.stringify([{ name: 'Land development', amount: 3000000, weightPct: 60 }, { name: 'Housing units', amount: 2000000, weightPct: 40 }]);
   const project = { projectUuid: 'p1', assignedUids: ['u1'], dateStarted: '2026-01-05', scopeOfWork: scope, contractCostOriginal: 5000000, barChartJson: '' };
