@@ -1031,22 +1031,24 @@ test('delete project: the Super Admin, or an Engineer Admin assigned to it, and 
     { projectUuid: 'p1', isDeleted: true, updatedAt: 1794292093231, updatedByUid: 'u1' });
 });
 
-test('bar chart editor: drafts from the scope or the saved chart, bars as month and cell, the errors and what is saved', () => {
+test('bar chart editor: drafts from the scope or the saved chart, bars as month and day, the errors and what is saved', () => {
   const scope = JSON.stringify([{ name: 'Land development', amount: 3000000, weightPct: 60 }, { name: 'Housing units', amount: 2000000, weightPct: 40 }]);
   const project = { projectUuid: 'p1', assignedUids: ['u1'], dateStarted: '2026-01-05', scopeOfWork: scope, contractCostOriginal: 5000000, barChartJson: '' };
   // No chart yet: one "Original" chart of the scope items from the start date, each with an empty bar; nothing to save until the bars read.
   const fresh = L.chartDrafts(project);
   assert.deepEqual(fresh, [{ label: 'Original', effective: '2026-01-05', items: [
-    { name: 'Land development', amount: 3000000, bars: [{ sm: '', sc: '', em: '', ec: '' }] }, { name: 'Housing units', amount: 2000000, bars: [{ sm: '', sc: '', em: '', ec: '' }] }] }]);
-  assert.deepEqual(L.chartErrors(fresh, project, []), ['Original: check the bars of Land development, Housing units (month 1+, cell 5, 10 … 30)']);
+    { name: 'Land development', amount: 3000000, bars: [{ sm: '', sd: '', em: '', ed: '' }] }, { name: 'Housing units', amount: 2000000, bars: [{ sm: '', sd: '', em: '', ed: '' }] }] }]);
+  assert.deepEqual(L.chartErrors(fresh, project, []), ['Original: check the bars of Land development, Housing units (month 1+, day 1 to 30)']);
   assert.equal(L.chartDrafts({ ...project, dateStarted: '' }), null);
-  // A bar: From month 1 cell 5 is day 1; To month 8 cell 30 is day 240.
-  assert.deepEqual(L.draftBar({ sm: '1', sc: '5', em: '8', ec: '30' }), [1, 240]);
-  assert.deepEqual(L.draftBar({ sm: ' 5 ', sc: '5', em: '18', ec: '30' }), [121, 540]);
-  assert.deepEqual([{ sm: '0', sc: '5', em: '2', ec: '30' }, { sm: '1', sc: '7', em: '2', ec: '30' }, { sm: '3', sc: '5', em: '2', ec: '30' }, { sm: '1', sc: '5', em: 'x', ec: '30' },
-    { sm: '1', sc: '35', em: '2', ec: '30' }, { sm: '1.5', sc: '5', em: '2', ec: '30' }].map(L.draftBar), [null, null, null, null, null, null]);
-  fresh[0].items[0].bars[0] = { sm: '1', sc: '5', em: '8', ec: '30' };
-  fresh[0].items[1].bars = [{ sm: '5', sc: '5', em: '18', ec: '30' }];
+  // A bar: From month 1 day 1 is day 1; To month 8 day 30 is day 240. A revised chart's bars start and end on any day.
+  assert.deepEqual(L.draftBar({ sm: '1', sd: '1', em: '8', ed: '30' }), [1, 240]);
+  assert.deepEqual(L.draftBar({ sm: ' 5 ', sd: '1', em: '18', ed: '30' }), [121, 540]);
+  assert.deepEqual(L.draftBar({ sm: '10', sd: '6', em: '10', ed: '26' }), [276, 296]);
+  assert.deepEqual(L.draftBar({ sm: '2', sd: '7', em: '2', ed: '7' }), [37, 37]);
+  assert.deepEqual([{ sm: '0', sd: '1', em: '2', ed: '30' }, { sm: '1', sd: '0', em: '2', ed: '30' }, { sm: '3', sd: '1', em: '2', ed: '30' }, { sm: '1', sd: '1', em: 'x', ed: '30' },
+    { sm: '1', sd: '31', em: '2', ed: '30' }, { sm: '1.5', sd: '1', em: '2', ed: '30' }, { sm: '2', sd: '8', em: '2', ed: '7' }].map(L.draftBar), [null, null, null, null, null, null, null]);
+  fresh[0].items[0].bars[0] = { sm: '1', sd: '1', em: '8', ed: '30' };
+  fresh[0].items[1].bars = [{ sm: '5', sd: '1', em: '18', ed: '30' }];
   assert.deepEqual(L.chartErrors(fresh, project, []), []);
   const json = L.chartJson(fresh);
   assert.equal(json, '[{"label":"Original","effective":"2026-01-05","items":[{"name":"Land development","amount":3000000,"bars":[[1,240]]},{"name":"Housing units","amount":2000000,"bars":[[121,540]]}]}]');
@@ -1069,14 +1071,27 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
   const vo = [{ documentName: 'Variation Order No. 1 (Additive) - PHP 500,000.00', status: 'Approved' }];
   two[1].label = 'Revised No. 1';
   assert.deepEqual(L.chartErrors(two, saved, vo), []);
+  // A revised chart's items can be renamed, added and removed: each needs a name of its own, and the chart an item.
+  two[1].items.push({ ...L.emptyItem(), bars: [{ sm: '1', sd: '1', em: '1', ed: '30' }] });
+  assert.deepEqual(L.chartErrors(two, saved, vo), ['Revised No. 1: name every item']);
+  two[1].items[2].name = ' Housing units ';
+  assert.deepEqual(L.chartErrors(two, saved, vo), ['Revised No. 1: two items are named Housing units']);
+  two[1].items[2].name = ' Drainage ';
+  two[1].items[1].amount = 2000000;
+  two[1].items[2].amount = 500000;
+  assert.deepEqual(L.chartErrors(two, saved, vo), []);
+  assert.deepEqual(JSON.parse(L.chartJson(two))[1].items[2], { name: 'Drainage', amount: 500000, bars: [[1, 30]] });
+  assert.deepEqual(L.chartErrors([two[0], { ...two[1], items: [] }], saved, vo), ['Revised No. 1: add an item, or import the Excel file']);
+  // The original's names are not typed, so two of a name from an Excel file do not keep Save off.
+  assert.deepEqual(L.chartErrors([{ ...two[0], items: [two[0].items[0], { ...two[0].items[1], name: 'Land development' }] }], saved, []), []);
   assert.deepEqual(L.chartErrors([{ label: 'Original', effective: '2026-01-05', items: [] }], { ...project, scopeOfWork: '' }, []), ['Original: import the Excel file, or add the Scope of Works items to the project first']);
   // An imported sheet (chart-excel.js) replaces a chart's items; its notes say what was read and where a bar is not its Duration.
   const sheet = { name: 'Revised', items: [{ name: 'Mobilization', amount: 1000, bars: [[1, 10], [41, 45]] }, { name: 'Earthworks', amount: 3000.5, bars: [[11, 40]] }, { name: 'Turnover', amount: 999.5, bars: [] }],
     durations: { Mobilization: 10, Earthworks: 30 } };
   assert.deepEqual(L.draftItems(sheet.items), [
-    { name: 'Mobilization', amount: 1000, bars: [{ sm: '1', sc: '5', em: '1', ec: '10' }, { sm: '2', sc: '15', em: '2', ec: '15' }] },
-    { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sc: '15', em: '2', ec: '10' }] },
-    { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sc: '', em: '', ec: '' }] }]);
+    { name: 'Mobilization', amount: 1000, bars: [{ sm: '1', sd: '1', em: '1', ed: '10' }, { sm: '2', sd: '11', em: '2', ed: '15' }] },
+    { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sd: '11', em: '2', ed: '10' }] },
+    { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sd: '', em: '', ed: '' }] }]);
   assert.deepEqual(L.importNotes(sheet), ['Read 3 items from the sheet "Revised".', 'Mobilization: the bar covers 15 days but its Duration says 10.']);
   assert.deepEqual([[0, 5000000], [0, 5500000], [1, 5500000], [1, 5000000], [1, 5200000]].map(([i, total]) => L.chartTotalMatches(i, total, project, vo)), [true, false, true, true, false]);
   assert.equal(L.chartJson([]), '');

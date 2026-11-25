@@ -65,6 +65,12 @@ object BarChart {
         return (d / MONTH_DAYS + 1) to ((d % MONTH_DAYS) / CELL_DAYS + 1) * CELL_DAYS
     }
 
+    /** Month and day of the month (1 … 30) holding contract [day], as the bar chart form enters a bar's ends. */
+    fun monthDayOf(day: Int): Pair<Int, Int> {
+        val d = day.coerceAtLeast(1) - 1
+        return (d / MONTH_DAYS + 1) to (d % MONTH_DAYS + 1)
+    }
+
     /** Versions in effective-date order; blank or unreadable JSON is no chart. */
     fun parse(json: String): List<Version> = runCatching {
         val arr = JSONArray(json)

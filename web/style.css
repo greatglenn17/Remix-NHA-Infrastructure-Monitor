@@ -787,6 +787,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
 .bb table.apa-info td:nth-child(3) { width: 100%; }
 .bb table.apa { font-size: 7.5pt; }
+.bb svg.chart { display: block; width: 100%; height: auto; margin-top: 2mm; }
 .bb table.apa th, .bb table.apa td { padding: 1mm 0.8mm; }
 .bb.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
 .bb.full h1 { font-size: 16pt; margin: 1mm 0 0; }

@@ -72,6 +72,36 @@ test('bar chart Excel: the items, their bars from the yellow cells, and the Dura
   assert.deepEqual(sheets[0].durations, { Mobilization: 10, 'Earthworks & grading': 30 });
 });
 
+// The office's sheet: B items, C description, F cost, I no. of days, J.. the day cells (J = 1st Month, days 1-5). A bar's
+// stretch holds the month's share of the item in its first cell; the red cells are a suspension.
+const office = `<worksheet><sheetData>
+  <row r="49"><c r="B49" t="s"><v>0</v></c><c r="C49" t="s"><v>1</v></c><c r="F49" t="s"><v>2</v></c><c r="I49" t="s"><v>3</v></c><c r="J49" t="s"><v>4</v></c></row>
+  <row r="50"><c r="J50"><v>5</v></c><c r="K50"><v>10</v></c></row>
+  <row r="51"><c r="C51" t="s"><v>5</v></c><c r="F51"><v>2000</v></c><c r="I51"><v>45</v></c>
+      <c r="N51" s="1"><v>0.10</v></c><c r="O51" s="1"/><c r="P51" s="3"/><c r="Q51" s="3"/>
+      <c r="R51" s="1"><v>0.21</v></c><c r="V51" s="1"><v>0.14</v></c><c r="AZ51"><v>0.45</v></c></row>
+  <row r="52"><c r="C52" t="s"><v>6</v></c><c r="P52" s="3"/></row>
+  <row r="53"><c r="C53" t="s"><v>7</v></c><c r="F53"><v>500</v></c><c r="I53"><v>5</v></c><c r="Y53" s="1"><v>0.05</v></c><c r="AZ53"><v>0.05</v></c></row>
+  <row r="54"><c r="B54" t="s"><v>8</v></c><c r="F54"><v>2500</v></c></row>
+  <row r="55"><c r="B55" t="s"><v>9</v></c><c r="F55"><v>1</v></c><c r="J55" s="1"><v>0.1</v></c></row>
+  </sheetData><mergeCells><mergeCell ref="N51:O51"/><mergeCell ref="R51:U51"/><mergeCell ref="V51:X51"/></mergeCells></worksheet>`;
+
+test('bar chart Excel: the office layout, a bar\'s days from the shares written in it, the suspension colours left out', async () => {
+  const sheets = await readChartWorkbook(zip({ ...parts,
+    'xl/sharedStrings.xml': `<sst><si><t>ITEMS</t></si><si><t>DESCRIPTION</t></si><si><t>COST (PHP)</t></si><si><t>NO. OF DAYS</t></si><si><t>1st Month</t></si>
+      <si><t>SITE PREPARATIONS</t></si><si><t>LAND DEVELOPMENT</t></si><si><t>TURNOVER</t></si><si><t>GRAND TOTAL</t></si><si><t>MONTHLY ACCOMPLISHMENT</t></si></sst>`,
+    // as above, and fill 4 red: xf 3
+    'xl/styles.xml': parts['xl/styles.xml'].replace('</fills>', '<fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill></fills>').replace('</cellXfs>', '<xf fillId="4"/></cellXfs>'),
+    'xl/worksheets/sheet2.xml': office }));
+  assert.deepEqual(sheets[0].items, [
+    // 45 days as 10, 21 and 14: N-O is cells 25-30 of month 1, days 21-30; R-U is drawn as 20 days from day 41, so its 21
+    // end with month 2, days 40-60; V-X follows from day 61 for 14 days, one bar with the stretch before it.
+    { name: 'SITE PREPARATIONS', amount: 2000, bars: [[21, 30], [40, 74]] },
+    { name: 'TURNOVER', amount: 500, bars: [[76, 80]] }, // one cell; the heading above it has no cost, the rows from the total on are not items
+  ]);
+  assert.deepEqual(sheets[0].durations, { 'SITE PREPARATIONS': 45, TURNOVER: 5 });
+});
+
 test('bar chart Excel: what is not a workbook is refused', async () => {
   await assert.rejects(readChartWorkbook(new TextEncoder().encode('not a zip')), NotAnExcelFile);
   await assert.rejects(readChartWorkbook(new Uint8Array(64)), NotAnExcelFile);

@@ -626,3 +626,35 @@ test('a part that is its own pay item shows its quantity and figures under its h
     { kind: 'subtotal', no: '', name: 'Subtotal (Land Acquisition Cost)', qty: null, unit: '', unitCost: null, amount: 33930260, prev: none, period: none, toDate: [null, 27405210, 80.77], balance: [null, null], equiv: none }]);
   assert.match(html, /<tr class="apa-item"><td>1<\/td><td>LAND ACQUISITION COST<\/td><td class="num">520<\/td><td>LOT<\/td>/);
 });
+
+test('bar chart print: bars to the day, each month\'s share, the S-curve, the cash flow rows and five signers', () => {
+  // Two 30-day months share the 176 mm right of the 109 mm of columns: a month is 88 mm and a day 88/30; rows are 6 mm under a 9 mm head.
+  const version = { label: 'Revised No. 1', effective: '2026-06-01', items: [{ name: 'Roads & <drainage>', amount: 600, bars: [[1, 30]] }, { name: 'Housing', amount: 400, bars: [[21, 30], [36, 45]] }] };
+  const svg = P.barChartSvg(version, 40);
+  assert.match(svg, /<rect x='109' y='10' width='88' height='4' fill='#92D050'\/>/); // Roads: all of month 1
+  assert.match(svg, /<rect x='167\.67' y='16' width='29\.33' height='4'/); // Housing: days 21-30
+  assert.match(svg, /<rect x='211\.67' y='16' width='29\.33' height='4'/); // and days 36-45, between the 5-day cells
+  assert.ok(svg.includes('>Roads &amp; &lt;drainage&gt;</text>') && svg.includes('>1st Month</text>') && svg.includes('>2nd Month</text>'));
+  // Roads is 60% of the project in month 1; Housing 20% in each month, which is also month 2's accomplishment.
+  assert.equal(svg.split('>60.00%</text>').length - 1, 2); // its percent column and its share on the bar
+  assert.equal(svg.split('>20.00%</text>').length - 1, 3);
+  for (const figure of ['80.00%', '100.00%', '800.00', '200.00', '1,000.00', 'TOTAL COST', 'CUMULATIVE CASHFLOW (PHP)']) assert.ok(svg.includes(`>${figure}</text>`), figure);
+  assert.ok(svg.includes('>40</text>')); // the total's days are the contract duration handed in
+  assert.match(svg, /points='109,21 197,11\.4 285,9'/); // the S-curve: 0%, 80%, 100% from the bottom of the bars to the top
+  // Twenty-one months: 8.38 mm each, so a month is headed by its number and a cash figure is squeezed into its column.
+  const long = P.barChartSvg({ items: [{ name: 'Housing', amount: 73112000, bars: [[1, 630]] }] });
+  assert.ok(long.includes('>21</text>') && !long.includes('Month</text>'));
+  assert.match(long, /textLength='7\.38' lengthAdjust='spacingAndGlyphs'>73,112,000\.00</);
+  assert.match(P.barChartSvg({ items: [] }), /^<svg /); // nothing to draw is still a sheet
+
+  const project = { name: 'P & Q', location: 'L', contractor: 'C', contractDurationDays: 215, dateStarted: '2024-12-10', completionDateOriginal: '2025-07-12', completionDateRevised: '2026-01-15' };
+  const sheet = index => P.barChartHtml({ project, docs: [], version, index, signatories: P.billingSignatories(project, { name: 'Juan' }) });
+  assert.match(sheet(1), /<div class='period'>Revised No\. 1 &#183; from June 1, 2026<\/div>/);
+  assert.match(sheet(0), /<div class='period'>Revised No\. 1<\/div>/);
+  assert.match(sheet(0), /CONTRACT PERIOD<\/td><td>: December 10, 2024 - July 12, 2025</);
+  assert.match(sheet(1), /CONTRACT PERIOD<\/td><td>: December 10, 2024 - January 15, 2026</);
+  assert.match(sheet(1), /PROJECT TITLE<\/td><td class='pc'>:<\/td><td>P &amp; Q<\/td><td class='pl'>CONTRACT COST<\/td><td>: Php 1,000\.00</);
+  assert.deepEqual(sheet(1).match(/(Prepared by|Checked by|Reviewed by|Recommending Approval|Approved by):/g), ['Prepared by:', 'Checked by:', 'Reviewed by:', 'Recommending Approval:', 'Approved by:']);
+  assert.match(sheet(1), /<b>JUAN<\/b>/);
+  assert.ok(sheet(0).includes('>215</text>') && !sheet(1).includes('>215</text>')); // the contract duration under the original's days only
+});
