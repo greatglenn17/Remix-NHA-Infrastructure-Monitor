@@ -4397,7 +4397,9 @@ function lettersCard(letters, editable = false) {
 /** DeveloperRequestsCard: requests not yet packaged stand out, with the days since NHA received them; `editable` adds Add request and Edit. */
 function requestsCard(requests, now, editable = false, payments = []) {
   const add = editable ? `<button class="text-btn" id="request-add">${icon('add_circle', 'sm')}Add request</button>` : '';
-  return section('Developer requests', 'move_to_inbox', requests.length ? requests.map(r => {
+  // Newest received first, like ProjectDao's ORDER BY dateReceived DESC.
+  const newest = [...requests].sort((a, b) => (b.dateReceived || '').localeCompare(a.dateReceived || ''));
+  return section('Developer requests', 'move_to_inbox', newest.length ? newest.map(r => {
     const waiting = ISO.test(r.dateReceived || '') ? Math.round((Date.parse(now) - Date.parse(r.dateReceived)) / 86400000) : null;
     const title = L.requestTitle(r), billed = r.requestType === L.BILLING_REQUEST && payments.find(p => p.uuid && p.uuid === r.paymentUuid);
     return entry(title, [
