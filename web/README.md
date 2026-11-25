@@ -369,7 +369,9 @@ is read only.
   takes the clicked day out the same way and moves the work back, unless there is work on it. **Undo** takes back
   the presses on the sheet one at a time (a column, or days painted; the page keeps the last 50), until anything
   else on the chart is changed. Pointing at a day shows it and the project's planned % by the end of it
-  (`L.chartPctOn`, the S-curve to the day), for viewers too.
+  (`L.chartPctOn`, the S-curve to the day), for viewers too. The sheet's headings are dates counted from the
+  start date (`L.chartDayDate`): each month's 30 days as a range, and every fifth day as the date it falls on. The
+  print keeps the office form's 1st Month and 5 to 30.
   The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised chart's date,
   bars that read, on a revised chart a name of its own for every item (a Partial suspension and the item targets go
   by name), and a name for every colour. The original chart totals the original contract, a revised one the original

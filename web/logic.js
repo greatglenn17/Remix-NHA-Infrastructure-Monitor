@@ -149,6 +149,12 @@ export function cellOf(day) {
   return [Math.floor(d / MONTH_DAYS) + 1, (Math.floor((d % MONTH_DAYS) / CELL_DAYS) + 1) * CELL_DAYS];
 }
 
+/** The calendar date (yyyy-MM-dd) of contract `day` of a project started on `start`, which is day 1; null where the start date does not read. */
+export function chartDayDate(start, day) {
+  const t = isoDay(start);
+  return t == null ? null : new Date(t + (day - 1) * DAY).toISOString().slice(0, 10);
+}
+
 /** The planned accomplishment (%) of a chart by the end of contract `day`, each item's amount spread evenly over its bars' days: the S-curve to the day. */
 export function chartPctOn(v, day) {
   const total = chartTotal(v);
