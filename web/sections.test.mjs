@@ -666,13 +666,18 @@ test('bar chart print: bars to the day, each month\'s share, the S-curve, the ca
   assert.match(whole, /width='9\.78' height='4' fill='#FF7C80'\/>/);
   assert.ok(whole.includes('>Work</text>') && whole.includes('>Suspension &lt;1&gt; (no work)</text>') && whole.includes('>VO 1</text>'));
   assert.ok(!svg.includes('>Work</text>')); // no legend on a chart without a colour
-  // Cut into pages of two months: the second page draws month 3 at the first page's scale, with the item columns and the rows under the total again.
-  const pages = P.barChartPages({ project, docs: [], version: coloured, index: 1, per: 2, signatories: P.billingSignatories(project, { name: 'Juan' }) });
+  // One long sheet on two pages to tape side by side: 570 mm, and each page is its own 285 mm of the same sheet, so the project, every month and the signers run across both.
+  const pages = P.barChartPages({ project, docs: [], version: coloured, index: 1, pages: 2, signatories: P.billingSignatories(project, { name: 'Juan' }) });
   assert.equal(pages.length, 2);
-  assert.ok(pages[0].includes('Months 1 to 2 &#183; Page 1 of 2') && pages[0].includes('PROJECT TITLE') && !pages[0].includes('Prepared by:'));
-  assert.ok(pages[1].includes('Months 3 to 3 &#183; Page 2 of 2') && !pages[1].includes('PROJECT TITLE') && pages[1].includes('Prepared by:'));
-  assert.ok(pages[0].includes('>1st Month</text>') && !pages[0].includes('>3rd Month</text>') && pages[1].includes('>3rd Month</text>') && !pages[1].includes('>1st Month</text>'));
-  assert.match(pages[1], /<rect x='109' y='10' width='29\.33' height='4' fill='#92D050'\/>/); // days 61-70 start the page
-  assert.ok(pages.every(p => p.includes('>Roads</text>') && p.includes('CUMULATIVE CASHFLOW (PHP)') && p.includes('>Work</text>')));
-  assert.equal(P.barChartPages({ project, docs: [], version: coloured, index: 1, per: 6, signatories: {} }).length, 1); // fewer months than a page holds
+  assert.ok(pages[0].includes("<div style='width:570mm;margin-left:0mm'>") && pages[1].includes("<div style='width:570mm;margin-left:-285mm'>"));
+  assert.equal(pages[0].replace('margin-left:0mm', 'margin-left:-285mm'), pages[1]);
+  assert.ok(pages[0].includes('PROJECT TITLE') && pages[0].includes('Prepared by:') && pages[0].includes('>1st Month</text>') && pages[0].includes('>3rd Month</text>'));
+  assert.match(pages[0], /viewBox='0 0 570 /);
+  assert.match(pages[0], /<rect x='416\.33' y='10' width='51\.22' height='4' fill='#92D050'\/>/); // 3 months share 461 mm: days 61-70
+  // A sheet too tall for the page is drawn wider, to be shrunk onto it: 300 mm pages of a 600 mm sheet.
+  const wider = P.barChartPages({ project, docs: [], version: coloured, index: 1, pages: 2, wide: 300, signatories: {} });
+  assert.ok(wider[1].includes("<div class='tile' style='width:300mm'><div style='width:600mm;margin-left:-300mm'>") && wider[1].includes("viewBox='0 0 600 "));
+  // Left to itself: a page for every eight months.
+  assert.equal(P.barChartPages({ project, docs: [], version: coloured, index: 1, signatories: {} }).length, 1);
+  assert.equal(P.barChartPages({ project, docs: [], version: { items: [{ name: 'A', amount: 1, bars: [[1, 270]] }] }, index: 0, signatories: {} }).length, 2);
 });
