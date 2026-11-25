@@ -1490,7 +1490,7 @@ function chartState(c) {
   const saved = L.chartDrafts(c.project);
   if (!saved) return (c.page.chart = null);
   const drafts = (L.canEditChart(c.project, s.user.uid, s.claims) && L.keptChart(kept(c, 'chart-draft'), base)) || saved;
-  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true, colNote: '' });
+  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true, colNote: '', undo: [], help: false });
 }
 
 function chartBody(c) {
@@ -1508,10 +1508,11 @@ function chartPalette(st, v) {
   const picked = v.colors[st.tool];
   return `<div class="bc-tools"><b>Paint with</b><div class="chips" role="group" aria-label="Paint with">${tool('work', `${swatch(WORK_GREEN)}Work`)}
       ${v.colors.map((x, k) => tool(k, `${swatch(x.color)}<span>${esc(colorName(x))}</span>`)).join('')}${tool('erase', `${icon('close', 'sm')}Erase`)}
-      ${tool('column', `${icon('add_circle', 'sm')}Add column`)}${tool('uncolumn', `${icon('delete', 'sm')}Remove column`)}</div>
-      <button type="button" class="text-btn" data-bc="add-color" data-add-color>${icon('add_circle', 'sm')}Add colour</button>
-      <label class="check"><input type="checkbox" data-bc="push" data-push${st.push ? ' checked' : ''}>Days with no work move the later work</label>
-      <span class="small" data-col-note aria-live="polite">${esc(st.colNote)}</span></div>
+      ${tool('column', `${icon('add_circle', 'sm')}Add column`)}${tool('uncolumn', `${icon('delete', 'sm')}Remove column`)}
+      <button type="button" data-bc="undo" data-undo${st.undo.length ? '' : ' disabled'}>${icon('history', 'sm')}Undo</button></div>
+      <div class="bc-more"><button type="button" class="text-btn" data-bc="add-color" data-add-color>${icon('add_circle', 'sm')}Add colour</button>
+        <label class="check"><input type="checkbox" data-bc="push" data-push${st.push ? ' checked' : ''}>Days with no work move the later work</label>
+        <span class="small" data-col-note aria-live="polite">${esc(st.colNote)}</span></div></div>
     ${picked ? `<div class="bc-fields"><label class="field">Name of this colour<input data-bc="cname" data-cname placeholder="e.g. Suspension No. 1" value="${esc(picked.name)}"></label>
       <label class="field">Colour<input type="color" data-bc="ccolor" data-ccolor value="${esc(picked.color)}"></label>
       <label class="check"><input type="checkbox" data-bc="cwork" data-cwork${picked.work ? ' checked' : ''}>Work is done on these days</label>
@@ -1525,18 +1526,19 @@ const chartLegend = v => (v.colors.length ? `<span>${swatch(WORK_GREEN)}Work</sp
 function chartPage(c, st, can) {
   const { project } = c, v = st.drafts[st.selected], revised = st.selected > 0;
   const total = items => items.reduce((t, x) => t + x.amount, 0);
-  const under = '<p class="bc-legend" data-legend></p><p class="bc-total" data-total aria-live="polite"></p>';
+  const legend = '<p class="bc-legend" data-legend></p>', sum = '<p class="bc-total" data-total aria-live="polite"></p>';
   return `<div class="bc-tools"><div class="chips" role="group" aria-label="Chart">${st.drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === st.selected}">${esc(chartTabName(st, i))}</button>`).join('')}
       ${can ? `<button type="button" data-add-chart>${icon('add_circle', 'sm')}${st.drafts.length ? 'Revised chart' : 'Add the chart'}</button>` : ''}</div>
+      ${can ? `<button type="button" class="text-btn" data-bc="help" data-help aria-expanded="${st.help}">${icon('info', 'sm')}How to use</button>` : ''}
       ${can && v ? `<button type="button" class="text-btn" data-import>${icon('upload_file', 'sm')}Import Excel</button><input type="file" data-file hidden accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : ''}
       <a class="text-btn" data-print href="#/p/${esc(project.projectUuid)}/print/chart-${st.selected}">${icon('print', 'sm')}Print</a>
       ${can ? `<button type="button" class="btn" data-save>${icon('check_circle', 'sm')}Save</button><button type="button" class="text-btn danger" data-discard>${icon('delete', 'sm')}Discard changes</button>` : ''}</div>
-    ${can ? `<p class="muted small">A cell is a day, and a month is 30 days from the start date. Pick what to paint with, then click a day or drag across an item's row; click a day
+    ${can ? `<p class="muted small" data-help-text${st.help ? '' : ' hidden'}>A cell is a day, and a month is 30 days from the start date. Pick what to paint with, then click a day or drag across an item's row; click a day
       again to clear it. Add a colour for each reason the chart was revised and name it yourself. For a suspension, pick a colour with no work and drag the suspended days on the
       Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
       Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: on the Whole project row
       every item gets an empty day there, on an item's row that item only, and the later work moves a day. Click once for each column you need. Remove column takes a day out
-      the same way, where nothing works on it. An item's cost is spread over its days of work, so the percentages and the
+      the same way, where nothing works on it. Undo takes back the last column added or removed, or the last days painted, one at a time. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1544,15 +1546,16 @@ function chartPage(c, st, can) {
     <ul class="bc-errors" data-errors aria-live="polite"></ul>
     <p class="error" role="alert" data-failed></p>
     ${!v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>'
-      : !can ? `<p class="wk-total">${esc(`${v.label} · from ${L.displayDate(v.effective)}`)}</p><div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${under}` : `
+      : !can ? `<p class="wk-total">${esc(`${v.label} · from ${L.displayDate(v.effective)}`)}</p><div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}${sum}` : `
       <div class="bc-fields"><label class="field">Name<input data-bc="label" data-label value="${esc(v.label)}"></label>
         ${revised ? `<label class="field">Takes effect on<input type="date" data-bc="effective" data-effective value="${esc(v.effective)}"></label>`
-          : `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`}</div>
-      ${revised ? `<p class="muted small">Draw the revised chart from the start date, as approved. Where the approved revision changes the money, change an item's cost, or add and
-        remove items: with a Variation Order the chart must total the revised contract.</p>` : ''}
+          : `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`}
+        ${revised ? `<p class="muted small">Draw the revised chart from the start date, as approved. Where the approved revision changes the money, change an item's cost, or add and
+          remove items: with a Variation Order the chart must total the revised contract.</p>`
+          : '<p class="muted small">The original chart totals the original contract. For a suspension, a time extension or a Variation Order, add a Revised chart and change that one.</p>'}</div>
       <div class="bc-palette" data-palette>${chartPalette(st, v)}</div>
-      <div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${under}
-      <div class="bc-tools">${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
+      <div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}
+      <div class="bc-tools">${sum}${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
         <button type="button" class="text-btn" data-bc="add-month" data-add-month>${icon('add_circle', 'sm')}Add month</button>
         <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${st.drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button></div>`}`;
 }
@@ -1579,7 +1582,7 @@ function chartSheet(c, st, can) {
     `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
     ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
   // A suspension of every item is drawn on this row; it shows the days of no work that an item has.
-  const whole = can ? `<tr data-all><th scope="row" class="bc-name">Whole project<small>Drag a colour with no work here to suspend every item. Add column here is for every item too.</small></th><td></td><td></td><td></td>
+  const whole = can ? `<tr data-all><th scope="row" class="bc-name">Whole project<small>Every item: suspend or add a column here</small></th><td></td><td></td><td></td>
       ${L.suspendedFills(made, v.colors, cells).map((f, k) => `<td class="bc-cell${edge(k)}" data-cell="${k}"${f == null ? '' : ` style="background:${dayColor(f, v.colors)}"`}></td>`).join('')}</tr>` : '';
   const row = (item, i) => {
     const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0), name = made.items[i].name || 'New item';
@@ -1641,6 +1644,7 @@ function bindChart(c) {
     if (whole) days(whole, L.suspendedFills(made, v.colors, months * MONTH_CELLS));
     table.tFoot.innerHTML = chartFoot(v, months);
     el.querySelector(`[data-tab="${st.selected}"]`).textContent = chartTabName(st, st.selected);
+    el.querySelector('[data-undo]').disabled = !st.undo.length;
     v.colors.forEach((x, k) => { const b = el.querySelector(`[data-tool="${k}"]`); b.firstElementChild.style.background = x.color; b.lastElementChild.textContent = colorName(x); });
   };
   // Drawn again, the box or button that had focus keeps it (they are named by data-bc).
@@ -1654,14 +1658,19 @@ function bindChart(c) {
   const sheet = () => again(() => { el.querySelector('[data-sheet]').innerHTML = chartSheet(c, st, can); });
   const palette = () => again(() => { el.querySelector('[data-palette]').innerHTML = chartPalette(st, open()); });
   const redraw = focus => { again(() => { el.innerHTML = chartPage(c, st, can); }); if (focus) el.querySelector(focus)?.focus(); };
-  const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; st.colNote = ''; }; // they are about the chart that was open
+  const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; st.colNote = ''; st.undo = []; }; // they are about the chart that was open
   numbers();
 
   el.onclick = async e => {
     const on = sel => e.target.closest(sel), tab = on('[data-tab]'), v = open(), i = on('[data-item]')?.dataset.item;
     if (tab) { st.selected = Number(tab.dataset.tab); leave(); redraw(`[data-tab="${st.selected}"]`); return; }
     if (!can) return;
-    if (on('[data-import]')) el.querySelector('[data-file]').click();
+    // Undo holds the items as they were before each press on the sheet (a column, or days painted). Any other change to
+    // the chart empties it, here and where a box is typed in, so it never takes back more than those presses.
+    if (on('[data-pick], [data-drop-color], [data-add-item], [data-drop-item], [data-add-bar], [data-drop-bar]')) st.undo = [];
+    if (on('[data-undo]')) { const was = st.undo.pop(); if (was) { v.items = was; el.querySelector('[data-col-note]').textContent = st.colNote = 'Took back the last change on the sheet.'; sheet(); } }
+    else if (on('[data-help]')) { st.help = !st.help; on('[data-help]').setAttribute('aria-expanded', st.help); el.querySelector('[data-help-text]').hidden = !st.help; }
+    else if (on('[data-import]')) el.querySelector('[data-file]').click();
     else if (on('[data-save]')) save();
     else if (on('[data-discard]')) { if (await ask('Discard your changes to the bar chart?', DISCARD)) { keep(c, 'chart-draft', null); page.chart = null; if (page === s.page) drawProject(page); } }
     else if (on('[data-pick]')) { const sh = st.sheets[on('[data-pick]').dataset.pick]; st.sheets = []; if (sh) { v.items = L.draftItems(sh.items); st.notes = L.importNotes(sh); st.open = {}; } redraw('[data-import]'); }
@@ -1693,6 +1702,7 @@ function bindChart(c) {
     else if (t.matches('[data-push]')) { st.push = t.checked; return; }
     else if (t.dataset.k) v.items[i].bars[t.closest('[data-bar]').dataset.bar][t.dataset.k] = t.value;
     else return;
+    st.undo = []; // Undo is for presses on the sheet only (see onclick)
     if (t.matches('[data-cwork]') && Object.values(st.open).some(Boolean)) sheet(); else numbers(); // the bars typed to the day changed with it
   };
 
@@ -1721,6 +1731,7 @@ function bindChart(c) {
   // Add column and Remove column: a press is one day, put in empty where there is still work from there on (the later work a
   // day later), or taken out where nothing works on it. On the Whole project row that is every item; on an item's row, that
   // item only. One at a time, so the columns are counted by hand.
+  const undoable = items => { st.undo = [...st.undo.slice(-49), items]; el.querySelector('[data-undo]').disabled = false; };
   const columnAt = td => {
     const v = open(), day = Number(td.dataset.cell) + 1, was = v.items, at = `month ${Math.ceil(day / MONTH_CELLS)} day ${(day - 1) % MONTH_CELLS + 1}`;
     const i = td.parentElement.dataset.item, who = i == null ? 'every item' : was[i].name || 'this item';
@@ -1731,6 +1742,7 @@ function bindChart(c) {
     } else if (was.filter(mine).some(x => L.removeDays(x, day, day) === null)) st.colNote = `There is work on ${at} there, so that column stays.`;
     else { v.items = each('erase'); st.colNote = `Removed the column from ${who} at ${at}: the later work moved back a day.`; }
     el.querySelector('[data-col-note]').textContent = st.colNote;
+    if (v.items.some((x, j) => x !== was[j])) undoable(was);
     sheet();
   };
   el.onmousedown = e => {
@@ -1738,7 +1750,7 @@ function bindChart(c) {
     const td = e.button === 0 && e.target.closest('.bc-cell');
     if (!td) return;
     e.preventDefault();
-    if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else paintAt(e);
+    if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else { paintAt(e); if (paint) undoable(paint.items); }
   };
   el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); };
   el.onmouseup = el.onmouseleave = () => { paint = null; };
@@ -1753,7 +1765,7 @@ function bindChart(c) {
     st.sheets = [];
     if (!found) st.notes = ['That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).'];
     else if (!found.length) st.notes = ['No sheet in that file has the ITEMS / DESCRIPTION / COST header with a 1st Month row.'];
-    else if (found.length === 1) { v.items = L.draftItems(found[0].items); st.notes = L.importNotes(found[0]); st.open = {}; }
+    else if (found.length === 1) { v.items = L.draftItems(found[0].items); st.notes = L.importNotes(found[0]); st.open = {}; st.undo = []; }
     else { st.notes = []; st.sheets = found; }
     redraw('[data-import]');
   };
@@ -4768,9 +4780,9 @@ function drawChartPrint(c) {
   const sheets = P.barChartPages({ project, docs: documents, version, index, per, signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png' });
   document.title = `Bar Chart - ${name(index)}`; // the file name "Save as PDF" offers
   main.innerHTML = `<style>@page { size: A4 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
-    <p class="muted no-print print-note">A4 landscape, ${sheets.length === 1 ? 'one page' : `${sheets.length} pages to lay side by side`}. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p>
     <div class="print-opts no-print">${versions.length > 1 ? `<div class="chips" role="group" aria-label="Chart">${versions.map((_, i) => `<button type="button" data-chart="${i}" aria-pressed="${i === index}">${esc(name(i))}</button>`).join('')}</div>` : ''}
-      <label class="field">Months on a page<select id="chart-per">${choices.map(n => `<option value="${n}"${n === per ? ' selected' : ''}>${n || 'All on one page'}</option>`).join('')}</select></label></div>
+      <label class="field row">Months on a page<select id="chart-per">${choices.map(n => `<option value="${n}"${n === per ? ' selected' : ''}>${n || 'All on one page'}</option>`).join('')}</select></label>
+      <p class="muted print-note">A4 landscape, ${sheets.length === 1 ? 'one page' : `${sheets.length} pages to lay side by side`}. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p></div>
     <div class="bb-scroll">${sheets.map(html => `<div class="bb full land">${html}</div>`).join('')}</div>`;
   main.querySelectorAll('[data-chart]').forEach(b => { b.onclick = () => { location.hash = `#/p/${page.id}/print/chart-${b.dataset.chart}`; }; });
   document.getElementById('chart-per').onchange = e => { keep(c, 'chart-per', Number(e.target.value)); drawChartPrint(c); document.getElementById('chart-per').focus(); };

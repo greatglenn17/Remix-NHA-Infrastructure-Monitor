@@ -827,8 +827,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .danger { margin: 0 0 0 auto; }
 /* The plan's actions are outlined buttons, and Plan setup opens its tools as one tight row of them under the toolbar,
    Delete plan last in rose (user, 2026-11-25: they must read as buttons, with no dead space). */
-.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn, .apa-actions .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover, .apa-actions .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
+.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn, .apa-actions .text-btn, #bc-page .text-btn:not([data-days]) { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
+.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover, .apa-actions .text-btn:hover, #bc-page .text-btn:not([data-days]):hover, #bc-page [data-help][aria-expanded="true"] { background: var(--primary-container); border-color: var(--link); }
 .lots-head .lots-links { gap: 8px; }
 .plan-panel { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .plan-panel[hidden] { display: none; }
@@ -1014,6 +1014,18 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bc-tools .chips button { display: inline-flex; align-items: center; gap: 6px; }
 .bc-tools [hidden] { display: none; } /* Print while an edit is open, Discard while none is */
 .bc-fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.bc-fields > p { flex: 1 1 280px; margin: 0; } /* the hint fills the row beside the name and date */
+#bc-page .text-btn.danger { border-color: var(--behind-line); }
+#bc-page [hidden] { display: none; }
+.bc-tools .bc-total { flex: 1 1 320px; margin: 0; } /* the total, then the sheet's buttons, on one row */
+.bc-more { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 8px; } /* what follows the tools wraps as one group, not a control alone */
+.bc-more [data-col-note] { flex: 1 1 200px; }
+.bc-more [data-col-note]:empty { display: none; }
+.bc-grid tbody th, .bc-grid tbody td { padding-top: 3px; padding-bottom: 3px; } /* compact rows */
+@media (pointer: fine) { .bc-grid .icon-btn { min-width: 30px; min-height: 30px; padding: 2px; } }
+.print-opts .field.row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.print-opts .field.row select { width: auto; }
+.print-opts .print-note { flex: 1 1 320px; margin: 0; }
 .bc-grid { width: auto; border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--outline); border-left: 1px solid var(--outline); } /* separate: a sticky cell keeps its borders */
 .bc-grid th, .bc-grid td { padding: 4px 8px; vertical-align: middle; white-space: nowrap; border-width: 0 1px 1px 0; }
 .bc-grid thead th { text-align: center; }
@@ -1028,11 +1040,11 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bc-grid .bc-day { padding: 2px 2px 2px 0; text-align: right; font-size: 10px; font-weight: 400; letter-spacing: 0; }
 .bc-grid .bc-cell { min-width: 9px; height: 30px; padding: 0; border-right-color: color-mix(in srgb, var(--outline) 30%, transparent); } /* a day */
 .bc-grid.can .bc-cell { cursor: cell; }
-.bc-palette [data-col-note] { flex-basis: 100%; } /* what Add column or Remove column just did, on its own line */
 .bc-grid.can .bc-cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
 .bc-sw { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 5px; border: 1px solid var(--outline); border-radius: 3px; vertical-align: -2px; }
 .bc-palette { display: grid; gap: 8px; }
 .bc-palette .chips { margin: 0; }
+.bc-palette .chips button:disabled { opacity: 0.5; cursor: default; } /* Undo with nothing to take back */
 .bc-palette .chips .bc-sw { margin-right: 0; }
 .bc-palette input[type="color"] { width: 64px; height: 40px; padding: 3px; cursor: pointer; }
 .bc-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; }
