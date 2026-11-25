@@ -4789,23 +4789,37 @@ function drawProfilePrint({ page, project, documents }) {
 /**
  * The bar chart / S-curve with cash flow of one chart (Print on the Bar chart page and the Summary's card) for
  * `#/p/<id>/print/chart-<n>`, 0 the original: the office's sheet less its PERT/CPM network, which the app has no data
- * for. It prints on A3 landscape (the A4 sheet enlarged to the page), cut into pages of as many months as picked here
- * (eight unless picked, kept in this browser), so a day stays wide enough to read. Website only. Its signers are the billing abstract's four, and Approved by is a line to sign.
+ * for. It is one long sheet cut into as many landscape pages as picked here (a page for every eight months unless
+ * picked), to tape side by side, on the paper picked here (A3, the A4 sheet enlarged to the page, unless picked); both
+ * are kept in this browser. A sheet taller than the page (many items) is drawn wider and shrunk onto it, so the
+ * signers stay on the same pages. On the screen the whole sheet is shrunk to fit across, the cuts as dashed lines,
+ * until Full size is pressed.
+ * Website only. Its signers are the billing abstract's four, and Approved by is a line to sign.
  */
 function drawChartPrint(c) {
   const { page, project, documents } = c, versions = L.chartVersions(project.barChartJson), index = Number(page.sub.slice(6)), version = versions[index];
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/chart">${icon('arrow_back', 'sm')}Bar chart</a>`;
   if (!version) { drawOnce(main, `${back}<p class="muted" role="alert">This bar chart was removed or does not exist.</p>`); return; }
-  const name = i => versions[i].label || `Chart ${i + 1}`, choices = [3, 4, 6, 8, 12, 0], asked = Number(kept(c, 'chart-per') ?? 8), per = choices.includes(asked) ? asked : 8;
-  const sheets = P.barChartPages({ project, docs: documents, version, index, per, signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png' });
+  const name = i => versions[i].label || `Chart ${i + 1}`, choices = [0, 1, 2, 3, 4, 5, 6], asked = Number(kept(c, 'chart-pages') ?? 0), pages = choices.includes(asked) ? asked : 0, paper = /A4/.test(kept(c, 'chart-paper')) ? 'A4' : 'A3';
+  const build = wide => P.barChartPages({ project, docs: documents, version, index, pages, wide, signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png' }), sheets = build(285);
   document.title = `Bar Chart - ${name(index)}`; // the file name "Save as PDF" offers
-  main.innerHTML = `<style>@page { size: A3 landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
+  main.innerHTML = `<style>@page { size: ${paper} landscape; }</style><div class="print-bar no-print">${back}${printActions(c, 'Print')}</div>
     <div class="print-opts no-print">${versions.length > 1 ? `<div class="chips" role="group" aria-label="Chart">${versions.map((_, i) => `<button type="button" data-chart="${i}" aria-pressed="${i === index}">${esc(name(i))}</button>`).join('')}</div>` : ''}
-      <label class="field row">Months on a page<select id="chart-per">${choices.map(n => `<option value="${n}"${n === per ? ' selected' : ''}>${n || 'All on one page'}</option>`).join('')}</select></label>
-      <p class="muted print-note">A3 landscape, ${sheets.length === 1 ? 'one page' : `${sheets.length} pages to lay side by side`}. Choose "Save as PDF" in the print window to keep a copy. The PERT/CPM network is not drawn.</p></div>
-    <div class="bb-scroll">${sheets.map(html => `<div class="bb full land a3">${html}</div>`).join('')}</div>`;
+      <label class="field row">Pages to join<select id="chart-pages">${choices.map(n => `<option value="${n}"${n === pages ? ' selected' : ''}>${n || `Auto (${sheets.length})`}</option>`).join('')}</select></label>
+      <label class="field row">Paper<select id="chart-paper">${['A3', 'A4'].map(p => `<option${p === paper ? ' selected' : ''}>${p}</option>`).join('')}</select></label>
+      <div class="chips"><button type="button" id="chart-big" aria-pressed="false">Full size</button></div>
+      <p class="muted print-note">${paper} landscape, ${sheets.length === 1 ? 'one page' : `one long sheet on ${sheets.length} pages: tape them side by side, cut where the dashed lines are`}. Pick ${paper} as the paper in the print window. The PERT/CPM network is not drawn.</p></div>
+    <div class="bb-scroll"><div class="bb full land tiles" id="sheet">${sheets.join('')}</div></div>`;
+  // A landscape A4 holds 198 mm down (196 here, for the rounding): a taller sheet is drawn that much wider and shrunk onto the page, which it then still fills across.
+  // A3 is the A4 page enlarged ((420 - 12) / (297 - 12)). A millimetre is 96/25.4 px.
+  const sheet = document.getElementById('sheet'), PX = 96 / 25.4, shrink = Math.min(1, 196 * PX / sheet.firstElementChild.offsetHeight);
+  if (shrink < 1) sheet.innerHTML = build(285 / shrink).join('');
+  sheet.style.setProperty('--z', shrink * (paper === 'A3' ? 1.43 : 1));
+  document.getElementById('chart-big').onclick = e => e.target.setAttribute('aria-pressed', sheet.classList.toggle('big')); // to read it: full size, scrolled sideways
+  // The whole sheet across the screen, however many pages long, with its 6 mm around it.
+  new ResizeObserver(() => sheet.style.setProperty('--fit', Math.min(1, (sheet.parentElement.clientWidth - 2) / ((sheets.length * 285 / shrink + 12) * PX)))).observe(sheet.parentElement);
   main.querySelectorAll('[data-chart]').forEach(b => { b.onclick = () => { location.hash = `#/p/${page.id}/print/chart-${b.dataset.chart}`; }; });
-  document.getElementById('chart-per').onchange = e => { keep(c, 'chart-per', Number(e.target.value)); drawChartPrint(c); document.getElementById('chart-per').focus(); };
+  for (const [id, value] of [['chart-pages', Number], ['chart-paper', String]]) document.getElementById(id).onchange = e => { keep(c, id, value(e.target.value)); drawChartPrint(c); document.getElementById(id).focus(); };
   bindSignatories(c, 'billing');
   const btn = document.getElementById('do-print');
   btn.disabled = false;

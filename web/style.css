@@ -784,13 +784,17 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bb .keep { break-inside: avoid; }
 /* Status of Construction (BlueBookForms.sdpPlan): the plan as big as one page allows, the legend over its bottom-left corner. */
 .bb.land { width: 285mm; }
-.bb.a3 { zoom: 1.43; } /* the bar chart on A3 landscape: the A4 sheet enlarged to the page ((420 - 12) / (297 - 12)) */
+/* The bar chart: one long sheet as its pages side by side, each a slice of it, shrunk to fit across the screen (--fit, drawChartPrint). */
+.bb.tiles { display: flex; width: fit-content; zoom: var(--fit, 1); }
+.bb.tiles.big { zoom: 1; margin: 0; } /* Full size: scrolled sideways */
+.bb .tile { flex: none; overflow: hidden; }
+.bb.tiles img.banner { height: 22mm; } /* its room before it loads: the sheet is measured as it is drawn */
+.bb .tile + .tile { border-left: 1px dashed #777; } /* where the paper is cut */
 .bb table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
 /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
 .bb table.apa-info td:nth-child(3) { width: 100%; }
 .bb table.apa { font-size: 7.5pt; }
 .bb svg.chart { display: block; width: 100%; height: auto; margin-top: 2mm; }
-.bb.land + .bb.land { margin-top: 12px; } /* the next page of a chart cut into pages */
 .bb table.apa th, .bb table.apa td { padding: 1mm 0.8mm; }
 .bb.full img.banner { width: auto; max-height: 22mm; margin: 0 auto 1mm; }
 .bb.full h1 { font-size: 16pt; margin: 1mm 0 0; }
@@ -816,7 +820,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   main { padding: 0; max-width: none; }
   .bb-scroll { overflow: visible; padding: 0; }
   .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }
-  .bb.land + .bb.land { margin-top: 0; break-before: page; }
+  .bb.tiles { display: block; zoom: 1; }
+  .bb .tile { zoom: var(--z, 1); } /* onto the paper picked, and a tall sheet onto the page (drawChartPrint) */
+  .bb .tile + .tile { border-left: 0; break-before: page; }
 }
 
 /* Lots (SubdivisionPlanTab, read-only): a one-line count, filters, and each block's lots as coloured squares. */
@@ -1027,6 +1033,7 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .print-opts .field.row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .print-opts .field.row select { width: auto; }
 .print-opts .print-note { flex: 1 1 320px; margin: 0; }
+.print-opts .chips { margin: 0; }
 .bc-grid { width: auto; border-collapse: separate; border-spacing: 0; border-top: 1px solid var(--outline); border-left: 1px solid var(--outline); } /* separate: a sticky cell keeps its borders */
 .bc-grid th, .bc-grid td { padding: 4px 8px; vertical-align: middle; white-space: nowrap; border-width: 0 1px 1px 0; }
 .bc-grid thead th { text-align: center; }

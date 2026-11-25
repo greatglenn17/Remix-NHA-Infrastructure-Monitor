@@ -391,11 +391,13 @@ is read only.
   asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused.
 - **Print** on that page and on the Summary's card, for anyone who can open the project, opens `#/p/<id>/print/chart-<n>` (0 the original;
   the chart in force first, the others by the chips above the sheet): the office's bar chart / S-curve with cash
-  flow on landscape A3 (`P.barChartPages`, the A4 sheet enlarged to the page; website only), without its PERT/CPM network, which the app has no data
-  for. A long chart is cut into pages to lay side by side: **Months on a page** (3 to 12, or all on one page; eight
-  unless picked, kept in the browser) sets how many months each holds, all at the same scale, with the item columns
-  and the rows under the total on every page, the project's details on the first and the signers on the last. A
-  page's chart is one SVG (`P.barChartSvg`): each item's cost, share and days, its days of work in green and its
+  flow (`P.barChartPages`; website only), without its PERT/CPM network, which the app has no data
+  for. It is one long sheet cut into landscape pages to tape side by side, as a poster is: the title, the project's
+  details, the chart and the signers run across the whole length, and each page is its own slice. **Pages to join**
+  (1 to 6; a page for every eight months unless picked) sets the length, **Paper** A3 (the A4 page enlarged) or A4;
+  both are kept in the browser. A sheet taller than the page (many items) is drawn wider and shrunk onto it. On the screen the whole sheet is
+  shrunk to fit, the cuts as dashed lines; **Full size** shows it as printed, scrolled sideways. The
+  chart is one SVG (`P.barChartSvg`): each item's cost, share and days, its days of work in green and its
   coloured days in the chart's colours on 30-day months of 5-day cells with each month's share of the project on
   them, the S-curve over the bars, the monthly and cumulative accomplishment and cash flow under the total, and the
   legend of the colours. Its signers are the billing abstract's four (**Signatories**) and an Approved by line.
