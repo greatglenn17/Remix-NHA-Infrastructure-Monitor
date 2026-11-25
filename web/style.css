@@ -510,6 +510,9 @@ thead .num { font-family: inherit; }
   #side a:focus-visible { outline-offset: -2px; } /* inside the item: the sidebar scrolls in a short window, which clips anything outside */
   #side a[href="#/users"] { margin-top: auto; } /* at the foot, so it does not move when a project opens */
   #side .tab-long, .side-name, .side-sub { display: none; }
+  /* The audit log has its own link in the sidebar: no chip for it, and no Documents chips over it. */
+  main .chips [data-chip="Audit log"], main .chips.on-audit { display: none; }
+  main .chips.on-audit + * { margin-top: 12px; }
   .side-group { display: grid; gap: 2px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
 }
 /* 208px and 13px names: the dashboard keeps three columns of cards at 1440px, and "Actual Accomplishment" keeps to one line. */
@@ -519,10 +522,11 @@ thead .num { font-family: inherit; }
   #side .tab-long { display: inline; }
   /* Progress's views, indented so their names start under "Progress" (8px padding, 20px icon, 8px gap). */
   .side-sub { display: grid; gap: 2px; }
-  main .chips.in-side { display: none; } /* the links above do the Progress chips' job here */
+  main .chips.in-side { display: none; } /* the links above do the chips' job here (Progress, Documents) */
   main .chips.in-side + * { margin-top: 12px; } /* the gap under the project header that the chips' margin gave */
-  #side .side-sub a { min-height: 36px; padding-left: 36px; font-weight: 500; }
+  #side .side-sub a { min-height: 36px; padding: 8px 4px 8px 36px; gap: 6px; font-weight: 500; } /* 4px and 6px: "Developer Requests" and its count keep to one line */
   #side .side-sub a[aria-current] { color: var(--link); font-weight: 600; }
+  .side-sub .chip-n { flex: none; margin-left: auto; padding: 0 6px; position: relative; } /* the count at the right edge; relative holds its hidden words */
   #side .tab-short { display: none; }
   .side-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; padding: 0 8px; margin-bottom: 6px; font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; text-wrap: balance; }
 }
@@ -615,6 +619,9 @@ div.apa-part { padding-top: 16px; }
 .apa-items td:nth-child(2) { white-space: normal; min-width: 220px; }
 .apa-group td, .apa-subtotal td, .apa-total td { font-weight: 600; }
 /* The tab's target / actual / advance or slippage table, and the boxes typed above the printed billing abstract. */
+/* The standing and the lots-and-units tables side by side where both fit, not one over the other with the right half empty. */
+.apa-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 32px; }
+.apa-pair > * { flex: 0 1 520px; min-width: 0; }
 .apa-standing { max-width: 520px; margin-bottom: 8px; }
 .apa-standing thead td { border: none; }
 .apa-standing thead th { white-space: normal; } /* "Plan on" over its date */
@@ -647,13 +654,21 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .album { margin-bottom: 12px; }
 .album > .muted { font-size: 13px; margin-bottom: 10px; }
 /* Monthly */
-.month-head { padding-top: 12px; max-width: 320px; }
+.month-head { padding-top: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; } /* Print beside the month */
+.month-head .field { flex: 0 1 320px; }
 .month-head select, .wx select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
 .month h2 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
 .month > p { margin-bottom: 12px; }
 
 /* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
-.bill-sum { max-width: 560px; }
+.bill-sum, .apa-file { max-width: 560px; }
+/* From 900px the summary's figures are one row, each label over its amount, not a column with the right half empty. */
+@media (min-width: 900px) {
+  .bill-sum { max-width: none; display: flex; flex-wrap: wrap; gap: 4px 48px; margin-bottom: 8px; }
+  .bill-sum .kv { display: block; padding: 0; }
+  .bill-sum .kv span { display: block; }
+  .bill-sum .kv b { font-size: 18px; }
+}
 .kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
 .pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
@@ -671,6 +686,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .entry > .badge { justify-self: start; margin-top: 4px; }
 .entry .file, .entry .entry-edit { justify-self: start; }
 .entry-edit { margin-top: 6px; white-space: nowrap; }
+/* From 768px an entry's button sits at its right, beside the title, not on a row of its own. */
+@media (min-width: 768px) {
+  .entry { grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
+  .entry > * { grid-column: 1; }
+  .entry > .entry-edit { grid-column: 2; grid-row: 1 / span 2; align-self: start; margin: 0; }
+}
 .photo-edit { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .photo-edit li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
 .photo-new { display: grid; gap: 14px; }
@@ -790,8 +811,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .danger { margin: 0 0 0 auto; }
 /* The plan's actions are outlined buttons, and Plan setup opens its tools as one tight row of them under the toolbar,
    Delete plan last in rose (user, 2026-11-25: they must read as buttons, with no dead space). */
-.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"] { background: var(--primary-container); border-color: var(--link); }
+.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
+.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
 .lots-head .lots-links { gap: 8px; }
 .plan-panel { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .plan-panel[hidden] { display: none; }
@@ -920,7 +941,15 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* Issues (IssueCard) */
 .issue-q { margin: 16px 0 0; }
 .issue-add { margin: 16px 0 0; }
-.billing-add { justify-self: start; margin-top: 4px; }
+/* From 900px the issue tools are one row: the search, the filters, Log issue at the right (the website leaves no dead space). */
+@media (min-width: 900px) {
+  .issue-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 12px 0; }
+  .issue-bar .issue-q { flex: 1 1 280px; margin: 0; }
+  .issue-bar .chips { margin: 0; }
+  .issue-bar .issue-add { order: 1; margin: 0; }
+  .issue-bar .chips button, .issue-bar .issue-add { min-height: 44px; } /* the search box's height */
+}
+.billing-add { margin-left: auto; } /* at the right of the Billing summary's heading */
 .issue-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .issue-card { padding: 12px 16px 14px; min-width: 0; }
 .issue-card.critical { border-color: color-mix(in srgb, var(--behind) 40%, transparent); }
@@ -933,9 +962,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .issue-card h3 { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .issue-card h3.link { color: var(--link); }
 .issue-card h3 + p { margin: 0; font-size: 14px; line-height: 20px; white-space: pre-line; overflow-wrap: anywhere; }
-.issue-card .logged { margin: 10px 0 0; font-style: italic; text-align: right; }
+/* Who logged it and Edit share the card's last line. */
+.ic-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; margin-top: 8px; }
+.ic-foot:empty { display: none; }
+.issue-card .logged { margin: 0; font-style: italic; }
 /* Edit button and the edit form (AddIssueDialog). */
-.ic-actions { display: flex; justify-content: flex-end; margin: 8px -8px -6px 0; }
+.ic-actions { margin: 0 -8px -6px auto; }
 .edit-form { width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh / var(--zoom) - 32px); overflow-y: auto; }
 .edit-form form { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; gap: 14px; margin: 0; }
 .edit-form h2 { margin: 0; }
