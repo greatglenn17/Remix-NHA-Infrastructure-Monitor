@@ -1,8 +1,8 @@
 {
-  "versionCode": 322,
-  "versionName": "2.8.42",
-  "releaseNotes": "v2.8.42: Rotating the phone no longer clears answers or attachments that are not saved yet.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.42/NHA_Monitor_v2.8.42_Build322.apk",
-  "apkSha256": "018e2ab1120d2db08b8567abf02a4f908d3c334d9b13f85e18ef70c5769507de",
+  "versionCode": 323,
+  "versionName": "2.8.43",
+  "releaseNotes": "v2.8.43: Bar chart bars are set by month and day, a revised chart's items take a new name and amount, and the Excel import reads the office layout.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.43/NHA_Monitor_v2.8.43_Build323.apk",
+  "apkSha256": "2179f52c894bdac2f03bbe6d23ef422af2c5de6494a4f52b14d5b9bc8044f16d",
   "isMandatory": false
 }
