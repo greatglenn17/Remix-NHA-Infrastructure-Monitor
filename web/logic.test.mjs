@@ -1117,15 +1117,13 @@ test('bar chart suspension: days of no work are put into an item or the whole pr
   // A chart holds 120 months: work that would pass them is left where it is.
   const far = made('Far', [3500, 3590]);
   assert.equal(L.insertDays(far, 3400, 3420, 0), far);
-  // An empty month put before month 2 (the + on its heading): the later work moves a month and the days put in have no colour.
-  const gap = L.suspendDays(items, 31, 60, null);
-  assert.deepEqual(saved(gap), [['Done', [[1, 30]], []], ['Running', [[20, 30], [61, 110]], []], ['Later', [[120, 150]], []]]);
-  // Month 2 is now empty and can be taken out, which moves the work back; a month with work or a coloured day in it cannot.
-  assert.deepEqual(L.emptyMonths(gap), [1]);
-  assert.deepEqual(L.suspendDays(gap, 31, 60, 'erase'), items);
-  assert.deepEqual(L.emptyMonths(items), []);
-  assert.deepEqual(L.emptyMonths([made('Late', [61, 90])]), [0, 1]);
-  assert.deepEqual(L.emptyMonths([L.insertDays(made('Late', [31, 60]), 31, 60, 0)]), [0]); // month 2 is a suspension, not empty
+  // Add column, pressed on month 2 day 16 (day 46): an empty day goes in there with no colour and the later work moves a day; pressed again, another.
+  const column = L.suspendDays(items, 46, 46, null);
+  assert.deepEqual(saved(column), [['Done', [[1, 30]], []], ['Running', [[20, 45], [47, 81]], []], ['Later', [[91, 121]], []]]);
+  assert.deepEqual(saved(L.suspendDays(column, 46, 46, null)), [['Done', [[1, 30]], []], ['Running', [[20, 45], [48, 82]], []], ['Later', [[92, 122]], []]]);
+  // Remove column takes it out and the work is back; the page leaves a column an item works on (removeDays is null for it).
+  assert.deepEqual(L.suspendDays(column, 46, 46, 'erase'), items);
+  assert.equal(L.removeDays(column[1], 45, 45), null);
 });
 
 test('bar chart editor: drafts from the scope or the saved chart, bars as month and day, the errors and what is saved', () => {

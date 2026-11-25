@@ -1490,7 +1490,7 @@ function chartState(c) {
   const saved = L.chartDrafts(c.project);
   if (!saved) return (c.page.chart = null);
   const drafts = (L.canEditChart(c.project, s.user.uid, s.claims) && L.keptChart(kept(c, 'chart-draft'), base)) || saved;
-  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true });
+  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true, colNote: '' });
 }
 
 function chartBody(c) {
@@ -1507,9 +1507,11 @@ function chartPalette(st, v) {
   const tool = (value, body) => `<button type="button" class="bc-tool" data-bc="tool:${value}" data-tool="${value}" aria-pressed="${st.tool === value}">${body}</button>`;
   const picked = v.colors[st.tool];
   return `<div class="bc-tools"><b>Paint with</b><div class="chips" role="group" aria-label="Paint with">${tool('work', `${swatch(WORK_GREEN)}Work`)}
-      ${v.colors.map((x, k) => tool(k, `${swatch(x.color)}<span>${esc(colorName(x))}</span>`)).join('')}${tool('erase', `${icon('close', 'sm')}Erase`)}</div>
+      ${v.colors.map((x, k) => tool(k, `${swatch(x.color)}<span>${esc(colorName(x))}</span>`)).join('')}${tool('erase', `${icon('close', 'sm')}Erase`)}
+      ${tool('column', `${icon('add_circle', 'sm')}Add column`)}${tool('uncolumn', `${icon('delete', 'sm')}Remove column`)}</div>
       <button type="button" class="text-btn" data-bc="add-color" data-add-color>${icon('add_circle', 'sm')}Add colour</button>
-      <label class="check"><input type="checkbox" data-bc="push" data-push${st.push ? ' checked' : ''}>Days with no work move the later work</label></div>
+      <label class="check"><input type="checkbox" data-bc="push" data-push${st.push ? ' checked' : ''}>Days with no work move the later work</label>
+      <span class="small" data-col-note aria-live="polite">${esc(st.colNote)}</span></div>
     ${picked ? `<div class="bc-fields"><label class="field">Name of this colour<input data-bc="cname" data-cname placeholder="e.g. Suspension No. 1" value="${esc(picked.name)}"></label>
       <label class="field">Colour<input type="color" data-bc="ccolor" data-ccolor value="${esc(picked.color)}"></label>
       <label class="check"><input type="checkbox" data-bc="cwork" data-cwork${picked.work ? ' checked' : ''}>Work is done on these days</label>
@@ -1532,8 +1534,8 @@ function chartPage(c, st, can) {
     ${can ? `<p class="muted small">A cell is a day, and a month is 30 days from the start date. Pick what to paint with, then click a day or drag across an item's row; click a day
       again to clear it. Add a colour for each reason the chart was revised and name it yourself. For a suspension, pick a colour with no work and drag the suspended days on the
       Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
-      Clicking those days again takes them out and moves the work back. The + on a month's heading puts an empty month before it, with no colour, and moves
-      every item's later work a month; the × on an empty month takes it out. An item's cost is spread over its days of work, so the percentages and the
+      Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: every item gets
+      an empty day there and its later work moves a day, so click once for each column you need. Remove column takes out a day that no item works on. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1570,10 +1572,7 @@ function chartFoot(v, months) {
  */
 function chartSheet(c, st, can) {
   const v = st.drafts[st.selected], revised = st.selected > 0, months = L.sheetMonths(v, c.project.contractDurationDays, st.months), cells = months * MONTH_CELLS;
-  const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0), gaps = can ? L.emptyMonths(v.items) : [];
-  // Editors put an empty month before a month with its +, and take a month with nothing on it out with its ×.
-  const month = m => `<th class="m" colspan="${MONTH_CELLS}">${can ? `<button type="button" class="icon-btn" data-bc="put-month:${m}" data-put-month="${m}" title="Add an empty month before Month ${m + 1}" aria-label="Add an empty month before Month ${m + 1}">${icon('add_circle', 'sm')}</button>` : ''}Month ${m + 1}${
-    gaps.includes(m) ? `<button type="button" class="icon-btn" data-bc="cut-month:${m}" data-cut-month="${m}" title="Take out this empty month" aria-label="Take out Month ${m + 1}, which is empty">${icon('close', 'sm')}</button>` : ''}</th>`;
+  const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
   const edge = k => (k % MONTH_CELLS ? (k % 5 ? '' : ' f') : ' m'); // where a month, or five days, start
   const barRow = (b, i, j, many) => `<div class="wk-row" data-bar="${j}">${[['sm', 'From month'], ['sd', 'Day'], ['em', 'To month'], ['ed', 'Day']].map(([k, label]) =>
     `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
@@ -1592,9 +1591,9 @@ function chartSheet(c, st, can) {
       ${can && st.open[i] ? `<tr class="bc-exact" data-item="${i}"><td colspan="${4 + cells}"><div class="bc-exact-in"><b>${esc(name)}</b>${item.bars.map((b, j) => barRow(b, i, j, item.bars.length > 1)).join('')}
         <button type="button" class="text-btn" data-bc="add-bar:${i}" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></div></td></tr>` : ''}`;
   };
-  return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}" data-gaps="${gaps.join()}">
+  return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}">
     <thead><tr><th rowspan="2" class="bc-name">Description</th><th rowspan="2" class="num">Cost (₱)</th><th rowspan="2" class="num">%</th><th rowspan="2" class="num">Days</th>
-      ${Array.from({ length: months }, (_, m) => month(m)).join('')}</tr>
+      ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}</th>`).join('')}</tr>
       <tr>${Array.from({ length: cells / 5 }, (_, k) => `<th class="bc-day${edge(k * 5)}" colspan="5">${(k % 6 + 1) * 5}</th>`).join('')}</tr></thead>
     <tbody>${whole}${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
 }
@@ -1623,8 +1622,7 @@ function bindChart(c) {
     keep(c, 'chart-draft', dirty ? L.chartKept(project.barChartJson || '', st.drafts) : null);
     if (!v) return;
     const table = el.querySelector('.bc-grid'), months = L.sheetMonths(v, project.contractDurationDays, st.months);
-    // A bar typed past the last month drawn, or taken back; or a month that became empty, or no longer is (its × on the heading).
-    if (Number(table.dataset.months) !== months || table.dataset.gaps !== L.emptyMonths(v.items).join()) { sheet(); return; }
+    if (Number(table.dataset.months) !== months) { sheet(); return; } // a bar typed past the last month drawn, or taken back
     const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0), hues = v.colors.map(x => x.color).join();
     const days = (tr, fills) => {
       const drawn = `${fills.join()}|${hues}`;
@@ -1655,7 +1653,7 @@ function bindChart(c) {
   const sheet = () => again(() => { el.querySelector('[data-sheet]').innerHTML = chartSheet(c, st, can); });
   const palette = () => again(() => { el.querySelector('[data-palette]').innerHTML = chartPalette(st, open()); });
   const redraw = focus => { again(() => { el.innerHTML = chartPage(c, st, can); }); if (focus) el.querySelector(focus)?.focus(); };
-  const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; }; // they are about the chart that was open
+  const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; st.colNote = ''; }; // they are about the chart that was open
   numbers();
 
   el.onclick = async e => {
@@ -1673,14 +1671,6 @@ function bindChart(c) {
     else if (on('[data-add-color]')) { v.colors.push(L.newColor(v.colors)); st.tool = v.colors.length - 1; palette(); el.querySelector('[data-cname]').focus(); }
     else if (on('[data-drop-color]')) { st.drafts[st.selected] = L.dropColor(v, st.tool); st.tool = 'work'; palette(); el.querySelector('[data-tool="work"]').focus(); }
     else if (on('[data-add-month]')) { st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1; sheet(); }
-    // An empty month put before this one moves every item's later work a month; where no item has work from there on, it is a month more at the end.
-    else if (on('[data-put-month]')) {
-      const a = on('[data-put-month]').dataset.putMonth * MONTH_CELLS + 1, was = v.items;
-      v.items = L.suspendDays(was, a, a + MONTH_CELLS - 1, null);
-      if (v.items.every((x, j) => x === was[j])) st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1;
-      sheet();
-    }
-    else if (on('[data-cut-month]')) { const m = Number(on('[data-cut-month]').dataset.cutMonth), a = m * MONTH_CELLS + 1; v.items = L.suspendDays(v.items, a, a + MONTH_CELLS - 1, 'erase'); sheet(); el.querySelector(`[data-put-month="${m}"]`)?.focus(); }
     else if (on('[data-add-item]')) { v.items.push(L.emptyItem()); sheet(); el.querySelector(`[data-bc="name:${v.items.length - 1}"]`).focus(); }
     else if (on('[data-drop-item]')) { v.items.splice(i, 1); st.open = {}; sheet(); el.querySelector('[data-add-item]').focus(); }
     else if (on('[data-days]')) { st.open[i] = !st.open[i]; sheet(); }
@@ -1727,7 +1717,25 @@ function bindChart(c) {
     v.items = i === 'all' ? L.suspendDays(paint.items, a, b, tool) : paint.items.map((item, j) => (j === Number(i) ? one(item) : item));
     if (i === 'all' ? Object.values(st.open).some(Boolean) : st.open[i]) sheet(); else numbers();
   };
-  el.onmousedown = e => { paint = null; if (e.button === 0 && e.target.closest('.bc-cell')) { e.preventDefault(); paintAt(e); } };
+  // Add column and Remove column: a press is one day, put into every item that still has work from there on (empty, the
+  // later work a day later) or taken out of every item where none works on it. One at a time, so the columns are counted by hand.
+  const columnAt = td => {
+    const v = open(), day = Number(td.dataset.cell) + 1, was = v.items, at = `month ${Math.ceil(day / MONTH_CELLS)} day ${(day - 1) % MONTH_CELLS + 1}`;
+    if (st.tool === 'column') {
+      v.items = L.suspendDays(was, day, day, null);
+      st.colNote = v.items.some((x, j) => x !== was[j]) ? `Added an empty column at ${at}: the later work moved a day.` : `No item has work on or after ${at}, so nothing moved.`;
+    } else if (was.some(x => L.removeDays(x, day, day) === null)) st.colNote = `An item has work on ${at}, so that column stays.`;
+    else { v.items = L.suspendDays(was, day, day, 'erase'); st.colNote = `Removed the column at ${at}: the later work moved back a day.`; }
+    el.querySelector('[data-col-note]').textContent = st.colNote;
+    sheet();
+  };
+  el.onmousedown = e => {
+    paint = null;
+    const td = e.button === 0 && e.target.closest('.bc-cell');
+    if (!td) return;
+    e.preventDefault();
+    if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else paintAt(e);
+  };
   el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); };
   el.onmouseup = el.onmouseleave = () => { paint = null; };
 
