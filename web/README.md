@@ -336,16 +336,24 @@ is read only.
   form's to change. **Mark as completed** (shown until work done reaches 100%) sets the target and actual to the
   final accomplishment and the revised completion date to the actual completion date. There is no duplicate name
   check on an edit, as on the phone.
-- **Edit** on the Approved bar chart card (Summary), for the Super Admin and an Engineer Admin who can edit the
-  project (the app's MANAGE_BAR_CHART roles and the rules: `L.canEditChart`), is the app's bar chart form
-  (`barChartForm`): a tab per chart and **Revised chart** to add one, and per Scope of Works item its bar(s) as From
-  month and day, To month and day (a month is 30 days from the start date; the bars are kept to the day, as a revised
-  chart's start and end between the 5-day cells where work stopped and resumed). A revised chart's items also take an **Item name** and an **Amount**, with
-  **Add item** and a remove button on each, for a revision that changes the money; the original keeps the Scope of
-  Works' (or the Excel file's). The errors that keep Save off are the app's (`L.chartErrors`): a name, the
-  contract total, a revised chart's date, bars that read, and on a revised chart a name of its own for every item
-  (a Partial suspension and the item targets go by name). Save writes `barChartJson` in the phone's shape
-  (`L.chartJson`), one revision up, with the app's "Bar Chart" audit entry; deleting the only chart removes it.
+- **Bar chart** (`#/p/<id>/chart`, the section after Progress; website only, where the phone has a form) is the
+  approved bar chart as the contractor's sheet (`chartBody`, `chartSheet`): a tab per chart, and per item its
+  Description, Cost, % and Days, then each month's six 5-day cells with the bars drawn to the day, and under them the
+  total and each month's and the cumulative %. Anyone who can open the project sees it. The Super Admin and an
+  Engineer Admin who can edit the project (the app's MANAGE_BAR_CHART roles and the rules: `L.canEditChart`) edit it
+  there, and **Edit** on the Summary's Approved bar chart card opens it: a click or a drag across an item's cells
+  fills them, or clears them when the first one pressed had any of a bar (`L.paintCell`; a touch paints on a tap
+  only, so a finger can scroll the sheet); an item's **Days** opens its bar(s) as From month and day, To month and
+  day (a month is 30 days from the start date; the bars are kept to the day, as a revised chart's start and end
+  between the 5-day cells where work stopped and resumed); **Add month** draws one more month, and **Revised chart**
+  adds a chart. A revised chart's items also take a name and a cost in the sheet, with **Add item** and a remove
+  button on each, for a revision that changes the money; the original keeps the Scope of Works' (or the Excel
+  file's). The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised
+  chart's date, bars that read, and on a revised chart a name of its own for every item (a Partial suspension and
+  the item targets go by name). Save writes `barChartJson` in the phone's shape (`L.chartJson`), one revision up,
+  with the app's "Bar Chart" audit entry; deleting the only chart removes it. Until Save or **Discard changes**, an
+  edit is kept in the browser (`L.chartKept`, for the chart it was made from only), so it survives a reload, and
+  Print waits for the save, as it draws the saved chart.
   **Import from Excel (.xlsx)** is the app's import (`chart-excel.js`, the port of `util/BarChartExcel.kt`; change
   both together): it reads the contractor's workbook in the browser, nothing is uploaded, and replaces the open
   chart's items with the sheet's items and their bars from the coloured cells. The headings vary by project, so it
@@ -354,7 +362,7 @@ is read only.
   stretch's days are its part of the item's days (21 days are drawn as 4 cells) and the other colours on the row, the
   suspensions, are not bars; without the shares every coloured cell is 5 days. A workbook with several chart sheets
   asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused.
-- **Print** on that card, for anyone who can open the project, opens `#/p/<id>/print/chart-<n>` (0 the original;
+- **Print** on that page and on the Summary's card, for anyone who can open the project, opens `#/p/<id>/print/chart-<n>` (0 the original;
   the chart in force first, the others by the chips above the sheet): the office's bar chart / S-curve with cash
   flow on a landscape A4 (`P.barChartHtml`, website only), without its PERT/CPM network, which the app has no data
   for. The chart is one SVG (`P.barChartSvg`): each item's cost, share and days, its bars to the day on 30-day months
@@ -423,7 +431,7 @@ is read only.
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
   changed are rewritten; the other stored days stay exactly as they were.
 - **Sidebar** (`drawSide`, drawn by `route` and again when the open project's name loads): from 768px wide the
-  window has a sidebar under the header with **All projects**, the open project's five sections under its name, its
+  window has a sidebar under the header with **All projects**, the open project's six sections under its name, its
   **Audit log** (for those who may read it; the address is still `#/p/<id>/documents/audit-log`, and the Documents chip
   for it shows only under 768px), and **Users** for the Super Admin. It takes the place of the project's tab row, which stays under 768px (phones). It is
   an 80px rail of icons over short names up to 1439px and 208px with full names from 1440px, chosen by the window's
@@ -447,7 +455,7 @@ is read only.
   "See all projects" see every project. Everyone else sees only the projects assigned to them.
   Unassigned projects are tagged **View only**, except for Super Viewers (same as the app).
 - Screens: the dashboard (project count, total cost, status pills, attention filters, search, project cards with their own
-  Work done and Billed; portfolio averages are deliberately not shown) and five project sections (tabs on a phone, sidebar links from 768px):
+  Work done and Billed; portfolio averages are deliberately not shown) and six project sections (tabs on a phone, sidebar links from 768px):
   - **Summary**: profile, key dates with the revised completion from approved orders, contract
     cost, latest weekly report, open issues, status of payment, and the lots status card (the six
     `SdpSummary` bands) for housing projects.
@@ -458,6 +466,8 @@ is read only.
     status, billing and photos. The filters dim the lots that do not match; billed lots have a dashed blue edge. **Weather** shows each logged day as the phone's 24-hour clock, by weekly report
     (7 days) or by month. **Issues** lists the logged site issues newest first, with the phone's search and
     its All / Critical / Pending / Overdue / Resolved chips.
+  - **Bar chart**: the approved bar chart as a sheet, items down and 5-day cells across, drawn to the day, with the
+    S-curve's monthly and cumulative %; those who manage the chart edit it there (above).
   - **Actual Accomplishment**: the uploaded abstracts of the actual work, every pay item as in Excel (see above).
   - **Payments**: the billing list with retention, housing units and the attached files.
   - **Documents**: suspension/resumption orders, time extensions, variation orders, letters to

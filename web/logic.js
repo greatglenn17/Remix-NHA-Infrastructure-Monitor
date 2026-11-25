@@ -2577,6 +2577,47 @@ export function draftBar(b) {
   return barDays(bar) > 0 ? bar : null;
 }
 
+/**
+ * A click on the Bar chart page's sheet: an item's draft bars with the 5-day `cell` (0 is days 1 to 5) filled or
+ * cleared. Bars that touch become one; a bar that does not read is dropped, as saving would.
+ */
+export function paintCell(bars, cell, on) {
+  const a = cell * CELL_DAYS + 1, b = a + CELL_DAYS - 1, out = [];
+  const kept = bars.map(draftBar).filter(Boolean).flatMap(([s, e]) => (on ? [[s, e]] : [[s, Math.min(e, a - 1)], [Math.max(s, b + 1), e]].filter(x => x[0] <= x[1])));
+  for (const x of [...kept, ...(on ? [[a, b]] : [])].sort((p, q) => p[0] - q[0])) {
+    if (out.length && out.at(-1)[1] + 1 >= x[0]) out.at(-1)[1] = Math.max(out.at(-1)[1], x[1]);
+    else out.push(x);
+  }
+  return draftItems([{ bars: out }])[0].bars;
+}
+
+/** The sheet's row of an item: for each of `cells` 5-day cells, null or the [left, width] share of it the draft bars cover (a bar can start or end inside a cell). */
+export function cellFills(bars, cells) {
+  const days = bars.map(draftBar).filter(Boolean);
+  return Array.from({ length: cells }, (_, c) => {
+    const a = c * CELL_DAYS + 1, b = a + CELL_DAYS - 1, hit = days.filter(([s, e]) => s <= b && e >= a);
+    if (!hit.length) return null;
+    const s = Math.max(a, Math.min(...hit.map(x => x[0]))), e = Math.min(b, Math.max(...hit.map(x => x[1])));
+    return [(s - a) / CELL_DAYS, (e - s + 1) / CELL_DAYS];
+  });
+}
+
+/** The months the sheet draws for a chart draft: to its last bar, the contract duration and `asked` (Add month), 1 to 120. */
+export const sheetMonths = (draft, durationDays, asked = 0) =>
+  Math.min(120, Math.max(1, asked, Math.ceil((Number(durationDays) || 0) / MONTH_DAYS), Math.ceil(chartLastDay(draftVersion(draft)) / MONTH_DAYS)));
+
+/**
+ * The Bar chart page's unsaved drafts as the browser keeps them (with the saved chart they were made from), and
+ * back: null unless they were made from the chart saved now (`base`) and still have the drafts' shape.
+ */
+export const chartKept = (base, drafts) => ({ base, drafts });
+export function keptChart(kept, base) {
+  const d = keptObject(kept), text = v => typeof v === 'string';
+  const ok = d && d.base === base && Array.isArray(d.drafts) && d.drafts.every(v => v && text(v.label) && text(v.effective) && Array.isArray(v.items)
+    && v.items.every(i => i && text(i.name) && Number.isFinite(i.amount) && Array.isArray(i.bars) && i.bars.every(b => b && ['sm', 'sd', 'em', 'ed'].every(k => text(b[k])))));
+  return ok ? d.drafts : null;
+}
+
 /** VersionDraft.version: the chart as saved; a bar that does not read is left out (chartErrors names its item). */
 export const draftVersion = d => ({ label: d.label.trim(), effective: d.effective, items: d.items.map(i => ({ name: String(i.name).trim(), amount: i.amount, bars: i.bars.map(draftBar).filter(Boolean) })) });
 

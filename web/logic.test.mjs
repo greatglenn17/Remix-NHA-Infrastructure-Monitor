@@ -1031,6 +1031,33 @@ test('delete project: the Super Admin, or an Engineer Admin assigned to it, and 
     { projectUuid: 'p1', isDeleted: true, updatedAt: 1794292093231, updatedByUid: 'u1' });
 });
 
+test('bar chart sheet: a 5-day cell is filled or cleared, bars that touch join, and a kept draft comes back only for the chart it was made from', () => {
+  const none = [{ sm: '', sd: '', em: '', ed: '' }], bar = (sm, sd, em, ed) => ({ sm: String(sm), sd: String(sd), em: String(em), ed: String(ed) });
+  // Cell 0 is days 1 to 5; cell 6 is the first of Month 2. A cell next to a bar lengthens it; one apart starts another.
+  const first = L.paintCell(none, 0, true);
+  assert.deepEqual(first, [bar(1, 1, 1, 5)]);
+  assert.deepEqual(L.paintCell(first, 1, true), [bar(1, 1, 1, 10)]);
+  assert.deepEqual(L.paintCell(first, 6, true), [bar(1, 1, 1, 5), bar(2, 1, 2, 5)]);
+  assert.deepEqual(L.paintCell(L.paintCell(first, 2, true), 1, true), [bar(1, 1, 1, 15)]);
+  // Clearing a cell in the middle splits the bar; a bar that ends inside a cell keeps its days outside the cell cleared.
+  assert.deepEqual(L.paintCell([bar(1, 1, 1, 15)], 1, false), [bar(1, 1, 1, 5), bar(1, 11, 1, 15)]);
+  assert.deepEqual(L.paintCell([bar(1, 4, 1, 12)], 1, false), [bar(1, 4, 1, 5), bar(1, 11, 1, 12)]);
+  assert.deepEqual(L.paintCell([bar(1, 4, 1, 12)], 0, true), [bar(1, 1, 1, 12)]);
+  assert.deepEqual(L.paintCell(first, 0, false), none); // the last cell cleared leaves the empty bar the form starts with
+  assert.deepEqual(L.paintCell([bar(1, 1, 1, 5), bar(9, 9, 1, 1)], 0, false), none); // a bar that does not read is dropped
+  // What the sheet draws: the share of each cell the bars cover.
+  assert.deepEqual(L.cellFills([bar(1, 4, 1, 12)], 4), [[0.6, 0.4], [0, 1], [0, 0.4], null]);
+  assert.deepEqual(L.cellFills(none, 2), [null, null]);
+  // Months drawn: to the last bar, the contract duration, or what Add month asked for.
+  const draft = { label: 'Original', effective: '2026-01-05', items: [{ name: 'A', amount: 1, bars: [bar(1, 1, 3, 2)] }] };
+  assert.deepEqual([L.sheetMonths(draft, 0), L.sheetMonths(draft, 240), L.sheetMonths(draft, 240, 9), L.sheetMonths({ ...draft, items: [] }, '')], [3, 8, 9, 1]);
+  assert.equal(L.sheetMonths({ ...draft, items: [{ name: 'A', amount: 1, bars: [bar(1, 1, 9999, 1)] }] }, 0), 120);
+  // The kept draft: back as the drafts when made from the chart saved now; not for another chart, or anything else in the box.
+  const kept = JSON.stringify(L.chartKept('[saved]', [draft]));
+  assert.deepEqual(L.keptChart(kept, '[saved]'), [draft]);
+  assert.deepEqual([L.keptChart(kept, '[other]'), L.keptChart(null, ''), L.keptChart('{"base":"","drafts":[{"label":"x"}]}', ''), L.keptChart('{"base":"","drafts":[{"label":"x","effective":"","items":[{"name":"A","amount":1,"bars":[{"sm":1}]}]}]}', '')], [null, null, null, null]);
+});
+
 test('bar chart editor: drafts from the scope or the saved chart, bars as month and day, the errors and what is saved', () => {
   const scope = JSON.stringify([{ name: 'Land development', amount: 3000000, weightPct: 60 }, { name: 'Housing units', amount: 2000000, weightPct: 40 }]);
   const project = { projectUuid: 'p1', assignedUids: ['u1'], dateStarted: '2026-01-05', scopeOfWork: scope, contractCostOriginal: 5000000, barChartJson: '' };
