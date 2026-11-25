@@ -363,9 +363,9 @@ is read only.
   (`L.suspendedFills`); the same days dragged there again, or with Erase, are taken out and the work moves back
   (`L.removeDays`, never from an item that works on them). On one item's row it does the same for that item, while
   **Days with no work move the later work** is ticked; unticked, such days only take the item's work off them.
-  **An empty month** goes in with the **+** on a month's heading: 30 blank days before that month in every item
-  that still has work from there on (`L.suspendDays` with no colour), the later work moving a month. A month with
-  no work and no coloured day in any item, and work after it, has an **×** that takes it out (`L.emptyMonths`).
+  **Add column**, among the tools, puts an empty day where a day is clicked: into every item that still has work
+  from there on (`L.suspendDays` with no colour), the later work moving a day. One click is one column, so they are
+  counted by hand. **Remove column** takes the clicked day out and moves the work back, unless an item works on it.
   The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised chart's date,
   bars that read, on a revised chart a name of its own for every item (a Partial suspension and the item targets go
   by name), and a name for every colour. The original chart totals the original contract, a revised one the original

@@ -2678,8 +2678,8 @@ export function removeDays(item, a, b) {
 /**
  * The sheet's Whole project row, a suspension of every item: painted with a colour of no work (`tool` is its index),
  * days `a` to `b` are put into each item that still has work on or after day `a` (insertDays); with 'erase' they are
- * taken out of each item that does not work on them (removeDays). With no `tool` the days put in are blank: the +
- * on a month's heading, an empty month.
+ * taken out of each item that does not work on them (removeDays). With no `tool` the days put in are blank: Add
+ * column, a day at a time.
  */
 export const suspendDays = (items, a, b, tool) => items.map(i => (tool === 'erase' ? removeDays(i, a, b) ?? i : itemBars(i).some(x => x[1] >= a) ? insertDays(i, a, b, tool) : i));
 
@@ -2688,12 +2688,6 @@ export function suspendedFills(version, colors, days) {
   const out = Array(days).fill(null);
   for (const item of version.items) dayFills(item, colors, days).forEach((k, d) => { if (Number.isInteger(k) && !colors[k].work) out[d] ??= k; });
   return out;
-}
-
-/** The months (from 0) of a draft chart's items that can be taken out: no item has a day of work or a coloured day in one, and an item has one after it. */
-export function emptyMonths(items) {
-  const used = items.flatMap(i => [...itemBars(i), ...i.marks]), months = Math.ceil(Math.max(0, ...used.map(x => x[1])) / MONTH_DAYS);
-  return Array.from({ length: months }, (_, m) => m).filter(m => !used.some(([s, e]) => s <= (m + 1) * MONTH_DAYS && e > m * MONTH_DAYS));
 }
 
 /** The last contract day a saved chart draws: its last bar, or a coloured day after it. */
