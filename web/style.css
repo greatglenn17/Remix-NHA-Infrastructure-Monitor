@@ -1040,6 +1040,10 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bc-grid .bc-day { padding: 2px 2px 2px 0; text-align: right; font-size: 10px; font-weight: 400; letter-spacing: 0; }
 .bc-grid .bc-cell { min-width: 9px; height: 30px; padding: 0; border-right-color: color-mix(in srgb, var(--outline) 30%, transparent); } /* a day */
 .bc-grid.can .bc-cell { cursor: cell; }
+/* The day pointed at and the project's planned % by it, over the cell. */
+.bc-tip { position: fixed; z-index: 5; transform: translate(-50%, calc(-100% - 6px)); padding: 4px 8px; border: 1px solid var(--outline); border-radius: 6px;
+  background: var(--surface-solid); color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
+@media print { .bc-tip { display: none; } }
 .bc-grid.can .bc-cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
 .bc-sw { display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 5px; border: 1px solid var(--outline); border-radius: 3px; vertical-align: -2px; }
 .bc-palette { display: grid; gap: 8px; }
