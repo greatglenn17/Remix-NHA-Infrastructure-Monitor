@@ -1534,8 +1534,9 @@ function chartPage(c, st, can) {
     ${can ? `<p class="muted small">A cell is a day, and a month is 30 days from the start date. Pick what to paint with, then click a day or drag across an item's row; click a day
       again to clear it. Add a colour for each reason the chart was revised and name it yourself. For a suspension, pick a colour with no work and drag the suspended days on the
       Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
-      Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: every item gets
-      an empty day there and its later work moves a day, so click once for each column you need. Remove column takes out a day that no item works on. An item's cost is spread over its days of work, so the percentages and the
+      Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: on the Whole project row
+      every item gets an empty day there, on an item's row that item only, and the later work moves a day. Click once for each column you need. Remove column takes a day out
+      the same way, where nothing works on it. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1578,7 +1579,7 @@ function chartSheet(c, st, can) {
     `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
     ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
   // A suspension of every item is drawn on this row; it shows the days of no work that an item has.
-  const whole = can ? `<tr data-all><th scope="row" class="bc-name">Whole project<small>Drag a colour with no work here to suspend every item</small></th><td></td><td></td><td></td>
+  const whole = can ? `<tr data-all><th scope="row" class="bc-name">Whole project<small>Drag a colour with no work here to suspend every item. Add column here is for every item too.</small></th><td></td><td></td><td></td>
       ${L.suspendedFills(made, v.colors, cells).map((f, k) => `<td class="bc-cell${edge(k)}" data-cell="${k}"${f == null ? '' : ` style="background:${dayColor(f, v.colors)}"`}></td>`).join('')}</tr>` : '';
   const row = (item, i) => {
     const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0), name = made.items[i].name || 'New item';
@@ -1717,15 +1718,18 @@ function bindChart(c) {
     v.items = i === 'all' ? L.suspendDays(paint.items, a, b, tool) : paint.items.map((item, j) => (j === Number(i) ? one(item) : item));
     if (i === 'all' ? Object.values(st.open).some(Boolean) : st.open[i]) sheet(); else numbers();
   };
-  // Add column and Remove column: a press is one day, put into every item that still has work from there on (empty, the
-  // later work a day later) or taken out of every item where none works on it. One at a time, so the columns are counted by hand.
+  // Add column and Remove column: a press is one day, put in empty where there is still work from there on (the later work a
+  // day later), or taken out where nothing works on it. On the Whole project row that is every item; on an item's row, that
+  // item only. One at a time, so the columns are counted by hand.
   const columnAt = td => {
     const v = open(), day = Number(td.dataset.cell) + 1, was = v.items, at = `month ${Math.ceil(day / MONTH_CELLS)} day ${(day - 1) % MONTH_CELLS + 1}`;
+    const i = td.parentElement.dataset.item, who = i == null ? 'every item' : was[i].name || 'this item';
+    const mine = (_, j) => i == null || j === Number(i), each = tool => was.map((x, j) => (mine(x, j) ? L.suspendDays([x], day, day, tool)[0] : x));
     if (st.tool === 'column') {
-      v.items = L.suspendDays(was, day, day, null);
-      st.colNote = v.items.some((x, j) => x !== was[j]) ? `Added an empty column at ${at}: the later work moved a day.` : `No item has work on or after ${at}, so nothing moved.`;
-    } else if (was.some(x => L.removeDays(x, day, day) === null)) st.colNote = `An item has work on ${at}, so that column stays.`;
-    else { v.items = L.suspendDays(was, day, day, 'erase'); st.colNote = `Removed the column at ${at}: the later work moved back a day.`; }
+      v.items = each(null);
+      st.colNote = v.items.some((x, j) => x !== was[j]) ? `Added an empty column to ${who} at ${at}: the later work moved a day.` : `No work on or after ${at} there, so nothing moved.`;
+    } else if (was.filter(mine).some(x => L.removeDays(x, day, day) === null)) st.colNote = `There is work on ${at} there, so that column stays.`;
+    else { v.items = each('erase'); st.colNote = `Removed the column from ${who} at ${at}: the later work moved back a day.`; }
     el.querySelector('[data-col-note]').textContent = st.colNote;
     sheet();
   };
