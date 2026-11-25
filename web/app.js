@@ -1490,7 +1490,7 @@ function chartState(c) {
   const saved = L.chartDrafts(c.project);
   if (!saved) return (c.page.chart = null);
   const drafts = (L.canEditChart(c.project, s.user.uid, s.claims) && L.keptChart(kept(c, 'chart-draft'), base)) || saved;
-  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work' });
+  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true });
 }
 
 function chartBody(c) {
@@ -1508,7 +1508,8 @@ function chartPalette(st, v) {
   const picked = v.colors[st.tool];
   return `<div class="bc-tools"><b>Paint with</b><div class="chips" role="group" aria-label="Paint with">${tool('work', `${swatch(WORK_GREEN)}Work`)}
       ${v.colors.map((x, k) => tool(k, `${swatch(x.color)}<span>${esc(colorName(x))}</span>`)).join('')}${tool('erase', `${icon('close', 'sm')}Erase`)}</div>
-      <button type="button" class="text-btn" data-bc="add-color" data-add-color>${icon('add_circle', 'sm')}Add colour</button></div>
+      <button type="button" class="text-btn" data-bc="add-color" data-add-color>${icon('add_circle', 'sm')}Add colour</button>
+      <label class="check"><input type="checkbox" data-bc="push" data-push${st.push ? ' checked' : ''}>Days with no work move the later work</label></div>
     ${picked ? `<div class="bc-fields"><label class="field">Name of this colour<input data-bc="cname" data-cname placeholder="e.g. Suspension No. 1" value="${esc(picked.name)}"></label>
       <label class="field">Colour<input type="color" data-bc="ccolor" data-ccolor value="${esc(picked.color)}"></label>
       <label class="check"><input type="checkbox" data-bc="cwork" data-cwork${picked.work ? ' checked' : ''}>Work is done on these days</label>
@@ -1529,7 +1530,10 @@ function chartPage(c, st, can) {
       <a class="text-btn" data-print href="#/p/${esc(project.projectUuid)}/print/chart-${st.selected}">${icon('print', 'sm')}Print</a>
       ${can ? `<button type="button" class="btn" data-save>${icon('check_circle', 'sm')}Save</button><button type="button" class="text-btn danger" data-discard>${icon('delete', 'sm')}Discard changes</button>` : ''}</div>
     ${can ? `<p class="muted small">A cell is a day, and a month is 30 days from the start date. Pick what to paint with, then click a day or drag across an item's row; click a day
-      again to clear it. Add a colour for each reason the chart was revised and name it yourself. An item's cost is spread over its days of work, so the percentages and the
+      again to clear it. Add a colour for each reason the chart was revised and name it yourself. For a suspension, pick a colour with no work and drag the suspended days on the
+      Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
+      Clicking those days again takes them out and moves the work back. The + on a month's heading puts an empty month before it, with no colour, and moves
+      every item's later work a month; the × on an empty month takes it out. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1566,11 +1570,17 @@ function chartFoot(v, months) {
  */
 function chartSheet(c, st, can) {
   const v = st.drafts[st.selected], revised = st.selected > 0, months = L.sheetMonths(v, c.project.contractDurationDays, st.months), cells = months * MONTH_CELLS;
-  const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0);
+  const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0), gaps = can ? L.emptyMonths(v.items) : [];
+  // Editors put an empty month before a month with its +, and take a month with nothing on it out with its ×.
+  const month = m => `<th class="m" colspan="${MONTH_CELLS}">${can ? `<button type="button" class="icon-btn" data-bc="put-month:${m}" data-put-month="${m}" title="Add an empty month before Month ${m + 1}" aria-label="Add an empty month before Month ${m + 1}">${icon('add_circle', 'sm')}</button>` : ''}Month ${m + 1}${
+    gaps.includes(m) ? `<button type="button" class="icon-btn" data-bc="cut-month:${m}" data-cut-month="${m}" title="Take out this empty month" aria-label="Take out Month ${m + 1}, which is empty">${icon('close', 'sm')}</button>` : ''}</th>`;
   const edge = k => (k % MONTH_CELLS ? (k % 5 ? '' : ' f') : ' m'); // where a month, or five days, start
   const barRow = (b, i, j, many) => `<div class="wk-row" data-bar="${j}">${[['sm', 'From month'], ['sd', 'Day'], ['em', 'To month'], ['ed', 'Day']].map(([k, label]) =>
     `<label class="field n">${label}<input data-bc="bar:${i}:${j}:${k}" data-k="${k}" inputmode="numeric" value="${esc(b[k])}"></label>`).join('')}
     ${many ? `<button type="button" class="icon-btn" data-drop-bar aria-label="Remove this bar">${icon('close', 'sm')}</button>` : ''}</div>`;
+  // A suspension of every item is drawn on this row; it shows the days of no work that an item has.
+  const whole = can ? `<tr data-all><th scope="row" class="bc-name">Whole project<small>Drag a colour with no work here to suspend every item</small></th><td></td><td></td><td></td>
+      ${L.suspendedFills(made, v.colors, cells).map((f, k) => `<td class="bc-cell${edge(k)}" data-cell="${k}"${f == null ? '' : ` style="background:${dayColor(f, v.colors)}"`}></td>`).join('')}</tr>` : '';
   const row = (item, i) => {
     const days = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0), name = made.items[i].name || 'New item';
     return `<tr data-item="${i}"><th scope="row" class="bc-name">${can && revised ? `<span class="bc-edit"><input data-bc="name:${i}" data-name placeholder="Item name" aria-label="Item name" value="${esc(item.name)}">
@@ -1582,11 +1592,11 @@ function chartSheet(c, st, can) {
       ${can && st.open[i] ? `<tr class="bc-exact" data-item="${i}"><td colspan="${4 + cells}"><div class="bc-exact-in"><b>${esc(name)}</b>${item.bars.map((b, j) => barRow(b, i, j, item.bars.length > 1)).join('')}
         <button type="button" class="text-btn" data-bc="add-bar:${i}" data-add-bar>${icon('add_circle', 'sm')}Another bar</button></div></td></tr>` : ''}`;
   };
-  return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}">
+  return `<table class="grid-table bc-grid${can ? ' can' : ''}" data-months="${months}" data-gaps="${gaps.join()}">
     <thead><tr><th rowspan="2" class="bc-name">Description</th><th rowspan="2" class="num">Cost (₱)</th><th rowspan="2" class="num">%</th><th rowspan="2" class="num">Days</th>
-      ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}</th>`).join('')}</tr>
+      ${Array.from({ length: months }, (_, m) => month(m)).join('')}</tr>
       <tr>${Array.from({ length: cells / 5 }, (_, k) => `<th class="bc-day${edge(k * 5)}" colspan="5">${(k % 6 + 1) * 5}</th>`).join('')}</tr></thead>
-    <tbody>${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
+    <tbody>${whole}${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
 }
 
 /**
@@ -1613,17 +1623,23 @@ function bindChart(c) {
     keep(c, 'chart-draft', dirty ? L.chartKept(project.barChartJson || '', st.drafts) : null);
     if (!v) return;
     const table = el.querySelector('.bc-grid'), months = L.sheetMonths(v, project.contractDurationDays, st.months);
-    if (Number(table.dataset.months) !== months) { sheet(); return; } // a bar typed past the last month drawn, or taken back
+    // A bar typed past the last month drawn, or taken back; or a month that became empty, or no longer is (its × on the heading).
+    if (Number(table.dataset.months) !== months || table.dataset.gaps !== L.emptyMonths(v.items).join()) { sheet(); return; }
     const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0), hues = v.colors.map(x => x.color).join();
+    const days = (tr, fills) => {
+      const drawn = `${fills.join()}|${hues}`;
+      if (tr.dataset.drawn === drawn) return;
+      tr.dataset.drawn = drawn;
+      fills.forEach((f, k) => { tr.children[4 + k].style.background = dayColor(f, v.colors); });
+    };
     table.querySelectorAll('tbody tr[data-item]:not(.bc-exact)').forEach((tr, i) => {
       tr.querySelector('[data-pct]').textContent = (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3);
       tr.querySelector('[data-days]').textContent = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
       // A row whose days did not change is left alone: a chart of two years is 720 cells a row.
-      const fills = L.dayFills(made.items[i], v.colors, months * MONTH_CELLS), drawn = `${fills.join()}|${hues}`;
-      if (tr.dataset.drawn === drawn) return;
-      tr.dataset.drawn = drawn;
-      fills.forEach((f, k) => { tr.children[4 + k].style.background = dayColor(f, v.colors); });
+      days(tr, L.dayFills(made.items[i], v.colors, months * MONTH_CELLS));
     });
+    const whole = table.querySelector('tr[data-all]');
+    if (whole) days(whole, L.suspendedFills(made, v.colors, months * MONTH_CELLS));
     table.tFoot.innerHTML = chartFoot(v, months);
     el.querySelector(`[data-tab="${st.selected}"]`).textContent = chartTabName(st, st.selected);
     v.colors.forEach((x, k) => { const b = el.querySelector(`[data-tool="${k}"]`); b.firstElementChild.style.background = x.color; b.lastElementChild.textContent = colorName(x); });
@@ -1657,6 +1673,14 @@ function bindChart(c) {
     else if (on('[data-add-color]')) { v.colors.push(L.newColor(v.colors)); st.tool = v.colors.length - 1; palette(); el.querySelector('[data-cname]').focus(); }
     else if (on('[data-drop-color]')) { st.drafts[st.selected] = L.dropColor(v, st.tool); st.tool = 'work'; palette(); el.querySelector('[data-tool="work"]').focus(); }
     else if (on('[data-add-month]')) { st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1; sheet(); }
+    // An empty month put before this one moves every item's later work a month; where no item has work from there on, it is a month more at the end.
+    else if (on('[data-put-month]')) {
+      const a = on('[data-put-month]').dataset.putMonth * MONTH_CELLS + 1, was = v.items;
+      v.items = L.suspendDays(was, a, a + MONTH_CELLS - 1, null);
+      if (v.items.every((x, j) => x === was[j])) st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1;
+      sheet();
+    }
+    else if (on('[data-cut-month]')) { const m = Number(on('[data-cut-month]').dataset.cutMonth), a = m * MONTH_CELLS + 1; v.items = L.suspendDays(v.items, a, a + MONTH_CELLS - 1, 'erase'); sheet(); el.querySelector(`[data-put-month="${m}"]`)?.focus(); }
     else if (on('[data-add-item]')) { v.items.push(L.emptyItem()); sheet(); el.querySelector(`[data-bc="name:${v.items.length - 1}"]`).focus(); }
     else if (on('[data-drop-item]')) { v.items.splice(i, 1); st.open = {}; sheet(); el.querySelector('[data-add-item]').focus(); }
     else if (on('[data-days]')) { st.open[i] = !st.open[i]; sheet(); }
@@ -1675,25 +1699,33 @@ function bindChart(c) {
     else if (t.matches('[data-cname]')) v.colors[st.tool].name = t.value;
     else if (t.matches('[data-ccolor]')) v.colors[st.tool].color = t.value;
     else if (t.matches('[data-cwork]')) st.drafts[st.selected] = L.colorWork(v, st.tool, t.checked);
+    else if (t.matches('[data-push]')) { st.push = t.checked; return; }
     else if (t.dataset.k) v.items[i].bars[t.closest('[data-bar]').dataset.bar][t.dataset.k] = t.value;
     else return;
     if (t.matches('[data-cwork]') && Object.values(st.open).some(Boolean)) sheet(); else numbers(); // the bars typed to the day changed with it
   };
 
   // Painting: the day pressed takes what is picked above the sheet, or is cleared if it already had it, and so do the
-  // days of that item dragged across, from the day pressed to the one the pointer is over.
+  // days of that item dragged across, from the day pressed to the one the pointer is over. Each move of the pointer
+  // paints again from the items as they were when the button went down, so dragging back gives the days back.
   // mousedown, not click: a touch sends it only for a tap, so scrolling the sheet with a finger paints nothing.
   let paint = null;
   const paintAt = e => {
-    const td = e.target.closest?.('.bc-cell'), i = td?.parentElement.dataset.item, v = open();
+    const td = e.target.closest?.('.bc-cell'), i = td && (td.parentElement.dataset.item ?? 'all'), v = open();
     if (!td || (paint && paint.i !== i)) return;
     const day = Number(td.dataset.cell) + 1;
     if (!paint) {
-      const had = L.dayFills(L.draftVersion(v).items[i], v.colors, day)[day - 1];
-      paint = { i, from: day, item: v.items[i], tool: had === st.tool ? 'erase' : st.tool };
+      const made = L.draftVersion(v), had = (i === 'all' ? L.suspendedFills(made, v.colors, day) : L.dayFills(made.items[i], v.colors, day))[day - 1];
+      const idle = k => v.colors[k]?.work === false, erase = st.tool === 'erase' || had === st.tool;
+      // Days of no work are put in, or taken out, with the later work moved (where that is ticked); the Whole project row does nothing else.
+      const move = (st.push || i === 'all') && idle(erase ? had : st.tool);
+      if (i === 'all' && !move) return;
+      paint = { i, from: day, items: v.items, tool: erase ? 'erase' : st.tool, move };
     }
-    v.items[i] = L.paintDays(paint.item, Math.min(paint.from, day), Math.max(paint.from, day), paint.tool, v.colors);
-    if (st.open[i]) sheet(); else numbers();
+    const a = Math.min(paint.from, day), b = Math.max(paint.from, day), { tool, move } = paint;
+    const one = item => (!move ? L.paintDays(item, a, b, tool, v.colors) : tool === 'erase' ? L.removeDays(item, a, b) ?? L.paintDays(item, a, b, tool, v.colors) : L.insertDays(item, a, b, tool));
+    v.items = i === 'all' ? L.suspendDays(paint.items, a, b, tool) : paint.items.map((item, j) => (j === Number(i) ? one(item) : item));
+    if (i === 'all' ? Object.values(st.open).some(Boolean) : st.open[i]) sheet(); else numbers();
   };
   el.onmousedown = e => { paint = null; if (e.button === 0 && e.target.closest('.bc-cell')) { e.preventDefault(); paintAt(e); } };
   el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); };

@@ -356,6 +356,16 @@ is read only.
   the bar and those of a colour of work join it (`L.dayFills` is what each day shows, `L.colorWork` and
   `L.dropColor` the tick and the removal). A revised chart starts with the colours and coloured days of the chart
   before it. Nothing about them is read from the Documents. The legend is under the sheet and on the print.
+  **A suspension** is drawn once on the **Whole project** row above the items (editors only): dragged with a colour
+  of no work, those days are put into every item that still has work on or after them (`L.suspendDays`,
+  `L.insertDays`), an item under way being cut there and its later work, like the items not started, moving later by
+  as many days, so no day of work is lost and the months follow. The row shows the days of no work that an item has
+  (`L.suspendedFills`); the same days dragged there again, or with Erase, are taken out and the work moves back
+  (`L.removeDays`, never from an item that works on them). On one item's row it does the same for that item, while
+  **Days with no work move the later work** is ticked; unticked, such days only take the item's work off them.
+  **An empty month** goes in with the **+** on a month's heading: 30 blank days before that month in every item
+  that still has work from there on (`L.suspendDays` with no colour), the later work moving a month. A month with
+  no work and no coloured day in any item, and work after it, has an **×** that takes it out (`L.emptyMonths`).
   The errors that keep Save off are the app's (`L.chartErrors`): a name, the contract total, a revised chart's date,
   bars that read, on a revised chart a name of its own for every item (a Partial suspension and the item targets go
   by name), and a name for every colour. The original chart totals the original contract, a revised one the original
