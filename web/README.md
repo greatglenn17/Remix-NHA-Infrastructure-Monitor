@@ -213,13 +213,14 @@ is read only.
   order guard puts back an approved order a Field Engineer deleted, and it must still find its file. storage.rules
   lets only the Super Admin delete a file, and lets an assigned writer overwrite one only with the same bytes (a
   retried upload). A file uploaded for a record that then fails to save stays too.
-- **New weekly report** (Progress → Weekly) is the app's weekly report form without its photo and weather steps:
+- **New weekly report** (Progress → Weekly) is the app's weekly report form without its weather step:
   the week (7 days from the first day picked, the Saturday of this week to start), the three accomplishment lines,
-  manpower, equipment, activities and issues. With an approved bar chart the targets are its plan for the week's last
+  manpower, equipment, activities, issues and **Add photos** (a title for each photo picked). With an approved bar chart the targets are its plan for the week's last
   day and have no boxes; without one they are typed, weighted by the Scope of Works. Save adds the `weekly_reports`
   record (`L.newWeeklyReport`), sets the project's target and actual accomplishment, and writes the
-  app's "Report Creation" audit entry. The new report has no photos and no weather log: add them with **Add photos**
-  and **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
+  app's "Report Creation" audit entry. Photos picked in the form are uploaded, then saved with the report, and the
+  first becomes the project's card photo; picked on **Edit**, they go after the report's own. The new report has no
+  weather log: add it with **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
   A new report's Actual % boxes, where it has them, start from the report of the latest week
   (`L.carriedActuals`).
 - **A week takes its Actual % from the latest abstract on or before its last day** (`L.abstractForWeek`,
@@ -448,7 +449,7 @@ is read only.
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
   the app's "Edited Weekly Report" audit entry and, in the same transaction, points the project's card photo
   (`latestUpdatePhotoUrl` on `projects/{id}`, one revision up) at the newest report photo left, as the app's
-  `refreshSitePhoto` does. This is the site's only write to a project document. A photo added here has no time or GPS
+  `refreshSitePhoto` does. A photo added here has no time or GPS
   (the site does not read EXIF) and no geo-tag stamp.
 - **Photos** opens with a notice when a weekly report lists a photo Storage cannot give (`loadMissingPhotos`,
   `L.missingPhotos`): how many, and each report by its week, with **Edit photos** for the people who can edit, to take

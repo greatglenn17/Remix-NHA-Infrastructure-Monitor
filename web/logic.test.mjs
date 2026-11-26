@@ -776,6 +776,12 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   assert.equal(L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }], [{ asOf: '2026-01-30' }]).projectFields, null);
   // No dates on the project: day counts are 0, as on the phone.
   assert.deepEqual((({ daysElapsed, remainingDays }) => [daysElapsed, remainingDays])(JSON.parse(L.newWeeklyReport(f, {}, 'x').build({}).data)), [0, 0]);
+  // Photos picked in the form are saved with the report, and the first is the project's card photo even for a late entry.
+  const shot = L.newWeeklyReport(f, project, 'x', [{ uuid: 'later', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }], [], [['nhafile:p/n1.jpg', 'Slab'], ['nhafile:p/n2.jpg', '']]);
+  const shotData = JSON.parse(shot.build({}).data);
+  assert.deepEqual(JSON.parse(shotData.attachedPhotoUrlsJson), ['nhafile:p/n1.jpg', 'nhafile:p/n2.jpg']);
+  assert.deepEqual(JSON.parse(shotData.photoDetailsJson), { 'nhafile:p/n1.jpg': { title: 'Slab', takenAt: '' }, 'nhafile:p/n2.jpg': { title: '', takenAt: '' } });
+  assert.deepEqual(shot.projectFields, { latestUpdatePhotoUrl: 'nhafile:p/n1.jpg' });
 });
 
 test('weekly report edit: the form starts from the saved report, keeps what it does not show, and deletes like the phone', () => {
@@ -812,6 +818,11 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   assert.deepEqual(JSON.parse(edit.changes.issuesJson), [{ description: 'Rain', actionTaken: 'Moved', remarks: 'see log', actionBy: 'Contractor/Developer' }]);
   assert.deepEqual(edit.projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5 });
   assert.deepEqual(edit.audit, { actionType: 'Edited Weekly Report', details: 'Modified report for Week 7: February 14 - February 20, 2026' });
+  // A photo picked in the form goes after the report's own; the card photo is still the newest report's first.
+  const withShot = L.editedWeeklyReport(report, f, project, [{ ...report, createdAtTimestamp: 5 }], [], [['nhafile:p/n.jpg', 'Gate']]);
+  assert.deepEqual(JSON.parse(withShot.changes.attachedPhotoUrlsJson), ['nhafile:p/a.jpg', 'nhafile:p/n.jpg']);
+  assert.deepEqual(JSON.parse(withShot.changes.photoDetailsJson), { 'nhafile:p/n.jpg': { title: 'Gate', takenAt: '' } });
+  assert.deepEqual(withShot.projectFields, { targetAccomplishment: 20, actualAccomplishment: 20.5, latestUpdatePhotoUrl: 'nhafile:p/a.jpg' });
 
   // A day later: the label is rewritten, the day counts move, and weather outside the new week is dropped.
   const moved = L.editedWeeklyReport(report, { ...f, first: '2026-02-15' }, project);
