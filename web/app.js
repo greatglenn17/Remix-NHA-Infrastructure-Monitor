@@ -1288,6 +1288,8 @@ function drawProject(page) {
   if (projectDrive) projectDrive.onclick = () => driveForm(c);
   const weeklyAdd = document.getElementById('weekly-add');
   if (weeklyAdd) weeklyAdd.onclick = () => weeklyForm(c);
+  // Details shows the row under its report, and the page remembers it across a redraw.
+  main.querySelectorAll('[data-rep-details]').forEach(b => { b.onclick = () => { const row = b.closest('tr').nextElementSibling; row.hidden = !row.hidden; b.setAttribute('aria-expanded', !row.hidden); page.openWeekly = { ...page.openWeekly, [b.dataset.repDetails]: !row.hidden }; }; });
   main.querySelectorAll('[data-edit-weekly]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editWeekly); if (r) weeklyForm(c, r); }; });
   const billingAdd = document.getElementById('billing-add');
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
@@ -1833,7 +1835,9 @@ function progressBody(c, chip) {
   const editable = L.canEdit(c.project, s.user.uid, s.claims);
   const add = editable ? `<button class="btn weekly-add" id="weekly-add">${icon('add_circle', 'sm')}New weekly report</button>` : '';
   if (!c.weekly.length) return `${add}<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
-  return `<div class="list-head">${add}<h2 class="list-title">NHA weekly project engineer's report</h2></div><div class="stack reports">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
+  return `<section class="card section weekly-list"><div class="list-head">${add}<h2 class="list-title">NHA weekly project engineer's report</h2></div>
+    ${table(['Reporting week', 'Submitted by', { text: 'Day', num: 1 }, { text: 'Days left', num: 1 }, { text: 'Target %', num: 1 }, { text: 'Actual %', num: 1 }, { text: 'Variance %', num: 1 }, { text: 'From previous', num: 1 }, { text: 'Photos', num: 1 }, ''],
+      c.weekly.map(r => reportRows(r, c.weekly, c.page.id, editable, c.page.openWeekly?.[r.uuid])).join(''))}</section>`;
 }
 
 const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
@@ -1843,8 +1847,8 @@ const equipmentLevel = status => (/^operational$/i.test(status.trim()) ? 'ok' : 
 /** varianceColor as a text colour class; small slips stay grey. */
 const noteLevel = v => { const lv = L.varianceLevel(Math.round(v * 100) / 100); return lv === 'neutral' ? 'muted' : lv; };
 
-/** WeeklyReportCard: week, who and when, actual against target; the report's five tables and photos under "Report details". */
-function reportCard(r, all, pid, editable = false) {
+/** WeeklyReportCard as a table row: week, who and when, actual against target; the report's five tables and photos in the row under it, shown by Details. */
+function reportRows(r, all, pid, editable = false, open = false) {
   const target = Number(r.targetAccomplishmentPct) || 0, actual = Number(r.actualAccomplishmentPct) || 0;
   const prev = L.previousReport(all, r);
   const acc = L.accomplishmentOf(r.accomplishmentItemsJson);
@@ -1852,16 +1856,12 @@ function reportCard(r, all, pid, editable = false) {
   const photos = L.attachmentList(r.attachedPhotoUrlsJson);
   const vCell = (v, tag = 'td') => `<${tag} class="num n-${noteLevel(v)}">${signedPct(v)}</${tag}>`;
   const crew = manpower.reduce((t, m) => t + m.count, 0);
-  return `<article class="card report">
-    <div class="rep-head">
-      <div class="rep-week"><h3>${esc(r.reportingWeek)}</h3><p class="muted">${esc(r.submittedByStaff || '-')} · Day ${esc(r.daysElapsed ?? 0)}, ${esc(r.remainingDays ?? 0)} days left</p></div>
-      <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-        <span class="muted">Filed against ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
-      <div class="rep-actions">${editable ? `<button class="text-btn" data-edit-weekly="${esc(r.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
-        <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
-    </div>
-    <details>
-      <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
+  return `<tr class="rep-row"><td><b>${esc(r.reportingWeek)}</b></td><td>${esc(r.submittedByStaff || '-')}</td><td class="num">${esc(r.daysElapsed ?? 0)}</td><td class="num">${esc(r.remainingDays ?? 0)}</td>
+      <td class="num">${pct(target)}</td><td class="num"><b>${pct(actual)}</b></td>${vCell(actual - target)}<td class="num">${prev ? signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0)) : '-'}</td><td class="num">${photos.length}</td>
+      <td><div class="rep-actions"><button class="text-btn" data-rep-details="${esc(r.uuid)}" aria-expanded="${!!open}">${icon('expand_more', 'sm')}Details</button>
+        ${editable ? `<button class="text-btn" data-edit-weekly="${esc(r.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
+        <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div></td></tr>
+    <tr class="rep-detail"${open ? '' : ' hidden'}><td colspan="10">
       <div class="rep-body">
         <h4>1. Weekly accomplishment status</h4>
         ${table(['Item', { text: 'Target', num: 1 }, { text: 'Actual', num: 1 }, { text: 'Variance', num: 1 }],
@@ -1883,8 +1883,7 @@ function reportCard(r, all, pid, editable = false) {
         ${photos.length ? photoGrid(photos, L.photoDetails(r.photoDetailsJson)) : ''}
         ${editable ? photosButton(r, photos.length) : ''}
       </div>
-    </details>
-  </article>`;
+    </td></tr>`;
 }
 
 /** Opens editPhotos for a weekly report. */

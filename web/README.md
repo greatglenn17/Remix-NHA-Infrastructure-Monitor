@@ -443,7 +443,7 @@ is read only.
   weekly figures, prepared by the signed-in name), a later one changes only the text; each writes the app's audit
   entry (`L.monthlyAudit`). The phone's own monthly form (`AddMonthlyReportDialog`) has no button that opens it and
   no recommendations box, and its workable-day counts are printed nowhere, so the rest of that form is not here.
-- **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → Report details, and each album under
+- **Edit photos** / **Add photos** on a weekly report (Progress → Weekly reports → a row's Details, and each album under
   Photos) is the app's photo strip for a report already saved: a title for each photo, take one off, add more (stored
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
   the app's "Edited Weekly Report" audit entry and, in the same transaction, points the project's card photo
