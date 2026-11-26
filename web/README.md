@@ -346,7 +346,7 @@ is read only.
   drag across an item's row, paints the days from the one pressed to the one under the pointer, or clears them when
   the first already had what is picked (`L.paintDays`; a touch paints on a tap only, so a finger can scroll the
   sheet); an item's **Days** opens its bar(s) as From month and day, To month and day (a month is 30 days from the
-  start date); **Add month** draws one more month (Undo takes it back), and **Revised chart** adds a chart. A revised chart's items also
+  start date); **Add month** draws one more month (Undo takes it back), **−**, **+** and **Fit** under the sheet zoom it (Fit: the whole chart across the screen; for viewers too), and **Revised chart** adds a chart. A revised chart's items also
   take a name and a cost in the sheet, with **Add item** and a remove button on each, for a revision that changes
   the money; the original keeps the Scope of Works' (or the Excel file's).
   **Colours** are the chart's own (`colors` on a version, `marks` of [from day, to day, colour] on an item, saved
