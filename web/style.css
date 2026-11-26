@@ -668,11 +668,14 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .album { margin-bottom: 12px; }
 .album > .muted { font-size: 13px; margin-bottom: 10px; }
 /* Monthly */
-.month-head { padding-top: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; } /* Print beside the month */
-.month-head .field { flex: 0 1 320px; }
+/* The monthly figures: the month, Print, the title and where the month stands on one row, and a card no wider than they need, so four short columns are not stretched across the screen. */
+.section.month { width: fit-content; max-width: 100%; }
+.month-head { padding: 12px 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.month-head .field { flex: none; display: flex; align-items: center; gap: 8px; }
+.month .grid-table th, .month .grid-table td { padding: 5px 10px; }
 .month-head select, .wx select { font: 600 15px var(--sans); color: var(--text); background: var(--field); border: 1px solid var(--outline); border-radius: 8px; padding: 10px 12px; min-height: 44px; width: 100%; }
-.month h2 { font-size: 16px; font-weight: 600; margin: 16px 0 6px; }
-.month > p { margin-bottom: 12px; }
+.month-head select { width: auto; padding: 8px 12px; min-height: 40px; }
+.month h2 { font-size: 16px; font-weight: 600; margin: 0 0 0 4px; }
 
 /* Billing summary: label and amount stay within reach of each other on a wide screen or projector. */
 .bill-sum { max-width: 560px; }

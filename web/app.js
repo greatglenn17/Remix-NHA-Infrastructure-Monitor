@@ -1914,9 +1914,9 @@ function monthlyView({ page, weekly, of, now }) {
     <div class="month-head">
       <label class="field">Month <select id="month">${months.map(m => `<option${m === month ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select></label>
       ${key ? `<a class="text-btn" href="#/p/${esc(page.id)}/print/${key}">${icon('print', 'sm')}Print</a>` : ''}
+      <h2>Monthly accomplishment report – ${esc(month)}</h2>
+      <span class="badge lv-${level}">${v >= 0 ? `Ahead (${signedPct(v)})` : `Slippage (${signedPct(v)})`}</span>
     </div>
-    <h2>Monthly accomplishment report – ${esc(month)}</h2>
-    <p><span class="badge lv-${level}">${v >= 0 ? `Ahead (${signedPct(v)})` : `Slippage (${signedPct(v)})`}</span></p>
     ${rows.length ? table(['Reporting week', { text: 'Target %', num: 1 }, { text: 'Actual %', num: 1 }, { text: 'Variance %', num: 1 }],
       rows.map(r => { const rv = (Number(r.actualAccomplishmentPct) || 0) - (Number(r.targetAccomplishmentPct) || 0);
         return `<tr><td>${esc(r.reportingWeek)}</td><td class="num">${pct(r.targetAccomplishmentPct)}</td><td class="num">${pct(r.actualAccomplishmentPct)}</td><td class="num n-${noteLevel(rv)}"><b>${signedPct(rv)}</b></td></tr>`; }).join(''),
