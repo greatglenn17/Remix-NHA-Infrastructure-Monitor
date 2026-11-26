@@ -569,29 +569,31 @@ a.file:not([href]) { color: var(--text-2); cursor: progress; }
 .file.gone { color: var(--text-2); font-weight: 400; text-decoration: line-through; cursor: default; }
 span.file.gone { text-decoration: none; }
 
-/* Weekly report cards (WeeklyReportCard) */
-/* A weekly report: its week, who and when, the figures and its buttons on one row where there is room, the details under it. */
-.report { padding: 8px 14px 2px; }
+/* Weekly reports (WeeklyReportCard) */
+/* One table: a report is a row (its week, who and when, the figures, its buttons) and Details shows its tables and photos in the row under it. */
 .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 8px; }
 .list-head .weekly-add, .list-head .list-title { margin: 0; }
-.stack.reports { gap: 8px; }
-.rep-head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
-.rep-week { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
-.rep-head h3 { font-size: 16px; font-weight: 600; }
-.rep-head p { font-size: 13px; }
-.rep-actions { display: flex; flex: none; gap: 8px; margin-left: auto; }
+.weekly-list > .scroll { container-type: inline-size; }
+.weekly-list > .scroll > .grid-table > thead th { white-space: nowrap; }
+.grid-table .rep-row > td { padding: 4px 10px; vertical-align: middle; }
+.rep-row > td:first-child { min-width: 150px; }
+.rep-row > td:last-child { width: 1%; }
+.rep-actions { display: flex; gap: 8px; }
 .rep-actions .text-btn { padding: 6px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.rep-actions .text-btn:hover { background: var(--primary-container); border-color: var(--link); }
-.rep-figures { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; }
+.rep-actions .text-btn:hover, .rep-actions [aria-expanded="true"] { background: var(--primary-container); border-color: var(--link); }
+@media (pointer: fine) { .rep-actions .text-btn { min-height: 32px; padding: 4px 10px; } } /* a mouse needs less than a finger */
+.rep-actions .text-btn .icon { transition: transform 150ms ease-out; }
+.rep-actions [aria-expanded="true"] .icon { transform: rotate(180deg); }
+/* The details stay as wide as the screen when a narrow one scrolls the table sideways. */
+.grid-table .rep-detail > td { padding: 10px 10px 14px; background: var(--surface-variant); }
+.rep-detail .rep-body { position: sticky; left: 10px; width: calc(100cqw - 22px); }
 details.curve { margin-top: 10px; border-top: 1px solid var(--border); }
-.report details[open] { margin-top: 4px; border-top: 1px solid var(--border); padding-bottom: 12px; }
-@media (pointer: fine) { .report details > summary { min-height: 32px; } } /* a mouse needs less than a finger */
 .more-alerts > .alerts { margin-top: 8px; }
 .fold { margin-top: 6px; }
-.report summary, .curve summary, .plan-tools summary, .more-alerts summary, .fold summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
-.report summary::-webkit-details-marker, .curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker, .more-alerts summary::-webkit-details-marker, .fold summary::-webkit-details-marker { display: none; }
-.report summary .icon, .curve summary .icon, .plan-tools summary .icon, .more-alerts summary .icon, .fold summary .icon { transition: transform 150ms ease-out; }
-.report details[open] summary .icon, .curve[open] summary .icon, .plan-tools[open] summary .icon, .more-alerts[open] summary .icon, .fold[open] summary .icon { transform: rotate(180deg); }
+.curve summary, .plan-tools summary, .more-alerts summary, .fold summary { list-style: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--link); }
+.curve summary::-webkit-details-marker, .plan-tools summary::-webkit-details-marker, .more-alerts summary::-webkit-details-marker, .fold summary::-webkit-details-marker { display: none; }
+.curve summary .icon, .plan-tools summary .icon, .more-alerts summary .icon, .fold summary .icon { transition: transform 150ms ease-out; }
+.curve[open] summary .icon, .plan-tools[open] summary .icon, .more-alerts[open] summary .icon, .fold[open] summary .icon { transform: rotate(180deg); }
 .rep-body h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
 .rep-body h4:first-child { margin-top: 2px; }
 .grid-table { font-size: 13px; }
@@ -677,7 +679,6 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .album > .muted { font-size: 13px; margin-bottom: 10px; }
 /* Monthly */
 /* The monthly figures: the month, Print, the title and where the month stands on one row, and a card no wider than they need, so four short columns are not stretched across the screen. */
-.section.month { width: fit-content; max-width: 100%; }
 .month-head { padding: 12px 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .month-head .field { flex: none; display: flex; align-items: center; gap: 8px; }
 .month .grid-table th, .month .grid-table td { padding: 5px 10px; }
