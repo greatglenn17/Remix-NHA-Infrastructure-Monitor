@@ -787,9 +787,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 /* The bar chart: one long sheet as its pages side by side, each a slice of it, shrunk to fit across the screen (--fit, drawChartPrint). */
 .bb.tiles { display: flex; width: fit-content; zoom: var(--fit, 1); }
 .bb.tiles.big { zoom: 1; margin: 0; } /* Full size: scrolled sideways */
-.bb .tile { flex: none; overflow: hidden; }
+.bb .bc-slice { flex: none; overflow: hidden; }
 .bb.tiles img.banner { height: 22mm; } /* its room before it loads: the sheet is measured as it is drawn */
-.bb .tile + .tile { border-left: 1px dashed #777; } /* where the paper is cut */
+.bb .bc-slice + .bc-slice { background: repeating-linear-gradient(#777 0 4px, transparent 4px 8px) left / 1px 100% no-repeat; } /* where the paper is cut: drawn, so it takes no room */
 .bb table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
 /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
 .bb table.apa-info td:nth-child(3) { width: 100%; }
@@ -821,8 +821,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
   .bb-scroll { overflow: visible; padding: 0; }
   .bb { width: auto; padding: 0; margin: 0; box-shadow: none; }
   .bb.tiles { display: block; zoom: 1; }
-  .bb .tile { zoom: var(--z, 1); } /* onto the paper picked, and a tall sheet onto the page (drawChartPrint) */
-  .bb .tile + .tile { border-left: 0; break-before: page; }
+  .bb .bc-slice { zoom: var(--z, 1); } /* onto the paper picked, and a tall sheet onto the page (drawChartPrint) */
+  .bb .bc-slice + .bc-slice { background: none; break-before: page; }
 }
 
 /* Lots (SubdivisionPlanTab, read-only): a one-line count, filters, and each block's lots as coloured squares. */
