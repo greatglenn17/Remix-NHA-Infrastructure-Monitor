@@ -3694,6 +3694,29 @@ async function uploadFile(c, [blob, ext, contentType]) {
   return refText;
 }
 
+/** Add photos in a form; photoPicker gives each photo picked a title box under it. */
+const PHOTO_FIELD = '<label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label><div class="photo-new"></div>';
+
+/** PHOTO_FIELD at work in `form`: `titles()` are the titles typed, `upload()` stores the photos and gives [[reference, title]]. */
+function photoPicker(c, form) {
+  const fresh = form.querySelector('.photo-new');
+  form.photos.onchange = () => {
+    fresh.innerHTML = [...form.photos.files].map((file, i) => `<label class="field">Title for ${esc(file.name)}<input data-new-title="${i}" autocomplete="off"></label>`).join('');
+  };
+  const titles = () => [...form.photos.files].map((_, i) => fresh.querySelector(`[data-new-title="${i}"]`)?.value.trim() || '');
+  return { titles, upload: async () => {
+    // Every photo is prepared before the first upload, so a file that is not a photo stops the save with nothing sent.
+    const blobs = [], captions = titles(), added = [];
+    for (const file of form.photos.files) {
+      const blob = await attachmentBlob(file, L.PHOTO_MAX_EDGE);
+      if (blob[1] === 'pdf') throw new Error('Only photos can be added here.');
+      blobs.push(blob);
+    }
+    for (const [i, blob] of blobs.entries()) added.push([await uploadFile(c, blob), captions[i]]);
+    return added;
+  } };
+}
+
 /**
  * A weekly report's site photos, as AddWeeklyReportDialog's photo strip: a title for each, take one off, add more.
  * Save rewrites only the report's two photo columns, with the app's "Edited Weekly Report" entry, and points the
@@ -3714,20 +3737,15 @@ function editPhotos(c, report) {
       <div><label class="field">Title<input data-title="${i}" value="${esc(details[refText]?.title || '')}" autocomplete="off"></label>
         <label class="check"><input type="checkbox" data-drop="${i}">Remove this photo</label></div>
     </li>`).join('')}</ul>` : emptyLine('No photos on this report yet.')}
-    <label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label>
-    <div class="photo-new"></div>
+    ${PHOTO_FIELD}
     <div class="form-foot"><p class="error" role="alert"></p>
     <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
-  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), fresh = d.querySelector('.photo-new');
-  // Each picked photo gets a title box of its own.
-  form.photos.onchange = () => {
-    fresh.innerHTML = [...form.photos.files].map((file, i) => `<label class="field">Title for ${esc(file.name)}<input data-new-title="${i}" autocomplete="off"></label>`).join('');
-  };
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn'), picker = photoPicker(c, form);
   const values = () => ({
     titles: Object.fromEntries(refs.map((refText, i) => [refText, form.querySelector(`[data-title="${i}"]`).value.trim()])),
     removed: refs.filter((_, i) => form.querySelector(`[data-drop="${i}"]`).checked),
-    newTitles: [...form.photos.files].map((_, i) => fresh.querySelector(`[data-new-title="${i}"]`)?.value.trim() || ''),
+    newTitles: picker.titles(),
   });
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
@@ -3741,16 +3759,7 @@ function editPhotos(c, report) {
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
-      // Every photo is prepared before the first upload, so a file that is not a photo stops the save with nothing sent.
-      const blobs = [];
-      for (const file of form.photos.files) {
-        const blob = await attachmentBlob(file, L.PHOTO_MAX_EDGE);
-        if (blob[1] === 'pdf') throw new Error('Only photos can be added here.');
-        blobs.push(blob);
-      }
-      const added = [];
-      for (const [i, blob] of blobs.entries()) added.push([await uploadFile(c, blob), f.newTitles[i]]);
-      const changes = L.editedPhotos(report, { titles: f.titles, removed: f.removed, added });
+      const changes = L.editedPhotos(report, { titles: f.titles, removed: f.removed, added: await picker.upload() });
       const cover = L.latestSitePhoto(c.weekly.map(r => (r.uuid === report.uuid ? { ...r, ...changes } : r)));
       await saveEdits(c, [[report, changes, { actionType: 'Edited Weekly Report', details: `Modified report for ${report.reportingWeek}` }]], 'weekly report', { latestUpdatePhotoUrl: cover });
       done(); savedNote();
@@ -3765,9 +3774,10 @@ function editPhotos(c, report) {
 }
 
 /**
- * AddWeeklyReportDialog's Week, Crew and Work steps as one form, for a new report or a saved one (`report`). The
- * report's photos and 24-hour weather are changed on the saved report (Add photos, Edit weather). With an approved bar
- * chart the targets are its plan for the week's last day; they follow the week picked.
+ * AddWeeklyReportDialog's Week, Crew and Work steps as one form, for a new report or a saved one (`report`), with its
+ * photo strip's Add photos. A saved report's photos are retitled or taken off, and its 24-hour weather logged, on the
+ * report itself (Edit photos, Edit weather). With an approved bar chart the targets are its plan for the week's last
+ * day; they follow the week picked.
  */
 function weeklyForm(c, report = null) {
   const d = document.createElement('dialog');
@@ -3776,7 +3786,7 @@ function weeklyForm(c, report = null) {
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   // A saved value outside the list stays a choice, so opening and saving does not change it.
   const pick = (choices, cur = '') => (cur && !choices.includes(cur) ? [cur, ...choices] : choices).map(v => opt(v, v, cur)).join('');
-  const text = (r, key) => esc(r[key] || '');
+  const text = (r, key) => esc(r[key] || ''), had = report ? L.attachmentList(report.attachedPhotoUrlsJson).length : 0;
   const count = r => `<label class="field n">No.<input data-f="count" type="number" min="0" step="1" value="${esc(r.count ?? 1)}"></label>`;
   // Remarks the form has no box for ride along, so an edit keeps them.
   const kept = r => `<input type="hidden" data-f="remarks" value="${text(r, 'remarks')}">`;
@@ -3808,12 +3818,15 @@ function weeklyForm(c, report = null) {
     ${list('equipment', 'Equipment', 'Add equipment')}
     ${list('activities', 'Activities of the week', 'Add activity')}
     ${list('issues', 'Issues encountered / action taken', 'Add issue')}
+    <h3>Site photos</h3>
+    ${had ? `<p class="muted small">This report has ${plural(had, 'photo')}. Edit photos in its Details retitles or removes them.</p>` : ''}
+    ${PHOTO_FIELD}
     <datalist id="wk-designations">${L.MANPOWER_DESIGNATIONS.map(v => opt(v)).join('')}</datalist>
     <datalist id="wk-equipment">${L.EQUIPMENT_NAMES.map(v => opt(v)).join('')}</datalist>
     <div class="form-foot"><div class="error" role="alert"></div>
     <div class="actions">${report && L.canDeleteReport(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete report</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
-  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn');
+  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn'), picker = photoPicker(c, form);
   const box = d.querySelector('#wk-lines');
   let lines = [];
   const rowsOf = kind => [...form.querySelectorAll(`[data-rows="${kind}"] .wk-row`)].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value])));
@@ -3821,7 +3834,7 @@ function weeklyForm(c, report = null) {
   const values = () => {
     const now = typed();
     return { first: form.first.value, lines: lines.map((l, k) => ({ name: l.name, weightPct: l.weightPct, ...now[k] })),
-      manpower: rowsOf('manpower'), equipment: rowsOf('equipment'), activities: rowsOf('activities'), issues: rowsOf('issues') };
+      manpower: rowsOf('manpower'), equipment: rowsOf('equipment'), activities: rowsOf('activities'), issues: rowsOf('issues'), photos: picker.titles() };
   };
   const total = () => {
     const t = L.weeklyTotals(values().lines);
@@ -3876,11 +3889,12 @@ function weeklyForm(c, report = null) {
     if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
     save.disabled = true; err.textContent = '';
     try {
+      const photos = await picker.upload();
       if (report) {
-        const edit = L.editedWeeklyReport(report, f, c.project, c.weekly, abstracts);
+        const edit = L.editedWeeklyReport(report, f, c.project, c.weekly, abstracts, photos);
         await saveEdits(c, [[report, edit.changes, edit.audit]], 'weekly report', edit.projectFields);
       } else {
-        const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly, abstracts);
+        const added = L.newWeeklyReport(f, c.project, s.profile.name || s.user.email, c.weekly, abstracts, photos);
         await addRecords(c, [[added.build, added.audit]], added.projectFields);
       }
       done(); savedNote();

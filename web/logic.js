@@ -2236,17 +2236,19 @@ function projectFollows(weekly, uuid, reportingWeek, target, actual, abstracts =
 /**
  * A new weekly report from the form: `build` makes the weekly_reports record as RecordSync uploads one,
  * `projectFields` are the project's target and actual saved with it (projectFollows; the target alone while the
- * project has `abstracts`), `audit` its entry. Photos and weather start empty: the report's Add photos and Edit weather fill them.
+ * project has `abstracts`), `audit` its entry. `photos` are the ones picked in the form, as [reference, title]: the
+ * first becomes the project's card photo, this being the newest report. Weather starts empty: Edit weather fills it.
  */
-export function newWeeklyReport(f, project, user, weekly = [], abstracts = []) {
+export function newWeeklyReport(f, project, user, weekly = [], abstracts = [], photos = []) {
   const data = weeklyFields(f, project), { reportingWeek, targetAccomplishmentPct: target, actualAccomplishmentPct: actual } = data;
+  const follows = projectFollows(weekly, null, reportingWeek, target, actual, abstracts);
   return {
     build: ({ uuid, projectUuid, assignedUids, uid, now }) => ({
       uuid, type: 'weekly_reports', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
-      data: JSON.stringify({ ...data, documentsIssuedReceivedJson: '[]', attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}', submittedByStaff: user,
+      data: JSON.stringify({ ...data, documentsIssuedReceivedJson: '[]', ...editedPhotos({}, { added: photos }), submittedByStaff: user,
         createdAtTimestamp: now, _weather: [] }),
     }),
-    projectFields: projectFollows(weekly, null, reportingWeek, target, actual, abstracts),
+    projectFields: photos.length ? { ...follows, latestUpdatePhotoUrl: photos[0][0] } : follows,
     audit: { actionType: 'Report Creation', details: `Submitted Weekly Report for ${reportingWeek}`, newValue: `Week: ${reportingWeek}, Target: ${target}%, Actual: ${actual}%` },
   };
 }
@@ -2268,15 +2270,17 @@ export function weeklyStart(report) {
  * The form's edit of a saved report (MainActivity's reportToEdit.copy, updateWeeklyReportWithWeather): the columns it
  * writes, the project's target and actual (projectFollows), and the phone's audit entry. The week's label is kept unless its first day
  * was changed (an older "Week 42: ..." label stays); then weather logged for days outside the new week is dropped.
- * Photos and the rest of the weather are left alone.
+ * `photos` picked in the form ([reference, title]) are added after the report's own, and the project's card photo is
+ * set again (latestSitePhoto). The photos it had and the rest of the weather are left alone.
  */
-export function editedWeeklyReport(report, f, project, weekly = [], abstracts = []) {
+export function editedWeeklyReport(report, f, project, weekly = [], abstracts = [], photos = []) {
   const fields = weeklyFields(f, project), moved = weekDays(report.reportingWeek)[0] !== f.first;
-  const days = weekDays(fields.reportingWeek);
-  const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek,
+  const days = weekDays(fields.reportingWeek), shots = photos.length ? editedPhotos(report, { added: photos }) : {};
+  const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek, ...shots,
     ...(moved && Array.isArray(report._weather) ? { _weather: report._weather.filter(w => days.includes((w.date || '').trim())) } : {}) };
+  const follows = projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct, abstracts);
   return {
-    changes, projectFields: projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct, abstracts),
+    changes, projectFields: photos.length ? { ...follows, latestUpdatePhotoUrl: latestSitePhoto(weekly.map(r => (r.uuid === report.uuid ? { ...r, ...shots } : r))) } : follows,
     audit: { actionType: 'Edited Weekly Report', details: `Modified report for ${changes.reportingWeek}` },
   };
 }
