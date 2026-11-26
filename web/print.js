@@ -668,5 +668,5 @@ export function barChartPages({ project, docs, version, index, signatories, bann
     <div class='keep'>${signRow({ ...signatories, approvedName: '', approvedPosition: '', approvedOffice: '' },
     [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval:', 'recommended'], ['Approved by:', 'approved']])}</div>`;
   // The same sheet in every page, moved left by the pages before it: the page shows its own slice of it.
-  return Array.from({ length: n }, (_, p) => `<div class='tile' style='width:${mm(wide)}mm'><div style='width:${mm(n * wide)}mm;margin-left:${mm(-p * wide) || 0}mm'>${sheet}</div></div>`);
+  return Array.from({ length: n }, (_, p) => `<div class='bc-slice' style='width:${mm(wide)}mm'><div style='width:${mm(n * wide)}mm;margin-left:${mm(-p * wide) || 0}mm'>${sheet}</div></div>`);
 }

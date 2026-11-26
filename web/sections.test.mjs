@@ -676,7 +676,7 @@ test('bar chart print: bars to the day, each month\'s share, the S-curve, the ca
   assert.match(pages[0], /<rect x='416\.33' y='10' width='51\.22' height='4' fill='#92D050'\/>/); // 3 months share 461 mm: days 61-70
   // A sheet too tall for the page is drawn wider, to be shrunk onto it: 300 mm pages of a 600 mm sheet.
   const wider = P.barChartPages({ project, docs: [], version: coloured, index: 1, pages: 2, wide: 300, signatories: {} });
-  assert.ok(wider[1].includes("<div class='tile' style='width:300mm'><div style='width:600mm;margin-left:-300mm'>") && wider[1].includes("viewBox='0 0 600 "));
+  assert.ok(wider[1].includes("<div class='bc-slice' style='width:300mm'><div style='width:600mm;margin-left:-300mm'>") && wider[1].includes("viewBox='0 0 600 "));
   // Left to itself: a page for every eight months.
   assert.equal(P.barChartPages({ project, docs: [], version: coloured, index: 1, signatories: {} }).length, 1);
   assert.equal(P.barChartPages({ project, docs: [], version: { items: [{ name: 'A', amount: 1, bars: [[1, 270]] }] }, index: 0, signatories: {} }).length, 2);
