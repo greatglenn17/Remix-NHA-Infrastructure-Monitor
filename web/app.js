@@ -1490,7 +1490,7 @@ function chartState(c) {
   const saved = L.chartDrafts(c.project);
   if (!saved) return (c.page.chart = null);
   const drafts = (L.canEditChart(c.project, s.user.uid, s.claims) && L.keptChart(kept(c, 'chart-draft'), base)) || saved;
-  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true, colNote: '', undo: [], help: false });
+  return (c.page.chart = { seen: base, initial: L.chartJson(saved), count: L.chartVersions(base).length, drafts, selected: Math.min(st?.selected ?? Infinity, drafts.length - 1), notes: [], sheets: [], open: {}, months: 0, tool: 'work', push: true, colNote: '', undo: [], help: false, zoom: st?.zoom ?? 1 });
 }
 
 function chartBody(c) {
@@ -1522,6 +1522,12 @@ function chartPalette(st, v) {
 /** Under the sheet: what the green and each of the chart's colours stand for. Nothing without a colour. */
 const chartLegend = v => (v.colors.length ? `<span>${swatch(WORK_GREEN)}Work</span>${v.colors.map(x => `<span>${swatch(x.color)}${esc(colorName(x))}${x.work ? '' : ' (no work)'}</span>`).join('')}` : '');
 
+/** Under the sheet, for anyone: the sheet smaller or larger, back to 100%, or the whole chart across the screen (Fit). */
+const chartZoom = st => `<div class="chips bc-zoom" role="group" aria-label="Zoom"><button type="button" data-bc="zoom:out" data-zoom="out" aria-label="Zoom out" title="Zoom out">−</button>
+  <button type="button" data-bc="zoom:1" data-zoom="1" data-zoom-at title="Back to 100%">${Math.round(st.zoom * 100)}%</button>
+  <button type="button" data-bc="zoom:in" data-zoom="in" aria-label="Zoom in" title="Zoom in">+</button>
+  <button type="button" data-bc="zoom:fit" data-zoom="fit" title="The whole chart across the screen">Fit</button></div>`;
+
 /** The page under its heading: a tab per chart, Import, Print and Save, the open chart's name and date, what to paint with, and its sheet. */
 function chartPage(c, st, can) {
   const { project } = c, v = st.drafts[st.selected], revised = st.selected > 0;
@@ -1539,7 +1545,7 @@ function chartPage(c, st, can) {
       Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: on the Whole project row
       every item gets an empty day there, on an item's row that item only, and the later work moves a day. Click once for each column you need. Remove column takes a day out
       the same way, where nothing works on it. Undo takes back the last column added or removed, the last days painted or the last month added, one at a time.
-      Point at a day to see where the project is planned to be by the end of it. An item's cost is spread over its days of work, so the percentages and the
+      Point at a day to see where the project is planned to be by the end of it. Under the sheet, − and + make it smaller or larger and Fit shows the whole chart across the screen. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
     ${st.sheets.length ? `<div class="bc-tools" role="group" aria-label="Which sheet?"><b>Which sheet?</b>${st.sheets.map((sh, i) => `<button type="button" class="text-btn" data-pick="${i}">${esc(`${sh.name} · ${sh.items.length} items · ${L.formatPhp(total(sh.items))}`
@@ -1547,7 +1553,7 @@ function chartPage(c, st, can) {
     <ul class="bc-errors" data-errors aria-live="polite"></ul>
     <p class="error" role="alert" data-failed></p>
     ${!v ? '<p class="muted">No bar chart. Saving removes it, and the target % is typed in each weekly report again.</p>'
-      : !can ? `<p class="wk-total">${esc(`${v.label} · from ${L.displayDate(v.effective)}`)}</p><div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}${sum}` : `
+      : !can ? `<p class="wk-total">${esc(`${v.label} · from ${L.displayDate(v.effective)}`)}</p><div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}<div class="bc-tools">${sum}${chartZoom(st)}</div>` : `
       <div class="bc-fields"><label class="field">Name<input data-bc="label" data-label value="${esc(v.label)}"></label>
         ${revised ? `<label class="field">Takes effect on<input type="date" data-bc="effective" data-effective value="${esc(v.effective)}"></label>`
           : `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`}
@@ -1556,7 +1562,7 @@ function chartPage(c, st, can) {
           : '<p class="muted small">The original chart totals the original contract. For a suspension, a time extension or a Variation Order, add a Revised chart and change that one.</p>'}</div>
       <div class="bc-palette" data-palette>${chartPalette(st, v)}</div>
       <div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}
-      <div class="bc-tools">${sum}${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
+      <div class="bc-tools">${sum}${chartZoom(st)}${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
         <button type="button" class="text-btn" data-bc="add-month" data-add-month>${icon('add_circle', 'sm')}Add month</button>
         <button type="button" class="text-btn danger" data-drop-chart>${icon('delete', 'sm')}${st.drafts.length === 1 ? 'Remove the bar chart' : 'Delete this chart'}</button></div>`}`;
 }
@@ -1664,6 +1670,11 @@ function bindChart(c) {
   const leave = () => { st.notes = []; st.sheets = []; st.open = {}; st.months = 0; st.tool = 'work'; st.colNote = ''; st.undo = []; }; // they are about the chart that was open
   numbers();
 
+  // The sheet's zoom, 5% to 200%, kept while the page is open. Fit measures the sheet at 100% and rounds down, so nothing is left to scroll.
+  const zoomTo = z => { st.zoom = Math.min(2, Math.max(0.05, Math.round(z * 1000) / 1000)); el.style.setProperty('--bc-zoom', st.zoom); const at = el.querySelector('[data-zoom-at]'); if (at) at.textContent = `${Math.round(st.zoom * 100)}%`; };
+  const fitZoom = () => { el.style.setProperty('--bc-zoom', 1); const box = el.querySelector('[data-sheet]'); return Math.min(1, Math.floor(box.clientWidth / box.firstElementChild.getBoundingClientRect().width * 1000) / 1000); };
+  zoomTo(st.zoom);
+
   // Pointing at a day shows where the project is planned to be by the end of it: the cumulative %, to the day.
   const tipAt = e => {
     const td = e.target.closest?.('.bc-cell'), v = open();
@@ -1683,6 +1694,8 @@ function bindChart(c) {
   el.onclick = async e => {
     const on = sel => e.target.closest(sel), tab = on('[data-tab]'), v = open(), i = on('[data-item]')?.dataset.item;
     if (tab) { st.selected = Number(tab.dataset.tab); leave(); redraw(`[data-tab="${st.selected}"]`); return; }
+    const zoom = on('[data-zoom]')?.dataset.zoom;
+    if (zoom) { zoomTo(zoom === 'fit' ? fitZoom() : zoom === '1' ? 1 : st.zoom + (zoom === 'in' ? 0.1 : -0.1)); return; }
     if (!can) return;
     // Undo holds the items and the months asked for as they were before each press on the sheet (a column, or days painted) and each Add month. Any other change to
     // the chart empties it, here and where a box is typed in, so it never takes back more than those presses.
