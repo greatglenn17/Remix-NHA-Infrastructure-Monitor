@@ -1538,7 +1538,7 @@ function chartPage(c, st, can) {
       Whole project row: every item's work after them moves later by as many days, and the months are added. On one item's row it moves that item only.
       Clicking those days again takes them out and moves the work back. To put an empty column in, pick Add column and click the day where it goes: on the Whole project row
       every item gets an empty day there, on an item's row that item only, and the later work moves a day. Click once for each column you need. Remove column takes a day out
-      the same way, where nothing works on it. Undo takes back the last column added or removed, or the last days painted, one at a time.
+      the same way, where nothing works on it. Undo takes back the last column added or removed, the last days painted or the last month added, one at a time.
       Point at a day to see where the project is planned to be by the end of it. An item's cost is spread over its days of work, so the percentages and the
       cash flow under the sheet follow at once. To type a bar's days, press the item's days. What you change is kept in this browser until you save or discard it.</p>` : ''}
     <ul class="bc-errors" data-notes aria-live="polite">${st.notes.map(n => `<li${n.startsWith('Read ') ? ' class="muted"' : ''}>${esc(n)}</li>`).join('')}</ul>
@@ -1684,10 +1684,10 @@ function bindChart(c) {
     const on = sel => e.target.closest(sel), tab = on('[data-tab]'), v = open(), i = on('[data-item]')?.dataset.item;
     if (tab) { st.selected = Number(tab.dataset.tab); leave(); redraw(`[data-tab="${st.selected}"]`); return; }
     if (!can) return;
-    // Undo holds the items as they were before each press on the sheet (a column, or days painted). Any other change to
+    // Undo holds the items and the months asked for as they were before each press on the sheet (a column, or days painted) and each Add month. Any other change to
     // the chart empties it, here and where a box is typed in, so it never takes back more than those presses.
     if (on('[data-pick], [data-drop-color], [data-add-item], [data-drop-item], [data-add-bar], [data-drop-bar]')) st.undo = [];
-    if (on('[data-undo]')) { const was = st.undo.pop(); if (was) { v.items = was; el.querySelector('[data-col-note]').textContent = st.colNote = 'Took back the last change on the sheet.'; sheet(); } }
+    if (on('[data-undo]')) { const was = st.undo.pop(); if (was) { v.items = was.items; st.months = was.months; el.querySelector('[data-col-note]').textContent = st.colNote = 'Took back the last change on the sheet.'; sheet(); } }
     else if (on('[data-help]')) { st.help = !st.help; on('[data-help]').setAttribute('aria-expanded', st.help); el.querySelector('[data-help-text]').hidden = !st.help; }
     else if (on('[data-import]')) el.querySelector('[data-file]').click();
     else if (on('[data-save]')) save();
@@ -1699,7 +1699,7 @@ function bindChart(c) {
     else if (on('[data-tool]')) { const t = on('[data-tool]').dataset.tool; st.tool = /^\d+$/.test(t) ? Number(t) : t; palette(); }
     else if (on('[data-add-color]')) { v.colors.push(L.newColor(v.colors)); st.tool = v.colors.length - 1; palette(); el.querySelector('[data-cname]').focus(); }
     else if (on('[data-drop-color]')) { st.drafts[st.selected] = L.dropColor(v, st.tool); st.tool = 'work'; palette(); el.querySelector('[data-tool="work"]').focus(); }
-    else if (on('[data-add-month]')) { st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1; sheet(); }
+    else if (on('[data-add-month]')) { undoable(v.items); st.months = L.sheetMonths(v, project.contractDurationDays, st.months) + 1; sheet(); }
     else if (on('[data-add-item]')) { v.items.push(L.emptyItem()); sheet(); el.querySelector(`[data-bc="name:${v.items.length - 1}"]`).focus(); }
     else if (on('[data-drop-item]')) { v.items.splice(i, 1); st.open = {}; sheet(); el.querySelector('[data-add-item]').focus(); }
     else if (on('[data-days]')) { st.open[i] = !st.open[i]; sheet(); }
@@ -1750,7 +1750,7 @@ function bindChart(c) {
   // Add column and Remove column: a press is one day, put in empty where there is still work from there on (the later work a
   // day later), or taken out where nothing works on it. On the Whole project row that is every item; on an item's row, that
   // item only. One at a time, so the columns are counted by hand.
-  const undoable = items => { st.undo = [...st.undo.slice(-49), items]; el.querySelector('[data-undo]').disabled = false; };
+  const undoable = items => { st.undo = [...st.undo.slice(-49), { items, months: st.months }]; el.querySelector('[data-undo]').disabled = false; };
   const columnAt = td => {
     const v = open(), day = Number(td.dataset.cell) + 1, was = v.items, at = `month ${Math.ceil(day / MONTH_CELLS)} day ${(day - 1) % MONTH_CELLS + 1}`;
     const i = td.parentElement.dataset.item, who = i == null ? 'every item' : was[i].name || 'this item';
