@@ -1833,7 +1833,7 @@ function progressBody(c, chip) {
   const editable = L.canEdit(c.project, s.user.uid, s.claims);
   const add = editable ? `<button class="btn weekly-add" id="weekly-add">${icon('add_circle', 'sm')}New weekly report</button>` : '';
   if (!c.weekly.length) return `${add}<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
-  return `${add}<h2 class="list-title">NHA weekly project engineer's report</h2><div class="stack">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
+  return `<div class="list-head">${add}<h2 class="list-title">NHA weekly project engineer's report</h2></div><div class="stack reports">${c.weekly.map(r => reportCard(r, c.weekly, c.page.id, editable)).join('')}</div>`;
 }
 
 const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
@@ -1854,12 +1854,12 @@ function reportCard(r, all, pid, editable = false) {
   const crew = manpower.reduce((t, m) => t + m.count, 0);
   return `<article class="card report">
     <div class="rep-head">
-      <div><h3>${esc(r.reportingWeek)}</h3><p class="muted">${esc(r.submittedByStaff || '-')} · Day ${esc(r.daysElapsed ?? 0)}, ${esc(r.remainingDays ?? 0)} days left</p></div>
+      <div class="rep-week"><h3>${esc(r.reportingWeek)}</h3><p class="muted">${esc(r.submittedByStaff || '-')} · Day ${esc(r.daysElapsed ?? 0)}, ${esc(r.remainingDays ?? 0)} days left</p></div>
+      <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
+        <span class="muted">Filed against ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
       <div class="rep-actions">${editable ? `<button class="text-btn" data-edit-weekly="${esc(r.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
         <a class="text-btn" href="#/p/${esc(pid)}/print/${esc(r.uuid)}">${icon('print', 'sm')}Print</a></div>
     </div>
-    <p class="rep-figures"><span class="badge lv-${L.varianceLevel(Math.round((actual - target) * 100) / 100)}">Actual ${pct(actual)}</span>
-      <span class="muted">Filed against ${pct(target)}${prev ? ` · ${signedPct(actual - (Number(prev.actualAccomplishmentPct) || 0))} from previous report` : ''}</span></p>
     <details>
       <summary>${icon('expand_more', 'sm')}Report details${photos.length ? ` · ${plural(photos.length, 'photo')}` : ''}</summary>
       <div class="rep-body">
