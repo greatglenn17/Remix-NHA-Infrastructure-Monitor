@@ -336,10 +336,11 @@ fun OrdersList(
         when (chip) {
             SectionChips.SUSPENSIONS -> {
                 item {
-                    val suspensions = documents.filter(ProjectSchedule::isSuspension)
+                    // A synced project's orders are kept as they arrived, in no order: by Effectivity here, by number below.
+                    val suspensions = ProjectSchedule.byEffectivity(documents.filter(ProjectSchedule::isSuspension))
                     val chains = suspensions.associateWith { ProjectSchedule.continuances(it, documents) }
                     // A continuance whose suspension was deleted still shows, at the end.
-                    val orphans = named("Work Suspension") - suspensions.toSet() - chains.values.flatten().toSet()
+                    val orphans = ProjectSchedule.byEffectivity(named("Work Suspension") - suspensions.toSet() - chains.values.flatten().toSet())
                     OrdersCard("Work suspension orders", Icons.Default.PauseCircle, suspensions.isEmpty() && orphans.isEmpty(), "No work suspension orders.", add("Work Suspension Order")) {
                         suspensions.forEach { ws ->
                             OrderEntry(ws, open, documents)
@@ -349,14 +350,14 @@ fun OrdersList(
                     }
                 }
                 item {
-                    val resumptions = named("Work Resumption")
+                    val resumptions = ProjectSchedule.byEffectivity(named("Work Resumption"))
                     OrdersCard("Work resumption orders", Icons.Default.PlayCircle, resumptions.isEmpty(), "No work resumption orders.", add("Work Resumption Order")) {
                         resumptions.forEach { OrderEntry(it, open) }
                     }
                 }
             }
             SectionChips.TIME_EXTENSIONS -> item {
-                val extensions = named("Time Extension")
+                val extensions = ProjectSchedule.byNumber(named("Time Extension"))
                 OrdersCard("Time extensions", Icons.Default.MoreTime, extensions.isEmpty(), "No time extensions.", add("Time Extension")) {
                     extensions.forEach { OrderEntry(it, open) }
                 }
@@ -428,7 +429,7 @@ fun VariationOrdersLog(
     modifier: Modifier = Modifier
 ) {
     var openOrder by remember { mutableStateOf<PendingDocument?>(null) }
-    val voLogs = documents.filter { it.documentName.contains("Variation Order", ignoreCase = true) }
+    val voLogs = ProjectSchedule.byNumber(documents.filter { it.documentName.contains("Variation Order", ignoreCase = true) })
     SectionCard(
         "Variation orders (${voLogs.size})",
         Icons.Default.ReceiptLong,

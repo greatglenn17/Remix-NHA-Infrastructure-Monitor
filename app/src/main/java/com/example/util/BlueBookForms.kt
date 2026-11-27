@@ -73,9 +73,7 @@ data class ContractLogs(
             fun mark(d: PendingDocument) = if (d.status.equals("Approved", ignoreCase = true)) "" else " (for approval)"
             // The cloud gives a project's orders in no order: suspensions and resumptions list by their Effectivity, time
             // extensions and variation orders by their number, one without it last (the website's inOrder).
-            fun effectivity(d: PendingDocument) = runCatching { LocalDate.parse(field(d.remarks, "Effectivity")) }.getOrDefault(LocalDate.MAX)
-            fun number(d: PendingDocument) = Regex("\\bNo\\.\\s*(\\d+)", RegexOption.IGNORE_CASE).find(d.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: Int.MAX_VALUE
-            fun named(prefix: String) = documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) }.sortedBy { number(it) }
+            fun named(prefix: String) = ProjectSchedule.byNumber(documents.filter { it.documentName.startsWith(prefix, ignoreCase = true) })
             val original = ContractCost.original(project.scopeOfWork, project.contractCostOriginal)
             return ContractLogs(
                 originalCost = original,
@@ -83,7 +81,7 @@ data class ContractLogs(
                 revisedCompletion = ProjectSchedule.revisedCompletion(project.dateStarted, project.contractDurationDays, documents)
                     ?: ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised),
                 // Continuances ("1st Continuance of Work Suspension Order No. 1") are listed with their suspension, without its reason again.
-                suspensions = documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.sortedBy { effectivity(it) }.map { d ->
+                suspensions = ProjectSchedule.byEffectivity(documents.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }).map { d ->
                     val ran = BarChart.inEffect(d, documents) // the days it ran: cut short by its resumption order
                     val days = field(ran, "Duration").substringBefore(" ").takeIf { it.isNotEmpty() }?.let { "$it calendar days – " }.orEmpty()
                     val from = BlueBookForms.date(field(d.remarks, "Effectivity"))
@@ -93,7 +91,7 @@ data class ContractLogs(
                         if (ProjectSchedule.isSuspension(d)) field(d.remarks, "Reason") else "", mark(d).trim()
                     )
                 },
-                resumptions = documents.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }.sortedBy { effectivity(it) }.map { d ->
+                resumptions = ProjectSchedule.byEffectivity(documents.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }).map { d ->
                     ProjectSchedule.orderLabel(d.documentName) to BlueBookForms.date(field(d.remarks, "Effectivity")) + mark(d)
                 },
                 extensions = named("Time Extension").map { d ->

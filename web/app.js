@@ -4605,22 +4605,22 @@ function documentsBody(c, chip) {
   if (chip === 'Audit log') return auditView(c);
   const named = text => documents.filter(d => (d.documentName || '').toLowerCase().includes(text));
   const editable = L.canEdit(c.project, s.user.uid, s.claims), [ws, , wr, vo, te] = L.REQUEST_TYPES, add = type => (editable ? type : '');
-  if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', named('time extension').map(d => orderEntry(d, editable)).join(''), 'No time extensions.', add(te));
+  if (chip === 'Time Extensions') return ordersCard('Time extensions', 'more_time', L.byOrderNumber(named('time extension')).map(d => orderEntry(d, editable)).join(''), 'No time extensions.', add(te));
   if (chip === 'Variation Orders') {
-    const vos = named('variation order');
+    const vos = L.byOrderNumber(named('variation order'));
     return ordersCard(`Variation orders (${vos.length})`, 'receipt_long', vos.map(d => entry(L.variationTitle(d.documentName), L.variationLines(d), orderExtra(d, editable), '', orderBadge(d))).join(''), 'No variation orders recorded.', add(vo));
   }
   if (chip === 'Letters to Contractor') return lettersCard(L.mergedLetters(of('contractor_letters'), documents), editable);
   if (chip === 'Developer Requests') return requestsCard(of('developer_requests'), now, editable, c.payments);
   if (chip === 'Related Files') return relatedCard(L.relatedFiles(documents), editable);
-  const suspensions = documents.filter(L.isSuspension);
+  const suspensions = L.byEffectivity(documents.filter(L.isSuspension)); // the cloud gives them in no order
   const chains = suspensions.map(ws => [ws, L.continuances(ws, documents)]);
   // A continuance whose suspension was deleted still shows, at the end.
   const listed = new Set(chains.flatMap(([ws, list]) => [ws, ...list]));
-  const orphans = named('work suspension').filter(d => !listed.has(d));
+  const orphans = L.byEffectivity(named('work suspension').filter(d => !listed.has(d)));
   return `<div class="stack">
     ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([s0, list]) => orderEntry(s0, editable, '', documents) + list.map(d => orderEntry(d, editable, 'nested', documents)).join('')).join('') + orphans.map(d => orderEntry(d, editable, '', documents)).join(''), 'No work suspension orders.', add(ws))}
-    ${ordersCard('Work resumption orders', 'play_circle', named('work resumption').map(d => orderEntry(d, editable)).join(''), 'No work resumption orders.', add(wr))}
+    ${ordersCard('Work resumption orders', 'play_circle', L.byEffectivity(named('work resumption')).map(d => orderEntry(d, editable)).join(''), 'No work resumption orders.', add(wr))}
   </div>`;
 }
 

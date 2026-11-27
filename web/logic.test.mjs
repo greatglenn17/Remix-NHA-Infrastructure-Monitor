@@ -578,6 +578,10 @@ test('new developer request: the order it files is named and worded as the phone
   // Continuances list 1st to last whatever order the cloud gives them in, old names included.
   const later = [{ documentName: '3rd Continuance of Work Suspension Order No. 1' }, { documentName: 'Continuance No. 2 of Work Suspension No. 1 (Partial)' }, ...docs];
   assert.deepEqual(L.continuances(s1, later).map(d => parseInt(L.orderLabel(d.documentName), 10)), [1, 2, 3]);
+  // The lists of orders too: suspensions and resumptions by their Effectivity, time extensions and variation orders by their number, one without it last.
+  const on = (documentName, day) => ({ documentName, remarks: day ? `Duration: 5 Days | Effectivity: ${day}` : '' });
+  assert.deepEqual(L.byEffectivity([on('Work Suspension Order No. 3', ''), on('Partial Work Suspension Order No. 2', '2026-09-01'), on('Work Suspension Order No. 1', '2026-08-01')]).map(d => d.documentName.slice(-1)), ['1', '2', '3']);
+  assert.deepEqual(L.byOrderNumber([on('Time Extension'), on('Time Extension No. 10 - 4 Days'), on('Time Extension No. 2 - 4 Days')]).map(d => d.documentName), ['Time Extension No. 2 - 4 Days', 'Time Extension No. 10 - 4 Days', 'Time Extension']);
   assert.equal(L.suspensionExtensionDays(docs), 6); // 10 suspended days, 4 already claimed
   assert.deepEqual(L.chartItemNames({ barChartJson: JSON.stringify([{ effective: '2026-01-01', items: [{ name: 'Roads' }, { name: 'Drainage' }] }]) }), ['Roads', 'Drainage']);
   assert.deepEqual(L.chartItemNames({}), []);

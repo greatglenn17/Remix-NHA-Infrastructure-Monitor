@@ -114,6 +114,16 @@ class ProjectScheduleTest {
         val c1 = doc("1st Continuance of Work Suspension Order No. 1", "Approved", ProjectSchedule.suspensionRemarks(15, "2026-01-31"))
         assertEquals("Duration: 15 Days | Effectivity: 2026-01-31 | End: 2026-02-14", c1.remarks)
         assertEquals("2nd Partial Continuance of Work Suspension Order No. 1" to "2026-02-15", ProjectSchedule.nextContinuance(ws, listOf(ws, c1), "Partial"))
+        // A synced project's orders arrive in no order: continuances list 1st to last, suspensions by their Effectivity
+        // and time extensions by their number, one without it last (web/logic.test.mjs has the same).
+        val c2 = doc("2nd Partial Continuance of Work Suspension Order No. 1", "Pending", ProjectSchedule.suspensionRemarks(5, "2026-02-15"))
+        val c3 = doc("Continuance No. 3 of Work Suspension No. 1", "Pending")
+        assertEquals(listOf(c1, c2, c3), ProjectSchedule.continuances(ws, listOf(c3, c2, ws, c1)))
+        val ws2 = doc("Partial Work Suspension Order No. 2", "Pending", ProjectSchedule.suspensionRemarks(5, "2026-09-01"))
+        val ws3 = doc("Work Suspension Order No. 3", "Pending")
+        assertEquals(listOf(ws, ws2, ws3), ProjectSchedule.byEffectivity(listOf(ws3, ws2, ws)))
+        val te = listOf("Time Extension", "Time Extension No. 10 - 4 Days", "Time Extension No. 2 - 4 Days").map { doc(it, "Pending") }
+        assertEquals(listOf(te[2], te[1], te[0]), ProjectSchedule.byNumber(te))
         assertTrue(ProjectSchedule.isSuspension(ws))
         assertFalse(ProjectSchedule.isSuspension(c1))
         assertEquals("Full", ProjectSchedule.suspensionType(ws))
