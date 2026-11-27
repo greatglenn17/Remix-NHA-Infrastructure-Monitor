@@ -1312,8 +1312,6 @@ function drawProject(page) {
   main.querySelectorAll('[data-edit-photos]').forEach(b => { b.onclick = () => { const r = c.weekly.find(x => x.uuid === b.dataset.editPhotos); if (r) editPhotos(c, r); }; });
   main.querySelectorAll('[data-edit-letter]').forEach(b => { b.onclick = () => { const l = c.of('contractor_letters').find(x => x.uuid === b.dataset.editLetter); if (l) editLetter(c, l); }; });
   main.querySelectorAll('[data-edit-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.editRequest); if (r) editRequest(c, r); }; });
-  const editWx = main.querySelector('[data-edit-weather]');
-  if (editWx) editWx.onclick = () => { const r = c.weekly.find(x => x.uuid === editWx.dataset.editWeather); if (r) editWeather(c, r); };
   if (document.getElementById('audit-results')) bindAudit(c);
   loadFiles(main);
   loadMissingPhotos(c);
@@ -3045,7 +3043,7 @@ async function bindLots(c) {
 /* ---------- Weather (WeatherChartTab); writers edit a weekly report's 24-hour weather (AddWeeklyReportDialog) ---------- */
 
 /** WeatherChartTab: each logged day as a 24-hour clock, by weekly report (7 days) or by month. */
-function weatherView({ page, weekly, project }) {
+function weatherView({ page, weekly }) {
   // Only logs saved with a weekly report reach the cloud, which matches the phone's submittedWeatherLogs.
   const logs = weekly.flatMap(r => (Array.isArray(r._weather) ? r._weather : []));
   if (!logs.length && !weekly.length) return `<div class="card empty">${icon('sunny')}<p>No Weather Logs Recorded Yet</p><small>Field staff can submit daily 24h weather logs when submitting weekly reports.</small></div>`;
@@ -3060,7 +3058,6 @@ function weatherView({ page, weekly, project }) {
     body = !report ? emptyLine('No weekly reports submitted yet.') : `
       <label class="field">Report<select data-wx="report">${weekly.map((r, i) => `<option value="${esc(r.uuid)}"${r === report ? ' selected' : ''}>Week ${weekly.length - i}: ${esc((r.reportingWeek || '').replace(/^Week \d+: /, ''))}</option>`).join('')}</select></label>
       <h2 class="wx-title">Weekly report weather mapping <span class="muted">7 days</span></h2>
-      ${days.length && L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn wx-edit-btn" data-edit-weather="${esc(report.uuid)}">${icon('edit', 'sm')}Edit weather</button>` : ''}
       <p class="muted small">Reporting period: ${esc(report.reportingWeek)}</p>
       ${days.length ? `<div class="wx-grid">${days.map(d => {
         const t = new Date(`${d}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
@@ -3081,7 +3078,7 @@ function weatherView({ page, weekly, project }) {
     <div class="chips views" role="group" aria-label="Weather view">${mode('week', 'Weekly report range', 'date_range')}${mode('month', 'Monthly view', 'calendar_month')}</div>
     ${body}
     <p class="wx-legend">${P.WEATHER.map(([, label, hex]) => `<span><i style="background:${hex}"></i>${esc(L.shownWord(label))}</span>`).join('')}</p>
-    <p class="muted small">Inner ring 12 AM to 11 AM, outer ring 12 PM to 11 PM. A day with no log stays blank.</p>
+    <p class="muted small">Inner ring 12 AM to 11 AM, outer ring 12 PM to 11 PM. A day with no log stays blank. Weather is logged in the weekly report's form (Weekly).</p>
   </section>`;
 }
 
@@ -3783,8 +3780,8 @@ function editPhotos(c, report) {
 
 /**
  * AddWeeklyReportDialog's Week, Crew and Work steps as one form, for a new report or a saved one (`report`), with its
- * photo strip's Add photos. A saved report's photos are retitled or taken off, and its 24-hour weather logged, on the
- * report itself (Edit photos, Edit weather). With an approved bar chart the targets are its plan for the week's last
+ * photo strip's Add photos and its 24-hour weather (weatherPad): a new report saves all 7 days, an edit the days
+ * painted. A saved report's photos are retitled or taken off on the report itself (Edit photos). With an approved bar chart the targets are its plan for the week's last
  * day; they follow the week picked.
  */
 function weeklyForm(c, report = null) {
@@ -3828,6 +3825,9 @@ function weeklyForm(c, report = null) {
     ${list('equipment', 'Equipment', 'Add equipment')}
     ${list('activities', 'Activities of the week', 'Add activity')}
     ${list('issues', 'Issues encountered / action taken', 'Add issue')}
+    <h3>Weather</h3>
+    <p class="muted small">Pick a condition, then tap or drag over the hours.${report ? '' : ' Every hour is Fair until you change it.'}</p>
+    <div class="wx-pad" id="wk-wx"></div>
     <h3>Site photos</h3>
     ${had ? `<p class="muted small">This report has ${plural(had, 'photo')}. Edit photos in its Details retitles or removes them.</p>` : ''}
     ${PHOTO_FIELD}
@@ -3837,14 +3837,14 @@ function weeklyForm(c, report = null) {
     <div class="actions">${report && L.canDeleteReport(s.claims) ? `<button type="button" class="text-btn danger" data-delete>${icon('delete', 'sm')}Delete report</button>` : ''}<button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.actions .btn'), picker = photoPicker(c, form);
-  const box = d.querySelector('#wk-lines');
+  const box = d.querySelector('#wk-lines'), pad = weatherPad(d.querySelector('#wk-wx'), report);
   let lines = [];
   const rowsOf = kind => [...form.querySelectorAll(`[data-rows="${kind}"] .wk-row`)].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value])));
   const typed = () => [...box.querySelectorAll('[data-line]')].map((el, k) => ({ name: lines[k].name, target: el.querySelector('[data-target]').value, actual: el.querySelector('[data-actual]').value }));
   const values = () => {
     const now = typed();
     return { first: form.first.value, lines: lines.map((l, k) => ({ name: l.name, weightPct: l.weightPct, ...now[k] })),
-      manpower: rowsOf('manpower'), equipment: rowsOf('equipment'), activities: rowsOf('activities'), issues: rowsOf('issues'), photos: picker.titles() };
+      manpower: rowsOf('manpower'), equipment: rowsOf('equipment'), activities: rowsOf('activities'), issues: rowsOf('issues'), photos: picker.titles(), weather: pad.days(!report) };
   };
   const total = () => {
     const t = L.weeklyTotals(values().lines);
@@ -3859,6 +3859,7 @@ function weeklyForm(c, report = null) {
     if (!form.first.value) return;
     const label = L.weekLabel(form.first.value), prev = !box.children.length ? start.lines : typed().map((t, k) => (own ? { ...t, actual: own[k] } : t));
     const abstract = L.abstractForWeek(abstracts, label);
+    pad.draw(label);
     lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6], abstract);
     // By name: a facility's lines are its abstract's works (the chart's items before the first abstract), which can change with the week.
     const was = lines.map(l => prev.find(p => p.name === l.name) ?? {});
@@ -3891,7 +3892,7 @@ function weeklyForm(c, report = null) {
   // The abstract a saved report's week takes changed its actuals on opening: Save stores them though nothing was typed.
   const refiled = Boolean(report) && typed().some(t => t.actual !== (start.lines.find(s => s.name === t.name)?.actual ?? ''));
   const initial = JSON.stringify(values());
-  const done = () => { d.close(); d.remove(); };
+  const done = () => { pad.off(); d.close(); d.remove(); };
   const close = async () => (JSON.stringify(values()) === initial || await ask(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?', DISCARD)) && done();
   d.querySelector('[data-cancel]').onclick = close;
   d.addEventListener('cancel', e => { e.preventDefault(); close(); });
@@ -3986,65 +3987,62 @@ async function saveEdits(c, edits, noun, projectFields = null) {
 }
 
 /**
- * AddWeeklyReportDialog's 24-hour weather for one weekly report: pick a condition, then tap or drag over hours (or
- * "Whole day"). Save rewrites only the days changed, inside the report's record, with the app's audit entry.
+ * AddWeeklyReportDialog's 24-hour weather inside the weekly report form, drawn into `host`: pick a condition, then tap
+ * or drag over hours, or take "Whole day" or a preset. `report` is the saved report being edited, if any. `draw(week)`
+ * shows the 7 days of that week's label; `days(all)` are the days to save as { date, hours }, the ones painted or,
+ * with `all`, every day shown; `off()` lets go of the window's listener.
  */
-function editWeather(c, report) {
-  const days = L.weatherForm(report), changed = new Set();
-  let brush = 'RAINY';
+function weatherPad(host, report) {
+  const stored = Array.isArray(report?._weather) ? report._weather : [], painted = new Map(); // date -> its hours, once painted
+  let days = [], brush = 'RAINY';
   const label = Object.fromEntries(P.WEATHER.map(([k, l]) => [k, L.shownWord(l)]));
   const colour = Object.fromEntries(P.WEATHER.map(([k, , hex]) => [k, hex]));
   const hourName = h => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
   const cell = (di, h) => `<button type="button" class="wx-h" data-d="${di}" data-h="${h}" style="background:${colour[days[di].hours[h]]}"
     aria-label="${esc(hourName(h))}: ${esc(label[days[di].hours[h]])}">${h % 12 || 12}</button>`;
-  const d = document.createElement('dialog');
-  d.className = 'help edit-form wx-edit';
-  d.innerHTML = `<form novalidate>
-    <h2>Edit weather</h2>
-    <p class="muted small">${esc(report.reportingWeek)}. Pick a condition, then tap or drag over the hours.</p>
-    <div class="seg wx-brush" role="group" aria-label="Condition">${L.WEATHER_KEYS.map(k =>
+  const draw = week => {
+    days = L.weatherForm({ reportingWeek: week, _weather: stored }).map(d => (painted.has(d.date) ? { ...d, hours: painted.get(d.date) } : d));
+    host.innerHTML = `<div class="seg wx-brush" role="group" aria-label="Condition">${L.WEATHER_KEYS.map(k =>
       `<button type="button" data-brush="${k}" aria-pressed="${k === brush}"><i style="background:${colour[k]}"></i>${esc(label[k])}</button>`).join('')}</div>
     ${days.map((day, di) => {
       const t = new Date(`${day.date}T00:00:00Z`), fmt = o => t.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' });
-      return `<fieldset class="wx-row"><legend>${fmt({ weekday: 'short' })}, ${fmt({ month: 'short', day: '2-digit' })}${day.logged ? '' : ' <span class="muted">(no log yet)</span>'}
+      return `<fieldset class="wx-row"><legend>${fmt({ weekday: 'short' })}, ${fmt({ month: 'short', day: '2-digit' })}${!report || day.logged || painted.has(day.date) ? '' : ' <span class="muted">(no log yet)</span>'}
         <button type="button" class="text-btn" data-all="${di}">Whole day</button>
         <select data-preset="${di}" aria-label="Preset for this day"><option value="">Preset…</option>${L.WEATHER_PRESETS.map(([name], i) => `<option value="${i}">${esc(name)}</option>`).join('')}</select></legend>
         <div class="wx-hours"><span class="muted">AM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h)).join('')}
         <span class="muted">PM</span>${Array.from({ length: 12 }, (_, h) => cell(di, h + 12)).join('')}</div></fieldset>`;
-    }).join('')}
-    <div class="form-foot"><p class="error" role="alert"></p>
-    <div class="actions"><button type="button" class="text-btn" data-cancel>Cancel</button><button class="btn">Save</button></div></div>
-  </form>`;
-  const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
+    }).join('')}`;
+  };
   const paint = (di, hours, as = () => brush) => {
+    const day = days[di];
     // A day with no log shows as Fair here but stays blank on the chart until it is saved, so painting it Fair is a change too.
-    if (!days[di].logged) changed.add(days[di].date);
+    if (!day.logged) painted.set(day.date, day.hours);
     for (const h of hours) {
       const k = as(h);
-      if (days[di].hours[h] === k) continue;
-      days[di].hours[h] = k; changed.add(days[di].date);
-      const b = form.querySelector(`[data-d="${di}"][data-h="${h}"]`);
+      if (day.hours[h] === k) continue;
+      day.hours[h] = k; painted.set(day.date, day.hours);
+      const b = host.querySelector(`[data-d="${di}"][data-h="${h}"]`);
       b.style.background = colour[k]; b.setAttribute('aria-label', `${hourName(h)}: ${label[k]}`);
     }
   };
-  form.onchange = e => {
+  host.addEventListener('change', e => {
     const sel = e.target.closest('[data-preset]');
     if (!sel || sel.value === '') return;
     const [, hours] = L.WEATHER_PRESETS[Number(sel.value)];
     paint(Number(sel.dataset.preset), [...Array(24).keys()], h => hours[h]);
     sel.value = '';
-  };
+  });
   // A mouse or pen paints from pointer down and drags; a finger paints on tap, so it can still scroll the form.
   let dragging = null, pressed = false; // dragging: the last hour painted, {di, h}
-  form.onclick = e => {
+  host.addEventListener('click', e => {
     const b = e.target.closest('button');
-    if (b?.dataset.brush) { brush = b.dataset.brush; form.querySelectorAll('[data-brush]').forEach(x => x.setAttribute('aria-pressed', x === b)); }
+    if (b?.dataset.brush) { brush = b.dataset.brush; host.querySelectorAll('[data-brush]').forEach(x => x.setAttribute('aria-pressed', x === b)); }
     else if (b?.dataset.all !== undefined) paint(Number(b.dataset.all), [...Array(24).keys()]);
     else if (b?.dataset.h !== undefined && !pressed) paint(Number(b.dataset.d), [Number(b.dataset.h)]); // a tap or the keyboard
     pressed = false;
-  };
+  });
   const under = e => document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.wx-h');
-  form.addEventListener('pointerdown', e => {
+  host.addEventListener('pointerdown', e => {
     const b = under(e);
     if (!b || e.pointerType === 'touch') return;
     pressed = true; e.preventDefault();
@@ -4052,7 +4050,7 @@ function editWeather(c, report) {
     paint(dragging.di, [dragging.h]);
   });
   // Pointer events skip cells when the pointer moves fast, so fill every hour between the last one and this one.
-  form.addEventListener('pointermove', e => {
+  host.addEventListener('pointermove', e => {
     const b = dragging && under(e);
     if (!b) return;
     const di = Number(b.dataset.d), h = Number(b.dataset.h);
@@ -4062,27 +4060,7 @@ function editWeather(c, report) {
   });
   const up = () => { dragging = null; };
   addEventListener('pointerup', up);
-  const done = () => { removeEventListener('pointerup', up); d.close(); d.remove(); };
-  const close = async () => (!changed.size || await ask('Discard your changes to this weather?', DISCARD)) && done();
-  d.querySelector('[data-cancel]').onclick = close;
-  d.addEventListener('cancel', e => { e.preventDefault(); close(); });
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const changes = L.weatherChanges(report, days, changed);
-    if (!changes) { done(); return; }
-    if (!navigator.onLine) { err.textContent = 'You are offline. Connect to the internet, then save again.'; return; }
-    save.disabled = true; err.textContent = '';
-    try {
-      // ProjectViewModel.updateWeeklyReportWithWeather's entry, word for word.
-      await saveEdit(c, report, changes, 'weekly report', { actionType: 'Edited Weekly Report', details: `Modified report and weather for ${report.reportingWeek}` });
-      done(); savedNote();
-    } catch (x) {
-      err.textContent = L.errorText(x, 'This account cannot edit this project.', 'Could not save. Try again.');
-      save.disabled = false;
-    }
-  };
-  document.body.append(named(d));
-  d.showModal();
+  return { draw, days: all => days.filter(d => all || painted.has(d.date)).map(d => ({ date: d.date, hours: d.hours })), off: () => removeEventListener('pointerup', up) };
 }
 
 /** MainActivity's addProjectIssue: a new issue logged by this account, and ProjectViewModel's audit entry, in one batch. */

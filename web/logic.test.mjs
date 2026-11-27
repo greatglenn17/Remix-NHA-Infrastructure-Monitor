@@ -873,6 +873,11 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   assert.deepEqual(JSON.parse(shotData.attachedPhotoUrlsJson), ['nhafile:p/n1.jpg', 'nhafile:p/n2.jpg']);
   assert.deepEqual(JSON.parse(shotData.photoDetailsJson), { 'nhafile:p/n1.jpg': { title: 'Slab', takenAt: '' }, 'nhafile:p/n2.jpg': { title: '', takenAt: '' } });
   assert.deepEqual(shot.projectFields, { latestUpdatePhotoUrl: 'nhafile:p/n1.jpg' });
+  // The form's weather is saved with the report, one row a day as the phone writes them.
+  const week = L.weekDays('Feb 14, 2026 - Feb 20, 2026').map((date, i) => ({ date, hours: Array(24).fill(i ? 'FAIR' : 'RAINY') }));
+  const wx = JSON.parse(L.newWeeklyReport({ ...f, weather: week }, project, 'x').build({}).data)._weather;
+  assert.deepEqual(wx.map(w => [w.date, w.dayOfWeek]).slice(0, 2), [['2026-02-14', 'Saturday'], ['2026-02-15', 'Sunday']]);
+  assert.deepEqual([wx.length, wx[0].hourlyConditionsCsv, wx[6].hourlyConditionsCsv], [7, Array(24).fill('RAINY').join(','), Array(24).fill('FAIR').join(',')]);
 });
 
 test('weekly report edit: the form starts from the saved report, keeps what it does not show, and deletes like the phone', () => {
@@ -921,6 +926,15 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   assert.deepEqual([moved.changes.daysElapsed, moved.changes.remainingDays], [52, 313]);
   assert.deepEqual(moved.changes._weather.map(w => w.date), ['2026-02-15', '2026-02-20']);
   assert.equal(moved.audit.details, 'Modified report for Feb 15, 2026 - Feb 21, 2026');
+  // A day painted in the form is saved with the edit, the other stored days exactly as they were, and the entry says so.
+  const rainy = Array(24).fill('RAINY');
+  const rained = L.editedWeeklyReport(report, { ...f, weather: [{ date: '2026-02-16', hours: rainy }] }, project);
+  assert.deepEqual(rained.changes._weather.map(w => [w.date, w.hourlyConditionsCsv.slice(0, 4)]), [['2026-02-14', 'FAIR'], ['2026-02-15', 'FAIR'], ['2026-02-16', 'RAIN'], ['2026-02-20', 'FAIR']]);
+  assert.equal(rained.changes._weather[0], report._weather[0]);
+  assert.equal(rained.audit.details, 'Modified report and weather for Week 7: February 14 - February 20, 2026');
+  // With the week moved too, a day painted outside the new week is dropped like the stored ones.
+  const movedWet = L.editedWeeklyReport(report, { ...f, first: '2026-02-15', weather: [{ date: '2026-02-14', hours: rainy }, { date: '2026-02-21', hours: rainy }] }, project);
+  assert.deepEqual(movedWet.changes._weather.map(w => w.date), ['2026-02-15', '2026-02-20', '2026-02-21']);
 
   // The project follows the edit only while no other report is for a later week; the report itself does not count.
   const others = [report, { uuid: 'r2', reportingWeek: 'Feb 21, 2026 - Feb 27, 2026' }];
