@@ -3700,7 +3700,7 @@ async function uploadFile(c, [blob, ext, contentType]) {
 /** Add photos in a form; photoPicker gives each photo picked a title box under it. */
 const PHOTO_FIELD = '<label class="field">Add photos<input type="file" name="photos" accept="image/*" multiple></label><div class="photo-new"></div>';
 
-/** PHOTO_FIELD at work in `form`: `titles()` are the titles typed, `upload()` stores the photos and gives [[reference, title]]. */
+/** PHOTO_FIELD at work in `form`: `titles()` are the titles typed, `upload()` stores the photos and gives [[reference, title, when and where taken]]. */
 function photoPicker(c, form) {
   const fresh = form.querySelector('.photo-new');
   form.photos.onchange = () => {
@@ -3709,13 +3709,14 @@ function photoPicker(c, form) {
   const titles = () => [...form.photos.files].map((_, i) => fresh.querySelector(`[data-new-title="${i}"]`)?.value.trim() || '');
   return { titles, upload: async () => {
     // Every photo is prepared before the first upload, so a file that is not a photo stops the save with nothing sent.
-    const blobs = [], captions = titles(), added = [];
+    const blobs = [], taken = [], captions = titles(), added = [];
     for (const file of form.photos.files) {
       const blob = await attachmentBlob(file, L.PHOTO_MAX_EDGE);
       if (blob[1] === 'pdf') throw new Error('Only photos can be added here.');
       blobs.push(blob);
+      taken.push(L.exifDetail(new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer()))); // the EXIF is in the file's first segments
     }
-    for (const [i, blob] of blobs.entries()) added.push([await uploadFile(c, blob), captions[i]]);
+    for (const [i, blob] of blobs.entries()) added.push([await uploadFile(c, blob), captions[i], taken[i]]);
     return added;
   } };
 }
