@@ -73,6 +73,26 @@ class BarChartExcelTest {
         assertEquals(mapOf("Mobilization" to 10, "Earthworks" to 30), read.durations)
     }
 
+    // A sheet drawn a day to a cell: E = Month 1's day 1, and Month 2's heading 30 cells on (AI).
+    private val daily = """<worksheet><sheetData>
+        <row r="3"><c r="A3" t="inlineStr"><is><t>NO.</t></is></c><c r="B3" t="inlineStr"><is><t>DESCRIPTION</t></is></c><c r="C3" t="inlineStr"><is><t>COST</t></is></c><c r="D3" t="inlineStr"><is><t>DAYS</t></is></c>
+            <c r="E3" t="inlineStr"><is><t>MONTH 1</t></is></c><c r="AI3" t="inlineStr"><is><t>MONTH 2</t></is></c></row>
+        <row r="4"><c r="E4"><v>1</v></c><c r="F4"><v>2</v></c></row>
+        <row r="5"><c r="A5"><v>1</v></c><c r="B5" t="inlineStr"><is><t>Fence</t></is></c><c r="C5"><v>1000</v></c><c r="D5"><v>5</v></c>
+            <c r="AG5" s="1"/><c r="AH5" s="1"/><c r="AI5" s="1"/><c r="AJ5" s="1"/><c r="AK5" s="1"/></row>
+        <row r="6"><c r="A6"><v>2</v></c><c r="B6" t="inlineStr"><is><t>Gate</t></is></c><c r="C6"><v>500</v></c><c r="D6"><v>3</v></c><c r="F6" s="1"/><c r="H6" s="1"/><c r="I6" s="1"/></row>
+        <row r="7"><c r="B7" t="inlineStr"><is><t>GRAND TOTAL</t></is></c><c r="C7"><v>1500</v></c></row>
+        </sheetData></worksheet>"""
+
+    @Test fun readsASheetDrawnADayToACell_theDaysExactly() {
+        val read = BarChartExcel.read(xlsx(daily).inputStream()).single()
+        assertEquals(listOf("Fence", "Gate"), read.items.map { it.name })
+        // AG-AK are days 29-33, across the end of month 1; F is day 2, H-I days 4-5.
+        assertEquals(listOf(BarChart.Bar(29, 33)), read.items[0].bars)
+        assertEquals(listOf(BarChart.Bar(2, 2), BarChart.Bar(4, 5)), read.items[1].bars)
+        assertEquals(mapOf("Fence" to 5, "Gate" to 3), read.durations)
+    }
+
     // The office's sheet: B items, C description, F cost, I no. of days, J.. the day cells (J = 1st Month, days 1-5). A bar's
     // stretch holds the month's share of the item in its first cell; the red cells are a suspension.
     private val office = """<worksheet><sheetData>

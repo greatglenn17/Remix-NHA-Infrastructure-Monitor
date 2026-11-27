@@ -8,7 +8,8 @@ import java.util.zip.ZipInputStream
 /**
  * Reads the contractor's bar chart with cash flow from its Excel file (.xlsx): under the "ITEM NO. / DESCRIPTION /
  * Amount / Duration" header (or the office's "ITEMS / DESCRIPTION / COST (PHP) / NO. OF DAYS"), each item row with an
- * amount, and its bar as the filled cells from "Month 1" ("1st Month") on, 6 cells of 5 days a month. Where a bar's
+ * amount, and its bar as the filled cells from "Month 1" ("1st Month") on, 6 cells of 5 days a month, or as many cells
+ * as lie between the "Month 1" and "Month 2" headings (30 for a sheet drawn a day to a cell). Where a bar's
  * stretches hold the month's share of the item, as the office's sheet does, the shares give their days and the other
  * colours on the row (the suspensions) are not bars. The cash flow rows are worked out again from the bars, so they
  * are not read. Change both when the website's reader (web/chart-excel.js) changes.
@@ -85,6 +86,10 @@ object BarChartExcel {
         val amountCol = column("Amount", "Cost") ?: return null
         val durationCol = column("Duration", "No. of Days", "Days")
         val dayCol = find { it.equals("Month 1", ignoreCase = true) || it.equals("1st Month", ignoreCase = true) }?.second ?: return null
+        // A month is 6 cells of 5 days as the contractors draw it; a sheet with another count of cells from one month's heading
+        // to the next (30 when it is drawn a day to a cell) has that many, where they divide the month's 30 days evenly.
+        val gap = find { it.equals("Month 2", ignoreCase = true) || it.equals("2nd Month", ignoreCase = true) }?.second?.minus(dayCol) ?: 0
+        val cellDays = BarChart.MONTH_DAYS / (if (gap > 0 && BarChart.MONTH_DAYS % gap == 0) gap else BarChart.CELLS_PER_MONTH)
         val end = cells.entries.filter { it.key.first > header.first && TOTAL.containsMatchIn(it.value.text) }
             .minOfOrNull { it.key.first } ?: Int.MAX_VALUE
         val lastCol = cells.keys.maxOfOrNull { it.second } ?: dayCol
@@ -108,7 +113,7 @@ object BarChartExcel {
                 val share = cell.text.toDoubleOrNull()?.takeIf { it > 0 } ?: return@mapNotNull null
                 Triple(col - dayCol, (merges.firstOrNull { it[0] == row && it[1] == col }?.get(3) ?: col) - dayCol, share)
             }
-            items += BarChart.Item(desc, Math.round(amount * 100) / 100.0, if (stretches.isEmpty()) runs(days.toList()) else shareBars(stretches, said ?: 0))
+            items += BarChart.Item(desc, Math.round(amount * 100) / 100.0, if (stretches.isEmpty()) runs(days.toList(), cellDays) else shareBars(stretches, said ?: 0, cellDays))
             said?.let { durations[desc] = it }
         }
         return Sheet(name, items, durations)
@@ -122,13 +127,13 @@ object BarChartExcel {
      * the bar: a stretch's days are its part of [duration] (the cells only round them: 21 days are drawn as 4 cells), counted
      * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
      */
-    private fun shareBars(stretches: List<Triple<Int, Int, Double>>, duration: Int): List<BarChart.Bar> {
+    private fun shareBars(stretches: List<Triple<Int, Int, Double>>, duration: Int, cellDays: Int): List<BarChart.Bar> {
         val sum = stretches.sumOf { it.third }
         val bars = mutableListOf<BarChart.Bar>()
         for ((first, last, share) in stretches) {
-            val days = if (duration > 0) Math.round(share / sum * duration).toInt() else (last - first + 1) * BarChart.CELL_DAYS
+            val days = if (duration > 0) Math.round(share / sum * duration).toInt() else (last - first + 1) * cellDays
             if (days <= 0) continue
-            val end = minOf(first * BarChart.CELL_DAYS + days, (last / BarChart.CELLS_PER_MONTH + 1) * BarChart.MONTH_DAYS)
+            val end = minOf(first * cellDays + days, (last * cellDays / BarChart.MONTH_DAYS + 1) * BarChart.MONTH_DAYS)
             val start = maxOf(end - days + 1, 1)
             if (bars.isNotEmpty() && bars.last().endDay + 1 >= start) bars[bars.lastIndex] = bars.last().copy(endDay = end)
             else bars += BarChart.Bar(start, end)
@@ -136,13 +141,13 @@ object BarChartExcel {
         return bars
     }
 
-    /** Consecutive cells (0 = Month 1's first) as bars in contract days. */
-    private fun runs(cells: List<Int>): List<BarChart.Bar> {
+    /** Consecutive cells (0 = Month 1's first), each [cellDays] long, as bars in contract days. */
+    private fun runs(cells: List<Int>, cellDays: Int): List<BarChart.Bar> {
         val bars = mutableListOf<BarChart.Bar>()
         var start = -1; var prev = -2
         for (c in cells + Int.MIN_VALUE) {
             if (c != prev + 1) {
-                if (start >= 0) bars += BarChart.Bar(start * BarChart.CELL_DAYS + 1, (prev + 1) * BarChart.CELL_DAYS)
+                if (start >= 0) bars += BarChart.Bar(start * cellDays + 1, (prev + 1) * cellDays)
                 start = c
             }
             prev = c
