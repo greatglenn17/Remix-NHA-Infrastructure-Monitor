@@ -386,7 +386,8 @@ is read only.
   both together): it reads the contractor's workbook in the browser, nothing is uploaded, and replaces the open
   chart's items with the sheet's items and their bars from the coloured cells. The headings vary by project, so it
   takes "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row, "Amount" or "COST (PHP)", "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and
-  stops at the total's row. Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
+  stops at the total's row. A month is 6 cells of 5 days, or as many cells as lie from the "Month 1" heading to "Month 2"
+  (30 in a sheet drawn a day to a cell, whose bars then come in to the day). Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
   stretch's days are its part of the item's days (21 days are drawn as 4 cells) and the other colours on the row, the
   suspensions, are not bars; without the shares every coloured cell is 5 days. A workbook with several chart sheets
   asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused. A first chart not saved yet starts from the Scope of Works items and says the import replaces them; the project's Scope of Works is never changed by the chart.

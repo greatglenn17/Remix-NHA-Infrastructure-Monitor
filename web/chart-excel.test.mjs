@@ -94,6 +94,24 @@ test('bar chart Excel: a header of NO. / DESCRIPTION / COST / DAYS / MONTH 1, an
   assert.deepEqual(sheets[0].durations, { Mobilization: 10, 'Earthworks & grading': 30 });
 });
 
+// A sheet drawn a day to a cell: E = Month 1's day 1, and Month 2's heading 30 cells on (AI).
+const daily = `<worksheet><sheetData>
+  <row r="3"><c r="A3" t="inlineStr"><is><t>NO.</t></is></c><c r="B3" t="inlineStr"><is><t>DESCRIPTION</t></is></c><c r="C3" t="inlineStr"><is><t>COST</t></is></c><c r="D3" t="inlineStr"><is><t>DAYS</t></is></c>
+      <c r="E3" t="inlineStr"><is><t>MONTH 1</t></is></c><c r="AI3" t="inlineStr"><is><t>MONTH 2</t></is></c></row>
+  <row r="4"><c r="E4"><v>1</v></c><c r="F4"><v>2</v></c></row>
+  <row r="5"><c r="A5"><v>1</v></c><c r="B5" t="inlineStr"><is><t>Fence</t></is></c><c r="C5"><v>1000</v></c><c r="D5"><v>5</v></c>
+      <c r="AG5" s="1"/><c r="AH5" s="1"/><c r="AI5" s="1"/><c r="AJ5" s="1"/><c r="AK5" s="1"/></row>
+  <row r="6"><c r="A6"><v>2</v></c><c r="B6" t="inlineStr"><is><t>Gate</t></is></c><c r="C6"><v>500</v></c><c r="D6"><v>3</v></c><c r="F6" s="1"/><c r="H6" s="1"/><c r="I6" s="1"/></row>
+  <row r="7"><c r="B7" t="inlineStr"><is><t>GRAND TOTAL</t></is></c><c r="C7"><v>1500</v></c></row>
+  </sheetData></worksheet>`;
+
+test('bar chart Excel: a sheet drawn a day to a cell, 30 cells from Month 1 to Month 2, gives the days exactly', async () => {
+  const sheets = await readChartWorkbook(zip({ ...parts, 'xl/worksheets/sheet2.xml': daily }));
+  // AG-AK are days 29-33, across the end of month 1; F is day 2, H-I days 4-5.
+  assert.deepEqual(sheets[0].items, [{ name: 'Fence', amount: 1000, bars: [[29, 33]] }, { name: 'Gate', amount: 500, bars: [[2, 2], [4, 5]] }]);
+  assert.deepEqual(sheets[0].durations, { Fence: 5, Gate: 3 });
+});
+
 test('bar chart Excel: the office layout, a bar\'s days from the shares written in it, the suspension colours left out', async () => {
   const sheets = await readChartWorkbook(zip({ ...parts,
     'xl/sharedStrings.xml': `<sst><si><t>ITEMS</t></si><si><t>DESCRIPTION</t></si><si><t>COST (PHP)</t></si><si><t>NO. OF DAYS</t></si><si><t>1st Month</t></si>

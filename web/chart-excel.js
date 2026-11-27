@@ -1,11 +1,11 @@
 // BarChartExcel for the website: reads the contractor's bar chart with cash flow from its Excel file (.xlsx). Under the
 // "ITEM NO. / DESCRIPTION / Amount / Duration" header (or the office's "ITEMS / DESCRIPTION / COST (PHP) / NO. OF DAYS"),
 // each item row with an amount, and its bar as the filled cells from "Month 1" ("1st Month") on, 6 cells of 5 days a
-// month. Where a bar's stretches hold the month's share of the item, as the office's sheet does, the shares give their
+// month, or as many cells as lie between the "Month 1" and "Month 2" headings (30 for a sheet drawn a day to a cell). Where a bar's stretches hold the month's share of the item, as the office's sheet does, the shares give their
 // days and the other colours on the row (the suspensions) are not bars. The cash flow rows are worked out again from the
 // bars, so they are not read. Change both when the phone's reader (util/BarChartExcel.kt) changes.
 
-const CELL_DAYS = 5, MONTH_CELLS = 6, MAX_BYTES = 20 * 1024 * 1024;
+const MONTH_DAYS = 30, MONTH_CELLS = 6, MAX_BYTES = 20 * 1024 * 1024;
 
 export class NotAnExcelFile extends Error {
   constructor() { super('Not an Excel workbook (.xlsx)'); }
@@ -45,13 +45,13 @@ function ref(r) {
 /** A cell's text as a number, as Kotlin's toDoubleOrNull reads it; null when it is not one. */
 export const number = text => (text != null && /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text) ? Number(text) : null);
 
-/** Consecutive cells (0 = Month 1's first) as bars in contract days. */
-function runs(cells) {
+/** Consecutive cells (0 = Month 1's first), each `cellDays` long, as bars in contract days. */
+function runs(cells, cellDays) {
   const bars = [];
   let start = -1, prev = -2;
   for (const c of [...cells, -Infinity]) {
     if (c !== prev + 1) {
-      if (start >= 0) bars.push([start * CELL_DAYS + 1, (prev + 1) * CELL_DAYS]);
+      if (start >= 0) bars.push([start * cellDays + 1, (prev + 1) * cellDays]);
       start = c;
     }
     prev = c;
@@ -64,13 +64,13 @@ function runs(cells) {
  * the bar: a stretch's days are its part of `duration` (the cells only round them: 21 days are drawn as 4 cells), counted
  * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
  */
-function shareBars(stretches, duration) {
+function shareBars(stretches, duration, cellDays) {
   const sum = stretches.reduce((t, s) => t + s[2], 0), bars = [];
   for (const [first, last, share] of stretches) {
-    const days = duration > 0 ? Math.round(share / sum * duration) : (last - first + 1) * CELL_DAYS;
+    const days = duration > 0 ? Math.round(share / sum * duration) : (last - first + 1) * cellDays;
     if (days <= 0) continue;
-    const monthEnd = (Math.floor(last / MONTH_CELLS) + 1) * MONTH_CELLS * CELL_DAYS;
-    const end = Math.min(first * CELL_DAYS + days, monthEnd), start = Math.max(end - days + 1, 1);
+    const monthEnd = (Math.floor(last * cellDays / MONTH_DAYS) + 1) * MONTH_DAYS;
+    const end = Math.min(first * cellDays + days, monthEnd), start = Math.max(end - days + 1, 1);
     if (bars.length && bars.at(-1)[1] + 1 >= start) bars.at(-1)[1] = end;
     else bars.push([start, end]);
   }
@@ -119,6 +119,10 @@ function sheetChart(name, xml, strings, filled) {
   const descCol = column('DESCRIPTION'), amountCol = column('Amount', 'Cost'), durationCol = column('Duration', 'No. of Days', 'Days');
   const dayCol = all.find(c => same(c.text, 'Month 1') || same(c.text, '1st Month'))?.col;
   if (descCol == null || amountCol == null || dayCol == null) return null;
+  // A month is 6 cells of 5 days as the contractors draw it; a sheet with another count of cells from one month's heading
+  // to the next (30 when it is drawn a day to a cell) has that many, where they divide the month's 30 days evenly.
+  const gap = all.find(c => same(c.text, 'Month 2') || same(c.text, '2nd Month'))?.col - dayCol;
+  const cellDays = MONTH_DAYS / (gap > 0 && MONTH_DAYS % gap === 0 ? gap : MONTH_CELLS);
   const end = all.find(c => c.row > header.row && TOTAL.test(c.text))?.row ?? Infinity;
   const lastCol = all.reduce((n, c) => Math.max(n, c.col), dayCol);
   const at = (row, col) => cells.get(key(row, col));
@@ -139,7 +143,7 @@ function sheetChart(name, xml, strings, filled) {
       const share = number(at(row, col)?.text);
       if (share > 0 && isFilled(row, col)) stretches.push([col - dayCol, (merges.find(([r1, c1]) => r1 === row && c1 === col)?.[3] ?? col) - dayCol, share]);
     }
-    const bars = stretches.length ? shareBars(stretches, Math.trunc(said ?? 0)) : runs([...days].sort((a, b) => a - b));
+    const bars = stretches.length ? shareBars(stretches, Math.trunc(said ?? 0), cellDays) : runs([...days].sort((a, b) => a - b), cellDays);
     items.push({ name: desc, amount: Math.round(amount * 100) / 100, bars });
     if (said != null) durations[desc] = Math.trunc(said);
   }
