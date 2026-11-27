@@ -74,13 +74,16 @@ object BarChartExcel {
         val merges = mutableListOf<IntArray>()
         val cells = cells(xml, strings, merges)
         fun find(test: (String) -> Boolean) = cells.entries.filter { test(it.value.text) }.minByOrNull { it.key.first * 100000 + it.key.second }?.key
-        // The headings vary by project: "ITEM NO." or "ITEMS", "Amount" or "COST (PHP)", "Month 1" or "1st Month", and the total's row.
-        val header = find { HEADER.matches(it) } ?: return null
+        // The headings vary by project: "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row, "Amount" or "COST (PHP)",
+        // "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and the total's row.
+        val described = cells.entries.filter { it.value.text.startsWith("DESCRIPTION", ignoreCase = true) }.map { it.key.first }.toSet()
+        val header = cells.entries.filter { HEADER.matches(it.value.text) && it.key.first in described }
+            .minByOrNull { it.key.first * 100000 + it.key.second }?.key ?: return null
         fun column(vararg prefixes: String) = cells.entries
             .filter { it.key.first == header.first && prefixes.any { p -> it.value.text.startsWith(p, ignoreCase = true) } }.minOfOrNull { it.key.second }
         val descCol = column("DESCRIPTION") ?: return null
         val amountCol = column("Amount", "Cost") ?: return null
-        val durationCol = column("Duration", "No. of Days")
+        val durationCol = column("Duration", "No. of Days", "Days")
         val dayCol = find { it.equals("Month 1", ignoreCase = true) || it.equals("1st Month", ignoreCase = true) }?.second ?: return null
         val end = cells.entries.filter { it.key.first > header.first && TOTAL.containsMatchIn(it.value.text) }
             .minOfOrNull { it.key.first } ?: Int.MAX_VALUE
@@ -111,7 +114,7 @@ object BarChartExcel {
         return Sheet(name, items, durations)
     }
 
-    private val HEADER = Regex("""items?( no\.?)?""", RegexOption.IGNORE_CASE)
+    private val HEADER = Regex("""items?( no\.?)?|no\.?""", RegexOption.IGNORE_CASE)
     private val TOTAL = Regex("""^(grand )?total\b""", RegexOption.IGNORE_CASE)
 
     /**

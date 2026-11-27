@@ -385,7 +385,7 @@ is read only.
   **Import from Excel (.xlsx)** is the app's import (`chart-excel.js`, the port of `util/BarChartExcel.kt`; change
   both together): it reads the contractor's workbook in the browser, nothing is uploaded, and replaces the open
   chart's items with the sheet's items and their bars from the coloured cells. The headings vary by project, so it
-  takes "ITEM NO." or "ITEMS", "Amount" or "COST (PHP)", "Duration" or "NO. OF DAYS", "Month 1" or "1st Month", and
+  takes "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row, "Amount" or "COST (PHP)", "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and
   stops at the total's row. Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
   stretch's days are its part of the item's days (21 days are drawn as 4 cells) and the other colours on the row, the
   suspensions, are not bars; without the shares every coloured cell is 5 days. A workbook with several chart sheets

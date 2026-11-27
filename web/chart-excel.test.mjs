@@ -86,6 +86,14 @@ const office = `<worksheet><sheetData>
   <row r="55"><c r="B55" t="s"><v>9</v></c><c r="F55"><v>1</v></c><c r="J55" s="1"><v>0.1</v></c></row>
   </sheetData><mergeCells><mergeCell ref="N51:O51"/><mergeCell ref="R51:U51"/><mergeCell ref="V51:X51"/></mergeCells></worksheet>`;
 
+test('bar chart Excel: a header of NO. / DESCRIPTION / COST / DAYS / MONTH 1, and a stray "No." above it', async () => {
+  const sheets = await readChartWorkbook(zip({ ...parts,
+    'xl/sharedStrings.xml': parts['xl/sharedStrings.xml'].replace('ITEM NO.', 'NO.').replace('Amount (Php)', 'COST').replace('Duration (C.D)', 'DAYS').replace('Month 1', 'MONTH 1'),
+    'xl/worksheets/sheet2.xml': sheet.replace('<sheetData>', '<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>No.</t></is></c><c r="B1" t="inlineStr"><is><t>12</t></is></c></row>') }));
+  assert.deepEqual(sheets[0].items.map(i => [i.name, i.amount, i.bars]), [['Mobilization', 1000, [[1, 10], [41, 45]]], ['Earthworks & grading', 3000.5, [[11, 40]]]]);
+  assert.deepEqual(sheets[0].durations, { Mobilization: 10, 'Earthworks & grading': 30 });
+});
+
 test('bar chart Excel: the office layout, a bar\'s days from the shares written in it, the suspension colours left out', async () => {
   const sheets = await readChartWorkbook(zip({ ...parts,
     'xl/sharedStrings.xml': `<sst><si><t>ITEMS</t></si><si><t>DESCRIPTION</t></si><si><t>COST (PHP)</t></si><si><t>NO. OF DAYS</t></si><si><t>1st Month</t></si>
