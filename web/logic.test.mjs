@@ -790,6 +790,37 @@ test('new weekly report: the week, the lines from the chart or the scope, the re
   assert.deepEqual(L.weeklyLines({ dateStarted: '2026-01-01', scopeOfWork: scope }, [], '2026-02-20').map(l => [l.weightPct, l.targetPct]), [[0, null], [70, null], [30, null]]);
   assert.deepEqual(L.weeklyLines({ scopeOfWork: '' }, [], '2026-02-20').map(l => [l.weightPct, l.targetPct]), [[0, null], [0, null], [0, null]]);
 
+  // A community facility: the lines are the bar chart's own items (else the scope's), read back as saved, never folded.
+  const hall = { ...project, projectType: 'Community Facility' };
+  assert.deepEqual(L.weeklyLines(hall, [], '2026-02-20'), [{ name: 'Roads', weightPct: 60, targetPct: 51 }, { name: 'Housing units', weightPct: 40, targetPct: 1 }]);
+  assert.deepEqual(L.weeklyLines({ projectType: 'Community Facility', scopeOfWork: scope }, [], '2026-02-20'), [{ name: 'Land development', weightPct: 70, targetPct: null }, { name: 'Housing units', weightPct: 30, targetPct: null }]);
+  assert.deepEqual(L.weeklyLines({ projectType: 'Community Facility', scopeOfWork: '' }, [], '2026-02-20'), []);
+  const hallReport = { reportingWeek: 'Feb 14, 2026 - Feb 20, 2026', accomplishmentItemsJson: JSON.stringify([{ itemDescription: 'Roads', weightPct: 60, targetPct: 51, actualPct: 50 }, { itemDescription: 'Roofing', weightPct: 40, targetPct: 1, actualPct: 0 }]) };
+  assert.deepEqual(L.accomplishmentOf(hallReport.accomplishmentItemsJson, true).map(a => a.itemDescription), ['Roads', 'Roofing']);
+  assert.deepEqual(L.weeklyStart(hallReport, true).lines, [{ name: 'Roads', target: '51.00', actual: '50.00' }, { name: 'Roofing', target: '1.00', actual: '0.00' }]);
+  assert.deepEqual(L.carriedActuals([hallReport], true), [{ name: 'Roads', actual: '50.00' }, { name: 'Roofing', actual: '0.00' }]);
+  // With the week's abstract the lines are the abstract's works: the weight by the work's amount, the actual its
+  // subtotal's (an overrun reads 100), and the target the chart's for the chart items that belong to the work, by
+  // their amounts: "Housing units" is a row under ROOFING WORKS on the abstract, so it counts there. A work with no
+  // chart item has a target of 0.
+  const hallAbstract = { rowsJson: JSON.stringify([{ kind: 'part', no: 'I', name: 'ROADS' }, { kind: 'subtotal', name: 'Sub-Total (Roads)', amount: 50, toDate: [null, null, 100.5] },
+    { kind: 'part', no: 'II', name: 'ROOFING WORKS' }, { kind: 'item', no: 'A', name: 'Housing Units', amount: 30 }, { kind: 'subtotal', name: 'Sub-Total (Roofing Works)', amount: 30, toDate: [null, null, 12.3] },
+    { kind: 'part', no: 'III', name: 'EXTRA WORKS' }, { kind: 'subtotal', name: 'Sub-Total (Extra Works)', amount: 20, toDate: [null, null, 0] }, { kind: 'total', name: 'GRAND TOTAL', amount: 100 }]) };
+  assert.deepEqual(L.weeklyLines(hall, [], '2026-02-20', hallAbstract), [{ name: 'ROADS', weightPct: 50, targetPct: 51, actual: '100.00' },
+    { name: 'ROOFING WORKS', weightPct: 30, targetPct: 1, actual: '12.30' }, { name: 'EXTRA WORKS', weightPct: 20, targetPct: 0, actual: '0.00' }]);
+  // No chart: the targets are typed. An abstract with no works to read: the chart's items, as before the first abstract.
+  assert.deepEqual(L.weeklyLines({ projectType: 'Community Facility', scopeOfWork: scope }, [], '2026-02-20', hallAbstract).map(l => [l.name, l.targetPct]), [['ROADS', null], ['ROOFING WORKS', null], ['EXTRA WORKS', null]]);
+  assert.deepEqual(L.weeklyLines(hall, [], '2026-02-20', { rowsJson: '[]' }).map(l => l.name), ['Roads', 'Housing units']);
+  // The Actual Accomplishment tab's table has the same works, then the overall; only the overall for an abstract with no works.
+  assert.deepEqual(L.abstractStanding(hall, [], { ...hallAbstract, asOf: '2026-02-20', overallPct: 53.69 }), [
+    { name: 'ROADS', target: 51, actual: 100, diff: 49 }, { name: 'ROOFING WORKS', target: 1, actual: 12.3, diff: 11.3 },
+    { name: 'EXTRA WORKS', target: 0, actual: 0, diff: 0 }, { name: 'Overall', target: 31, actual: 53.69, diff: 22.69 }]);
+  assert.deepEqual(L.abstractStanding(hall, [], { rowsJson: '[]', asOf: '2026-02-20', overallPct: 5 }).map(r => r.name), ['Overall']);
+  // A chart item belongs to the work whose name, or one of whose rows' names, it is most like: a typo or a shorter wording still matches.
+  const works = [{ names: ['ARCHITECTURAL WORKS', 'Construction of Perimeter Fence and Gate', 'Construction of Guard House'] }, { names: ['MISCELLANEOUS WORKS'] }, { names: ['MASONRY WORKS'] }];
+  assert.deepEqual(['Architectural Works', 'Construction of Perimeter Fence', 'Misccellaneous Works', 'Masonry Works', 'Landscaping'].map(n => L.workOf(n, works)), [0, 0, 1, 2, -1]);
+  assert.deepEqual([L.nameLikeness('Flag-pole', 'FLAG POLE'), L.nameLikeness('A', 'A'), L.nameLikeness('Roads', '')], [1, 0, 0]);
+
   const f = {
     first: '2026-02-14',
     lines: [{ ...lines[0], target: '0.00', actual: '' }, { ...lines[1], target: '51.00', actual: '50' }, { ...lines[2], target: '1.00', actual: '' }],
@@ -855,7 +886,7 @@ test('weekly report edit: the form starts from the saved report, keeps what it d
   };
   const start = L.weeklyStart(report);
   assert.equal(start.first, '2026-02-14');
-  assert.deepEqual(start.lines, [{ target: '0.00', actual: '0.00' }, { target: '20.00', actual: '15.50' }, { target: '20.00', actual: '10.00' }]);
+  assert.deepEqual(start.lines, [{ name: 'Land Acquisition', target: '0.00', actual: '0.00' }, { name: 'Land Development', target: '20.00', actual: '15.50' }, { name: 'Housing Construction', target: '20.00', actual: '10.00' }]);
   assert.deepEqual(start.manpower, [{ designation: 'Foreman', count: 2, remarks: 'night shift' }]);
   assert.deepEqual(start.activities, [{ from: 'Monday', to: 'Wednesday', description: 'Excavation', remarks: 'ok' }, { from: 'Whole week', to: '', description: 'Hauling', remarks: '' }]);
   assert.equal(start.equipment[0].status, 'On standby');
@@ -1732,7 +1763,7 @@ test('abstracts: what is billed never passes the actual, and the billing abstrac
     { uuid: 'w2', reportingWeek: 'Mar 8, 2025 - Mar 14, 2025', actualAccomplishmentPct: 10.74, accomplishmentItemsJson: lines(50, 25.21, 1) }];
   assert.equal(L.latestWeekly(weekly).uuid, 'w2');
   assert.equal(L.latestWeekly([]), undefined);
-  assert.deepEqual(L.carriedActuals(weekly), [{ actual: '50.00' }, { actual: '25.21' }, { actual: '1.00' }]);
+  assert.deepEqual(L.carriedActuals(weekly), [{ name: 'Land Acquisition', actual: '50.00' }, { name: 'Land Development', actual: '25.21' }, { name: 'Housing Construction', actual: '1.00' }]);
   assert.deepEqual(L.carriedActuals([]), []);
   assert.deepEqual(L.partAmounts(project, [], '2025-03-14'), [1000000, 2000000, 7000000]);
   assert.deepEqual(L.partAmounts({ scopeOfWork: '' }, [], '2025-03-14'), [0, 0, 0]);

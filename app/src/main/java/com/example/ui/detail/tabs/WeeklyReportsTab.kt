@@ -34,7 +34,9 @@ fun WeeklyReportsTab(
     onAddWeeklyReportClick: () -> Unit,
     onEditWeeklyReportClick: (WeeklyReport) -> Unit,
     onDeleteWeeklyReportClick: (WeeklyReport) -> Unit,
-    onPrintWeeklyReportClick: (WeeklyReport) -> Unit = {}
+    onPrintWeeklyReportClick: (WeeklyReport) -> Unit = {},
+    // A community facility's reports list its bar chart's items, not the three housing lines.
+    facility: Boolean = false
 ) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (weeklyReports.isEmpty()) {
@@ -90,7 +92,7 @@ fun WeeklyReportsTab(
                 }
 
                 items(weeklyReports, key = { it.id }) { report ->
-                    WeeklyReportCard(report = report, currentUserRole = currentUserRole, previousActual = previousReport(weeklyReports, report)?.actualAccomplishmentPct, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) }, onPrintClick = { onPrintWeeklyReportClick(report) })
+                    WeeklyReportCard(report = report, facility = facility, currentUserRole = currentUserRole, previousActual = previousReport(weeklyReports, report)?.actualAccomplishmentPct, onEditClick = { onEditWeeklyReportClick(report) }, onDeleteClick = { onDeleteWeeklyReportClick(report) }, onPrintClick = { onPrintWeeklyReportClick(report) })
                 }
             }
             if (currentUserRole.hasPermission(Permission.SUBMIT_REPORT)) {
@@ -113,6 +115,7 @@ internal fun previousReport(reports: List<WeeklyReport>, report: WeeklyReport): 
 @Composable
 private fun WeeklyReportCard(
     report: WeeklyReport,
+    facility: Boolean,
     currentUserRole: UserRole,
     previousActual: Double?,
     onEditClick: () -> Unit,
@@ -242,7 +245,7 @@ private fun WeeklyReportCard(
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(bottom = 12.dp))
 
-                    val parsedAccItems = remember(report.accomplishmentItemsJson) { parseAccomplishmentItemsList(report.accomplishmentItemsJson) }
+                    val parsedAccItems = remember(report.accomplishmentItemsJson, facility) { parseAccomplishmentItemsList(report.accomplishmentItemsJson, facility) }
 
                     // 1. Weekly Accomplishment Status (Scope of Works)
                     Text(
@@ -669,8 +672,9 @@ internal fun parseActivitiesList(jsonStr: String): List<DailyActivity> {
 }
 
 
-/** A report's accomplishment as the three lines (see accomplishmentLines). */
-internal fun parseAccomplishmentItemsList(jsonStr: String): List<AccomplishmentItem> = com.example.data.model.accomplishmentLines(parseSavedItems(jsonStr))
+/** A report's accomplishment as the three lines (see accomplishmentLines); [asItems], a community facility's, as saved: its lines are the bar chart's items. */
+internal fun parseAccomplishmentItemsList(jsonStr: String, asItems: Boolean = false): List<AccomplishmentItem> =
+    parseSavedItems(jsonStr).let { if (asItems) it else com.example.data.model.accomplishmentLines(it) }
 
 private fun parseSavedItems(jsonStr: String): List<AccomplishmentItem> {
     if (jsonStr.isBlank()) return emptyList()

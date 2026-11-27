@@ -129,6 +129,23 @@ class ProjectAbstractsTest {
             ProjectAbstracts.standing(project, emptyList(), uploaded)
         )
         assertEquals(listOf("+4.66%", "-7.58%", "0.00%", "-"), listOf(4.66, -7.58, 0.0, null).map(ProjectAbstracts::diffText))
+
+        // A community facility: its abstract's works, as on its weekly form ("Housing Units" is a row under ROOFING WORKS), then the overall.
+        val hall = charted.copy(projectType = "Community Facility")
+        val works = uploaded.copy(overallPct = 53.69, rowsJson = ProjectAbstracts.rowsJson(listOf(
+            row("part", "I", "ROADS"), row("subtotal", "", "Sub-Total (Roads)", 50.0, listOf(null, null, 100.5)),
+            row("part", "II", "ROOFING WORKS"), row("item", "A", "Housing Units", 30.0), row("subtotal", "", "Sub-Total (Roofing Works)", 30.0, listOf(null, null, 12.3)),
+            row("part", "III", "EXTRA WORKS"), row("subtotal", "", "Sub-Total (Extra Works)", 20.0, listOf(null, null, 0.0)), row("total", "", "GRAND TOTAL", 100.0))))
+        assertEquals(
+            listOf(
+                ProjectAbstracts.Standing("ROADS", 73.0, 100.0, 27.0),
+                ProjectAbstracts.Standing("ROOFING WORKS", 23.0, 12.3, -10.7),
+                ProjectAbstracts.Standing("EXTRA WORKS", 0.0, 0.0, 0.0),
+                ProjectAbstracts.Standing("Overall", 53.0, 53.69, 0.69),
+            ),
+            ProjectAbstracts.standing(hall, emptyList(), works)
+        )
+        assertEquals(listOf("Overall"), ProjectAbstracts.standing(hall, emptyList(), works.copy(rowsJson = "[]")).map { it.name })
     }
 
     // The same figures as web/logic.test.mjs "monthly abstract: to date from the latest abstract, previous from the one at the end of the month before".

@@ -116,3 +116,41 @@ test('abstract Excel: the as-of line', () => {
   assert.equal(asOfDate('As of last week'), null);
   assert.equal(asOfDate('As of September 31, 2026'), null); // no such day
 });
+
+// The office-building layout (a community facility): works numbered I, II, "Sub-Total (...)" and "GRAND TOTAL" in the
+// item no. column, Original and V.O.#1 columns under QUANTITY, UNIT COST and AMOUNT, and a sub-item's number where its
+// description starts. The phone's AbstractExcelTest reads the same sheet.
+const OFFICE = [
+  ['A1', 'As of May 25, 2026'],
+  ['A3', 'Item No.'], ['B3', 'ITEM DESCRIPTION'], ['J3', 'QUANTITY'], ['L3', 'UNIT'], ['M3', 'UNIT COST'], ['O3', 'AMOUNT'], ['Q3', 'Accomplishment'],
+  ['Q4', 'Previous'], ['T4', 'This Period'], ['W4', 'To Date'],
+  ['J5', 'Original'], ['K5', 'V.O.#1'], ['M5', 'Original'], ['N5', 'V.O.#1'], ['O5', 'Original'], ['P5', 'V.O#1'],
+  ['Q5', 'Qty'], ['R5', 'Amount'], ['S5', '%WT'], ['T5', 'Qty'], ['U5', 'Amount'], ['V5', '%WT'], ['W5', 'Qty'], ['X5', 'Amount'], ['Y5', '%WT'],
+  ['A6', 'I'], ['B6', 'GENERAL REQUIREMENTS'],
+  ['A7', 'A'], ['B7', 'Mobilization'], ['J7', 1], ['K7', 1], ['L7', 'lot'], ['M7', 300], ['N7', 400], ['O7', 300], ['P7', 400], ['W7', 0.5], ['X7', 200], ['Y7', 0.5],
+  ['A8', 'Sub-Total (General Requirements)'], ['O8', 300], ['P8', 400], ['X8', 200], ['Y8', 0.5],
+  ['A9', 'CONSTRUCTION OF OFFICE BUILDING'], // a title between works: not a row
+  ['A10', 'II'], ['B10', 'ARCHITECTURAL WORKS'],
+  ['A11', 'A'], ['B11', 'Doors and Jambs'],
+  ['B12', '1a'], ['C12', 'D1 Door'], ['K12', 2], ['L12', 'sets'], ['N12', 50], ['P12', 100], ['X12', 0], ['Y12', 0],
+  ['A13', 'I'], ['B13', 'Tempered Glass'], ['P13', 500], ['X13', 150], ['Y13', 0.3], // the letter I of an item, not work I
+  ['A14', 'Sub-Total (Architectural Works 1)'], ['P14', 600], ['X14', 150], ['Y14', 0.25],
+  ['A15', 'J'], ['B15', 'Construction of Guard House'], ['P15', 200], ['X15', 50], ['Y15', 0.25],
+  ['A16', 'Sub-Total (Architectural Works)'], ['O16', 800], ['P16', 800], ['X16', 200], // no % WT: 200 of 800
+  ['A17', 'GRAND TOTAL'], ['O17', 1100], ['P17', 1200], ['X17', 400], ['Y17', 0.3333],
+  ['A20', 'Prepared By:'],
+];
+
+test('abstract Excel, office-building layout: Roman-numbered works with their Sub-Totals, the V.O. columns in force', () => {
+  const { rows, ...found } = abstractOf(workbook(sheet(OFFICE)));
+  assert.deepEqual(found, { asOf: '2026-05-25', overallPct: 33.33, billing: false, equivUnits: 0,
+    parts: [{ name: 'GENERAL REQUIREMENTS', amount: 400, actualPct: 50 }, { name: 'ARCHITECTURAL WORKS', amount: 800, actualPct: 25 }] });
+  assert.deepEqual(rows.map(r => [r.kind, r.no, r.name, r.amount]), [
+    ['part', 'I', 'GENERAL REQUIREMENTS', null], ['item', 'A', 'Mobilization', 400], ['subtotal', '', 'Sub-Total (General Requirements)', 400],
+    ['part', 'II', 'ARCHITECTURAL WORKS', null], ['group', 'A', 'Doors and Jambs', null], ['item', '1a', 'D1 Door', 100], ['item', 'I', 'Tempered Glass', 500],
+    ['subtotal', '', 'Sub-Total (Architectural Works 1)', 600], ['item', 'J', 'Construction of Guard House', 200],
+    ['subtotal', '', 'Sub-Total (Architectural Works)', 800], ['total', '', 'GRAND TOTAL', 1200]]);
+  // The V.O.#1 quantity and unit cost, and the work's own subtotal over its groups'.
+  assert.deepEqual([rows[1].qty, rows[1].unit, rows[1].unitCost, rows[1].toDate], [1, 'lot', 400, [0.5, 200, 50]]);
+  assert.deepEqual([rows[5].qty, rows[5].unit, rows[5].unitCost], [2, 'sets', 50]);
+});

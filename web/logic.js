@@ -671,16 +671,17 @@ export function accomplishmentLines(items) {
 }
 /**
  * parseAccomplishmentItemsList: stops at the first row without a description, target or actual, keeping the rows
- * before it; then the three lines, so reports saved item by item read like new ones.
+ * before it; then the three lines, so reports saved item by item read like new ones. `asItems` (a community
+ * facility's report) keeps the rows as saved: its lines are the bar chart's items, not the three housing lines.
  */
-export function accomplishmentOf(json) {
+export function accomplishmentOf(json, asItems = false) {
   const out = [];
   for (const o of jsonArray(json)) {
     const t = Number(o?.targetPct), a = Number(o?.actualPct);
     if (typeof o?.itemDescription !== 'string' || o.targetPct == null || o.actualPct == null || !Number.isFinite(t) || !Number.isFinite(a)) break;
     out.push({ itemDescription: o.itemDescription, weightPct: Number(o.weightPct) || 0, targetPct: t, actualPct: a, variancePct: a - t });
   }
-  return accomplishmentLines(out);
+  return asItems ? out : accomplishmentLines(out);
 }
 
 /** Attachments.parseList: a weekly report's photo list, which older versions saved as an array, an array inside a string, or one uri. */
@@ -1890,17 +1891,35 @@ export function weekLabel(first) {
  * The form's three accomplishment lines for a week ending `asOf`: a line's weight is its items' (the bar chart in force
  * that day, by amount; without a chart the Scope of Works'). With a chart the target is its plan and is not typed;
  * `targetPct` is null when it is typed.
+ *
+ * A community facility has no land or housing lines. With the week's `abstract` its lines are the abstract's works
+ * (its parts: I. General Requirements, II. ...): the weight is the work's amount of all works', `actual` its subtotal's
+ * % to date ("49.29", an overrun reading 100), and the target the chart's plan for the chart items that belong to the
+ * work (workOf), by their amounts; a work with no chart item has a target of 0. Before the first abstract the lines
+ * are the chart's own items (else the Scope of Works'), with no `actual`.
  */
-export function weeklyLines(project, docs, asOf) {
+export function weeklyLines(project, docs, asOf, abstract = null) {
   const plan = planOn(project, docs, asOf), total = plan ? chartTotal(plan.version) : 0;
   const items = total > 0 ? plan.version.items.map(i => ({ name: i.name, weightPct: (Number(i.amount) || 0) / total * 100 }))
     : String(project.scopeOfWork ?? '').trim() ? scopeItems(project.scopeOfWork) : [];
+  const round = v => Math.round(v * 100) / 100;
+  if (isCommunityFacility(project.projectType)) {
+    const works = abstract ? abstractWorks(abstractRows(abstract.rowsJson)) : [], all = works.reduce((t, w) => t + w.amount, 0);
+    if (!(all > 0)) return items.map(i => ({ name: i.name, weightPct: i.weightPct, targetPct: total > 0 ? round(plan.itemTargets[i.name] ?? 0) : null }));
+    const planned = works.map(() => [0, 0]); // each work's chart amount, and that amount by its items' targets
+    for (const i of total > 0 ? plan.version.items : []) {
+      const k = workOf(i.name, works), amount = Number(i.amount) || 0;
+      if (k >= 0) { planned[k][0] += amount; planned[k][1] += amount * (plan.itemTargets[i.name] ?? 0); }
+    }
+    return works.map((w, k) => ({ name: w.name, weightPct: all > 0 ? w.amount / all * 100 : 0,
+      targetPct: total > 0 ? round(planned[k][0] > 0 ? planned[k][1] / planned[k][0] : 0) : null, actual: Math.min(100, w.actualPct).toFixed(2) }));
+  }
   const lines = accomplishmentLines(items.map(i => ({ itemDescription: i.name, weightPct: i.weightPct, targetPct: total > 0 ? plan.itemTargets[i.name] ?? 0 : 0, actualPct: 0 })));
   return ACCOMPLISHMENT_LINES.map((name, k) => ({ name, weightPct: lines[k]?.weightPct ?? 0, targetPct: total > 0 ? Math.round((lines[k]?.targetPct ?? 0) * 100) / 100 : null }));
 }
 
 /** BillingAbstract.carriedActuals: a new report's Actual % boxes start from the latest report's, so a week without a new abstract keeps the last actual. */
-export const carriedActuals = weekly => { const last = latestWeekly(weekly); return last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => ({ actual: a.actualPct.toFixed(2) })) : []; };
+export const carriedActuals = (weekly, asItems = false) => { const last = latestWeekly(weekly); return last ? accomplishmentOf(last.accomplishmentItemsJson, asItems).map(a => ({ name: a.itemDescription, actual: a.actualPct.toFixed(2) })) : []; };
 /** A new report's manpower and equipment start as the latest report's, so only the changes are typed; with none, the usual designations at zero. */
 export const carriedCrew = weekly => {
   const last = latestWeekly(weekly), manpower = last ? manpowerOf(last.manpowerJson) : [];
@@ -1942,6 +1961,44 @@ export function abstractForWeek(abstracts, reportingWeek) {
 /** An abstract's three Actual % as the weekly form shows them (abstractActuals of its parts); 0.00 for a line it has no part for. */
 export const abstractLineActuals = abstract => abstractActuals(abstractParts(abstractRows(abstract.rowsJson))).map(v => Math.min(100, Number(v ?? 0)).toFixed(2)); // an overrun part reads 100: the weekly form takes 0 to 100
 
+/**
+ * ProjectAbstracts.works: an abstract's parts as a community facility's works, each { name, amount, actualPct } as
+ * abstractParts gives them, with `names`: its own name and those of the rows under it, which workOf matches a bar
+ * chart item against.
+ */
+export function abstractWorks(rows) {
+  const works = [];
+  for (const r of rows) {
+    if (r.kind === 'part') works.push({ name: r.name, amount: 0, actualPct: 0, names: [r.name] });
+    else if (r.kind === 'subtotal' && works.length) Object.assign(works.at(-1), { amount: r.amount ?? 0, actualPct: r.toDate?.[2] ?? 0 });
+    else if (r.kind !== 'total' && works.length) works.at(-1).names.push(r.name);
+  }
+  return works;
+}
+
+/**
+ * ProjectAbstracts.likeness: how alike two names are, 0 to 1: the share of the pairs of neighbouring characters they
+ * have in common (letters and digits only, any case), so a typo ("Misccellaneous Works") or a shorter wording
+ * ("Construction of Perimeter Fence" for "... Fence and Gate") still matches.
+ */
+export function nameLikeness(a, b) {
+  const pairs = s => { const t = String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); return new Set(Array.from({ length: Math.max(0, t.length - 1) }, (_, i) => t.slice(i, i + 2))); };
+  const x = pairs(a), y = pairs(b);
+  return x.size && y.size ? 2 * [...x].filter(p => y.has(p)).length / (x.size + y.size) : 0;
+}
+
+/**
+ * ProjectAbstracts.workOf: the index in `works` (abstractWorks) of the work a bar chart item belongs to: the one with
+ * the name most like the item's among each work's own name and its rows' (a chart can list "Construction of Guard
+ * House" on its own while the abstract has it under Architectural Works); the first on a tie, -1 when none is at
+ * least half alike.
+ */
+export function workOf(itemName, works) {
+  let best = -1, top = 0.5;
+  works.forEach((w, k) => { const score = Math.max(...w.names.map(n => nameLikeness(itemName, n))); if (score > top || (best < 0 && score === top)) { best = k; top = score; } });
+  return best;
+}
+
 /** Each accomplishment line's sum, at 2 decimals, of `of(row)` over the own subtotal rows (the last before the next part) of the abstract's parts of that line. */
 function abstractLineSums(abstract, of) {
   const parts = [];
@@ -1966,13 +2023,14 @@ export const abstractToDateAmounts = abstract => abstractLineSums(abstract, r =>
  * actual, diff }: the three accomplishment lines, then "Overall". A line's target is the weekly form's (the approved
  * bar chart's plan for that line on the "As of" date; null without a chart), the overall the chart's plan that day,
  * else the project's stored target. The actuals are the abstract's. `diff` is the actual less the target, each at 2
- * decimals; null without a target.
+ * decimals; null without a target. A Community Facility's rows are its abstract's works, as on its weekly form (none
+ * when the abstract has no works to read), then "Overall".
  */
 export function abstractStanding(project, docs, abstract) {
-  const round = v => Math.round(v * 100) / 100;
-  const targets = weeklyLines(project, docs, abstract.asOf), actuals = abstractLineActuals(abstract);
+  const round = v => Math.round(v * 100) / 100, facility = isCommunityFacility(project.projectType);
+  const targets = weeklyLines(project, docs, abstract.asOf, facility ? abstract : null), actuals = facility ? [] : abstractLineActuals(abstract);
   const row = (name, target, actual) => ({ name, target, actual, diff: target == null ? null : round(round(actual) - round(target)) });
-  return [...ACCOMPLISHMENT_LINES.map((name, k) => row(name, targets[k].targetPct, Number(actuals[k]))),
+  return [...(facility ? targets.filter(l => l.actual != null).map(l => row(l.name, l.targetPct, Number(l.actual))) : ACCOMPLISHMENT_LINES.map((name, k) => row(name, targets[k].targetPct, Number(actuals[k])))),
     row('Overall', plannedTarget(project, docs, abstract.asOf) ?? (Number(project.targetAccomplishment) || 0), Number(abstract.overallPct) || 0)];
 }
 
@@ -2310,13 +2368,13 @@ export function newWeeklyReport(f, project, user, weekly = [], abstracts = [], p
   };
 }
 
-/** A saved report as the form's starting values: its first day, each line's target and actual, and its rows. */
-export function weeklyStart(report) {
+/** A saved report as the form's starting values: its first day, each line's target and actual, and its rows; `asItems` as in accomplishmentOf. */
+export function weeklyStart(report, asItems = false) {
   // ActivityDays.split: "Monday - Wednesday" is a range, anything else one day.
   const span = day => { const parts = day.split('-').map(x => x.trim()); return parts.length === 2 ? { from: parts[0], to: parts[1] } : { from: day.trim(), to: '' }; };
   return {
     first: weekDays(report.reportingWeek)[0] || '',
-    lines: accomplishmentOf(report.accomplishmentItemsJson).map(a => ({ target: a.targetPct.toFixed(2), actual: a.actualPct.toFixed(2) })),
+    lines: accomplishmentOf(report.accomplishmentItemsJson, asItems).map(a => ({ name: a.itemDescription, target: a.targetPct.toFixed(2), actual: a.actualPct.toFixed(2) })),
     manpower: manpowerOf(report.manpowerJson), equipment: equipmentOf(report.equipmentJson),
     activities: activitiesOf(report.activitiesJson).map(a => ({ ...span(a.day), description: a.description, remarks: a.remarks })),
     issues: issuesOf(report.issuesJson),

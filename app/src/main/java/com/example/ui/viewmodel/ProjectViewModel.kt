@@ -2018,7 +2018,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
             com.example.ui.detail.tabs.parseActivitiesList(report.activitiesJson),
             // Only the report's own construction issues; the Issues tab's are the project's and go on the monthly form.
             com.example.ui.detail.tabs.parseIssuesList(report.issuesJson),
-            com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson),
+            com.example.ui.detail.tabs.parseAccomplishmentItemsList(report.accomplishmentItemsJson, com.example.data.model.isCommunityFacility(project.projectType)),
             repository.getDailyWeather(project.id).first().filter { it.weeklyReportId == report.id },
             photos,
             contractLogs(project),
@@ -2038,7 +2038,7 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
         val lastWeekly = monthWeeklyReports.maxWithOrNull(com.example.ui.dialogs.WeekRange.byWeek)
         return com.example.util.BlueBookForms.monthlyReport(
             project, ym, lastWeekly,
-            lastWeekly?.let { com.example.ui.detail.tabs.parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty(),
+            lastWeekly?.let { com.example.ui.detail.tabs.parseAccomplishmentItemsList(it.accomplishmentItemsJson, com.example.data.model.isCommunityFacility(project.projectType)) }.orEmpty(),
             repository.getProjectPaymentsForProject(project.id).first(),
             repository.getProjectIssues(project.id).first(),
             contractLogs(project),

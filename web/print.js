@@ -128,7 +128,7 @@ function scopeText(json) {
  */
 export function weeklyReportHtml({ project, report, docs, letters, requests, photos, signatories: s, banner }) {
   const manpower = L.manpowerOf(report.manpowerJson), equipment = L.equipmentOf(report.equipmentJson);
-  const accomplishment = L.accomplishmentOf(report.accomplishmentItemsJson);
+  const accomplishment = L.accomplishmentOf(report.accomplishmentItemsJson, L.isCommunityFacility(project.projectType));
   const weather = Array.isArray(report._weather) ? report._weather : [];
   const b = [header(banner, `For the Week of ${esc((report.reportingWeek || '').replace(/^Week \d+: /, ''))}`),
     basicInfo(project, docs, 'DAYS ELAPSED:', `${esc(report.daysElapsed ?? 0)} calendar days`, 'REMAINING DAYS:', `${esc(report.remainingDays ?? 0)} calendar days`)];
@@ -485,8 +485,9 @@ export function monthlyReportHtml({ project, month, weeks, payments, issues, doc
   const b = [header(banner, `For the Month of ${esc(monthName(month))}`),
     basicInfo(project, docs, 'VARIATION ORDER/S', list(variations), 'WORK SUSPENSION ORDER/S', list(suspensions))];
 
-  const acc = last ? L.accomplishmentOf(last.accomplishmentItemsJson) : [];
-  const items = acc.length ? acc : L.ACCOMPLISHMENT_LINES.map(itemDescription => ({ itemDescription, weightPct: 0, actualPct: 0, targetPct: 0 }));
+  // A community facility's rows are its bar chart's items as the last report saved them; it has no housing lines to fall back on.
+  const facility = L.isCommunityFacility(project.projectType), acc = last ? L.accomplishmentOf(last.accomplishmentItemsJson, facility) : [];
+  const items = acc.length || facility ? acc : L.ACCOMPLISHMENT_LINES.map(itemDescription => ({ itemDescription, weightPct: 0, actualPct: 0, targetPct: 0 }));
   const sum = f => items.reduce((t, a) => t + f(a), 0);
   b.push(`<table><tr><th colspan='5' class='sec'>II. PROJECT STATUS</th></tr><tr><th colspan='5' class='sub'>STATUS OF ACCOMPLISHMENT</th></tr>
     <tr><th>ITEM</th><th>% WEIGHT</th><th>TARGET ACCOMPLISHMENT</th><th>ACTUAL ACCOMPLISHMENT</th><th>TOTAL</th></tr>

@@ -6,6 +6,7 @@ import com.example.data.model.Project
 import com.example.data.model.ProjectAbstract
 import com.example.data.model.WeeklyReport
 import com.example.data.model.accomplishmentLine
+import com.example.data.model.isCommunityFacility
 import com.example.data.model.lineAverages
 import org.json.JSONArray
 import org.json.JSONObject
@@ -65,10 +66,71 @@ object ProjectAbstracts {
 
     /** The three lines' actual % of an abstract at 2 decimals (the website's "25.21"), in the order of ACCOMPLISHMENT_LINES; a line it has no part for is 0. */
     fun lineActuals(abstract: ProjectAbstract): List<Double> =
-        AbstractExcel.actuals(AbstractExcel.parts(rows(abstract.rowsJson))).let { actual -> ACCOMPLISHMENT_LINES.map {
-            // BigDecimal of the double rounds a tie as the website's toFixed does (25.215 is stored just under it); an overrun part reads 100.
-            java.math.BigDecimal((actual[it] ?: 0.0).coerceAtMost(100.0)).setScale(2, java.math.RoundingMode.HALF_UP).toDouble()
-        } }
+        AbstractExcel.actuals(AbstractExcel.parts(rows(abstract.rowsJson))).let { actual -> ACCOMPLISHMENT_LINES.map { shown(actual[it] ?: 0.0) } }
+
+    // BigDecimal of the double rounds a tie as the website's toFixed does (25.215 is stored just under it); an overrun part reads 100.
+    private fun shown(pct: Double) = java.math.BigDecimal(pct.coerceAtMost(100.0)).setScale(2, java.math.RoundingMode.HALF_UP).toDouble()
+
+    /**
+     * An abstract's part as a community facility's work (I. General Requirements, II. ...), a line of its weekly report:
+     * [amount] and [actualPct] are its own subtotal's, [names] its own name and those of the rows under it, which
+     * [workOf] matches a bar chart item against. web/logic.js abstractWorks, nameLikeness and workOf are the website's.
+     */
+    data class Work(val name: String, val amount: Double, val actualPct: Double, val names: List<String>)
+
+    fun works(abstract: ProjectAbstract): List<Work> {
+        val works = mutableListOf<Work>()
+        for (r in rows(abstract.rowsJson)) when {
+            r.kind == "part" -> works += Work(r.name, 0.0, 0.0, listOf(r.name))
+            works.isEmpty() || r.kind == "total" -> Unit
+            r.kind == "subtotal" -> works[works.lastIndex] = works.last().copy(amount = r.amount ?: 0.0, actualPct = r.toDate.getOrNull(2) ?: 0.0)
+            else -> works[works.lastIndex] = works.last().let { it.copy(names = it.names + r.name) }
+        }
+        return works
+    }
+
+    /** Each work's actual % as the weekly form shows it, by the work's name. */
+    fun workActuals(abstract: ProjectAbstract): Map<String, Double> = works(abstract).associate { it.name to shown(it.actualPct) }
+
+    /**
+     * How alike two names are, 0 to 1: the share of the pairs of neighbouring characters they have in common (letters
+     * and digits only, any case), so a typo ("Misccellaneous Works") or a shorter wording ("Construction of Perimeter
+     * Fence" for "... Fence and Gate") still matches.
+     */
+    fun likeness(a: String, b: String): Double {
+        fun pairs(s: String) = s.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim().windowed(2).toSet()
+        val x = pairs(a)
+        val y = pairs(b)
+        return if (x.isEmpty() || y.isEmpty()) 0.0 else 2.0 * x.count { it in y } / (x.size + y.size)
+    }
+
+    /**
+     * The index in [works] of the work a bar chart item belongs to: the one with the name most like the item's among
+     * each work's own name and its rows' (a chart can list "Construction of Guard House" on its own while the abstract
+     * has it under Architectural Works); the first on a tie, -1 when none is at least half alike.
+     */
+    fun workOf(itemName: String, works: List<Work>): Int {
+        var best = -1
+        var top = 0.5
+        works.forEachIndexed { k, w ->
+            val score = w.names.maxOf { likeness(itemName, it) }
+            if (score > top || (best < 0 && score == top)) { best = k; top = score }
+        }
+        return best
+    }
+
+    /**
+     * Each work's target %: the chart's plan ([itemTargets], by item name) for the chart [items] that belong to the
+     * work, by their amounts; 0 for a work with no chart item.
+     */
+    fun workTargets(works: List<Work>, items: List<BarChart.Item>, itemTargets: Map<String, Double>): Map<String, Double> {
+        val planned = works.map { doubleArrayOf(0.0, 0.0) } // each work's chart amount, and that amount by its items' targets
+        for (i in items) {
+            val k = workOf(i.name, works)
+            if (k >= 0) { planned[k][0] += i.amount; planned[k][1] += i.amount * (itemTargets[i.name] ?: 0.0) }
+        }
+        return works.mapIndexed { k, w -> w.name to if (planned[k][0] > 0) planned[k][1] / planned[k][0] else 0.0 }.toMap()
+    }
 
     /** Each accomplishment line's sum, at 2 decimals, of [of] over the own subtotal rows of the abstract's parts of that line. */
     private fun lineSums(abstract: ProjectAbstract, of: (AbstractExcel.Row) -> Double?): List<Double> {
@@ -92,15 +154,22 @@ object ProjectAbstracts {
      * The tab's table for an abstract: the three accomplishment lines, then "Overall". A line's target is the weekly
      * form's (the approved bar chart's plan for that line on the "As of" date; null without a chart), the overall the
      * chart's plan that day, else the project's stored target. The actuals are the abstract's. The difference is the
-     * actual less the target, each at 2 decimals.
+     * actual less the target, each at 2 decimals. A Community Facility's rows are its abstract's works, as on its weekly
+     * form (none when the abstract has no works to read), then "Overall".
      */
     fun standing(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract): List<Standing> {
         val plan = runCatching { LocalDate.parse(abstract.asOf.trim()) }.getOrNull()?.let { BarChart.planOn(project, documents, it) }
-        val total = plan?.version?.total ?: 0.0
-        val targets = plan?.takeIf { total > 0 }?.let { p -> lineAverages(p.version.items, { it.name }, { it.amount / total * 100 }, { p.itemTargets[it.name] ?: 0.0 }) }
+        val charted = plan?.takeIf { it.version.total > 0 }
         fun row(name: String, target: Double?, actual: Double) = Standing(name, target, actual, target?.let { round2(round2(actual) - round2(it)) })
-        return ACCOMPLISHMENT_LINES.zip(lineActuals(abstract)) { line, actual -> row(line, targets?.let { round2(it[line] ?: 0.0) }, actual) } +
-            row("Overall", plan?.plannedPct ?: project.targetAccomplishment, abstract.overallPct)
+        val lines = if (isCommunityFacility(project.projectType)) {
+            val works = works(abstract).takeIf { all -> all.sumOf { it.amount } > 0 }.orEmpty()
+            val targets = charted?.let { workTargets(works, it.version.items, it.itemTargets) }
+            works.map { row(it.name, targets?.let { t -> round2(t[it.name] ?: 0.0) }, shown(it.actualPct)) }
+        } else {
+            val targets = charted?.let { p -> lineAverages(p.version.items, { it.name }, { it.amount / p.version.total * 100 }, { p.itemTargets[it.name] ?: 0.0 }) }
+            ACCOMPLISHMENT_LINES.zip(lineActuals(abstract)) { line, actual -> row(line, targets?.let { round2(it[line] ?: 0.0) }, actual) }
+        }
+        return lines + row("Overall", plan?.plannedPct ?: project.targetAccomplishment, abstract.overallPct)
     }
 
     /** A standing row's +/- as shown: "+4.66%", "-7.58%", "0.00%"; "-" without a target. */
