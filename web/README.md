@@ -483,7 +483,8 @@ is read only.
   as a phone's delete is uploaded, with the app's audit entry for that deletion.
 - **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
   gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
-  changed are rewritten; the other stored days stay exactly as they were.
+  changed are rewritten; the other stored days stay exactly as they were. A day with no log shows as Fair in the
+  form, so painting it (a preset, Whole day or an hour, Fair included) counts as a change and saves it.
 - **Sidebar** (`drawSide`, drawn by `route` and again when the open project's name loads): from 768px wide the
   window has a sidebar under the header with **All projects**, the open project's six sections under its name, its
   **Audit log** (for those who may read it; the address is still `#/p/<id>/documents/audit-log`, and the Documents chip
