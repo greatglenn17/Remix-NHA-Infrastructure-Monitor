@@ -124,22 +124,42 @@ object BarChart {
     /**
      * Each approved suspension (and continuance) with when it stops the clock: its Effectivity up to (not including)
      * its resumption order's Effectivity or the day after its End (its last suspended day), whichever comes first;
-     * a null end means it is still suspended. Its resumption order is the first of its number to take effect on or
-     * after its own first day (an earlier one resumed work before it was ordered); a Partial resumption leaves a Full
-     * suspension on.
+     * a null end means it is still suspended.
      */
     private fun periods(documents: List<PendingDocument>): List<Pair<PendingDocument, Pair<LocalDate, LocalDate?>>> {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
-        val resumptions = approved.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }
-            .mapNotNull { r -> field(r.remarks, "Effectivity")?.let { r to it } }.sortedBy { it.second }
         return approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.mapNotNull { doc ->
             val begin = field(doc.remarks, "Effectivity") ?: return@mapNotNull null
-            val partial = isPartial(doc.documentName)
-            val resumed = resumptions.firstOrNull { (r, on) ->
-                !on.isBefore(begin) && orderNo(r.documentName) == orderNo(doc.documentName) && (partial || !isPartial(r.documentName))
-            }?.second
-            doc to (begin to listOfNotNull(ProjectSchedule.suspensionEnd(doc.remarks)?.plusDays(1), resumed).minOrNull())
+            doc to (begin to listOfNotNull(ProjectSchedule.suspensionEnd(doc.remarks)?.plusDays(1), resumptionOf(doc, begin, documents)?.second).minOrNull())
         }
+    }
+
+    /**
+     * The approved resumption order of the suspension or continuance [doc], begun on [begin], with its Effectivity:
+     * the first of its number to take effect on or after that first day (an earlier one resumed work before it was
+     * ordered); a Partial resumption leaves a Full suspension on.
+     */
+    private fun resumptionOf(doc: PendingDocument, begin: LocalDate, documents: List<PendingDocument>): Pair<PendingDocument, LocalDate>? {
+        val partial = isPartial(doc.documentName)
+        return documents.filter { it.status.equals("Approved", ignoreCase = true) && it.documentName.contains("Work Resumption", ignoreCase = true) }
+            .mapNotNull { r -> field(r.remarks, "Effectivity")?.let { r to it } }.sortedBy { it.second }
+            .firstOrNull { (r, on) -> !on.isBefore(begin) && orderNo(r.documentName) == orderNo(doc.documentName) && (partial || !isPartial(r.documentName)) }
+    }
+
+    /**
+     * An approved suspension's or continuance's remarks as it took effect (the website's inEffect): one its resumption
+     * order cut short ends the day before that order's Effectivity, the Duration following, with a note of the order
+     * and of the days approved. The record itself keeps what was approved. Any other order's remarks come back unchanged.
+     */
+    fun inEffect(doc: PendingDocument, documents: List<PendingDocument>): String {
+        if (!doc.status.equals("Approved", ignoreCase = true) || !doc.documentName.contains("Work Suspension", ignoreCase = true)) return doc.remarks
+        val begin = field(doc.remarks, "Effectivity") ?: return doc.remarks
+        val (by, on) = resumptionOf(doc, begin, documents) ?: return doc.remarks
+        if (ProjectSchedule.suspensionEnd(doc.remarks)?.let { on.isAfter(it) } == true) return doc.remarks
+        val order = ProjectSchedule.orderLabel(by.documentName)
+        if (on == begin) return "${doc.remarks} | No days: $order took effect on its first day"
+        val approved = Regex("Duration: (\\d+)").find(doc.remarks)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        return ProjectSchedule.withEndDate(doc.remarks, on.minusDays(1).toString()) + " | Ended by $order" + (if (approved > 0) " (approved for $approved days)" else "")
     }
 
     /**

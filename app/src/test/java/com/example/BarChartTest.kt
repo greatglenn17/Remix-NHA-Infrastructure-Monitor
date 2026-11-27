@@ -221,6 +221,18 @@ class BarChartTest {
         assertEquals(100, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-09-03"))))
         assertEquals(40, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-06-05"))))
         assertEquals(120, BarChart.suspensionExtensionDays(listOf(approved("Partial Work Resumption Order No. 1", "Effectivity: 2026-06-05"), ws, c1)))
+        // The lists and forms give a cut suspension the days it ran; the record keeps what was approved.
+        val resumed = approved("Work Resumption Order No. 1", "Effectivity: 2026-09-03")
+        assertEquals(
+            "Duration: 10 Days | Effectivity: 2026-08-24 | End: 2026-09-02 | Ended by Work Resumption Order No. 1 (approved for 30 days)",
+            BarChart.inEffect(c1, listOf(ws, c1, resumed))
+        )
+        assertEquals(ws.remarks, BarChart.inEffect(ws, listOf(ws, c1, resumed)))
+        assertEquals(c1.remarks, BarChart.inEffect(c1, listOf(ws, c1, resumed.copy(status = "Pending"))))
+        assertEquals(
+            "${c1.remarks} | No days: Work Resumption Order No. 1 took effect on its first day",
+            BarChart.inEffect(c1, listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-08-24")))
+        )
         // Days already given by a time extension for a suspension are not asked for again.
         val te = approved("Time Extension No. 1 - 90 Days", "Reason: Work Suspension Order No. 1")
         assertEquals(30, BarChart.suspensionExtensionDays(listOf(ws, c1, te)))
