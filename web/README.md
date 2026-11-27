@@ -313,7 +313,9 @@ is read only.
     actual work, the detailed one, made every week and at month end: `#/p/<id>/print/abstract-<as-of date>`
     (`P.actualAbstractHtml`, the phone's `BlueBookForms.actualAbstract`), a landscape A4 sheet with the same top as
     the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
-    for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns up to TO
+    for the "As of" date and the actual the abstract's own; the contract's own cost, duration and completion date,
+    with REVISED CONTRACT COST / DURATION / COMPLETION DATE lines once a variation order or time extension is
+    approved, the duration as "360 C.D. + 291 C.D. (T.E. 1) = 651 C.D."), then every row of the abstract in its columns up to TO
     DATE (neither printed abstract has BALANCE columns, nor has the tab's table), the header rows repeating on each
     page. An abstract in terms of a variation order prints as its sheet: "Original" beside "V.O.#1" under QTY, UNIT
     COST and AMOUNT (each row's `was`, read from an upload made since this was added; the tab's own table shows the

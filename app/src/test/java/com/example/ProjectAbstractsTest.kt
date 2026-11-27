@@ -279,6 +279,17 @@ class ProjectAbstractsTest {
         val wide = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(equivUnits = 1370.0), signatories)
         assertTrue(!wide.contains("EQUIVALENT"))
         assertTrue(wide.contains(">100,000.00</td><td class='n'>25.00%</td></tr>")) // 2.1.1's row ends at its to date, though it carries a balance and equivalent units
+        // An approved time extension and variation order: the contract's own figures stay, and the REVISED lines say what they made of them.
+        fun order(name: String, status: String = "Approved") = PendingDocument(projectId = 1, documentName = name, status = status, remarks = "")
+        val orders = listOf(order("Time Extension No. 1 - 30 Days"), order("Variation Order No. 1 - PHP 500,000.00"), order("Time Extension No. 2 - 15 Days", "Pending"))
+        val top = BlueBookForms.actualAbstract(project, orders, abstract("2025-03-14"), signatories)
+        assertTrue(top.contains("CONTRACT DURATION</td><td>: 360 C.D.</td>"))
+        assertTrue(top.contains("COMPLETION DATE</td><td>: December 31, 2025</td>"))
+        assertTrue(top.contains("CONTRACT COST</td><td class='pc'>:</td><td>Php 10,000,000.00</td><td class='pl'>REVISED CONTRACT DURATION</td><td>: 360 C.D. + 30 C.D. (T.E. 1) = 390 C.D.</td>"))
+        assertTrue(top.contains("REVISED CONTRACT COST</td><td class='pc'>:</td><td>Php 10,500,000.00</td><td class='pl'>REVISED COMPLETION DATE</td><td>: January 25, 2026</td>"))
+        assertTrue(!html.contains("REVISED")) // nothing approved: no REVISED lines
+        // A time extension alone: no cost line beside the revised completion date.
+        assertTrue(BlueBookForms.actualAbstract(project, orders.take(1), abstract("2025-03-14"), signatories).contains("<tr><td class='pl'></td><td class='pc'></td><td></td><td class='pl'>REVISED COMPLETION DATE</td>"))
         // An abstract in terms of a variation order prints as its sheet: Original beside V.O.#1 under QTY, UNIT COST and AMOUNT.
         val none = none3
         val revised = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(rowsJson = ProjectAbstracts.rowsJson(listOf(
