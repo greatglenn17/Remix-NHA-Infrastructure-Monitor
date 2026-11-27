@@ -10,6 +10,9 @@ enum class ProjectType(val label: String) {
     CUSTOM("Custom")
 }
 
+/** A community facility has no land area, units or beneficiaries: the edit form and the Project Profile sheet leave them out. */
+fun isCommunityFacility(projectType: String) = projectType.contains(ProjectType.COMMUNITY_FACILITY.label, ignoreCase = true)
+
 enum class ProjectStatus(val label: String) {
     ONGOING("On-going"),
     SUSPENDED("Suspended"),

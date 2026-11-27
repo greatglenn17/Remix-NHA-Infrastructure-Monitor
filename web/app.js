@@ -735,7 +735,7 @@ function projectForm(c = null) {
     ${text('Contractor name', 'contractor', ' required')}
     <label class="field">Project type<select name="type">${[...L.PROJECT_TYPES, 'Custom...'].map(t => opt(t, custom ? 'Custom...' : start.projectType)).join('')}</select></label>
     <label class="field" id="pj-custom" hidden>Custom project type<input name="customType" value="${custom ? v('projectType') : ''}"></label>
-    <div class="wk-row">
+    <div class="wk-row" id="pj-housing">
       ${text('Land area (optional)', 'landArea', ' inputmode="decimal"')}
       <label class="field">Unit<select name="landUnit">${L.LAND_UNITS.map(u => opt(u, start.landUnit)).join('')}</select></label>
       ${text('No. of units (optional)', 'numberOfUnits', ' inputmode="numeric"')}
@@ -778,6 +778,10 @@ function projectForm(c = null) {
   const draw = () => {
     const f = values(), end = L.projectEnd(f);
     d.querySelector('#pj-custom').hidden = el.type.value !== 'Custom...';
+    // Hidden, not cleared: what a housing project had comes back if the type is switched back.
+    const facility = L.isCommunityFacility(f.projectType);
+    d.querySelector('#pj-housing').hidden = facility;
+    if (el.projectedBeneficiaries) el.projectedBeneficiaries.closest('label').hidden = facility;
     d.querySelector('#pj-cost').textContent = `Original contract cost: ${L.formatPhp(f.scope.reduce((t, r) => t + (L.parseAmount(r.amount) || 0), 0))}`;
     d.querySelector('#pj-end').textContent = end ? `Completion date: ${L.displayDate(end)}` : '';
     if (!el.completed) return;

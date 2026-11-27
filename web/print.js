@@ -350,14 +350,14 @@ export function projectProfileHtml({ project, docs, preparer, asOf, banner }) {
   const when = longDate(asOf), actual = Number(project.actualAccomplishment) || 0, target = Number(project.targetAccomplishment) || 0;
   row('Project Title', esc(project.name));
   row('Project Location', esc(project.location));
-  row('Projected Beneficiaries', esc(project.projectedBeneficiaries));
+  const facility = L.isCommunityFacility(project.projectType);
+  if (!facility) row('Projected Beneficiaries', esc(project.projectedBeneficiaries));
   row('Contractor', esc(project.contractor));
   row('Board Resolution/Date', esc(project.boardResolution));
   row('Notice of Award', esc(longDate(project.noticeOfAward)));
   row('Notice to Proceed', esc(longDate(project.noticeToProceed)));
   row('Date Commenced', esc(longDate(project.dateStarted)));
-  row('Land Area', esc(project.landArea));
-  row('Number of Units', esc(project.numberOfUnits));
+  if (!facility) { row('Land Area', esc(project.landArea)); row('Number of Units', esc(project.numberOfUnits)); }
   row('Original Contract Amount', esc(peso(L.originalCost(project))));
   row('Original Contract Duration', esc(`${project.contractDurationDays ?? 0} calendar days (c.d.)`));
   row('Contract Suspension/s', suspensions.length ? '' : 'None');
