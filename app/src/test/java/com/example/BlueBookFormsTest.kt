@@ -57,6 +57,33 @@ class BlueBookFormsTest {
     }
 
     @Test
+    fun orders_listInOrder_andASuspensionCutShortGivesTheDaysItRan() {
+        // As the cloud may give them: in no order.
+        val logs = ContractLogs.from(
+            project,
+            listOf(
+                doc("1st Continuance of Work Suspension Order No. 1", "Approved", "Duration: 90 Days | Effectivity: 2019-02-01 | End: 2019-05-01"),
+                doc("Work Suspension Order No. 1", "Approved", "Duration: 31 Days | Effectivity: 2019-01-01 | End: 2019-01-31 | Reason: Rain"),
+                doc("Work Resumption Order No. 1", "Approved", "Effectivity: 2019-03-18"),
+                doc("Partial Work Resumption Order No. 1", "Approved", "Effectivity: 2019-02-10"),
+                doc("Time Extension No. 2 - 30 Days", "Approved", ""), doc("Time Extension No. 1 - 76 Days", "Approved", ""),
+                doc("Variation Order No. 2 (Deductive)", "Approved", ""), doc("Variation Order No. 1 (Additive) - PHP 500", "Approved", "")
+            )
+        )
+        assertEquals(
+            listOf(
+                "Work Suspension Order No. 1" to "31 calendar days – January 1, 2019 to January 31, 2019",
+                // Approved for 90 days, resumed on March 18; the Partial resumption of February 10 leaves it on.
+                "1st Continuance of Work Suspension Order No. 1" to "45 calendar days – February 1, 2019 to March 17, 2019"
+            ),
+            logs.suspensions.map { it.label to it.value }
+        )
+        assertEquals(listOf("Partial Work Resumption Order No. 1" to "February 10, 2019", "Work Resumption Order No. 1" to "March 18, 2019"), logs.resumptions)
+        assertEquals(listOf("1", "2"), logs.extensions.map { it.no })
+        assertEquals(listOf("Variation Order No. 1", "Variation Order No. 2"), logs.variations.map { it.label })
+    }
+
+    @Test
     fun profile_putsReasonsUnderTheDaysOrAmount_andContinuancesCarryNone() {
         val continuance = doc("1st Continuance of Work Suspension Order No. 1", "Pending", "Duration: 30 Days | Effectivity: 2019-05-30 | End: 2019-06-28 | Reason: Road widening")
         val html = BlueBookForms.projectProfile(project, ContractLogs.from(project, docs + continuance), Preparer("", "", ""), LocalDate.of(2026, 5, 31))

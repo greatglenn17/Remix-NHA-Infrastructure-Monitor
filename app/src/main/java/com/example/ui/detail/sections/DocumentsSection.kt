@@ -25,6 +25,7 @@ import com.example.ui.detail.tabs.AddRelatedDocumentDialog
 import com.example.ui.detail.tabs.ViewScannedCopyDialog
 import com.example.ui.detail.SectionChips
 import com.example.ui.theme.LocalNHAColors
+import com.example.util.BarChart
 import com.example.util.ContractorLetters
 import com.example.util.ProjectSchedule
 
@@ -341,10 +342,10 @@ fun OrdersList(
                     val orphans = named("Work Suspension") - suspensions.toSet() - chains.values.flatten().toSet()
                     OrdersCard("Work suspension orders", Icons.Default.PauseCircle, suspensions.isEmpty() && orphans.isEmpty(), "No work suspension orders.", add("Work Suspension Order")) {
                         suspensions.forEach { ws ->
-                            OrderEntry(ws, open)
-                            chains.getValue(ws).forEach { Box(Modifier.padding(start = 24.dp)) { OrderEntry(it, open) } }
+                            OrderEntry(ws, open, documents)
+                            chains.getValue(ws).forEach { Box(Modifier.padding(start = 24.dp)) { OrderEntry(it, open, documents) } }
                         }
-                        orphans.forEach { OrderEntry(it, open) }
+                        orphans.forEach { OrderEntry(it, open, documents) }
                     }
                 }
                 item {
@@ -409,9 +410,10 @@ private fun OrdersCard(
     }
 }
 
+/** [documents], the project's orders, lets a suspension its resumption order cut short show the days it ran ([BarChart.inEffect]). */
 @Composable
-private fun OrderEntry(doc: PendingDocument, onOpen: ((PendingDocument) -> Unit)?) {
-    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", ProjectSchedule.withEnd(doc.remarks)), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
+private fun OrderEntry(doc: PendingDocument, onOpen: ((PendingDocument) -> Unit)?, documents: List<PendingDocument> = emptyList()) {
+    LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", ProjectSchedule.withEnd(BarChart.inEffect(doc, documents))), onClick = onOpen?.let { open -> { open(doc) } }, uuid = doc.uuid)
 }
 
 /** Documents › Variation orders: every order, pending too, so a new one shows; only approved ones change the cost. */

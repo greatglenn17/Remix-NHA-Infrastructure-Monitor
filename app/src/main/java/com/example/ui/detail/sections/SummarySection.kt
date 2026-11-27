@@ -38,6 +38,7 @@ import com.example.ui.theme.TabularNumbers
 import com.example.ui.theme.figures
 import com.example.utils.CurrencyFormatter
 import com.example.util.AttentionFlag
+import com.example.util.BarChart
 import com.example.util.ContractCost
 import com.example.util.ProjectSchedule
 import com.example.util.SdpSummary
@@ -215,7 +216,7 @@ private fun KeyDatesCard(
         Text("Time extensions & suspensions", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
         if (orders.isEmpty()) EmptyLine("No time extension or suspension orders.")
         orders.forEach { doc ->
-            LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", ProjectSchedule.withEnd(doc.remarks)), onClick = onOpenOrder?.let { open -> { open(doc) } })
+            LogEntry(ProjectSchedule.orderLabel(doc.documentName), MaterialTheme.colorScheme.onSurface, listOf("Status: ${doc.status}", ProjectSchedule.withEnd(BarChart.inEffect(doc, documents))), onClick = onOpenOrder?.let { open -> { open(doc) } })
         }
     }
 }
