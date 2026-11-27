@@ -4342,7 +4342,8 @@ function actualBody(c) {
   const note = `<p class="muted small" id="abstract-note" role="status">${esc(c.page.note || '')}</p>`;
   if (c.page.sub === 'new' && editable && list.length) return nextAbstractBody(c);
   if (/^monthly(\/|$)/.test(c.page.sub || '') && list.length) return monthlyAbstractBody(c);
-  const units = shown ? unitsTable(c, shown, list) : ''; // beside the standing table, which is then headed too, so the two are level
+  // Beside the standing table, which is then headed too, so the two are level. A Community Facility has no lots or units to bill by.
+  const units = shown && !L.isCommunityFacility(c.project.projectType) ? unitsTable(c, shown, list) : '';
   if (!shown) return `<div class="toolbar apa-tools">${upload}${undo}</div>${note}<div class="card empty">${icon('upload_file')}<p>No abstract uploaded yet. Upload the Abstract of Physical Accomplishment of the actual work (the "As of" one), saved as an Excel workbook (.xlsx).</p></div>`;
   // The date and the buttons are the card's heading row: a toolbar above it left most of its row empty and said the date twice.
   return `${abstractSwitch(false)}<div class="stack">

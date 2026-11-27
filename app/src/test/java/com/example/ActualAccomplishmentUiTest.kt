@@ -125,6 +125,17 @@ class ActualAccomplishmentUiTest {
         rule.onNodeWithTag("upload_abstract").assertDoesNotExist()
     }
 
+    // Lots and units are a housing project's: a community facility's tab has no such table.
+    @Test fun aCommunityFacility_hasNoLotsAndUnits() {
+        rule.setContent {
+            NHATheme(themeMode = AppThemeMode.LIGHT) {
+                ActualAccomplishmentSection(project.copy(projectType = "Community Facility"), emptyList(), listOf(abstract), "", null, null, {}, { _, _ -> }, units = 100)
+            }
+        }
+        rule.onNodeWithTag("actual_accomplishment").performScrollToNode(hasTestTag("standing_Overall")) // the same card as the table
+        rule.onNodeWithTag("units_table").assertDoesNotExist()
+    }
+
     // The work done in lots and units, at the billing abstract's unit costs of 100 units: on the screen, never printed.
     @Config(qualifiers = "w360dp-h640dp")
     @Test fun tab_showsTheWorkDoneInLotsAndUnits() {
