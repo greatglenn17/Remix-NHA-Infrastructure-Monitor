@@ -92,9 +92,20 @@ object ProjectSchedule {
     /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st. */
     fun ordinal(n: Int) = "$n" + if (n % 100 in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
 
-    /** The continuances of [suspension] among [documents], in the order they were added. */
+    /** The continuances of [suspension] among [documents], 1st to last: a phone keeps a synced project's orders as they arrived, in no order. */
     fun continuances(suspension: PendingDocument, documents: List<PendingDocument>) =
         documents.filter { continuanceOf(it.documentName) == baseOf(suspension.documentName) }
+            .sortedBy { orderLabel(it.documentName).takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+
+    /**
+     * [orders] by their Effectivity date, one without it last: how suspensions and resumptions are listed and printed.
+     * The cloud gives a project's orders in no order. web/logic.js byEffectivity and byOrderNumber are the website's.
+     */
+    fun byEffectivity(orders: List<PendingDocument>) = orders.sortedBy { EFFECTIVITY.find(it.remarks)?.groupValues?.get(1)?.let(::parse) ?: LocalDate.MAX }
+
+    /** [orders] by the number in their name ("No. 2"), one without it last: time extensions and variation orders. */
+    fun byNumber(orders: List<PendingDocument>) =
+        orders.sortedBy { Regex("\\bNo\\.\\s*(\\d+)", RegexOption.IGNORE_CASE).find(it.documentName)?.groupValues?.get(1)?.toIntOrNull() ?: Int.MAX_VALUE }
 
     /** Key dates' [orders]: each suspension, then its continuances, then its resumption; the other orders keep their place. */
     fun chained(orders: List<PendingDocument>): List<PendingDocument> {

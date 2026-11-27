@@ -926,6 +926,14 @@ export const isSuspension = doc => /^suspension$/i.test((ORDER.exec((doc.documen
 /** ProjectSchedule.continuances: a suspension's continuances, 1st to last (the phone lists them as added, which the cloud does not record). */
 export const continuances = (suspension, docs) => docs.filter(d => continuanceOf(d.documentName) === baseOf(suspension.documentName || ''))
   .sort((a, b) => (parseInt(orderLabel(a.documentName), 10) || 0) - (parseInt(orderLabel(b.documentName), 10) || 0));
+/**
+ * ProjectSchedule.byEffectivity and byNumber. The cloud gives a project's orders in no order, so the lists and the
+ * printed forms have suspensions and resumptions by their Effectivity, time extensions and variation orders by their
+ * number, one without it last.
+ */
+const inOrder = (docs, key) => [...docs].sort((a, b) => key(a) - key(b) || 0);
+export const byEffectivity = docs => inOrder(docs, d => Date.parse(remarkField(d.remarks, 'Effectivity')) || Infinity);
+export const byOrderNumber = docs => inOrder(docs, d => Number(/\bNo\.\s*(\d+)/i.exec(d.documentName || '')?.[1] ?? Infinity));
 /** ProjectSchedule.chained: each suspension, then its continuances, then its resumption; the other orders keep their place. */
 export function chained(orders) {
   const resumes = (r, s) => /^resumption$/i.test((ORDER.exec((r.documentName || '').trim()) || [])[2] || '') && baseOf(r.documentName) === baseOf(s.documentName);
