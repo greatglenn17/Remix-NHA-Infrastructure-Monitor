@@ -1,8 +1,8 @@
 {
-  "versionCode": 328,
-  "versionName": "2.8.48",
-  "releaseNotes": "v2.8.48: The Documents lists are in order: suspensions and resumptions by effectivity date, continuances 1st to last, time extensions and variation orders by number. A Community Facility's weekly accomplishment lists the works of its uploaded abstract.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.48/NHA_Monitor_v2.8.48_Build328.apk",
-  "apkSha256": "d6aed58a26ce336f507ca299629a93b669778c275cb3cbec8646448219cf1a79",
+  "versionCode": 329,
+  "versionName": "2.8.49",
+  "releaseNotes": "v2.8.49: Print abstract follows the office sheet. An abstract in terms of a variation order prints Original beside V.O.#1 under QTY, Unit Cost and Amount. Upload the abstract's Excel again to print an older one this way.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.49/NHA_Monitor_v2.8.49_Build329.apk",
+  "apkSha256": "2c41ea60dbd90a941c65456d7c533976923beca43683c59d867ac3db55345e53",
   "isMandatory": true
 }
