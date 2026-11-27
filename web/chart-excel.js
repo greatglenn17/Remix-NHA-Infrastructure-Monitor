@@ -62,15 +62,17 @@ function runs(cells, cellDays) {
 /**
  * Bars from a row's `stretches` ([first cell, last cell, share of the item]) when the sheet writes each month's share in
  * the bar: a stretch's days are its part of `duration` (the cells only round them: 21 days are drawn as 4 cells), counted
- * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
+ * from its first cell and moved back where they would run past the month it is drawn in; a stretch drawn to its month's
+ * last cell, with the bar going on from the next month's first, ends with the month. Without a duration, its cells' days.
  */
 function shareBars(stretches, duration, cellDays) {
   const sum = stretches.reduce((t, s) => t + s[2], 0), bars = [];
-  for (const [first, last, share] of stretches) {
+  for (const [k, [first, last, share]] of stretches.entries()) {
     const days = duration > 0 ? Math.round(share / sum * duration) : (last - first + 1) * cellDays;
     if (days <= 0) continue;
     const monthEnd = (Math.floor(last * cellDays / MONTH_DAYS) + 1) * MONTH_DAYS;
-    const end = Math.min(first * cellDays + days, monthEnd), start = Math.max(end - days + 1, 1);
+    const goesOn = (last + 1) * cellDays === monthEnd && stretches[k + 1]?.[0] === last + 1;
+    const end = goesOn ? monthEnd : Math.min(first * cellDays + days, monthEnd), start = Math.max(end - days + 1, 1);
     if (bars.length && bars.at(-1)[1] + 1 >= start) bars.at(-1)[1] = end;
     else bars.push([start, end]);
   }

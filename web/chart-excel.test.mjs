@@ -82,9 +82,11 @@ const office = `<worksheet><sheetData>
       <c r="R51" s="1"><v>0.21</v></c><c r="V51" s="1"><v>0.14</v></c><c r="AZ51"><v>0.45</v></c></row>
   <row r="52"><c r="C52" t="s"><v>6</v></c><c r="P52" s="3"/></row>
   <row r="53"><c r="C53" t="s"><v>7</v></c><c r="F53"><v>500</v></c><c r="I53"><v>5</v></c><c r="Y53" s="1"><v>0.05</v></c><c r="AZ53"><v>0.05</v></c></row>
-  <row r="54"><c r="B54" t="s"><v>8</v></c><c r="F54"><v>2500</v></c></row>
-  <row r="55"><c r="B55" t="s"><v>9</v></c><c r="F55"><v>1</v></c><c r="J55" s="1"><v>0.1</v></c></row>
-  </sheetData><mergeCells><mergeCell ref="N51:O51"/><mergeCell ref="R51:U51"/><mergeCell ref="V51:X51"/></mergeCells></worksheet>`;
+  <row r="54"><c r="C54" t="inlineStr"><is><t>FENCING</t></is></c><c r="F54"><v>300</v></c><c r="I54"><v>12</v></c>
+      <c r="AA54" s="1"><v>0.02</v></c><c r="AB54" s="1"><v>0.10</v></c><c r="AC54" s="1"/><c r="AZ54"><v>0.12</v></c></row>
+  <row r="55"><c r="B55" t="s"><v>8</v></c><c r="F55"><v>2800</v></c></row>
+  <row r="56"><c r="B56" t="s"><v>9</v></c><c r="F56"><v>1</v></c><c r="J56" s="1"><v>0.1</v></c></row>
+  </sheetData><mergeCells><mergeCell ref="N51:O51"/><mergeCell ref="R51:U51"/><mergeCell ref="V51:X51"/><mergeCell ref="AB54:AC54"/></mergeCells></worksheet>`;
 
 test('bar chart Excel: a header of NO. / DESCRIPTION / COST / DAYS / MONTH 1, and a stray "No." above it', async () => {
   const sheets = await readChartWorkbook(zip({ ...parts,
@@ -124,8 +126,10 @@ test('bar chart Excel: the office layout, a bar\'s days from the shares written 
     // end with month 2, days 40-60; V-X follows from day 61 for 14 days, one bar with the stretch before it.
     { name: 'SITE PREPARATIONS', amount: 2000, bars: [[21, 30], [40, 74]] },
     { name: 'TURNOVER', amount: 500, bars: [[76, 80]] }, // one cell; the heading above it has no cost, the rows from the total on are not items
+    // 12 days as 2 and 10: AA is month 3's last cell and AB-AC goes on from month 4's first, so the 2 days end the month: no gap.
+    { name: 'FENCING', amount: 300, bars: [[89, 100]] },
   ]);
-  assert.deepEqual(sheets[0].durations, { 'SITE PREPARATIONS': 45, TURNOVER: 5 });
+  assert.deepEqual(sheets[0].durations, { 'SITE PREPARATIONS': 45, TURNOVER: 5, FENCING: 12 });
 });
 
 test('bar chart Excel: what is not a workbook is refused', async () => {
