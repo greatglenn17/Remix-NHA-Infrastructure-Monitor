@@ -498,7 +498,8 @@ fun ActualAccomplishmentSection(
                     StandingRow(row.name, listOf(row.target?.let(ProjectAbstracts::pct) ?: "-", ProjectAbstracts.pct(row.actual), ProjectAbstracts.diffText(row.diff)))
                 }
                 val inUnits = remember(viewed, abstracts, payments, units) { BillingAbstract.inUnits(viewed, abstracts, payments, units) }
-                if (!inMonthly && inUnits.isNotEmpty()) Column(Modifier.padding(top = 8.dp).testTag("units_table")) {
+                // A Community Facility has no lots or units to bill by.
+                if (!inMonthly && inUnits.isNotEmpty() && !com.example.data.model.isCommunityFacility(project.projectType)) Column(Modifier.padding(top = 8.dp).testTag("units_table")) {
                     // The contract's lots or units go with the name: a fifth column cuts "Contract" in two on a 360dp phone.
                     StandingRow("In lots and units", listOf("Done to date", "Billed", "Can still bill"), header = true)
                     inUnits.forEach { row ->

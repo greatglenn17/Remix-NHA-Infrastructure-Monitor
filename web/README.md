@@ -283,7 +283,8 @@ is read only.
     line's amount over N (the billing abstract's units), the Contract (N), Done to date, Billed and Can still bill
     (whole) of Land acquisition, Land development and Milestone 1 (80%) and 2 (20%), the housing to date filling
     Milestone 1 first. Billed is every saved billing of that type for the latest abstract, those dated up to its "As
-    of" for an older one. A line without an amount is left out. The file's name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
+    of" for an older one. A line without an amount is left out. A Community Facility has no such table: it is for a
+    Housing Project only. The file's name and who uploaded it follow, then every pay item in the sheet's columns (`P.abstractItemsHtml`): each part
     folds, groups are headings, subtotals are bold, and the grand total comes last. The table ends at TO DATE, as the
     printed abstracts do: the BALANCE and equivalent-units columns are read and kept on the record but not shown
     (the phone's table ends at TO DATE too). On a laptop or wider (a window of about 1,180px or more) the 15 columns
