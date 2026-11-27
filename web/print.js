@@ -428,9 +428,10 @@ export function billingSignatories(project, user) {
 export function ordersOf(docs) {
   const mark = d => (/^approved$/i.test(d.status || '') ? '' : '(for approval)');
   const suspensions = docs.filter(d => /work suspension/i.test(d.documentName || '')).map(d => {
-    const days = L.remarkField(d.remarks, 'Duration').split(' ')[0];
+    const ran = L.inEffect(d, docs); // the days it ran: cut short by its resumption order
+    const days = L.remarkField(ran, 'Duration').split(' ')[0];
     const from = longDate(L.remarkField(d.remarks, 'Effectivity'));
-    const to = L.remarkField(L.withEnd(d.remarks || ''), 'End');
+    const to = L.remarkField(L.withEnd(ran), 'End');
     return {
       label: L.orderLabel(d.documentName), value: (days ? `${days} calendar days – ` : '') + (to ? `${from} to ${longDate(to)}` : from),
       reason: L.isSuspension(d) ? L.remarkField(d.remarks, 'Reason') : '', status: mark(d),

@@ -1391,7 +1391,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
     ${kv('Contract duration', `${project.contractDurationDays ?? 0} days`)}
     ${kv('Revised duration', revisedDays == null ? '-' : `${revisedDays} days`)}
     <div class="kv"><span>Days left</span><b><span class="badge ${daysLeft.startsWith('Overdue') ? 'lv-behind' : finished ? 'lv-ok' : 'lv-neutral'}">${esc(daysLeft)}</span></b></div>
-    ${orders.length ? fold(page, 'fold-orders', `Time extensions &amp; suspensions (${orders.length})`, orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}${orderBadge(d)}</b>${d.remarks ? `<span>${esc(L.remarksText(d.remarks))}</span>` : ''}</div>`).join(''))
+    ${orders.length ? fold(page, 'fold-orders', `Time extensions &amp; suspensions (${orders.length})`, orders.map(d => `<div class="log"><b>${esc(L.orderLabel(d.documentName))}${orderBadge(d)}</b>${d.remarks ? `<span>${esc(L.remarksText(L.inEffect(d, documents)))}</span>` : ''}</div>`).join(''))
       : `<p class="none-note">${icon('info', 'sm')}No time extension or suspension orders.</p>`}`);
   const costCard = section('Contract cost', 'payments', `<div class="money">
     <div><span>${icon('work', 'sm')}Original cost</span><b>${esc(L.formatPhp(L.originalCost(project)))}</b></div>
@@ -4585,7 +4585,8 @@ const orderExtra = (d, editable) => (d.fileUrl ? fileLink(d.fileUrl, 'Attached c
   + (editable ? `<button class="text-btn entry-edit" data-edit-order="${esc(d.uuid)}">${icon('edit', 'sm')}Update status</button>` : '');
 /** An order's status as a badge: green once Approved, amber while it waits. */
 const orderBadge = d => `<span class="badge ${/^approved$/i.test((d.status || '').trim()) ? 'lv-ok' : 'lv-watch'}">${esc(d.status || 'No status')}</span>`;
-const orderEntry = (d, editable, cls = '') => entry(L.orderLabel(d.documentName), [L.remarksText(d.remarks)], orderExtra(d, editable), cls, orderBadge(d));
+/** `docs`, the project's orders, lets a suspension its resumption order cut short show the days it ran (L.inEffect). */
+const orderEntry = (d, editable, cls = '', docs = []) => entry(L.orderLabel(d.documentName), [L.remarksText(L.inEffect(d, docs))], orderExtra(d, editable), cls, orderBadge(d));
 /** `addType`, when set, is the kind of order the card's Add button files. */
 const ordersCard = (title, ic, items, emptyText, addType = '') => section(title, ic, items || emptyLine(emptyText), '',
   addType ? `<button class="text-btn" data-add-order="${esc(addType)}">${icon('add_circle', 'sm')}Add</button>` : '');
@@ -4609,7 +4610,7 @@ function documentsBody(c, chip) {
   const listed = new Set(chains.flatMap(([ws, list]) => [ws, ...list]));
   const orphans = named('work suspension').filter(d => !listed.has(d));
   return `<div class="stack">
-    ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([s0, list]) => orderEntry(s0, editable) + list.map(d => orderEntry(d, editable, 'nested')).join('')).join('') + orphans.map(d => orderEntry(d, editable)).join(''), 'No work suspension orders.', add(ws))}
+    ${ordersCard('Work suspension orders', 'pause_circle', chains.map(([s0, list]) => orderEntry(s0, editable, '', documents) + list.map(d => orderEntry(d, editable, 'nested', documents)).join('')).join('') + orphans.map(d => orderEntry(d, editable, '', documents)).join(''), 'No work suspension orders.', add(ws))}
     ${ordersCard('Work resumption orders', 'play_circle', named('work resumption').map(d => orderEntry(d, editable)).join(''), 'No work resumption orders.', add(wr))}
   </div>`;
 }

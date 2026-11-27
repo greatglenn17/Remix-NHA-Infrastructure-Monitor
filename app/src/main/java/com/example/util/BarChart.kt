@@ -124,14 +124,20 @@ object BarChart {
     /**
      * Each approved suspension (and continuance) with when it stops the clock: its Effectivity up to (not including)
      * its resumption order's Effectivity or the day after its End (its last suspended day), whichever comes first;
-     * a null end means it is still suspended.
+     * a null end means it is still suspended. Its resumption order is the first of its number to take effect on or
+     * after its own first day (an earlier one resumed work before it was ordered); a Partial resumption leaves a Full
+     * suspension on.
      */
     private fun periods(documents: List<PendingDocument>): List<Pair<PendingDocument, Pair<LocalDate, LocalDate?>>> {
         val approved = documents.filter { it.status.equals("Approved", ignoreCase = true) }
         val resumptions = approved.filter { it.documentName.contains("Work Resumption", ignoreCase = true) }
+            .mapNotNull { r -> field(r.remarks, "Effectivity")?.let { r to it } }.sortedBy { it.second }
         return approved.filter { it.documentName.contains("Work Suspension", ignoreCase = true) }.mapNotNull { doc ->
             val begin = field(doc.remarks, "Effectivity") ?: return@mapNotNull null
-            val resumed = resumptions.firstOrNull { orderNo(it.documentName) == orderNo(doc.documentName) }?.let { field(it.remarks, "Effectivity") }
+            val partial = isPartial(doc.documentName)
+            val resumed = resumptions.firstOrNull { (r, on) ->
+                !on.isBefore(begin) && orderNo(r.documentName) == orderNo(doc.documentName) && (partial || !isPartial(r.documentName))
+            }?.second
             doc to (begin to listOfNotNull(ProjectSchedule.suspensionEnd(doc.remarks)?.plusDays(1), resumed).minOrNull())
         }
     }
@@ -187,7 +193,7 @@ object BarChart {
      * takes its suspension's), or null for a Full one, which pauses everything.
      */
     fun pausedItems(doc: PendingDocument, documents: List<PendingDocument>): Set<String>? {
-        if (!ProjectSchedule.orderLabel(doc.documentName).contains("Partial", ignoreCase = true)) return null
+        if (!isPartial(doc.documentName)) return null
         val own = itemsOf(doc.remarks)
         if (own != null || !doc.documentName.contains("Continuance", ignoreCase = true)) return own.orEmpty()
         return documents.firstOrNull {
@@ -243,6 +249,8 @@ object BarChart {
 
     private fun field(remarks: String, key: String): LocalDate? =
         Regex("$key: (\\d{4}-\\d{2}-\\d{2})").find(remarks)?.groupValues?.get(1)?.let(::isoDate)
+
+    private fun isPartial(name: String) = ProjectSchedule.orderLabel(name).contains("Partial", ignoreCase = true)
 
     private fun orderNo(name: String) = Regex("No\\. ?(\\S+?)(?:\\s|$|\\))").find(name)?.groupValues?.get(1)
 

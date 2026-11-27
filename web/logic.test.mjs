@@ -229,6 +229,32 @@ test('bar chart target: Full suspensions freeze it, Partial and pending ones do 
   assert.ok(Math.abs(L.plannedTarget(p, [open, resumed], '2026-02-09') - 5.129) < 0.001);
 });
 
+test('a suspension ends at the resumption order taking effect in it; a Partial one leaves a Full suspension on', () => {
+  const ws = approvedDoc('Work Suspension Order No. 1', 'Duration: 90 Days | Effectivity: 2026-01-01 | End: 2026-03-31 | Reason: Rain');
+  const c1 = approvedDoc('1st Continuance of Work Suspension Order No. 1', 'Duration: 90 Days | Effectivity: 2026-04-01 | End: 2026-06-29');
+  const partial = approvedDoc('Partial Work Resumption Order No. 1', 'Effectivity: 2026-02-01');
+  const wr = approvedDoc('Work Resumption Order No. 1', 'Effectivity: 2026-05-06 | Remarks: Cleared');
+  const docs = [ws, partial, c1, wr];
+  assert.equal(L.suspensionExtensionDays(docs), 90 + 35);
+  assert.equal(L.inEffect(ws, docs), ws.remarks);
+  assert.equal(L.inEffect(wr, docs), wr.remarks);
+  assert.equal(L.inEffect(c1, docs), 'Duration: 35 Days | Effectivity: 2026-04-01 | End: 2026-05-05 | Ended by Work Resumption Order No. 1 (approved for 90 days)');
+  assert.equal(L.remarksText(L.inEffect(c1, docs)), 'Duration: 35 Days · Effectivity: Apr 1, 2026 · End: May 5, 2026 · Ended by Work Resumption Order No. 1 (approved for 90 days)');
+  assert.equal(L.isSuspendedOn(docs, '2026-05-05'), true);
+  assert.equal(L.isSuspendedOn(docs, '2026-05-06'), false);
+  // Not until the resumption order is approved; one on the continuance's first day leaves it no days.
+  assert.equal(L.inEffect(c1, [ws, c1, { ...wr, status: 'Pending' }]), c1.remarks);
+  const first = approvedDoc('Work Resumption Order No. 1', 'Effectivity: 2026-04-01');
+  assert.equal(L.suspensionExtensionDays([ws, c1, first]), 90);
+  assert.equal(L.inEffect(c1, [ws, c1, first]), `${c1.remarks} | No days: Work Resumption Order No. 1 took effect on its first day`);
+  // A suspension still open takes its end from the order; a Partial resumption ends a Partial suspension.
+  const open = approvedDoc('Work Suspension Order No. 3', 'Duration: 0 Days | Effectivity: 2026-08-01');
+  assert.equal(L.inEffect(open, [open, approvedDoc('Work Resumption Order No. 3', 'Effectivity: 2026-08-11')]),
+    'Duration: 10 Days | Effectivity: 2026-08-01 | End: 2026-08-10 | Ended by Work Resumption Order No. 3');
+  const pws = approvedDoc('Partial Work Suspension Order No. 2', 'Duration: 30 Days | Effectivity: 2026-07-01 | End: 2026-07-30 | Items: Roads');
+  assert.equal(L.suspensionExtensionDays([pws, approvedDoc('Partial Work Resumption Order No. 2', 'Effectivity: 2026-07-11')]), 10);
+});
+
 test('status: Suspended during an approved Full suspension, back when it ends or work resumes', () => {
   const p = { ...chartProject([sih]), status: 'On-going', actualAccomplishment: 50 };
   const full = approvedDoc('Work Suspension Order No. 1', 'Duration: 30 Days | Effectivity: 2026-01-21 | End: 2026-02-20');

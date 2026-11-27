@@ -253,20 +253,37 @@ export function withEndDate(remarks, end) {
 /**
  * BarChart.periods: each approved suspension (and continuance) with its Effectivity and when work resumes, the earlier
  * of its resumption order's Effectivity and the day after its End, its last suspended day (UTC ms); a null end means
- * it is still suspended.
+ * it is still suspended. Its resumption order is the first of its number to take effect on or after its own first
+ * day (an earlier one resumed work before it was ordered); a Partial resumption leaves a Full suspension on. `by` is
+ * that order when it cut the suspension short of its End.
  */
 function periods(docs) {
   const approved = (docs || []).filter(d => /^approved$/i.test(d.status || ''));
-  const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''));
   const field = (remarks, key) => isoDay((new RegExp(`${key}: (\\d{4}-\\d{2}-\\d{2})`).exec(remarks || '') || [])[1]);
+  const resumptions = approved.filter(d => /work resumption/i.test(d.documentName || ''))
+    .map(r => [r, field(r.remarks, 'Effectivity')]).filter(x => x[1] != null).sort((a, b) => a[1] - b[1]);
   return approved.filter(d => /work suspension/i.test(d.documentName || '')).flatMap(d => {
-    const begin = field(d.remarks, 'Effectivity');
+    const begin = field(d.remarks, 'Effectivity'), name = d.documentName || '';
     if (begin == null) return [];
-    const r = resumptions.find(x => orderNo(x.documentName) === orderNo(d.documentName));
+    const [by, resumed] = resumptions.find(([r, on]) => on >= begin && orderNo(r.documentName) === orderNo(name)
+      && (isPartialOrder(name) || !isPartialOrder(r.documentName))) || [];
     const last = field(withEnd(d.remarks), 'End');
-    const ends = [last == null ? null : last + DAY, r ? field(r.remarks, 'Effectivity') : null].filter(x => x != null);
-    return [{ d, begin, end: ends.length ? Math.min(...ends) : null }];
+    const cut = resumed != null && (last == null || resumed <= last);
+    return [{ d, begin, end: cut ? resumed : last == null ? null : last + DAY, ...(cut && { by }) }];
   });
+}
+
+/**
+ * An approved suspension's or continuance's remarks as it took effect: one its resumption order cut short ends the day
+ * before that order's Effectivity, the Duration following, with a note of the order and of the days approved. The
+ * record itself keeps what was approved. Any other order's remarks come back unchanged.
+ */
+export function inEffect(d, docs) {
+  const p = periods(docs).find(x => x.d === d);
+  if (!p?.by) return d.remarks || '';
+  const approved = Number((/Duration: (\d+)/.exec(d.remarks) || [])[1]) || 0, order = orderLabel(p.by.documentName);
+  if (p.end === p.begin) return `${d.remarks} | No days: ${order} took effect on its first day`;
+  return `${withEndDate(d.remarks, new Date(p.end - DAY).toISOString().slice(0, 10))} | Ended by ${order}${approved ? ` (approved for ${approved} days)` : ''}`;
 }
 
 /**
