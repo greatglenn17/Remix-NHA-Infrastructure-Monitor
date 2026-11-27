@@ -322,8 +322,9 @@ body.signed-out main { max-width: none; padding: 0; }
 .kv b.nil { color: var(--text-2); font-weight: 400; opacity: 0.5; }
 .kv b.hl { color: var(--link); }
 .sub { font-size: 12px; font-weight: 400; color: var(--text-2); margin: 10px 0 4px; }
-.scope { background: var(--surface-variant); border-radius: 6px; padding: 8px; margin-top: 4px; }
-.scope b { font-size: 14px; font-weight: 600; display: block; }
+.scope { display: grid; grid-template-columns: 1fr auto 6ch; gap: 12px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.scope b { font-weight: 600; overflow-wrap: anywhere; }
+.scope span { font-weight: 600; text-align: right; white-space: nowrap; }
 .log { padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .log b { font-weight: 600; } .log > span { display: block; color: var(--text-2); font-size: 12px; }
 
