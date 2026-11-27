@@ -689,10 +689,50 @@ export function photoDetails(json) {
   return Object.fromEntries(Object.entries(o).map(([ref, d]) => [ref, { title: str(d?.title), takenAt: str(d?.takenAt) }]));
 }
 
+const EXIF_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * PhotoDetails.fromExif: when and where a picked JPEG was taken, from the EXIF at the start of the file (`bytes`, a
+ * Uint8Array): {takenAt: "Nov 25, 2026 11:35 am", lat, lng}, each only where the photo holds it. It is read from the
+ * file as picked, since shrinking a photo for upload drops its EXIF.
+ */
+export function exifDetail(bytes) {
+  const out = {};
+  try {
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (v.getUint16(0) !== 0xFFD8) return out;
+    let at = 2;
+    for (;; at += 2 + v.getUint16(at + 2)) { // each segment, up to the one that says "Exif"; reading past the end throws
+      const marker = v.getUint16(at);
+      if (marker === 0xFFE1 && v.getUint32(at + 4) === 0x45786966) break;
+      if (marker >> 8 !== 0xFF || marker === 0xFFDA) return out;
+    }
+    const tiff = at + 10, le = v.getUint16(tiff) === 0x4949;
+    const u16 = o => v.getUint16(tiff + o, le), u32 = o => v.getUint32(tiff + o, le);
+    // A directory's entries as tag -> where the entry is; an entry is tag, type, count, then the value or where it is.
+    const entries = o => Object.fromEntries(Array.from({ length: u16(o) }, (_, i) => [u16(o + 2 + i * 12), o + 2 + i * 12]));
+    const sub = (dir, tag) => (dir[tag] ? entries(u32(dir[tag] + 8)) : {});
+    const text = e => { const n = u32(e + 4), o = n > 4 ? u32(e + 8) : e + 8; return String.fromCharCode(...bytes.subarray(tiff + o, tiff + o + n)).replace(/\0[^]*$/, ''); };
+    const base = entries(u32(4)), taken = sub(base, 0x8769)[0x9003] ?? base[0x0132]; // DateTimeOriginal, else DateTime
+    const [, y, mo, d, h, mi] = (taken ? /^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d)/.exec(text(taken)) : null) || [];
+    if (EXIF_MONTHS[mo - 1] && d >= 1 && d <= 31 && h < 24 && mi < 60) out.takenAt = `${EXIF_MONTHS[mo - 1]} ${+d}, ${y} ${h % 12 || 12}:${mi} ${h < 12 ? 'am' : 'pm'}`;
+    const gps = sub(base, 0x8825);
+    const degrees = (e, ref) => {
+      const o = u32(e + 8), part = k => u32(o + k * 8) / u32(o + k * 8 + 4), deg = part(0) + part(1) / 60 + part(2) / 3600;
+      return Math.round((/[SW]/.test(text(ref)) ? -deg : deg) * 1e6) / 1e6;
+    };
+    if (gps[1] && gps[2] && gps[3] && gps[4]) {
+      const lat = degrees(gps[2], gps[1]), lng = degrees(gps[4], gps[3]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) Object.assign(out, { lat, lng });
+    }
+  } catch { /* cut short, or not laid out as EXIF: what was read so far stands */ }
+  return out;
+}
+
 /**
  * A weekly report's photo columns after an edit on the site: `titles` are the captions by reference, `removed` the
- * references taken off, `added` the new photos as [reference, title]. A photo keeps the time and place it was taken.
- * shortcut: a photo added here has neither (the site does not read a picked photo's EXIF, as PhotoDetails.fromExif does).
+ * references taken off, `added` the new photos as [reference, title, exifDetail]. A photo keeps the time and place it
+ * was taken; a new one has them from its EXIF, and neither when the file holds none.
  */
 export function editedPhotos(report, { titles = {}, removed = [], added = [] }) {
   let details;
@@ -702,7 +742,7 @@ export function editedPhotos(report, { titles = {}, removed = [], added = [] }) 
   const kept = attachmentList(report.attachedPhotoUrlsJson).filter(ref => !removed.includes(ref));
   const out = {};
   for (const ref of kept) if (details[ref] || titles[ref]) out[ref] = detail(details[ref], titles[ref] ?? str(details[ref]?.title));
-  for (const [ref, title] of added) out[ref] = detail(null, title);
+  for (const [ref, title, exif] of added) out[ref] = detail(exif, title);
   return { attachedPhotoUrlsJson: JSON.stringify([...kept, ...added.map(([ref]) => ref)]), photoDetailsJson: JSON.stringify(out) };
 }
 

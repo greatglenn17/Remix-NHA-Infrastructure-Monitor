@@ -449,8 +449,9 @@ is read only.
   as the phone stores a site photo, a JPEG no larger than 2048 px). Save rewrites the report's two photo columns with
   the app's "Edited Weekly Report" audit entry and, in the same transaction, points the project's card photo
   (`latestUpdatePhotoUrl` on `projects/{id}`, one revision up) at the newest report photo left, as the app's
-  `refreshSitePhoto` does. A photo added here has no time or GPS
-  (the site does not read EXIF) and no geo-tag stamp.
+  `refreshSitePhoto` does. A photo added here, or in the report's form, takes
+  its time and GPS from the file's EXIF as the phone does (`L.exifDetail`, read before the photo is shrunk, which drops
+  it; neither when the file holds none) and has no geo-tag stamp.
 - **Photos** opens with a notice when a weekly report lists a photo Storage cannot give (`loadMissingPhotos`,
   `L.missingPhotos`): how many, and each report by its week, with **Edit photos** for the people who can edit, to take
   the photo off and add it again. It reads the addresses the gallery already asks for, so it costs no extra request. A

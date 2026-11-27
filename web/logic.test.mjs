@@ -3,6 +3,36 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as L from './logic.js';
 
+/** The start of a JPEG as a camera writes it: an APP0 segment, then the EXIF with the time taken and the place. */
+function exifJpeg(le, taken, ref = 'N') {
+  const t = new DataView(new ArrayBuffer(208)), u16 = (o, x) => t.setUint16(o, x, le), u32 = (o, x) => t.setUint32(o, x, le);
+  const chars = (o, s) => [...s].forEach((ch, i) => t.setUint8(o + i, ch.charCodeAt(0)));
+  const entry = (o, tag, type, count, value) => { u16(o, tag); u16(o + 2, type); u32(o + 4, count); if (typeof value === 'string') chars(o + 8, value); else u32(o + 8, value); };
+  const rationals = (o, list) => list.forEach(([n, d], i) => { u32(o + i * 8, n); u32(o + i * 8 + 4, d); });
+  chars(0, le ? 'II' : 'MM'); u16(2, 42); u32(4, 8);
+  u16(8, 2); entry(10, 0x8769, 4, 1, 60); entry(22, 0x8825, 4, 1, 100);
+  u16(60, 1); entry(62, 0x9003, 2, 20, 80); chars(80, taken);
+  u16(100, 4); entry(102, 1, 2, 2, ref); entry(114, 2, 5, 3, 160); entry(126, 3, 2, 2, 'E'); entry(138, 4, 5, 3, 184);
+  rationals(160, [[14, 1], [49, 1], [305, 10]]); rationals(184, [[120, 1], [57, 1], [0, 1]]);
+  return new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 4, 0, 0, 0xFF, 0xE1, 0, 216, 0x45, 0x78, 0x69, 0x66, 0, 0, ...new Uint8Array(t.buffer)]);
+}
+
+test('a picked photo: when and where it was taken, from its EXIF', () => {
+  assert.deepEqual(L.exifDetail(exifJpeg(false, '2026:11:25 11:35:02')), { takenAt: 'Nov 25, 2026 11:35 am', lat: 14.825139, lng: 120.95 });
+  // The other byte order, just after midnight, south of the equator.
+  assert.deepEqual(L.exifDetail(exifJpeg(true, '2026:01:05 00:07:59', 'S')), { takenAt: 'Jan 5, 2026 12:07 am', lat: -14.825139, lng: 120.95 });
+  assert.equal(L.exifDetail(exifJpeg(false, '2026:11:25 13:05:00')).takenAt, 'Nov 25, 2026 1:05 pm');
+  // A camera with no clock set writes zeros: no time, the place still read.
+  assert.deepEqual(L.exifDetail(exifJpeg(false, '0000:00:00 00:00:00')), { lat: 14.825139, lng: 120.95 });
+  // Cut short, a PNG, or nothing at all: no details, and no error.
+  assert.deepEqual(L.exifDetail(exifJpeg(false, '2026:11:25 11:35:02').slice(0, 90)), {});
+  assert.deepEqual(L.exifDetail(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 13, 10, 26, 10])), {});
+  assert.deepEqual(L.exifDetail(new Uint8Array(0)), {});
+  // The report stores them with the new photo, as the phone does.
+  const out = L.editedPhotos({ attachedPhotoUrlsJson: '[]', photoDetailsJson: '{}' }, { added: [['nhafile:p/n.jpg', 'Slab', L.exifDetail(exifJpeg(false, '2026:11:25 11:35:02'))]] });
+  assert.deepEqual(JSON.parse(out.photoDetailsJson), { 'nhafile:p/n.jpg': { title: 'Slab', takenAt: 'Nov 25, 2026 11:35 am', lat: 14.825139, lng: 120.95 } });
+});
+
 test('variation order: a title and lines, not the stored name', () => {
   const vo = { documentName: 'Variation Order No. 2 (Deductive) - PHP 1,500,000.50', remarks: 'Reason: Less fill | Date Approved: 2026-11-05' };
   assert.equal(L.variationTitle(vo.documentName), 'Variation Order No. 2');
