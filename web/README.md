@@ -389,7 +389,7 @@ is read only.
   stops at the total's row. Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
   stretch's days are its part of the item's days (21 days are drawn as 4 cells) and the other colours on the row, the
   suspensions, are not bars; without the shares every coloured cell is 5 days. A workbook with several chart sheets
-  asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused.
+  asks which one, and an item whose bars do not cover its Duration column is named. A chart with no items is refused. A first chart not saved yet starts from the Scope of Works items and says the import replaces them; the project's Scope of Works is never changed by the chart.
 - **Print** on that page and on the Summary's card, for anyone who can open the project, opens `#/p/<id>/print/chart-<n>` (0 the original;
   the chart in force first, the others by the chips above the sheet): the office's bar chart / S-curve with cash
   flow (`P.barChartPages`; website only), without its PERT/CPM network, which the app has no data
