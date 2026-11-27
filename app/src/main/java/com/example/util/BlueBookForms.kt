@@ -18,6 +18,7 @@ import com.example.data.model.SdpSites
 import com.example.data.model.WeatherCondition
 import com.example.data.model.WeeklyIssue
 import com.example.data.model.WeeklyReport
+import com.example.data.model.isCommunityFacility
 import com.example.data.model.netAmount
 import com.example.ui.theme.WeatherCloudyYellow
 import com.example.ui.theme.WeatherFairGreen
@@ -123,14 +124,17 @@ object BlueBookForms {
         val asOfText = asOf.format(LONG_DATE)
         row("Project Title", esc(project.name))
         row("Project Location", esc(project.location))
-        row("Projected Beneficiaries", esc(project.projectedBeneficiaries))
+        val facility = isCommunityFacility(project.projectType)
+        if (!facility) row("Projected Beneficiaries", esc(project.projectedBeneficiaries))
         row("Contractor", esc(project.contractor))
         row("Board Resolution/Date", esc(project.boardResolution))
         row("Notice of Award", esc(date(project.noticeOfAward)))
         row("Notice to Proceed", esc(date(project.noticeToProceed)))
         row("Date Commenced", esc(date(project.dateStarted)))
-        row("Land Area", esc(project.landArea))
-        row("Number of Units", esc(project.numberOfUnits))
+        if (!facility) {
+            row("Land Area", esc(project.landArea))
+            row("Number of Units", esc(project.numberOfUnits))
+        }
         row("Original Contract Amount", esc(peso(logs.originalCost)))
         row("Original Contract Duration", esc("${project.contractDurationDays} calendar days (c.d.)"))
         row("Contract Suspension/s", if (logs.suspensions.isEmpty()) "None" else "")

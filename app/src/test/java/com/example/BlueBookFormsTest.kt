@@ -94,6 +94,18 @@ class BlueBookFormsTest {
     }
 
     @Test
+    fun profile_ofACommunityFacility_hasNoBeneficiariesLandAreaOrUnits() {
+        val housingRows = listOf("Projected Beneficiaries", "Land Area", "Number of Units")
+        fun html(type: String) = BlueBookForms.projectProfile(
+            project.copy(projectType = type, landArea = "5 Hectares", numberOfUnits = "400", projectedBeneficiaries = "ISFs"),
+            ContractLogs.from(project, emptyList()), Preparer("", "", ""), LocalDate.of(2026, 5, 31)
+        )
+        housingRows.forEach { assertTrue(it, html("Housing Project").contains(">$it<")) }
+        // Left out even with values saved from when the project was housing.
+        housingRows.forEach { assertFalse(it, html("Community Facility").contains(">$it<")) }
+    }
+
+    @Test
     fun weekStart_readsBothWeekFormats() {
         assertEquals(LocalDate.of(2026, 10, 26), BlueBookForms.weekStart("Oct 26, 2026 - Nov 1, 2026"))
         assertEquals(LocalDate.of(2026, 7, 20), BlueBookForms.weekStart("Week 30: July 20 - July 26, 2026"))

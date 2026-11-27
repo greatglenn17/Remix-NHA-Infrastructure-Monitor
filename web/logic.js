@@ -2385,6 +2385,9 @@ export const canCreateProject = claims => isWriter(claims) && ['SUPER_ADMIN', 'E
 export const PROJECT_TYPES = ['Housing Project', 'Community Facility'];
 export const LAND_UNITS = ['Hectares', 'Square Meters'];
 
+/** A community facility has no land area, units or beneficiaries: the project form and the Project Profile sheet leave them out. */
+export const isCommunityFacility = type => /community facility/i.test(type || '');
+
 /** normalizeProjectKey: how a name or a location is compared for the duplicate check. */
 const projectKey = text => String(text ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 

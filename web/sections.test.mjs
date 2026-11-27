@@ -492,6 +492,12 @@ test('project profile: orders listed under their headings, revised cost only aft
     /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>90 calendar days<br>May 26, 2026 to August 23, 2026<br>\(EO 110\)/);
   assert.match(html([{ documentName: 'Work Resumption Order No. 1', status: 'Pending', remarks: 'Effectivity: 2026-08-16' }]),
     /Work Resumption Order No. 1<\/td><td class='pc'>:<\/td><td>August 16, 2026 \(for approval\)/);
+  // A community facility has no beneficiaries, land area or units rows, even with values saved from when it was housing.
+  const housingRows = /Projected Beneficiaries|Land Area|Number of Units/;
+  assert.match(plain, housingRows);
+  const facility = P.projectProfileHtml({ project: { ...project, projectType: 'Community Facility', landArea: '5 Hectares', numberOfUnits: '400', projectedBeneficiaries: 'ISFs' }, docs: [], preparer, asOf: '2026-11-10' });
+  assert.doesNotMatch(facility, housingRows);
+  assert.match(facility, /Date Commenced.*Original Contract Amount/s);
 });
 
 test('billing abstract: each line as quantity, amount and share before, in this billing and to date, with subtotals and the grand total', () => {

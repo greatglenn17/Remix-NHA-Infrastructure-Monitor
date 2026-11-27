@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Project
+import com.example.data.model.isCommunityFacility
 import com.example.ui.components.LongForm
 import com.example.ui.components.DateField
 import com.example.ui.theme.LocalNHAColors
@@ -308,7 +309,7 @@ fun EditProjectDialog(
         }
 
         // Printed on the Project Profile sheet; left blank when unknown.
-        OutlinedTextField(
+        if (!isCommunityFacility(projectType)) OutlinedTextField(
             value = projectedBeneficiaries,
             onValueChange = { projectedBeneficiaries = it },
             label = { Text("Projected Beneficiaries") },
