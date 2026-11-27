@@ -33,7 +33,8 @@ object ProjectAbstracts {
             }
             AbstractExcel.Row(
                 o.optString("kind"), o.optString("no"), o.optString("name"), number("qty"), o.optString("unit"), number("unitCost"), number("amount"),
-                numbers("prev", 3), numbers("period", 3), numbers("toDate", 3), numbers("balance", 2), numbers("equiv", 3)
+                numbers("prev", 3), numbers("period", 3), numbers("toDate", 3), numbers("balance", 2), numbers("equiv", 3),
+                o.optJSONArray("was")?.let { a -> List(a.length()) { j -> a.optJSONArray(j).let { t -> List(3) { k -> if (t == null || t.isNull(k)) null else t.optDouble(k).takeUnless { it.isNaN() } } } } }.orEmpty()
             )
         }
     }.getOrDefault(emptyList())
@@ -44,6 +45,7 @@ object ProjectAbstracts {
         JSONObject().put("kind", r.kind).put("no", r.no).put("name", r.name).put("qty", r.qty ?: JSONObject.NULL).put("unit", r.unit)
             .put("unitCost", r.unitCost ?: JSONObject.NULL).put("amount", r.amount ?: JSONObject.NULL)
             .put("prev", array(r.prev)).put("period", array(r.period)).put("toDate", array(r.toDate)).put("balance", array(r.balance)).put("equiv", array(r.equiv))
+            .apply { if (r.was.isNotEmpty()) put("was", JSONArray(r.was.map(::array))) }
     }).toString()
 
     /** The abstract of the latest "As of" date; of two with one date (uploaded on two devices), the one changed last. */

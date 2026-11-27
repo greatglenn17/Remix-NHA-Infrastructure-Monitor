@@ -153,4 +153,6 @@ test('abstract Excel, office-building layout: Roman-numbered works with their Su
   // The V.O.#1 quantity and unit cost, and the work's own subtotal over its groups'.
   assert.deepEqual([rows[1].qty, rows[1].unit, rows[1].unitCost, rows[1].toDate], [1, 'lot', 400, [0.5, 200, 50]]);
   assert.deepEqual([rows[5].qty, rows[5].unit, rows[5].unitCost], [2, 'sets', 50]);
+  // The Original quantity, unit cost and amount beside them, for the printed abstract; an extra work has none.
+  assert.deepEqual([rows[1].was, rows[2].was, rows[5].was, rows.at(-1).was], [[[1, 300, 300]], [[null, null, 300]], [[null, null, null]], [[null, null, 1100]]]);
 });

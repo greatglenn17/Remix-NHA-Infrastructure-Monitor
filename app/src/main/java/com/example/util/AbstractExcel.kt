@@ -11,6 +11,8 @@ import java.time.LocalDate
  * and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows. The sheet's last three columns,
  * under "EQUIVALENT TO 370 UNITS" (PREVIOUS, TO DATE, BALANCE), are each row's equiv.
  * The office-building layout (a community facility) is read too: its parts are the works numbered I, II, III.
+ * A sheet in terms of a variation order has "Original" and "V.O.#1" columns under QUANTITY, UNIT COST and AMOUNT: the
+ * last is the row's own figure, the ones before it the row's was, kept for the printed abstract.
  * web/apa-excel.js is the website's copy; change both together.
  */
 object AbstractExcel {
@@ -19,12 +21,13 @@ object AbstractExcel {
     /**
      * A row of the sheet. [kind] is "part" (item no. 1, 2, 3), "group" (a heading such as 2.1 ROADWORKS), "item",
      * "subtotal" or "total". [prev], [period] and [toDate] are quantity, amount, %; [balance] quantity, amount; [equiv]
-     * previous, to date, balance in equivalent units. Null is an empty cell. Kept as the record's rowsJson (see [ProjectAbstracts]).
+     * previous, to date, balance in equivalent units; [was], only on a sheet with "Original" columns, quantity, unit cost,
+     * amount in each column before the one in force, oldest first. Null is an empty cell. Kept as the record's rowsJson (see [ProjectAbstracts]).
      */
     data class Row(
         val kind: String, val no: String, val name: String, val qty: Double?, val unit: String, val unitCost: Double?, val amount: Double?,
         val prev: List<Double?>, val period: List<Double?>, val toDate: List<Double?>, val balance: List<Double?>,
-        val equiv: List<Double?> = listOf(null, null, null)
+        val equiv: List<Double?> = listOf(null, null, null), val was: List<List<Double?>> = emptyList()
     )
 
     /** [billing] is true for the billing format, which is not the actual work; [equivUnits] is the N of the sheet's "EQUIVALENT TO N UNITS" columns, 0 without them. */
@@ -99,7 +102,11 @@ object AbstractExcel {
         }
         val amountCol = inForce(amountHead)
         val qtyCol = inForce(qtyHead)
-        val unitCostCol = inForce(named("UNIT COST"))
+        val unitCostHead = named("UNIT COST")
+        val unitCostCol = inForce(unitCostHead)
+        // The columns before the one in force, oldest first ("Original"): how many, of the heading with the most.
+        val heads = listOf(qtyHead to qtyCol, unitCostHead to unitCostCol, amountHead to amountCol)
+        val earlier = heads.maxOf { (head, col) -> if (head == null || col == null) 0 else col - head }
         // The office-building layout: works numbered I, II, III, "Sub-Total (...)" and "GRAND TOTAL" written in the item no.
         // column, and a sub-item's number ("6.1.") where its description starts, the description one column further in.
         val wide = qtyHead ?: unitCol ?: amountHead
@@ -113,6 +120,10 @@ object AbstractExcel {
         // "EQUIVALENT TO 370 UNITS" in the header row: the number of units, and the first of its three columns.
         val equivCol = inHeader { EQUIVALENT.matches(it.trim()) }
         val equivUnits = equivCol?.let { EQUIVALENT.find(at(header.first, it).trim())?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull() } ?: 0.0
+        // A row's quantity, unit cost and amount in each of them; null where a heading has fewer columns.
+        fun was(row: Int) = List(earlier) { j ->
+            heads.mapIndexed { i, (head, col) -> col?.minus(earlier - j)?.takeIf { head != null && it >= head }?.let { if (i == 0) qty(row, it) else money(row, it) } }
+        }
         val rows = mutableListOf<Row>()
         var billing = false
         for (row in all.map { it.key.first }.filter { it > toDate.first + 1 }.distinct()) {
@@ -146,7 +157,7 @@ object AbstractExcel {
             rows += Row(
                 kind, no, name, qty(row, qtyCol), at(row, unitCol), money(row, unitCostCol), amount,
                 figures(row, prev), figures(row, period), done, listOf(qty(row, balanceCol), money(row, balanceCol?.plus(1))),
-                List(3) { i -> money(row, equivCol?.plus(i)) }
+                List(3) { i -> money(row, equivCol?.plus(i)) }, was(row)
             )
             if (kind == "total") break
         }

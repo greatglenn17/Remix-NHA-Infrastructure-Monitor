@@ -452,7 +452,7 @@ object BlueBookForms {
             """
             ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct)}
             <table class='apa'>
-              $APA_HEAD
+              ${apaHead()}
               $rows
               ${total("GRAND TOTAL", all)}
             </table>
@@ -464,11 +464,20 @@ object BlueBookForms {
         )
     }
 
-    /** The district's column layout of an Abstract of Physical Accomplishment under three header rows: 15 columns, up to TO DATE. Neither printed abstract has the sheet's BALANCE columns. */
-    private const val APA_HEAD = "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th>" +
-        "<th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th></tr>" +
-        "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
-        "<tr><th>QTY</th><th>AMOUNT</th><th>% WT</th><th>QTY</th><th>AMOUNT</th><th>% WT</th><th>QTY</th><th>AMOUNT</th><th>% WT</th></tr>"
+    /**
+     * The district's column layout of an Abstract of Physical Accomplishment under three header rows: 15 columns, up to
+     * TO DATE. Neither printed abstract has the sheet's BALANCE columns. An abstract in terms of a variation order has
+     * [earlier] more columns under each of QTY, UNIT COST and AMOUNT: "Original", then "V.O.#1" on. web/print.js apaHead.
+     */
+    private fun apaHead(earlier: Int = 0): String {
+        // shortcut: the columns are named in order, not as the sheet names them; keep the sheet's names when one differs.
+        val names = (listOf("Original") + (1..earlier).map { "V.O.#$it" }).joinToString("") { "<th>$it</th>" }
+        fun over(name: String) = if (earlier > 0) "<th rowspan='2' colspan='${earlier + 1}'>$name</th>" else "<th rowspan='3'>$name</th>"
+        return "<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th>${over("QTY")}<th rowspan='3'>UNIT</th>${over("UNIT COST")}" +
+            "${over("AMOUNT")}<th colspan='9'>ACCOMPLISHMENT</th></tr>" +
+            "<tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>" +
+            "<tr>${if (earlier > 0) names.repeat(3) else ""}${"<th>QTY</th><th>AMOUNT</th><th>% WT</th>".repeat(3)}</tr>"
+    }
 
     /**
      * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
@@ -498,7 +507,8 @@ object BlueBookForms {
      * landscape sheet: the same top as the billing format, with the target the tab shows for its "As of" date
      * ([ProjectAbstracts.standing]'s Overall) and the abstract's own actual, then every row in the abstract's columns
      * up to TO DATE, an empty cell left blank, and the signatures. The header rows repeat on each page. Neither BALANCE
-     * nor the sheet's "EQUIVALENT TO N UNITS" columns are shown. web/print.js actualAbstractHtml prints the same page.
+     * nor the sheet's "EQUIVALENT TO N UNITS" columns are shown. An abstract in terms of a variation order (its rows have
+     * was) prints as its sheet: the Original quantity, unit cost and amount beside the V.O.'s. web/print.js actualAbstractHtml prints the same page.
      */
     fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = ""): String {
         val overall = ProjectAbstracts.standing(project, documents, abstract).last()
@@ -508,17 +518,21 @@ object BlueBookForms {
         fun money(v: Double?) = n(v?.let { "%,.2f".format(Locale.US, it) })
         fun qty(v: Double?) = n(v?.let { quantity.format(it) })
         fun figures(f: List<Double?>) = qty(f.getOrNull(0)) + money(f.getOrNull(1)) + n(f.getOrNull(2)?.let(::pct))
-        val rows = ProjectAbstracts.rows(abstract.rowsJson).joinToString("") { r ->
+        val read = ProjectAbstracts.rows(abstract.rowsJson)
+        val earlier = read.maxOfOrNull { it.was.size } ?: 0
+        // A figure after the same one in each earlier column (was: 0 quantity, 1 unit cost, 2 amount).
+        fun cells(r: AbstractExcel.Row, i: Int, v: Double?, show: (Double?) -> String) = (0 until earlier).joinToString("") { j -> show(r.was.getOrNull(j)?.getOrNull(i)) } + show(v)
+        val rows = read.joinToString("") { r ->
             val name = esc(r.name).let { if (r.kind == "part" || r.kind == "group") "<b>$it</b>" else it }
-            "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${qty(r.qty)}<td class='c'>${esc(r.unit)}</td>" +
-                "${money(r.unitCost)}${money(r.amount)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>"
+            "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${cells(r, 0, r.qty, ::qty)}<td class='c'>${esc(r.unit)}</td>" +
+                "${cells(r, 1, r.unitCost, ::money)}${cells(r, 2, r.amount, ::money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>"
         }
         return page(
             "Abstract of Physical Accomplishment",
             """
             ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
             <table class='apa'>
-              <thead>$APA_HEAD</thead>
+              <thead>${apaHead(earlier)}</thead>
               <tbody>$rows</tbody>
             </table>
             <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
