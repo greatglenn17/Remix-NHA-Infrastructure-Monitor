@@ -482,19 +482,30 @@ object BlueBookForms {
     /**
      * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
      * (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
-     * advance/slippage, the last as the two at 2 decimals each. web/print.js apaTop.
+     * advance/slippage, the last as the two at 2 decimals each. As on the district's sheet, the contract's own cost,
+     * duration and completion date stay, and what an approved variation order or time extension made of them is on the
+     * REVISED lines: "360 C.D. + 291 C.D. (T.E. 1) = 651 C.D.", the total alone when the orders' names do not give the days.
+     * web/print.js apaTop.
      */
     private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double): String {
         fun info(label: String, value: String, label2: String = "", value2: String = "") =
-            "<tr><td class='pl'>$label</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
+            "<tr><td class='pl'>$label</td><td class='pc'>${if (label.isEmpty()) "" else ":"}</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
+        val logs = ContractLogs.from(project, documents)
+        val added = ProjectSchedule.addedDays(documents)
+        val revisedDays = ProjectSchedule.revisedDurationDays(project.dateStarted, project.contractDurationDays, added, project.completionDateRevised, project.completionDateOriginal)
+        val extensions = logs.extensions.filter { it.status.isEmpty() && it.days > 0 }
+        val sum = if (added > 0 && extensions.sumOf { it.days } == added) "${project.contractDurationDays} C.D. + ${extensions.joinToString(" + ") { "${it.days} C.D. (T.E. ${it.no})" }} = " else ""
+        val time = if (revisedDays == null) emptyList() else listOf("REVISED CONTRACT DURATION" to "$sum$revisedDays C.D.", "REVISED COMPLETION DATE" to date(logs.revisedCompletion))
+        fun right(i: Int) = time.getOrNull(i) ?: ("" to "")
         return """
             <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
             <div class='period'>${esc(period)}</div>
             <table class='apa-info'>
               ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}
               ${info("LOCATION", project.location, "DATE STARTED", date(project.dateStarted))}
-              ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised)))}
-              ${info("CONTRACT COST", peso(ContractCost.current(project.scopeOfWork, project.contractCostOriginal, documents)))}
+              ${info("CONTRACTOR", project.contractor, "COMPLETION DATE", date(if (revisedDays == null) ProjectSchedule.effectiveCompletion(project.completionDateOriginal, project.completionDateRevised) else project.completionDateOriginal))}
+              ${info("CONTRACT COST", peso(logs.originalCost), right(0).first, right(0).second)}
+              ${if (logs.revisedCost != null || time.size > 1) info(if (logs.revisedCost != null) "REVISED CONTRACT COST" else "", logs.revisedCost?.let(::peso).orEmpty(), right(1).first, right(1).second) else ""}
               <tr><td colspan='5'>&nbsp;</td></tr>
               ${info("TARGET ACCOMPLISHMENT", pct(targetPct))}
               ${info("ACTUAL ACCOMPLISHMENT", pct(actual))}

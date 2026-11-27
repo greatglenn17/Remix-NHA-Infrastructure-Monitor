@@ -608,6 +608,17 @@ test('abstract of the actual work: the billing format\'s top with the tab\'s tar
   assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%'));
   assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%').source}`));
   assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
+  // An approved time extension and variation order: the contract's own figures stay, and the REVISED lines say what they made of them.
+  const orders = [{ documentName: 'Time Extension No. 1 - 30 Days', status: 'Approved' }, { documentName: 'Variation Order No. 1 - PHP 500.00', status: 'Approved' },
+    { documentName: 'Time Extension No. 2 - 15 Days', status: 'Pending' }];
+  const top = P.actualAbstractHtml({ project: { ...project, contractCostOriginal: 1000 }, docs: orders, abstract, signatories });
+  assert.match(top, /CONTRACT DURATION<\/td><td>: 360 C\.D\.<\/td>/);
+  assert.match(top, /COMPLETION DATE<\/td><td>: December 31, 2025<\/td>/);
+  assert.match(top, /CONTRACT COST<\/td><td class='pc'>:<\/td><td>Php 1,000\.00<\/td><td class='pl'>REVISED CONTRACT DURATION<\/td><td>: 360 C\.D\. \+ 30 C\.D\. \(T\.E\. 1\) = 390 C\.D\.<\/td>/);
+  assert.match(top, /REVISED CONTRACT COST<\/td><td class='pc'>:<\/td><td>Php 1,500\.00<\/td><td class='pl'>REVISED COMPLETION DATE<\/td><td>: January 30, 2026<\/td>/);
+  assert.ok(!html.includes('REVISED')); // nothing approved: no REVISED lines
+  // A time extension alone: no cost line beside the revised completion date.
+  assert.match(P.actualAbstractHtml({ project, docs: orders.slice(0, 1), abstract, signatories }), /<tr><td class='pl'><\/td><td class='pc'><\/td><td><\/td><td class='pl'>REVISED COMPLETION DATE<\/td>/);
   // An abstract in terms of a variation order prints as its sheet: Original beside V.O.#1 under QTY, UNIT COST and AMOUNT.
   const revised = P.actualAbstractHtml({ project, docs: [], signatories, abstract: { ...abstract, rowsJson: JSON.stringify([
     { ...blank, kind: 'part', no: 'I', name: 'GENERAL REQUIREMENTS', was: [[null, null, null]] },

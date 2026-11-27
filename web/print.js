@@ -264,18 +264,26 @@ function apaHead(earlier = 0) {
 /**
  * The top of both abstracts (BlueBookForms.apaTop): the banner, the title, the `period` line, then the project, its
  * contract (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
- * advance/slippage, the last as the two at 2 decimals each.
+ * advance/slippage, the last as the two at 2 decimals each. As on the district's sheet, the contract's own cost,
+ * duration and completion date stay, and what an approved variation order or time extension made of them is on the
+ * REVISED lines: "360 C.D. + 291 C.D. (T.E. 1) = 651 C.D.", the total alone when the orders' names do not give the days.
  */
 function apaTop(banner, period, project, docs, targetPct, actual) {
-  const info = (label, value, label2 = '', value2 = '') => `<tr><td class='pl'>${label}</td><td class='pc'>:</td><td>${esc(value)}</td><td class='pl'>${label2}</td><td>${label2 ? `: ${esc(value2)}` : ''}</td></tr>`;
+  const info = (label, value, label2 = '', value2 = '') => `<tr><td class='pl'>${label}</td><td class='pc'>${label ? ':' : ''}</td><td>${esc(value)}</td><td class='pl'>${label2}</td><td>${label2 ? `: ${esc(value2)}` : ''}</td></tr>`;
+  const duration = Number(project.contractDurationDays) || 0, added = L.addedDays(docs), revisedDays = L.revisedDurationDays(project, added);
+  const extensions = extensionsOf(docs).filter(e => !e.status && e.days > 0);
+  const sum = added > 0 && extensions.reduce((t, e) => t + e.days, 0) === added ? `${duration} C.D. + ${extensions.map(e => `${e.days} C.D. (T.E. ${e.no})`).join(' + ')} = ` : '';
+  const time = revisedDays == null ? [] : [['REVISED CONTRACT DURATION', `${sum}${revisedDays} C.D.`], ['REVISED COMPLETION DATE', longDate(L.revisedCompletion(project, docs) ?? L.effectiveCompletion(project))]];
+  const varied = docs.some(d => /variation order/i.test(d.documentName || '') && /^approved$/i.test(d.status || ''));
   return `${banner ? `<img class='banner' src='${esc(banner)}' alt='National Housing Authority'>` : ''}
     <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
     <div class='period'>${esc(period)}</div>
     <table class='apa-info'>
       ${info('PROJECT NAME', project.name, 'CONTRACT DURATION', `${project.contractDurationDays ?? 0} C.D.`)}
       ${info('LOCATION', project.location, 'DATE STARTED', longDate(project.dateStarted))}
-      ${info('CONTRACTOR', project.contractor, 'COMPLETION DATE', longDate(L.effectiveCompletion(project)))}
-      ${info('CONTRACT COST', peso(L.currentCost(project, docs)))}
+      ${info('CONTRACTOR', project.contractor, 'COMPLETION DATE', longDate(revisedDays == null ? L.effectiveCompletion(project) : project.completionDateOriginal))}
+      ${info('CONTRACT COST', peso(L.originalCost(project)), ...(time[0] ?? []))}
+      ${varied || time[1] ? info(varied ? 'REVISED CONTRACT COST' : '', varied ? peso(L.currentCost(project, docs)) : '', ...(time[1] ?? [])) : ''}
       <tr><td colspan='5'>&nbsp;</td></tr>
       ${info('TARGET ACCOMPLISHMENT', pct(targetPct))}
       ${info('ACTUAL ACCOMPLISHMENT', pct(actual))}
