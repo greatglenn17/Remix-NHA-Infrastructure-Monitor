@@ -493,6 +493,16 @@ test('project profile: orders listed under their headings, revised cost only aft
   assert.match(vo, /Revised Contract Cost<\/td><td class='pc'>:<\/td><td>Php 1,500.00/);
   assert.match(html([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-05-26 | Duration: 90 days | End: 2026-08-23 | Reason: EO 110' }]),
     /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>90 calendar days<br>May 26, 2026 to August 23, 2026<br>\(EO 110\)/);
+  // Whatever order the cloud gives them in, suspensions and resumptions list by date, time extensions and variation orders by number.
+  const s = (documentName, remarks) => ({ documentName, status: 'Approved', remarks });
+  const mixed = html([s('2nd Continuance of Work Suspension Order No. 1', 'Duration: 10 Days | Effectivity: 2026-03-01'), s('Work Suspension Order No. 1', 'Duration: 31 Days | Effectivity: 2026-01-01'),
+    s('1st Continuance of Work Suspension Order No. 1', 'Duration: 28 Days | Effectivity: 2026-02-01'), s('Work Suspension Order No. 2', 'Duration: 5 Days'),
+    s('Work Resumption Order No. 1', 'Effectivity: 2026-03-11'), s('Partial Work Resumption Order No. 1', 'Effectivity: 2026-02-10'),
+    s('Time Extension No. 2 - 30 Days', ''), s('Time Extension No. 1 - 69 Days', ''), s('Variation Order No. 2 (Deductive)', ''), s('Variation Order No. 1 - PHP 500', '')]);
+  const at = text => { const i = mixed.indexOf(text); assert.ok(i >= 0, text); return i; };
+  const listed = ['>Work Suspension Order No. 1<', '>1st Continuance of', '>2nd Continuance of', '>Work Suspension Order No. 2<', '>Partial Work Resumption Order No. 1<', '>Work Resumption Order No. 1<',
+    '>Time Extension No. 1<', '>Time Extension No. 2<', '>Variation Order No. 1<', '>Variation Order No. 2<'].map(at);
+  assert.deepEqual(listed, [...listed].sort((a, b) => a - b));
   // Resumed halfway, the profile gives the days it ran, not the 90 approved.
   assert.match(html([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-05-26 | Duration: 90 days | End: 2026-08-23 | Reason: EO 110' },
     { documentName: 'Work Resumption Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-07-10' }]),
