@@ -1844,7 +1844,7 @@ function progressBody(c, chip) {
   if (!c.weekly.length) return `${add}<div class="card empty">${icon('event_note')}<p>No weekly engineer reports submitted yet</p></div>`;
   return `<section class="card section weekly-list"><div class="list-head">${add}<h2 class="list-title">NHA weekly project engineer's report</h2></div>
     ${table(['Reporting week', 'Submitted by', { text: 'Day', num: 1 }, { text: 'Days left', num: 1 }, { text: 'Target %', num: 1 }, { text: 'Actual %', num: 1 }, { text: 'Variance %', num: 1 }, { text: 'From previous', num: 1 }, { text: 'Photos', num: 1 }, ''],
-      c.weekly.map(r => reportRows(r, c.weekly, c.page.id, editable, c.page.openWeekly?.[r.uuid])).join(''))}</section>`;
+      c.weekly.map(r => reportRows(r, c.weekly, c.page.id, editable, c.page.openWeekly?.[r.uuid], L.isCommunityFacility(c.project.projectType))).join(''))}</section>`;
 }
 
 const table = (head, rows, foot = '') => `<div class="scroll"><table class="grid-table"><thead><tr>${head.map(h => `<th${h.num ? ' class="num"' : ''}>${esc(h.text ?? h)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
@@ -1855,10 +1855,10 @@ const equipmentLevel = status => (/^operational$/i.test(status.trim()) ? 'ok' : 
 const noteLevel = v => { const lv = L.varianceLevel(Math.round(v * 100) / 100); return lv === 'neutral' ? 'muted' : lv; };
 
 /** WeeklyReportCard as a table row: week, who and when, actual against target; the report's five tables and photos in the row under it, shown by Details. */
-function reportRows(r, all, pid, editable = false, open = false) {
+function reportRows(r, all, pid, editable = false, open = false, facility = false) {
   const target = Number(r.targetAccomplishmentPct) || 0, actual = Number(r.actualAccomplishmentPct) || 0;
   const prev = L.previousReport(all, r);
-  const acc = L.accomplishmentOf(r.accomplishmentItemsJson);
+  const acc = L.accomplishmentOf(r.accomplishmentItemsJson, facility);
   const activities = L.activitiesOf(r.activitiesJson), manpower = L.manpowerOf(r.manpowerJson), equipment = L.equipmentOf(r.equipmentJson), issues = L.issuesOf(r.issuesJson);
   const photos = L.attachmentList(r.attachedPhotoUrlsJson);
   const vCell = (v, tag = 'td') => `<${tag} class="num n-${noteLevel(v)}">${signedPct(v)}</${tag}>`;
@@ -3790,7 +3790,9 @@ function editPhotos(c, report) {
 function weeklyForm(c, report = null) {
   const d = document.createElement('dialog');
   d.className = 'help edit-form wk-form';
-  const start = report ? L.weeklyStart(report) : { first: L.weekSaturday(today()), lines: L.carriedActuals(c.weekly), ...L.carriedCrew(c.weekly), activities: [{}], issues: [] };
+  // A community facility's lines are its bar chart's items, not the three housing lines.
+  const facility = L.isCommunityFacility(c.project.projectType);
+  const start = report ? L.weeklyStart(report, facility) : { first: L.weekSaturday(today()), lines: L.carriedActuals(c.weekly, facility), ...L.carriedCrew(c.weekly), activities: [{}], issues: [] };
   const opt = (v, label = v, cur = '') => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
   // A saved value outside the list stays a choice, so opening and saving does not change it.
   const pick = (choices, cur = '') => (cur && !choices.includes(cur) ? [cur, ...choices] : choices).map(v => opt(v, v, cur)).join('');
@@ -3838,7 +3840,7 @@ function weeklyForm(c, report = null) {
   const box = d.querySelector('#wk-lines');
   let lines = [];
   const rowsOf = kind => [...form.querySelectorAll(`[data-rows="${kind}"] .wk-row`)].map(r => Object.fromEntries([...r.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value])));
-  const typed = () => [...box.querySelectorAll('[data-line]')].map(el => ({ target: el.querySelector('[data-target]').value, actual: el.querySelector('[data-actual]').value }));
+  const typed = () => [...box.querySelectorAll('[data-line]')].map((el, k) => ({ name: lines[k].name, target: el.querySelector('[data-target]').value, actual: el.querySelector('[data-actual]').value }));
   const values = () => {
     const now = typed();
     return { first: form.first.value, lines: lines.map((l, k) => ({ name: l.name, weightPct: l.weightPct, ...now[k] })),
@@ -3855,12 +3857,16 @@ function weeklyForm(c, report = null) {
   // automatic has no box: it rides in a hidden input, so the rest of the form reads it as it reads a typed one.
   const drawLines = () => {
     if (!form.first.value) return;
-    const label = L.weekLabel(form.first.value), was = !box.children.length ? start.lines : typed().map((t, k) => (own ? { ...t, actual: own[k] } : t));
-    lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6]);
-    const charted = lines[0].targetPct != null;
-    const abstract = L.abstractForWeek(abstracts, label), filed = abstract && L.abstractLineActuals(abstract);
-    own = abstract ? lines.map((_, k) => was[k]?.actual ?? '') : null;
-    d.querySelector('#wk-abstract').textContent = abstract ? L.abstractWeekNote(abstract) : '';
+    const label = L.weekLabel(form.first.value), prev = !box.children.length ? start.lines : typed().map((t, k) => (own ? { ...t, actual: own[k] } : t));
+    const abstract = L.abstractForWeek(abstracts, label);
+    lines = L.weeklyLines(c.project, c.documents, L.weekDays(label)[6], abstract);
+    // By name: a facility's lines are its abstract's works (the chart's items before the first abstract), which can change with the week.
+    const was = lines.map(l => prev.find(p => p.name === l.name) ?? {});
+    const charted = lines[0]?.targetPct != null;
+    // A facility's works carry their own actual; an abstract with no works to read leaves the actuals typed.
+    const filed = !abstract ? null : !facility ? L.abstractLineActuals(abstract) : lines[0]?.actual != null ? lines.map(l => l.actual) : null;
+    own = filed ? lines.map((_, k) => was[k].actual ?? '') : null;
+    d.querySelector('#wk-abstract').textContent = filed ? L.abstractWeekNote(abstract) : '';
     d.querySelector('#wk-week').textContent = label;
     d.querySelector('#wk-note').textContent = charted ? 'Targets are the approved bar chart\'s plan for the last day of this week.'
       : lines.some(l => l.weightPct > 0) ? 'No bar chart yet: type each target.' : 'This project has no scope of works yet, so the overall figures stay at 0%.';
@@ -3883,7 +3889,7 @@ function weeklyForm(c, report = null) {
   };
   drawLines();
   // The abstract a saved report's week takes changed its actuals on opening: Save stores them though nothing was typed.
-  const refiled = Boolean(report) && typed().some((t, k) => t.actual !== (start.lines[k]?.actual ?? ''));
+  const refiled = Boolean(report) && typed().some(t => t.actual !== (start.lines.find(s => s.name === t.name)?.actual ?? ''));
   const initial = JSON.stringify(values());
   const done = () => { d.close(); d.remove(); };
   const close = async () => (JSON.stringify(values()) === initial || await ask(report ? 'Discard your changes to this weekly report?' : 'Discard this new weekly report?', DISCARD)) && done();

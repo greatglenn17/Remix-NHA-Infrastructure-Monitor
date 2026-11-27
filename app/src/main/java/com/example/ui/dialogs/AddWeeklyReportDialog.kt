@@ -205,19 +205,31 @@ private fun WeeklyReportForm(
             }
         }
     } }
-    val scopeItems = remember { com.example.data.model.accomplishmentScope(workItems) }
+    // A community facility has no land or housing lines: its rows are the works of the week's abstract (I. General
+    // Requirements, II. ...), weighted by their amounts; before the first abstract, the bar chart's own items.
+    // shortcut: the abstract of the week the form opens on sets the rows; moving the week keeps them.
+    val facility = project != null && com.example.data.model.isCommunityFacility(project.projectType)
+    val facilityWorks = remember {
+        (if (facility) com.example.util.ProjectAbstracts.forWeek(abstracts, reportingWeek)?.let(com.example.util.ProjectAbstracts::works) else null)
+            .orEmpty().takeIf { works -> works.sumOf { it.amount } > 0 }.orEmpty()
+    }
+    val scopeItems = remember {
+        val all = facilityWorks.sumOf { it.amount }
+        if (facilityWorks.isNotEmpty()) facilityWorks.map { com.example.data.model.ScopeItem(it.name, it.amount, it.amount / all * 100) }
+        else if (facility) workItems.toList() else com.example.data.model.accomplishmentScope(workItems)
+    }
     
     // Accomps = Map of Scope Name to Pair<Target, Actual>
     val accomplishmentMap = remember { 
         mutableStateMapOf<String, Pair<String, String>>().apply {
             if (seed != null) {
                 // A report saved item by item opens as its three lines.
-                com.example.ui.detail.tabs.parseAccomplishmentItemsList(seed.accomplishmentItemsJson).forEach {
+                com.example.ui.detail.tabs.parseAccomplishmentItemsList(seed.accomplishmentItemsJson, facility).forEach {
                     put(it.itemDescription, Pair(twoDecimals(it.targetPct), twoDecimals(it.actualPct)))
                 }
             } else {
                 // A week without a new abstract keeps the last actual.
-                val carried = com.example.util.BillingAbstract.carriedActuals(reports)
+                val carried = com.example.util.BillingAbstract.carriedActuals(reports, facility)
                 scopeItems.forEach { put(it.name, Pair("0.00", twoDecimals(carried[it.name] ?: 0.0))) }
             }
         }
@@ -227,15 +239,23 @@ private fun WeeklyReportForm(
     val chartAsOf = daysOfWeekWithDates.lastOrNull()?.third
     val chartTargets = remember(chartAsOf, project?.barChartJson, documents) {
         project?.takeIf { chartVersion != null }?.let { p -> chartAsOf?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }?.let { BarChart.itemTargetsOn(p, documents, it) } }
-            ?.let { t -> com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 }) }
+            ?.let { t ->
+                // A facility's work takes the plan of the chart items that belong to it.
+                if (facilityWorks.isNotEmpty()) com.example.util.ProjectAbstracts.workTargets(facilityWorks, chartVersion?.items.orEmpty(), t)
+                else if (facility) t else com.example.data.model.lineAverages(workItems, { it.name }, { it.weightPct }, { t[it.name] ?: 0.0 })
+            }
     }
     fun targetText(name: String) = chartTargets?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.first ?: "0.00"
     // The latest abstract on or before the week's last day (Actual Accomplishment tab) gives the three actuals, not typed; a line it has no part for is 0.
     val weekAbstract = remember(reportingWeek, abstracts) { com.example.util.ProjectAbstracts.forWeek(abstracts, reportingWeek) }
+    // A facility's actual is the abstract work of the row's name; a row it has no work for is not in the map and stays typed.
     val abstractActuals = remember(weekAbstract) {
-        weekAbstract?.let { com.example.data.model.ACCOMPLISHMENT_LINES.zip(com.example.util.ProjectAbstracts.lineActuals(it)).toMap() }
+        weekAbstract?.let {
+            if (facility) com.example.util.ProjectAbstracts.workActuals(it)
+            else com.example.data.model.ACCOMPLISHMENT_LINES.zip(com.example.util.ProjectAbstracts.lineActuals(it)).toMap()
+        }
     }
-    fun actualText(name: String) = abstractActuals?.let { twoDecimals(it[name] ?: 0.0) } ?: accomplishmentMap[name]?.second ?: "0.00"
+    fun actualText(name: String) = abstractActuals?.get(name)?.let { twoDecimals(it) } ?: accomplishmentMap[name]?.second ?: "0.00"
     val overallTarget by remember(chartTargets) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (targetText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallActual by remember(abstractActuals) { androidx.compose.runtime.derivedStateOf { scopeItems.sumOf { (actualText(it.name).toDoubleOrNull() ?: 0.0) * (it.weightPct / 100.0) } } }
     val overallVariance = overallActual - overallTarget
@@ -503,7 +523,7 @@ private fun WeeklyReportForm(
                     "Target % is from the approved bar chart as of ${com.example.util.ProjectSchedule.displayDate(chartAsOf.orEmpty())}.",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                 )
-                if (weekAbstract != null) Text(
+                if (weekAbstract != null && scopeItems.any { abstractActuals?.containsKey(it.name) == true }) Text(
                     "Actual % is from the abstract as of ${com.example.util.ProjectSchedule.displayDate(weekAbstract.asOf)} (Actual Accomplishment tab).",
                     style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                     modifier = Modifier.testTag("abstract_note")
@@ -511,7 +531,7 @@ private fun WeeklyReportForm(
 
                 // A figure that is automatic has no field (the chart's target, the abstract's actual); with both, the lines are left out and the grand total shows what is saved.
                 val typesTarget = chartTargets == null
-                val typesActual = abstractActuals == null
+                val typesActual = abstractActuals == null || scopeItems.any { it.name !in abstractActuals }
 
                 // Header
                 if (typesTarget || typesActual) Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -542,7 +562,9 @@ private fun WeeklyReportForm(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                         )
-                        if (typesActual) OutlinedTextField(
+                        // In a facility's mixed list, an item the abstract has a part for shows that figure instead of a field.
+                        if (typesActual && abstractActuals?.containsKey(item.name) == true) Text(actualText(item.name), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface))
+                        else if (typesActual) OutlinedTextField(
                             value = actualText(item.name),
                             onValueChange = { accomplishmentMap[item.name] = Pair(vals.first, it) },
                             modifier = Modifier.weight(1f).testTag("weekly_actual_${item.name}"),

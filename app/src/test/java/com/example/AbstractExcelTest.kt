@@ -154,4 +154,45 @@ class AbstractExcelTest {
         assertNull(AbstractExcel.asOfDate("As of last week"))
         assertNull(AbstractExcel.asOfDate("As of September 31, 2026")) // no such day
     }
+
+    // The office-building layout (a community facility), the sheet of web/apa-excel.test.mjs: works numbered I, II,
+    // "Sub-Total (...)" and "GRAND TOTAL" in the item no. column, Original and V.O.#1 columns under QUANTITY, UNIT COST
+    // and AMOUNT, and a sub-item's number where its description starts.
+    @Test fun readsTheOfficeBuildingLayout() {
+        val found = read(listOf(
+            "A1" to "As of May 25, 2026",
+            "A3" to "Item No.", "B3" to "ITEM DESCRIPTION", "J3" to "QUANTITY", "L3" to "UNIT", "M3" to "UNIT COST", "O3" to "AMOUNT", "Q3" to "Accomplishment",
+            "Q4" to "Previous", "T4" to "This Period", "W4" to "To Date",
+            "J5" to "Original", "K5" to "V.O.#1", "M5" to "Original", "N5" to "V.O.#1", "O5" to "Original", "P5" to "V.O#1",
+            "Q5" to "Qty", "R5" to "Amount", "S5" to "%WT", "T5" to "Qty", "U5" to "Amount", "V5" to "%WT", "W5" to "Qty", "X5" to "Amount", "Y5" to "%WT",
+            "A6" to "I", "B6" to "GENERAL REQUIREMENTS",
+            "A7" to "A", "B7" to "Mobilization", "J7" to 1, "K7" to 1, "L7" to "lot", "M7" to 300, "N7" to 400, "O7" to 300, "P7" to 400, "W7" to 0.5, "X7" to 200, "Y7" to 0.5,
+            "A8" to "Sub-Total (General Requirements)", "O8" to 300, "P8" to 400, "X8" to 200, "Y8" to 0.5,
+            "A9" to "CONSTRUCTION OF OFFICE BUILDING", // a title between works: not a row
+            "A10" to "II", "B10" to "ARCHITECTURAL WORKS",
+            "A11" to "A", "B11" to "Doors and Jambs",
+            "B12" to "1a", "C12" to "D1 Door", "K12" to 2, "L12" to "sets", "N12" to 50, "P12" to 100, "X12" to 0, "Y12" to 0,
+            "A13" to "I", "B13" to "Tempered Glass", "P13" to 500, "X13" to 150, "Y13" to 0.3, // the letter I of an item, not work I
+            "A14" to "Sub-Total (Architectural Works 1)", "P14" to 600, "X14" to 150, "Y14" to 0.25,
+            "A15" to "J", "B15" to "Construction of Guard House", "P15" to 200, "X15" to 50, "Y15" to 0.25,
+            "A16" to "Sub-Total (Architectural Works)", "O16" to 800, "P16" to 800, "X16" to 200, // no % WT: 200 of 800
+            "A17" to "GRAND TOTAL", "O17" to 1100, "P17" to 1200, "X17" to 400, "Y17" to 0.3333,
+            "A20" to "Prepared By:",
+        ))!!
+        assertEquals(LocalDate.of(2026, 5, 25), found.asOf)
+        assertEquals(33.33, found.overallPct!!, 0.0)
+        assertEquals(listOf(AbstractExcel.Part("GENERAL REQUIREMENTS", 400.0, 50.0), AbstractExcel.Part("ARCHITECTURAL WORKS", 800.0, 25.0)), found.parts)
+        assertEquals(
+            listOf(
+                listOf("part", "I", "GENERAL REQUIREMENTS", null), listOf("item", "A", "Mobilization", 400.0), listOf("subtotal", "", "Sub-Total (General Requirements)", 400.0),
+                listOf("part", "II", "ARCHITECTURAL WORKS", null), listOf("group", "A", "Doors and Jambs", null), listOf("item", "1a", "D1 Door", 100.0), listOf("item", "I", "Tempered Glass", 500.0),
+                listOf("subtotal", "", "Sub-Total (Architectural Works 1)", 600.0), listOf("item", "J", "Construction of Guard House", 200.0),
+                listOf("subtotal", "", "Sub-Total (Architectural Works)", 800.0), listOf("total", "", "GRAND TOTAL", 1200.0)
+            ),
+            found.rows.map { listOf(it.kind, it.no, it.name, it.amount) }
+        )
+        // The V.O.#1 quantity and unit cost.
+        assertEquals(listOf(1.0, "lot", 400.0, listOf(0.5, 200.0, 50.0)), found.rows[1].let { listOf(it.qty, it.unit, it.unitCost, it.toDate) })
+        assertEquals(listOf(2.0, "sets", 50.0), found.rows[5].let { listOf(it.qty, it.unit, it.unitCost) })
+    }
 }

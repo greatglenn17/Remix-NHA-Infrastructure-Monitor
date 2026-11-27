@@ -10,6 +10,7 @@ import java.time.LocalDate
  * (parts, groups, pay items, subtotals) and the "As of" date; the parts (item no. 1, 2, 3, with the contract amount
  * and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows. The sheet's last three columns,
  * under "EQUIVALENT TO 370 UNITS" (PREVIOUS, TO DATE, BALANCE), are each row's equiv.
+ * The office-building layout (a community facility) is read too: its parts are the works numbered I, II, III.
  * web/apa-excel.js is the website's copy; change both together.
  */
 object AbstractExcel {
@@ -54,6 +55,9 @@ object AbstractExcel {
     private val EQUIVALENT = Regex("^equivalent to\\s+([\\d,.]+)\\s+units?$", RegexOption.IGNORE_CASE)
     // Excel keeps a typed 2.2 as 2.2000000000000002.
     private val FLOAT_TAIL = Regex("^\\d+\\.\\d{7,}$")
+    private val TOTALS = Regex("^(sub-?\\s*total|grand total)", RegexOption.IGNORE_CASE)
+    private val LABEL = Regex("^\\d+[a-z]?(\\.\\d+)*\\.?$", RegexOption.IGNORE_CASE)
+    private fun romanNo(n: Int) = listOf("", "X", "XX", "XXX").getOrElse(n / 10) { "" } + listOf("", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX")[n % 10]
     private val MONTHS = listOf("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
 
     /** "As of October 30, 2026" as that day; null for anything else. */
@@ -74,8 +78,11 @@ object AbstractExcel {
         val header = all.firstOrNull { it.value.equals("ITEM NO.", ignoreCase = true) }?.key ?: return null
         fun inHeader(test: (String) -> Boolean) = all.firstOrNull { it.key.first == header.first && test(it.value) }?.key?.second
         val descCol = inHeader { it.contains("description", ignoreCase = true) } ?: return null
-        val amountCol = inHeader { it.equals("AMOUNT", ignoreCase = true) } ?: return null
-        val (qtyCol, unitCol, unitCostCol, balanceCol) = listOf("QTY", "UNIT", "UNIT COST", "BALANCE").map { name -> inHeader { it.equals(name, ignoreCase = true) } }
+        fun named(name: String) = inHeader { it.equals(name, ignoreCase = true) }
+        val amountHead = named("AMOUNT") ?: return null
+        val qtyHead = named("QTY") ?: named("QUANTITY")
+        val unitCol = named("UNIT")
+        val balanceCol = named("BALANCE")
         // The first PREVIOUS, THIS PERIOD and TO DATE under the header are the accomplishment's: QTY, AMOUNT, % WT.
         fun block(name: String) = all.firstOrNull { it.key.first > header.first && it.value.equals(name, ignoreCase = true) }?.key
         val toDate = block("TO DATE") ?: return null
@@ -83,6 +90,21 @@ object AbstractExcel {
         if (!at(toDate.first + 1, toDate.second + 2).startsWith("%")) return null
         val prev = block("PREVIOUS")
         val period = block("THIS PERIOD")
+        // A heading over several columns (AMOUNT over "Original" and "V.O.#1") is read at its last one, the figures in force.
+        val blocks = listOfNotNull(prev, period, toDate).minOf { it.second }
+        fun inForce(head: Int?): Int? {
+            var col = head ?: return null
+            while (col + 1 < blocks && at(header.first, col + 1).isEmpty() && at(toDate.first + 1, col + 1).isNotEmpty()) col++
+            return col
+        }
+        val amountCol = inForce(amountHead)
+        val qtyCol = inForce(qtyHead)
+        val unitCostCol = inForce(named("UNIT COST"))
+        // The office-building layout: works numbered I, II, III, "Sub-Total (...)" and "GRAND TOTAL" written in the item no.
+        // column, and a sub-item's number ("6.1.") where its description starts, the description one column further in.
+        val wide = qtyHead ?: unitCol ?: amountHead
+        var roman: Boolean? = null
+        var works = 0
         // A cell's number at [times] decimals' worth: amounts 2, quantities 4, and a % (a fraction on the sheet) as 0 to 100 at 2.
         fun number(row: Int, col: Int?, times: Double, over: Double = times) = at(row, col).toDoubleOrNull()?.let { Math.round(it * times) / over }
         fun money(row: Int, col: Int?) = number(row, col, 100.0)
@@ -94,19 +116,29 @@ object AbstractExcel {
         val rows = mutableListOf<Row>()
         var billing = false
         for (row in all.map { it.key.first }.filter { it > toDate.first + 1 }.distinct()) {
-            val name = at(row, descCol)
+            var name = at(row, descCol)
+            var cellNo = at(row, header.second)
+            if (roman == null && name.isNotEmpty() && cellNo.isNotEmpty()) roman = cellNo.equals("I", ignoreCase = true)
+            if (roman == true && name.isEmpty() && TOTALS.containsMatchIn(cellNo)) { name = cellNo; cellNo = "" }
+            else if (roman == true && cellNo.isEmpty()) {
+                val texts = (descCol until wide).map { at(row, it) }.filter { it.isNotEmpty() }
+                if (texts.size > 1 && LABEL.matches(texts[0])) { cellNo = texts[0]; name = texts[1] }
+            }
             if (name.isEmpty()) continue
             if (name.startsWith("milestone", ignoreCase = true)) billing = true // the billing format's lines
             // An item no. with a float tail is the number at 6 decimals, written plainly.
-            val no = at(row, header.second).let { if (FLOAT_TAIL.matches(it)) java.math.BigDecimal(it).setScale(6, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() else it }
+            val no = cellNo.let { if (FLOAT_TAIL.matches(it)) java.math.BigDecimal(it).setScale(6, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString() else it }
             val amount = money(row, amountCol)
+            // A work is the next Roman numeral in turn, so the letters I, V, X, C, D and L of a work's own items are not taken for one.
+            val part = if (roman == true) amount == null && no.equals(romanNo(works + 1), ignoreCase = true) else no.matches(Regex("\\d+"))
             val kind = when {
                 name.startsWith("grand total", ignoreCase = true) -> "total"
-                name.startsWith("subtotal", ignoreCase = true) -> "subtotal"
-                no.matches(Regex("\\d+")) -> "part"
+                TOTALS.containsMatchIn(name) -> "subtotal"
+                part -> "part"
                 no.isNotEmpty() && amount == null -> "group"
                 else -> "item"
             }
+            if (kind == "part") works++
             var done = figures(row, toDate)
             // The sheet's own "% WT" (it adds two rounded figures); a subtotal without one, the amount to date over the contract amount.
             if ((kind == "subtotal" || kind == "total") && done[2] == null && amount != null && amount > 0)

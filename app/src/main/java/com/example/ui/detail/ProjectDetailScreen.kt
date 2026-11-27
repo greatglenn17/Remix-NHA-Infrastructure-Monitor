@@ -275,6 +275,7 @@ fun ProjectDetailScreen(
                             when (chip) {
                                 "Weekly" -> WeeklyReportsTab(
                                     weeklyReports = weeklyReports,
+                                    facility = com.example.data.model.isCommunityFacility(currentProject.projectType),
                                     currentUserRole = currentUser.role,
                                     onAddWeeklyReportClick = onAddWeeklyReportClick,
                                     onEditWeeklyReportClick = { viewModel.weeklyReportToEdit.value = it; onAddWeeklyReportClick() },

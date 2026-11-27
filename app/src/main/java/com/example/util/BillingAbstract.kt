@@ -27,9 +27,9 @@ object BillingAbstract {
     fun latestWeekly(weekly: List<WeeklyReport>): WeeklyReport? =
         weekly.maxWithOrNull(compareBy { BlueBookForms.weekStart(it.reportingWeek) ?: LocalDate.MIN })
 
-    /** A new report's Actual % starts from the latest report's, by line, so a week without a new abstract keeps the last actual. */
-    fun carriedActuals(weekly: List<WeeklyReport>): Map<String, Double> =
-        latestWeekly(weekly)?.let { parseAccomplishmentItemsList(it.accomplishmentItemsJson) }.orEmpty().associate { it.itemDescription to it.actualPct }
+    /** A new report's Actual % starts from the latest report's, by line, so a week without a new abstract keeps the last actual; [asItems] as in parseAccomplishmentItemsList. */
+    fun carriedActuals(weekly: List<WeeklyReport>, asItems: Boolean = false): Map<String, Double> =
+        latestWeekly(weekly)?.let { parseAccomplishmentItemsList(it.accomplishmentItemsJson, asItems) }.orEmpty().associate { it.itemDescription to it.actualPct }
 
     /**
      * The contract amount of each accomplishment line on [asOf], from the bar chart in force; without one from the

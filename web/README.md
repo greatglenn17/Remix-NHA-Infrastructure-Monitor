@@ -230,6 +230,21 @@ is read only.
   as the report's. A week before the first abstract is typed as before. The report's overall is each line by its
   weight, so it can differ from the sheet's by 0.01 (the sheet adds two rounded figures). The form no longer reads an
   Excel file itself: the abstract is uploaded on the Actual Accomplishment tab.
+- **A Community Facility's weekly accomplishment is its abstract's works**, not the three housing lines
+  (`L.weeklyLines`; the phone's `AddWeeklyReportDialog`). With an abstract on or before the week's last day, each
+  work of the abstract (its parts: I. General Requirements, II. ...) is a line: its weight is the work's amount of
+  all works', its Actual % the work's own Sub-Total to date, and its Target % the approved bar chart's plan for the
+  chart items that belong to the work, by their amounts. A chart item belongs to the work whose name, or one of
+  whose rows' names, it is most like (`L.workOf`, `L.nameLikeness`), so "Construction of Guard House" on the chart
+  counts under Architectural Works, where the abstract has it; a work with no chart item has a target of 0. Before
+  the first abstract the lines are the chart's own items (the Scope of Works' without a chart) and the actuals are
+  typed. Its reports are read back as saved (`L.accomplishmentOf(json, true)`), on the Weekly tab and both printed
+  forms. The Actual Accomplishment tab's Target / Actual table lists the same works (`L.abstractStanding`; the
+  phone's `ProjectAbstracts.standing`). A Housing Project is unchanged.
+- **The abstract reader takes the office-building layout too** (`apa-excel.js`; the phone's `AbstractExcel`): works
+  numbered I, II, III instead of 1, 2, 3, "Sub-Total (...)" and "GRAND TOTAL" written in the item no. column,
+  "Original" and "V.O.#1" columns under QUANTITY, UNIT COST and AMOUNT (the last one is read), and a sub-item's
+  number ("6.1.") where its description starts.
 - **A figure that is automatic has no box** in the form's Weekly accomplishment part. A line has a Target % box only
   when the week has no approved bar chart plan, and an Actual % box only when no abstract is filed on or before the
   week's last day; with both, the line is not shown at all. The part keeps its heading, the bar chart and abstract
