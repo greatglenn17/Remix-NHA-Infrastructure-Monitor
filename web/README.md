@@ -387,7 +387,9 @@ is read only.
   chart's items with the sheet's items and their bars from the coloured cells. The headings vary by project, so it
   takes "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row ("ITEM DESCRIPTION" too), "Amount" or "COST (PHP)", "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and
   stops at the total's row. A month is 6 cells of 5 days, or as many cells as lie from the "Month 1" heading to "Month 2"
-  (30 in a sheet drawn a day to a cell, whose bars then come in to the day). Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
+  (30 in a sheet drawn a day to a cell, whose bars then come in to the day). A legend above the header, a coloured cell
+  with "<name> (no work)" in the cell after it, names a colour no work is done on (a suspension): its cells on an item's
+  row come in as that colour's days and the chart takes the legend's colours (the phone app leaves them out of the bar). Where a bar's stretches hold the month's share of the item, as the office's sheet does, a
   stretch's days are its part of the item's days (21 days are drawn as 4 cells), ending with the month where the bar goes
   on from the next month's first cell, and the other colours on the row, the
   suspensions, are not bars; without the shares every coloured cell is 5 days. A workbook with several chart sheets

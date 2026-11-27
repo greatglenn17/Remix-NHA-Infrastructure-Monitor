@@ -1714,7 +1714,7 @@ function bindChart(c) {
     else if (on('[data-import]')) el.querySelector('[data-file]').click();
     else if (on('[data-save]')) save();
     else if (on('[data-discard]')) { if (await ask('Discard your changes to the bar chart?', DISCARD)) { keep(c, 'chart-draft', null); page.chart = null; if (page === s.page) drawProject(page); } }
-    else if (on('[data-pick]')) { const sh = st.sheets[on('[data-pick]').dataset.pick]; st.sheets = []; if (sh) { v.items = L.draftItems(sh.items); st.notes = L.importNotes(sh); st.open = {}; } redraw('[data-import]'); }
+    else if (on('[data-pick]')) { const sh = st.sheets[on('[data-pick]').dataset.pick]; st.sheets = []; if (sh) { v.items = L.draftItems(sh.items); if (sh.colors) { v.colors = L.chartColors(sh); st.tool = 'work'; } st.notes = L.importNotes(sh); st.open = {}; } redraw('[data-import]'); }
     else if (on('[data-add-chart]')) { st.drafts.push(st.drafts.length ? L.revisedDraft(st.drafts) : L.chartDrafts({ ...project, barChartJson: '' })[0]); st.selected = st.drafts.length - 1; leave(); redraw(`[data-tab="${st.selected}"]`); }
     // The first chart left always runs from the start date.
     else if (on('[data-drop-chart]')) { st.drafts.splice(st.selected, 1); st.selected = Math.max(st.selected - 1, 0); if (st.drafts[0]) st.drafts[0].effective = project.dateStarted; leave(); redraw(st.drafts.length ? `[data-tab="${st.selected}"]` : '[data-add-chart]'); }
@@ -1807,7 +1807,7 @@ function bindChart(c) {
     st.sheets = [];
     if (!found) st.notes = ['That file could not be read. Pick the bar chart saved as an Excel workbook (.xlsx).'];
     else if (!found.length) st.notes = ['No sheet in that file has the ITEMS / DESCRIPTION / COST header with a 1st Month row.'];
-    else if (found.length === 1) { v.items = L.draftItems(found[0].items); st.notes = L.importNotes(found[0]); st.open = {}; st.undo = []; }
+    else if (found.length === 1) { v.items = L.draftItems(found[0].items); if (found[0].colors) { v.colors = L.chartColors(found[0]); st.tool = 'work'; } st.notes = L.importNotes(found[0]); st.open = {}; st.undo = []; }
     else { st.notes = []; st.sheets = found; }
     redraw('[data-import]');
   };

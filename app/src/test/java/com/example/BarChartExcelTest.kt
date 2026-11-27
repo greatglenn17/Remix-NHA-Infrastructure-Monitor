@@ -93,6 +93,14 @@ class BarChartExcelTest {
         assertEquals(mapOf("Fence" to 5, "Gate" to 3), read.durations)
     }
 
+    @Test fun leavesALegendColourOfNoWorkOutOfTheBar() {
+        // A1 red with "Suspension (no work)" beside it; the Fence's AL-AM (days 34-35) red after its bar.
+        val sheet = daily.replace("<sheetData>", """<sheetData><row r="1"><c r="A1" s="3"/><c r="B1" t="inlineStr"><is><t>Suspension (no work)</t></is></c></row>""")
+            .replace("""<c r="AK5" s="1"/>""", """<c r="AK5" s="1"/><c r="AL5" s="3"/><c r="AM5" s="3"/>""")
+        val read = BarChartExcel.read(xlsx(sheet).inputStream()).single()
+        assertEquals(listOf(BarChart.Bar(29, 33)), read.items[0].bars)
+    }
+
     // The office's sheet: B items, C description, F cost, I no. of days, J.. the day cells (J = 1st Month, days 1-5). A bar's
     // stretch holds the month's share of the item in its first cell; the red cells are a suspension.
     private val office = """<worksheet><sheetData>
