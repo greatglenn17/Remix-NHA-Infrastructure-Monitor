@@ -75,14 +75,14 @@ object BarChartExcel {
         val merges = mutableListOf<IntArray>()
         val cells = cells(xml, strings, merges)
         fun find(test: (String) -> Boolean) = cells.entries.filter { test(it.value.text) }.minByOrNull { it.key.first * 100000 + it.key.second }?.key
-        // The headings vary by project: "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row, "Amount" or "COST (PHP)",
+        // The headings vary by project: "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row ("ITEM DESCRIPTION" too), "Amount" or "COST (PHP)",
         // "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and the total's row.
-        val described = cells.entries.filter { it.value.text.startsWith("DESCRIPTION", ignoreCase = true) }.map { it.key.first }.toSet()
+        val described = cells.entries.filter { it.value.text.startsWith("DESCRIPTION", ignoreCase = true) || it.value.text.startsWith("ITEM DESCRIPTION", ignoreCase = true) }.map { it.key.first }.toSet()
         val header = cells.entries.filter { HEADER.matches(it.value.text) && it.key.first in described }
             .minByOrNull { it.key.first * 100000 + it.key.second }?.key ?: return null
         fun column(vararg prefixes: String) = cells.entries
             .filter { it.key.first == header.first && prefixes.any { p -> it.value.text.startsWith(p, ignoreCase = true) } }.minOfOrNull { it.key.second }
-        val descCol = column("DESCRIPTION") ?: return null
+        val descCol = column("DESCRIPTION", "ITEM DESCRIPTION") ?: return null
         val amountCol = column("Amount", "Cost") ?: return null
         val durationCol = column("Duration", "No. of Days", "Days")
         val dayCol = find { it.equals("Month 1", ignoreCase = true) || it.equals("1st Month", ignoreCase = true) }?.second ?: return null
