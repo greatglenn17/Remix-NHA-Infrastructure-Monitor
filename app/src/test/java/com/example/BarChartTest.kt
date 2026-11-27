@@ -215,9 +215,12 @@ class BarChartTest {
         assertEquals("Suspended", BarChart.withSchedule(p, listOf(ws, c1), LocalDate.of(2026, 9, 22)).status)
         assertEquals("On-going", BarChart.withSchedule(p, listOf(ws, c1), LocalDate.of(2026, 9, 23)).status)
         assertEquals(120, BarChart.suspensionExtensionDays(listOf(ws, c1)))
-        // A pending continuance adds nothing yet; a resumption cuts the suspension short (and leaves the continuance none).
+        // A pending continuance adds nothing yet. A resumption order cuts short the suspension or continuance it takes
+        // effect in (one before the continuance leaves that its days); a Partial one leaves a Full suspension on.
         assertEquals(90, BarChart.suspensionExtensionDays(listOf(ws, c1.copy(status = "Pending"))))
-        assertEquals(10, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-06-05"))))
+        assertEquals(100, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-09-03"))))
+        assertEquals(40, BarChart.suspensionExtensionDays(listOf(ws, c1, approved("Work Resumption Order No. 1", "Effectivity: 2026-06-05"))))
+        assertEquals(120, BarChart.suspensionExtensionDays(listOf(approved("Partial Work Resumption Order No. 1", "Effectivity: 2026-06-05"), ws, c1)))
         // Days already given by a time extension for a suspension are not asked for again.
         val te = approved("Time Extension No. 1 - 90 Days", "Reason: Work Suspension Order No. 1")
         assertEquals(30, BarChart.suspensionExtensionDays(listOf(ws, c1, te)))

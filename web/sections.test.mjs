@@ -264,6 +264,9 @@ test('print: monthly form pieces read months, orders, weather and signatories li
     { documentName: 'Variation Order No. 2 (Deductive)', status: 'Approved' },
   ]);
   assert.deepEqual(suspensions, [{ label: 'Work Suspension Order No. 1', value: '90 calendar days – August 24, 2026 to November 21, 2026', reason: 'Rain', status: '' }]);
+  // Cut short by its resumption order, the form prints the days it ran.
+  assert.equal(P.ordersOf([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Duration: 90 Days | Effectivity: 2026-08-24 | Reason: Rain' },
+    { documentName: 'Work Resumption Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-09-03' }]).suspensions[0].value, '10 calendar days – August 24, 2026 to September 2, 2026');
   assert.deepEqual(variations, [
     { label: 'Variation Order No. 1', value: 'Php 1,500,000.00', reason: 'Added road', status: '(for approval)' },
     { label: 'Variation Order No. 2', value: '', reason: '', status: '' }]);
@@ -490,6 +493,10 @@ test('project profile: orders listed under their headings, revised cost only aft
   assert.match(vo, /Revised Contract Cost<\/td><td class='pc'>:<\/td><td>Php 1,500.00/);
   assert.match(html([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-05-26 | Duration: 90 days | End: 2026-08-23 | Reason: EO 110' }]),
     /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>90 calendar days<br>May 26, 2026 to August 23, 2026<br>\(EO 110\)/);
+  // Resumed halfway, the profile gives the days it ran, not the 90 approved.
+  assert.match(html([{ documentName: 'Work Suspension Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-05-26 | Duration: 90 days | End: 2026-08-23 | Reason: EO 110' },
+    { documentName: 'Work Resumption Order No. 1', status: 'Approved', remarks: 'Effectivity: 2026-07-10' }]),
+  /Work Suspension Order No. 1<\/td><td class='pc'>:<\/td><td>45 calendar days<br>May 26, 2026 to July 9, 2026<br>\(EO 110\)/);
   assert.match(html([{ documentName: 'Work Resumption Order No. 1', status: 'Pending', remarks: 'Effectivity: 2026-08-16' }]),
     /Work Resumption Order No. 1<\/td><td class='pc'>:<\/td><td>August 16, 2026 \(for approval\)/);
   // A community facility has no beneficiaries, land area or units rows, even with values saved from when it was housing.
