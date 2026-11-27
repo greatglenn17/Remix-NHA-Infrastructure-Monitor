@@ -1533,6 +1533,9 @@ const chartZoom = st => `<div class="chips bc-zoom" role="group" aria-label="Zoo
 /** The page under its heading: a tab per chart, Import, Print and Save, the open chart's name and date, what to paint with, and its sheet. */
 function chartPage(c, st, can) {
   const { project } = c, v = st.drafts[st.selected], revised = st.selected > 0;
+  // A first chart not saved yet still holds the Scope of Works items until an import or an edit changes them.
+  const scope = L.draftItems(L.scopeItems(project.scopeOfWork));
+  const fromScope = can && v && !st.count && !revised && scope.length > 0 && scope.length === v.items.length && scope.every((x, k) => x.name === v.items[k].name && x.amount === v.items[k].amount);
   const total = items => items.reduce((t, x) => t + x.amount, 0);
   const legend = '<p class="bc-legend" data-legend></p>', sum = '<p class="bc-total" data-total aria-live="polite"></p>';
   return `<div class="bc-tools"><div class="chips" role="group" aria-label="Chart">${st.drafts.map((_, i) => `<button type="button" data-tab="${i}" aria-pressed="${i === st.selected}">${esc(chartTabName(st, i))}</button>`).join('')}
@@ -1561,7 +1564,7 @@ function chartPage(c, st, can) {
           : `<p class="wk-total">Takes effect: start date · ${esc(L.displayDate(project.dateStarted))}</p>`}
         ${revised ? `<p class="muted small">Draw the revised chart from the start date, as approved. Where the approved revision changes the money, change an item's cost, or add and
           remove items: with a Variation Order the chart must total the revised contract.</p>`
-          : '<p class="muted small">The original chart totals the original contract. For a suspension, a time extension or a Variation Order, add a Revised chart and change that one.</p>'}</div>
+          : '<p class="muted small">' + (fromScope ? '<b data-from-scope>These items are from the Scope of Works. Import Excel replaces them with the items in the file; the Scope of Works on the Summary stays as it is.</b> ' : '') + 'The original chart totals the original contract. For a suspension, a time extension or a Variation Order, add a Revised chart and change that one.</p>'}</div>
       <div class="bc-palette" data-palette>${chartPalette(st, v)}</div>
       <div class="scroll" data-sheet>${chartSheet(c, st, can)}</div>${legend}
       <div class="bc-tools">${sum}${chartZoom(st)}${revised ? `<button type="button" class="text-btn" data-bc="add-item" data-add-item>${icon('add_circle', 'sm')}Add item</button>` : ''}
