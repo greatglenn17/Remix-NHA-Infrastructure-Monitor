@@ -125,15 +125,19 @@ object BarChartExcel {
     /**
      * Bars from a row's [stretches] (first cell, last cell, share of the item) when the sheet writes each month's share in
      * the bar: a stretch's days are its part of [duration] (the cells only round them: 21 days are drawn as 4 cells), counted
-     * from its first cell and moved back where they would run past the month it is drawn in. Without a duration, its cells' days.
+     * from its first cell and moved back where they would run past the month it is drawn in; a stretch drawn to its month's
+     * last cell, with the bar going on from the next month's first, ends with the month. Without a duration, its cells' days.
      */
     private fun shareBars(stretches: List<Triple<Int, Int, Double>>, duration: Int, cellDays: Int): List<BarChart.Bar> {
         val sum = stretches.sumOf { it.third }
         val bars = mutableListOf<BarChart.Bar>()
-        for ((first, last, share) in stretches) {
+        for ((k, stretch) in stretches.withIndex()) {
+            val (first, last, share) = stretch
             val days = if (duration > 0) Math.round(share / sum * duration).toInt() else (last - first + 1) * cellDays
             if (days <= 0) continue
-            val end = minOf(first * cellDays + days, (last * cellDays / BarChart.MONTH_DAYS + 1) * BarChart.MONTH_DAYS)
+            val monthEnd = (last * cellDays / BarChart.MONTH_DAYS + 1) * BarChart.MONTH_DAYS
+            val goesOn = (last + 1) * cellDays == monthEnd && stretches.getOrNull(k + 1)?.first == last + 1
+            val end = if (goesOn) monthEnd else minOf(first * cellDays + days, monthEnd)
             val start = maxOf(end - days + 1, 1)
             if (bars.isNotEmpty() && bars.last().endDay + 1 >= start) bars[bars.lastIndex] = bars.last().copy(endDay = end)
             else bars += BarChart.Bar(start, end)
