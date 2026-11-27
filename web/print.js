@@ -240,7 +240,7 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
   const all = sumOf(parts.flatMap(p => p.lines));
   return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, Number(abstract.overallPct) || 0)}
     <table class='apa'>
-      ${APA_HEAD}
+      ${apaHead()}
       ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
       ${total('GRAND TOTAL', all)}
     </table>
@@ -248,12 +248,18 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
 }
 
 /**
- * The district's column layout of an Abstract of Physical Accomplishment under three header rows (BlueBookForms.APA_HEAD):
- * 15 columns, up to TO DATE. Neither printed abstract has the sheet's BALANCE columns.
+ * The district's column layout of an Abstract of Physical Accomplishment under three header rows (BlueBookForms.apaHead):
+ * 15 columns, up to TO DATE. Neither printed abstract has the sheet's BALANCE columns. An abstract in terms of a
+ * variation order has `earlier` more columns under each of QTY, UNIT COST and AMOUNT: "Original", then "V.O.#1" on.
  */
-const APA_HEAD = `<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th><th rowspan='3'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='3'>UNIT COST</th><th rowspan='3'>AMOUNT</th><th colspan='9'>ACCOMPLISHMENT</th></tr>
+function apaHead(earlier = 0) {
+  // shortcut: the columns are named in order, not as the sheet names them; keep the sheet's names when one differs.
+  const names = ['Original', ...Array.from({ length: earlier }, (_, i) => `V.O.#${i + 1}`)].map(name => `<th>${name}</th>`).join('');
+  const over = name => (earlier ? `<th rowspan='2' colspan='${earlier + 1}'>${name}</th>` : `<th rowspan='3'>${name}</th>`);
+  return `<tr><th rowspan='3'>ITEM NO.</th><th rowspan='3'>ITEM DESCRIPTION</th>${over('QTY')}<th rowspan='3'>UNIT</th>${over('UNIT COST')}${over('AMOUNT')}<th colspan='9'>ACCOMPLISHMENT</th></tr>
       <tr><th colspan='3'>PREVIOUS</th><th colspan='3'>THIS PERIOD</th><th colspan='3'>TO DATE</th></tr>
-      <tr>${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}</tr>`;
+      <tr>${earlier ? names.repeat(3) : ''}${'<th>QTY</th><th>AMOUNT</th><th>% WT</th>'.repeat(3)}</tr>`;
+}
 
 /**
  * The top of both abstracts (BlueBookForms.apaTop): the banner, the title, the `period` line, then the project, its
@@ -284,19 +290,23 @@ function apaTop(banner, period, project, docs, targetPct, actual) {
  * top as the billing format, with the target the tab shows for its "As of" date (L.abstractStanding's Overall) and
  * the abstract's own actual, then every row of `abstract` in the abstract's columns up to TO DATE, an empty cell
  * left blank, and the signatures. The header rows repeat on each page. Neither BALANCE nor the sheet's "EQUIVALENT
- * TO <N> UNITS" columns are shown.
+ * TO <N> UNITS" columns are shown. An abstract in terms of a variation order (its rows have `was`) prints as its
+ * sheet: the Original quantity, unit cost and amount beside the V.O.'s.
  */
 export function actualAbstractHtml({ project, docs, abstract, signatories, banner }) {
   const overall = L.abstractStanding(project, docs, abstract).at(-1);
   const n = (v, show) => `<td class='n'>${v == null ? '' : show(v)}</td>`;
   const quantity = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
   const figures = t => n(t?.[0], quantity) + n(t?.[1], money) + n(t?.[2], pct);
-  const row = r => `<tr${r.kind === 'subtotal' || r.kind === 'total' ? " class='tot'" : ''}><td class='c'>${esc(r.no)}</td><td>${r.kind === 'part' || r.kind === 'group' ? `<b>${esc(r.name)}</b>` : esc(r.name)}</td>${n(r.qty, quantity)}<td class='c'>${esc(r.unit)}</td>`
-    + `${n(r.unitCost, money)}${n(r.amount, money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>`;
+  const rows = L.abstractRows(abstract.rowsJson), earlier = Math.max(0, ...rows.map(r => r.was?.length ?? 0));
+  // A figure after the same one in each earlier column (`was`: 0 quantity, 1 unit cost, 2 amount).
+  const cells = (r, i, v, show) => Array.from({ length: earlier }, (_, j) => n(r.was?.[j]?.[i], show)).join('') + n(v, show);
+  const row = r => `<tr${r.kind === 'subtotal' || r.kind === 'total' ? " class='tot'" : ''}><td class='c'>${esc(r.no)}</td><td>${r.kind === 'part' || r.kind === 'group' ? `<b>${esc(r.name)}</b>` : esc(r.name)}</td>${cells(r, 0, r.qty, quantity)}<td class='c'>${esc(r.unit)}</td>`
+    + `${cells(r, 1, r.unitCost, money)}${cells(r, 2, r.amount, money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>`;
   return `${apaTop(banner, `As of ${longDate(abstract.asOf)}`, project, docs, overall.target, overall.actual)}
     <table class='apa'>
-      <thead>${APA_HEAD}</thead>
-      <tbody>${L.abstractRows(abstract.rowsJson).map(row).join('')}</tbody>
+      <thead>${apaHead(earlier)}</thead>
+      <tbody>${rows.map(row).join('')}</tbody>
     </table>
     <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
 }

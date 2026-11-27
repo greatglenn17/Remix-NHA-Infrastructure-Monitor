@@ -279,6 +279,20 @@ class ProjectAbstractsTest {
         val wide = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(equivUnits = 1370.0), signatories)
         assertTrue(!wide.contains("EQUIVALENT"))
         assertTrue(wide.contains(">100,000.00</td><td class='n'>25.00%</td></tr>")) // 2.1.1's row ends at its to date, though it carries a balance and equivalent units
+        // An abstract in terms of a variation order prints as its sheet: Original beside V.O.#1 under QTY, UNIT COST and AMOUNT.
+        val none = none3
+        val revised = BlueBookForms.actualAbstract(project, emptyList(), abstract("2025-03-14").copy(rowsJson = ProjectAbstracts.rowsJson(listOf(
+            AbstractExcel.Row("part", "I", "GENERAL REQUIREMENTS", null, "", null, null, none, none, none, none2, was = listOf(none)),
+            AbstractExcel.Row("item", "A", "Mobilization", 1.0, "lot", 400.0, 400.0, none, none, listOf(0.5, 200.0, 50.0), none2, was = listOf(listOf(1.0, 300.0, 300.0))),
+            AbstractExcel.Row("item", "B", "Extra work", 2.0, "sets", 50.0, 100.0, none, none, none, none2), // made after the upload: no was
+            AbstractExcel.Row("total", "", "GRAND TOTAL", null, "", null, 500.0, none, none, listOf(null, 200.0, 40.0), none2, was = listOf(listOf(null, null, 300.0)))
+        ))), signatories)
+        fun prints(vararg cells: String) = assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" } + "</tr>").containsMatchIn(revised))
+        assertTrue(revised.contains("<th rowspan='2' colspan='2'>QTY</th><th rowspan='3'>UNIT</th><th rowspan='2' colspan='2'>UNIT COST</th><th rowspan='2' colspan='2'>AMOUNT</th>"))
+        assertTrue(revised.contains("<tr>" + "<th>Original</th><th>V.O.#1</th>".repeat(3) + "<th>QTY</th>"))
+        prints("A", "Mobilization", "1", "1", "lot", "300.00", "400.00", "300.00", "400.00", "", "", "", "", "", "", "0.5", "200.00", "50.00%")
+        prints("B", "Extra work", "", "2", "sets", "", "50.00", "", "100.00", "", "", "", "", "", "", "", "", "")
+        prints("GRAND TOTAL", "", "", "", "", "", "300.00", "500.00", "", "", "", "", "", "", "", "200.00", "40.00%")
     }
 
     // The made-up project of web/logic.test.mjs (NEXT_ROWS), figure for figure: Land Acquisition is a part that is its own pay line.

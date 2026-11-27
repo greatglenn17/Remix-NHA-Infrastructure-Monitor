@@ -194,5 +194,12 @@ class AbstractExcelTest {
         // The V.O.#1 quantity and unit cost.
         assertEquals(listOf(1.0, "lot", 400.0, listOf(0.5, 200.0, 50.0)), found.rows[1].let { listOf(it.qty, it.unit, it.unitCost, it.toDate) })
         assertEquals(listOf(2.0, "sets", 50.0), found.rows[5].let { listOf(it.qty, it.unit, it.unitCost) })
+        // The Original quantity, unit cost and amount beside them, for the printed abstract; an extra work has none.
+        assertEquals(
+            listOf(listOf(listOf(1.0, 300.0, 300.0)), listOf(listOf(null, null, 300.0)), listOf(listOf(null, null, null)), listOf(listOf(null, null, 1100.0))),
+            listOf(found.rows[1], found.rows[2], found.rows[5], found.rows.last()).map { it.was }
+        )
+        // A record keeps them, and reads them back.
+        assertEquals(found.rows, com.example.util.ProjectAbstracts.rows(com.example.util.ProjectAbstracts.rowsJson(found.rows)))
     }
 }

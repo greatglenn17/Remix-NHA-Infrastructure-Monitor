@@ -315,7 +315,9 @@ is read only.
     the billing format (project, contract, target, actual, advance/slippage; the target is the tab's Overall target
     for the "As of" date and the actual the abstract's own), then every row of the abstract in its columns up to TO
     DATE (neither printed abstract has BALANCE columns, nor has the tab's table), the header rows repeating on each
-    page, and the Prepared by / Checked by / Approved by signatures (the monthly
+    page. An abstract in terms of a variation order prints as its sheet: "Original" beside "V.O.#1" under QTY, UNIT
+    COST and AMOUNT (each row's `was`, read from an upload made since this was added; the tab's own table shows the
+    V.O. figures only). Then the Prepared by / Checked by / Approved by signatures (the monthly
     report's signatories). **Print billing abstract**, made when the contractor asks for a billing, is described
     under the billings above. "Save as PDF" names them "Abstract of Physical Accomplishment - As of <date>" and
     "Billing Abstract - As of <date>".

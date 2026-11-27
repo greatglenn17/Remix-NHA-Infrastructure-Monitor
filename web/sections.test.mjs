@@ -608,6 +608,18 @@ test('abstract of the actual work: the billing format\'s top with the tab\'s tar
   assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%'));
   assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%').source}`));
   assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
+  // An abstract in terms of a variation order prints as its sheet: Original beside V.O.#1 under QTY, UNIT COST and AMOUNT.
+  const revised = P.actualAbstractHtml({ project, docs: [], signatories, abstract: { ...abstract, rowsJson: JSON.stringify([
+    { ...blank, kind: 'part', no: 'I', name: 'GENERAL REQUIREMENTS', was: [[null, null, null]] },
+    { ...blank, kind: 'item', no: 'A', name: 'Mobilization', qty: 1, unit: 'lot', unitCost: 400, amount: 400, toDate: [0.5, 200, 50], was: [[1, 300, 300]] },
+    { ...blank, kind: 'item', no: 'B', name: 'Extra work', qty: 2, unit: 'sets', unitCost: 50, amount: 100 }, // made after the upload: no `was`
+    { ...blank, kind: 'total', no: '', name: 'GRAND TOTAL', amount: 500, toDate: [null, 200, 40], was: [[null, null, 300]] },
+  ]) } });
+  assert.match(revised, /<th rowspan='2' colspan='2'>QTY<\/th><th rowspan='3'>UNIT<\/th><th rowspan='2' colspan='2'>UNIT COST<\/th><th rowspan='2' colspan='2'>AMOUNT<\/th>/);
+  assert.match(revised, /<tr>(<th>Original<\/th><th>V\.O\.#1<\/th>){3}<th>QTY<\/th>/);
+  assert.match(revised, row('A', 'Mobilization', '1', '1', 'lot', '300.00', '400.00', '300.00', '400.00', '', '', '', '', '', '', '0.5', '200.00', '50.00%'));
+  assert.match(revised, row('B', 'Extra work', '', '2', 'sets', '', '50.00', '', '100.00', '', '', '', '', '', '', '', '', ''));
+  assert.match(revised, row('GRAND TOTAL', '', '', '', '', '', '300.00', '500.00', '', '', '', '', '', '', '', '200.00', '40.00%'));
 });
 
 test('actual accomplishment tab: every pay item of an uploaded abstract in the sheet\'s columns, a part to a block, then the grand total', () => {

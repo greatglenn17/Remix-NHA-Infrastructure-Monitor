@@ -4,6 +4,8 @@
 // contract amount and the TO DATE "% WT" of their subtotal rows) and the overall % come from those rows. The sheet's
 // last three columns, under "EQUIVALENT TO 370 UNITS" (PREVIOUS, TO DATE, BALANCE), are each row's `equiv`.
 // The office-building layout (a community facility) is read too: its parts are the works numbered I, II, III.
+// A sheet in terms of a variation order has "Original" and "V.O.#1" columns under QUANTITY, UNIT COST and AMOUNT: the
+// last is the row's own figure, the ones before it the row's `was`, kept for the printed abstract.
 // Change both when the phone's reader (util/AbstractExcel.kt) changes.
 import { unzip, workbookSheets, sheetCells, number } from './chart-excel.js';
 import { abstractParts } from './logic.js';
@@ -37,7 +39,10 @@ function sheetAbstract(xml, strings) {
   const blocks = Math.min(...[prev, period, toDate].filter(Boolean).map(b => b.col));
   const inForce = col => { while (col != null && col + 1 < blocks && !at(header.row, col + 1) && at(toDate.row + 1, col + 1)) col++; return col; };
   const qtyHead = named('QTY') ?? named('QUANTITY'), unitCol = named('UNIT'), balanceCol = named('BALANCE');
-  const amountCol = inForce(amountHead), qtyCol = inForce(qtyHead), unitCostCol = inForce(named('UNIT COST'));
+  const unitCostHead = named('UNIT COST'), amountCol = inForce(amountHead), qtyCol = inForce(qtyHead), unitCostCol = inForce(unitCostHead);
+  // The columns before the one in force, oldest first ("Original"): how many, of the heading with the most.
+  const heads = [[qtyHead, qtyCol], [unitCostHead, unitCostCol], [amountHead, amountCol]];
+  const earlier = Math.max(...heads.map(([head, col]) => (head == null ? 0 : col - head)));
   // The office-building layout: works numbered I, II, III, "Sub-Total (...)" and "GRAND TOTAL" written in the item no.
   // column, and a sub-item's number ("6.1.") where its description starts, the description one column further in.
   const TOTALS = /^(sub-?\s*total|grand total)/i, LABEL = /^\d+[a-z]?(\.\d+)*\.?$/i, wide = qtyHead ?? unitCol ?? amountHead;
@@ -50,6 +55,8 @@ function sheetAbstract(xml, strings) {
   // "EQUIVALENT TO 370 UNITS" in the header row: the number of units, and the first of its three columns.
   const EQUIV = /^equivalent to\s+([\d,.]+)\s+units?$/i, equivCol = inHeader(text => EQUIV.test(text.trim()));
   const equivUnits = equivCol == null ? 0 : Number(EQUIV.exec(at(header.row, equivCol).trim())[1].replace(/,/g, '')) || 0;
+  // A row's [qty, unit cost, amount] in each of them; null where a heading has fewer columns.
+  const was = row => Array.from({ length: earlier }, (_, j) => heads.map(([head, col], i) => (head == null || col - earlier + j < head ? null : (i ? money : qty)(row, col - earlier + j))));
   const rows = [];
   let billing = false;
   for (const row of new Set(all.filter(c => c.row > toDate.row + 1).map(c => c.row))) {
@@ -74,7 +81,7 @@ function sheetAbstract(xml, strings) {
     if ((kind === 'subtotal' || kind === 'total') && done[2] == null && amount > 0 && done[1] != null) done[2] = Math.round(done[1] / amount * 10000) / 100;
     rows.push({ kind, no, name, qty: qty(row, qtyCol), unit: at(row, unitCol), unitCost: money(row, unitCostCol), amount,
       prev: figures(row, prev), period: figures(row, period), toDate: done, balance: [qty(row, balanceCol), balanceCol == null ? null : money(row, balanceCol + 1)],
-      equiv: [0, 1, 2].map(i => (equivCol == null ? null : money(row, equivCol + i))) });
+      equiv: [0, 1, 2].map(i => (equivCol == null ? null : money(row, equivCol + i))), ...(earlier ? { was: was(row) } : {}) });
     if (kind === 'total') break;
   }
   const parts = abstractParts(rows);
@@ -87,7 +94,8 @@ function sheetAbstract(xml, strings) {
  * sheet's "EQUIVALENT TO N UNITS" columns, 0 without them), rows }; null without one.
  * A row is { kind ("part", "group", "item", "subtotal" or "total"), no, name, qty, unit, unitCost, amount, prev, period,
  * toDate (each [qty, amount, %]), balance ([qty, amount]), equiv ([previous, to date, balance] in equivalent units, at
- * 2 decimals) }; null is an empty cell. Kept as the record's rowsJson.
+ * 2 decimals), was (only on a sheet with "Original" columns: [qty, unit cost, amount] in each column before the one in
+ * force, oldest first) }; null is an empty cell. Kept as the record's rowsJson.
  */
 export function abstractOf(files) {
   const { sheets, strings } = workbookSheets(files);
