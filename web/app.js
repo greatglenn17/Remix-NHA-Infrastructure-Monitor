@@ -4017,6 +4017,8 @@ function editWeather(c, report) {
   </form>`;
   const form = d.querySelector('form'), err = d.querySelector('.error'), save = d.querySelector('.btn');
   const paint = (di, hours, as = () => brush) => {
+    // A day with no log shows as Fair here but stays blank on the chart until it is saved, so painting it Fair is a change too.
+    if (!days[di].logged) changed.add(days[di].date);
     for (const h of hours) {
       const k = as(h);
       if (days[di].hours[h] === k) continue;
