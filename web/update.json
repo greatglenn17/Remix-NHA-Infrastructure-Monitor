@@ -1,8 +1,8 @@
 {
-  "versionCode": 326,
-  "versionName": "2.8.46",
-  "releaseNotes": "v2.8.46: A Community Facility's weekly accomplishment lists the works of its uploaded abstract, with the actual from the abstract and the target from the approved bar chart, and the office-building abstract Excel is read.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.46/NHA_Monitor_v2.8.46_Build326.apk",
-  "apkSha256": "7cd312ee6e94859f79d5fd87f992aaed13234615c978b3c63783b4821c9c2b65",
+  "versionCode": 327,
+  "versionName": "2.8.47",
+  "releaseNotes": "v2.8.47: A Community Facility's weekly accomplishment lists the works of its uploaded abstract, with the actual from the abstract and the target from the approved bar chart, and its Actual Accomplishment tab has no \"In lots and units\" table.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.47/NHA_Monitor_v2.8.47_Build327.apk",
+  "apkSha256": "169e1e17ffe187e5be713a9179d180ddcc64a00ec6d16e40d19afde376f4d002",
   "isMandatory": true
 }
