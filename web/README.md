@@ -2,7 +2,7 @@
 
 A web version of the NHA Monitor app. It reads the same Firestore data as the phones
 (`projects` and `records` on `nha-monitor-bulacan-2026`). Its record writes are logging, editing and deleting issues (Progress → Issues → Log issue / Edit), adding and editing a billing (Payments → Add billing / Edit), adding and editing a developer request or a letter to the contractor
-(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, setting a plan's scale, turning or deleting it, picking the revision in use, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report (Progress → Weekly) and a weekly report's 24-hour weather (Progress → Weather → Edit weather), uploading, replacing and deleting an abstract of the actual work (Actual Accomplishment),
+(Documents → Developer Requests / Letters to Contractor), adding an order and updating its status, adding a related file and its scanned copy (Documents), uploading a subdivision plan, drawing a lot on it, naming or removing a lot, setting a plan's scale, turning or deleting it, picking the revision in use, and updating a lot's progress and billing (Progress → Lots), adding, editing and deleting a weekly report with its 24-hour weather (Progress → Weekly), uploading, replacing and deleting an abstract of the actual work (Actual Accomplishment),
 for the people the app lets edit: approved Engineer Admins and Field Engineers assigned to the project, and the Super
 Admin. It also adds a project (**New project** on the dashboard, for the Super Admin and Engineer Admins) and edits one (**Edit** on the Project profile card, and **Signatories** on a weekly or monthly report's print page, for the people who can edit the project). A new issue is written as the phones upload one (revision 1, logged by the signed-in name); an edit as the phones
 write a change (revision up by one, a new edit time, every other field kept) together with an audit log entry with "Website" as the device, so phones take it like another phone's change.
@@ -219,8 +219,8 @@ is read only.
   day and have no boxes; without one they are typed, weighted by the Scope of Works. Save adds the `weekly_reports`
   record (`L.newWeeklyReport`), sets the project's target and actual accomplishment, and writes the
   app's "Report Creation" audit entry. Photos picked in the form are uploaded, then saved with the report, and the
-  first becomes the project's card photo; picked on **Edit**, they go after the report's own. The new report has no
-  weather log: add it with **Edit weather**. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
+  first becomes the project's card photo; picked on **Edit**, they go after the report's own. The form has the week's 24-hour
+  **Weather** too, saved with the report in the same Save. Rows without a name or description are not saved. Unlike the phone, the form keeps no draft.
   A new report's Actual % boxes, where it has them, start from the report of the latest week
   (`L.carriedActuals`).
 - **A week takes its Actual % from the latest abstract on or before its last day** (`L.abstractForWeek`,
@@ -481,10 +481,11 @@ is read only.
   say which projects have any.
 - **Delete request** and **Delete letter**, in those forms, ask first, then mark the record `isDeleted` (one revision up)
   as a phone's delete is uploaded, with the app's audit entry for that deletion.
-- **Edit weather** changes a weekly report's weather the way the app's weekly report form does: the report's record
-  gets the new `_weather` rows (revision up by one), with the app's "Edited Weekly Report" audit entry. Only the days
-  changed are rewritten; the other stored days stay exactly as they were. A day with no log shows as Fair in the
-  form, so painting it (a preset, Whole day or an hour, Fair included) counts as a change and saves it.
+- **Weather is in the weekly report form** (`weatherPad`), as on the phone, and saved with the report's `_weather`
+  rows in the one Save; the Weather tab only shows it. A new report saves all 7 days, Fair unless painted. An edit
+  rewrites only the days painted, with the app's "Modified report and weather" audit entry; the other stored days
+  stay exactly as they were. A day with no log shows as Fair in the form, so painting it (a preset, Whole day or an
+  hour, Fair included) counts as a change and saves it. Weather painted follows its date when the week is changed.
 - **Sidebar** (`drawSide`, drawn by `route` and again when the open project's name loads): from 768px wide the
   window has a sidebar under the header with **All projects**, the open project's six sections under its name, its
   **Audit log** (for those who may read it; the address is still `#/p/<id>/documents/audit-log`, and the Documents chip

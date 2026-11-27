@@ -2360,8 +2360,15 @@ function projectFollows(weekly, uuid, reportingWeek, target, actual, abstracts =
  * A new weekly report from the form: `build` makes the weekly_reports record as RecordSync uploads one,
  * `projectFields` are the project's target and actual saved with it (projectFollows; the target alone while the
  * project has `abstracts`), `audit` its entry. `photos` are the ones picked in the form, as [reference, title]: the
- * first becomes the project's card photo, this being the newest report. Weather starts empty: Edit weather fills it.
+ * first becomes the project's card photo, this being the newest report. The form's weather (`f.weather`, every day
+ * of the week as { date, hours }) is saved with it, as the phone's form does.
  */
+// The form's days of weather as the report's `_weather` over the stored `rows` (weatherChanges); null with none in `within`.
+function formWeather(rows, f, within = null) {
+  const days = (f.weather || []).filter(d => !within || within.includes(d.date));
+  return weatherChanges({ _weather: rows }, days, new Set(days.map(d => d.date)));
+}
+
 export function newWeeklyReport(f, project, user, weekly = [], abstracts = [], photos = []) {
   const data = weeklyFields(f, project), { reportingWeek, targetAccomplishmentPct: target, actualAccomplishmentPct: actual } = data;
   const follows = projectFollows(weekly, null, reportingWeek, target, actual, abstracts);
@@ -2369,7 +2376,7 @@ export function newWeeklyReport(f, project, user, weekly = [], abstracts = [], p
     build: ({ uuid, projectUuid, assignedUids, uid, now }) => ({
       uuid, type: 'weekly_reports', projectUuid, assignedUids, revision: 1, updatedAt: now, updatedByUid: uid, isDeleted: false,
       data: JSON.stringify({ ...data, documentsIssuedReceivedJson: '[]', ...editedPhotos({}, { added: photos }), submittedByStaff: user,
-        createdAtTimestamp: now, _weather: [] }),
+        createdAtTimestamp: now, _weather: formWeather([], f)?._weather ?? [] }),
     }),
     projectFields: photos.length ? { ...follows, latestUpdatePhotoUrl: photos[0][0] } : follows,
     audit: { actionType: 'Report Creation', details: `Submitted Weekly Report for ${reportingWeek}`, newValue: `Week: ${reportingWeek}, Target: ${target}%, Actual: ${actual}%` },
@@ -2394,17 +2401,19 @@ export function weeklyStart(report, asItems = false) {
  * writes, the project's target and actual (projectFollows), and the phone's audit entry. The week's label is kept unless its first day
  * was changed (an older "Week 42: ..." label stays); then weather logged for days outside the new week is dropped.
  * `photos` picked in the form ([reference, title]) are added after the report's own, and the project's card photo is
- * set again (latestSitePhoto). The photos it had and the rest of the weather are left alone.
+ * set again (latestSitePhoto). The days of weather painted in the form (`f.weather`, as { date, hours }) are rewritten
+ * and the entry then reads "report and weather"; the photos it had and the rest of the weather are left alone.
  */
 export function editedWeeklyReport(report, f, project, weekly = [], abstracts = [], photos = []) {
   const fields = weeklyFields(f, project), moved = weekDays(report.reportingWeek)[0] !== f.first;
   const days = weekDays(fields.reportingWeek), shots = photos.length ? editedPhotos(report, { added: photos }) : {};
-  const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek, ...shots,
-    ...(moved && Array.isArray(report._weather) ? { _weather: report._weather.filter(w => days.includes((w.date || '').trim())) } : {}) };
+  const kept = moved && Array.isArray(report._weather) ? report._weather.filter(w => days.includes((w.date || '').trim())) : null;
+  const painted = formWeather(kept ?? report._weather, f, days);
+  const changes = { ...fields, reportingWeek: moved ? fields.reportingWeek : report.reportingWeek, ...shots, ...(painted ?? (kept ? { _weather: kept } : {})) };
   const follows = projectFollows(weekly, report.uuid, changes.reportingWeek, fields.targetAccomplishmentPct, fields.actualAccomplishmentPct, abstracts);
   return {
     changes, projectFields: photos.length ? { ...follows, latestUpdatePhotoUrl: latestSitePhoto(weekly.map(r => (r.uuid === report.uuid ? { ...r, ...shots } : r))) } : follows,
-    audit: { actionType: 'Edited Weekly Report', details: `Modified report for ${changes.reportingWeek}` },
+    audit: { actionType: 'Edited Weekly Report', details: `Modified report${painted ? ' and weather' : ''} for ${changes.reportingWeek}` },
   };
 }
 
@@ -2422,7 +2431,7 @@ export const deletedIssueAudit = issue => ({
   actionType: 'Issue Deletion', details: `Deleted issue: ${String(issue.description ?? '').slice(0, 30)}...`, oldValue: `Issue ID: ${issue.uuid}`, newValue: '',
 });
 
-/* ---------- Weather edit (AddWeeklyReportDialog's 24-hour weather, saved with its weekly report) ---------- */
+/* ---------- Weather (AddWeeklyReportDialog's 24-hour weather, in the weekly report form and saved with the report) ---------- */
 
 export const WEATHER_KEYS = ['FAIR', 'CLOUDY', 'RAIN_SHOWERS', 'RAINY', 'STORMY'];
 /** AddWeeklyReportDialog's one-tap day weather (Reports.kt WEATHER_PRESETS): half-and-half is 12 AM-11 AM, then 12 PM-11 PM. */
