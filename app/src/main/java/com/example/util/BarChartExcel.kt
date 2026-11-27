@@ -71,7 +71,7 @@ object BarChartExcel {
         return cells
     }
 
-    private fun chart(name: String, xml: ByteArray, strings: List<String>, filled: Set<Int>): Sheet? {
+    private fun chart(name: String, xml: ByteArray, strings: List<String>, colours: Map<Int, String>): Sheet? {
         val merges = mutableListOf<IntArray>()
         val cells = cells(xml, strings, merges)
         fun find(test: (String) -> Boolean) = cells.entries.filter { test(it.value.text) }.minByOrNull { it.key.first * 100000 + it.key.second }?.key
@@ -84,6 +84,11 @@ object BarChartExcel {
             .filter { it.key.first == header.first && prefixes.any { p -> it.value.text.startsWith(p, ignoreCase = true) } }.minOfOrNull { it.key.second }
         val descCol = column("DESCRIPTION", "ITEM DESCRIPTION") ?: return null
         val amountCol = column("Amount", "Cost") ?: return null
+        // A legend above the header, a coloured cell with "<name> (no work)" in the cell after it, names a colour no work is
+        // done on (a suspension): its cells on an item's row are not the bar. The website keeps them as that colour's days.
+        val idle = cells.entries.filter { it.key.first < header.first && cells[it.key.first to it.key.second + 1]?.text?.endsWith("(no work)", ignoreCase = true) == true }
+            .mapNotNull { colours[it.value.style]?.takeIf(String::isNotEmpty) }.toSet()
+        val filled = colours.filterValues { it !in idle }.keys
         val durationCol = column("Duration", "No. of Days", "Days")
         val dayCol = find { it.equals("Month 1", ignoreCase = true) || it.equals("1st Month", ignoreCase = true) }?.second ?: return null
         // A month is 6 cells of 5 days as the contractors draw it; a sheet with another count of cells from one month's heading
@@ -213,10 +218,10 @@ object BarChartExcel {
         return out
     }
 
-    /** Cell style indexes (cellXfs) with a solid fill other than white. */
-    private fun filledStyles(xml: ByteArray?): Set<Int> {
-        if (xml == null) return emptySet()
-        val coloured = mutableListOf<Boolean>() // per fill
+    /** Cell style indexes (cellXfs) with a solid fill other than white, each to its colour as #RRGGBB ("" for a theme colour). */
+    private fun filledStyles(xml: ByteArray?): Map<Int, String> {
+        if (xml == null) return emptyMap()
+        val coloured = mutableListOf<String?>() // per fill
         val xfFills = mutableListOf<Int>()
         var inFills = false; var inCellXfs = false
         var solid = false
@@ -227,11 +232,11 @@ object BarChartExcel {
                 XmlPullParser.START_TAG -> when (p.name) {
                     "fills" -> inFills = true
                     "cellXfs" -> inCellXfs = true
-                    "fill" -> if (inFills) { solid = false; coloured += false }
+                    "fill" -> if (inFills) { solid = false; coloured += null }
                     "patternFill" -> if (inFills) solid = p.getAttributeValue(null, "patternType") == "solid"
                     "fgColor" -> if (inFills && solid && coloured.isNotEmpty()) {
                         val rgb = p.getAttributeValue(null, "rgb")
-                        coloured[coloured.lastIndex] = rgb == null || !rgb.uppercase().endsWith("FFFFFF")
+                        coloured[coloured.lastIndex] = if (rgb == null) "" else if (rgb.uppercase().endsWith("FFFFFF")) null else "#" + rgb.takeLast(6).uppercase()
                     }
                     "xf" -> if (inCellXfs) xfFills += p.getAttributeValue(null, "fillId")?.toIntOrNull() ?: 0
                 }
@@ -241,7 +246,7 @@ object BarChartExcel {
                 }
             }
         }
-        return xfFills.indices.filter { coloured.getOrNull(xfFills[it]) == true }.toSet()
+        return xfFills.indices.mapNotNull { i -> coloured.getOrNull(xfFills[i])?.let { i to it } }.toMap()
     }
 
     private fun skip(p: XmlPullParser) {

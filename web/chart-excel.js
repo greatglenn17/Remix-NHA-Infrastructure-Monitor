@@ -128,7 +128,15 @@ function sheetChart(name, xml, strings, filled) {
   const end = all.find(c => c.row > header.row && TOTAL.test(c.text))?.row ?? Infinity;
   const lastCol = all.reduce((n, c) => Math.max(n, c.col), dayCol);
   const at = (row, col) => cells.get(key(row, col));
-  const isFilled = (row, col) => { const c = at(row, col); return c != null && filled.has(c.style); };
+  // A legend above the header, a coloured cell with "<name> (no work)" in the cell after it, names a colour no work is done
+  // on (a suspension): its cells on an item's row are that colour's days, not the bar.
+  const colors = [];
+  for (const c of all) {
+    const hex = c.row < header.row && filled.get(c.style), label = hex && /^(.*\S)\s*\(no work\)$/i.exec(at(c.row, c.col + 1)?.text ?? '');
+    if (label && !colors.some(x => x.color === hex)) colors.push({ name: label[1], color: hex, work: false });
+  }
+  const idle = (row, col) => { const hex = filled.get(at(row, col)?.style); return hex ? colors.findIndex(x => x.color === hex) : -1; };
+  const isFilled = (row, col) => { const c = at(row, col); return c != null && filled.has(c.style) && idle(row, col) < 0; };
 
   const items = [], durations = {};
   for (const row of new Set(all.filter(c => c.row > header.row && c.row < end).map(c => c.row))) {
@@ -146,10 +154,17 @@ function sheetChart(name, xml, strings, filled) {
       if (share > 0 && isFilled(row, col)) stretches.push([col - dayCol, (merges.find(([r1, c1]) => r1 === row && c1 === col)?.[3] ?? col) - dayCol, share]);
     }
     const bars = stretches.length ? shareBars(stretches, Math.trunc(said ?? 0), cellDays) : runs([...days].sort((a, b) => a - b), cellDays);
-    items.push({ name: desc, amount: Math.round(amount * 100) / 100, bars });
+    const marks = []; // [from day, to day, colour]
+    for (let col = dayCol; col <= lastCol; col++) {
+      const k = idle(row, col), d = (col - dayCol) * cellDays;
+      if (k < 0) continue;
+      if (marks.at(-1)?.[2] === k && marks.at(-1)[1] === d) marks.at(-1)[1] = d + cellDays;
+      else marks.push([d + 1, d + cellDays, k]);
+    }
+    items.push({ name: desc, amount: Math.round(amount * 100) / 100, bars, ...(marks.length && { marks }) });
     if (said != null) durations[desc] = Math.trunc(said);
   }
-  return { name, items, durations };
+  return { name, items, durations, ...(colors.length && { colors }) };
 }
 
 /** The workbook's sheets as [name, relationship id]. */
@@ -181,7 +196,7 @@ function sharedStrings(xml) {
   return out;
 }
 
-/** Cell style indexes (cellXfs) with a solid fill other than white. */
+/** Cell style indexes (cellXfs) with a solid fill other than white, each to its colour as #RRGGBB ('' for a theme colour). */
 function filledStyles(xml) {
   const coloured = [], xfFills = []; // per fill; per cell style, its fill
   let inFills = false, inCellXfs = false, solid = false;
@@ -190,12 +205,12 @@ function filledStyles(xml) {
     else if (e.close === 'fills') inFills = false;
     else if (e.open === 'cellXfs') inCellXfs = true;
     else if (e.close === 'cellXfs') inCellXfs = false;
-    else if (e.open === 'fill' && inFills) { solid = false; coloured.push(false); }
+    else if (e.open === 'fill' && inFills) { solid = false; coloured.push(null); }
     else if (e.open === 'patternFill' && inFills) solid = e.attrs.patternType === 'solid';
-    else if (e.open === 'fgColor' && inFills && solid && coloured.length) coloured[coloured.length - 1] = e.attrs.rgb == null || !e.attrs.rgb.toUpperCase().endsWith('FFFFFF');
+    else if (e.open === 'fgColor' && inFills && solid && coloured.length) coloured[coloured.length - 1] = e.attrs.rgb == null ? '' : e.attrs.rgb.toUpperCase().endsWith('FFFFFF') ? null : `#${e.attrs.rgb.slice(-6).toUpperCase()}`;
     else if (e.open === 'xf' && inCellXfs) xfFills.push(parseInt(e.attrs.fillId, 10) || 0);
   }
-  return new Set(xfFills.flatMap((fill, i) => (coloured[fill] ? [i] : [])));
+  return new Map(xfFills.flatMap((fill, i) => (coloured[fill] != null ? [[i, coloured[fill]]] : [])));
 }
 
 /** The unzipped workbook's sheets as [name, xml] in workbook order, and its shared strings. */

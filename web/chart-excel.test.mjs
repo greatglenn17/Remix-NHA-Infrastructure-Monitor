@@ -114,6 +114,17 @@ test('bar chart Excel: a sheet drawn a day to a cell, 30 cells from Month 1 to M
   assert.deepEqual(sheets[0].durations, { Fence: 5, Gate: 3 });
 });
 
+test('bar chart Excel: a legend colour of no work is its days on an item, not the bar', async () => {
+  const sheets = await readChartWorkbook(zip({ ...parts,
+    // as above, and fill 4 red: xf 3
+    'xl/styles.xml': parts['xl/styles.xml'].replace('</fills>', '<fill><patternFill patternType="solid"><fgColor rgb="FFFF0000"/></patternFill></fill></fills>').replace('</cellXfs>', '<xf fillId="4"/></cellXfs>'),
+    // A1 red with "Suspension (no work)" beside it; the Fence's AL-AM (days 34-35) red after its bar.
+    'xl/worksheets/sheet2.xml': daily.replace('<sheetData>', '<sheetData><row r="1"><c r="A1" s="3"/><c r="B1" t="inlineStr"><is><t>Suspension (no work)</t></is></c></row>')
+      .replace('<c r="AK5" s="1"/>', '<c r="AK5" s="1"/><c r="AL5" s="3"/><c r="AM5" s="3"/>') }));
+  assert.deepEqual(sheets[0].colors, [{ name: 'Suspension', color: '#FF0000', work: false }]);
+  assert.deepEqual(sheets[0].items, [{ name: 'Fence', amount: 1000, bars: [[29, 33]], marks: [[34, 35, 0]] }, { name: 'Gate', amount: 500, bars: [[2, 2], [4, 5]] }]);
+});
+
 test('bar chart Excel: the office layout, a bar\'s days from the shares written in it, the suspension colours left out', async () => {
   const sheets = await readChartWorkbook(zip({ ...parts,
     'xl/sharedStrings.xml': `<sst><si><t>ITEMS</t></si><si><t>DESCRIPTION</t></si><si><t>COST (PHP)</t></si><si><t>NO. OF DAYS</t></si><si><t>1st Month</t></si>

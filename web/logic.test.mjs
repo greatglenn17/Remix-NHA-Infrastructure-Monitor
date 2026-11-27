@@ -1240,6 +1240,7 @@ test('bar chart editor: drafts from the scope or the saved chart, bars as month 
     { name: 'Earthworks', amount: 3000.5, bars: [{ sm: '1', sd: '11', em: '2', ed: '10' }], marks: [] },
     { name: 'Turnover', amount: 999.5, bars: [{ sm: '', sd: '', em: '', ed: '' }], marks: [] }]);
   assert.deepEqual(L.importNotes(sheet), ['Read 3 items from the sheet "Revised".', 'Mobilization: the bar covers 15 days but its Duration says 10.']);
+  assert.equal(L.importNotes({ ...sheet, colors: [{ name: 'WSO 1' }, { name: 'CWSO 1.1' }] })[1], 'Took the colours of its legend: WSO 1, CWSO 1.1.');
   assert.deepEqual([[0, 5000000], [0, 5500000], [1, 5500000], [1, 5000000], [1, 5200000]].map(([i, total]) => L.chartTotalMatches(i, total, project, vo)), [true, false, true, true, false]);
   assert.equal(L.chartJson([]), '');
   assert.deepEqual([L.chartAudit(json), L.chartAudit('')], [{ actionType: 'Bar Chart', details: 'Saved the approved bar chart' }, { actionType: 'Bar Chart', details: 'Removed the approved bar chart' }]);

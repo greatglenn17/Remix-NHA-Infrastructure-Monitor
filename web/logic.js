@@ -2624,7 +2624,7 @@ const NEW_COLOURS = ['#FFD966', '#FF7C80', '#9DC3E6', '#C9A0DC', '#F4B183', '#7F
 
 /**
  * A chart's own colours, website only: each is named by whoever draws the chart (a suspension, a time extension, a
- * variation order), with whether work is done on its days. Nothing here is read from the Documents. A colour that is
+ * variation order) or by the legend of an imported sheet, with whether work is done on its days. Nothing here is read from the Documents. A colour that is
  * not #RRGGBB is replaced, as it goes into the page's and the print's styles.
  */
 export const chartColors = v => (Array.isArray(v?.colors) ? v.colors : []).map(c => ({ name: String(c?.name ?? ''), color: /^#[0-9a-f]{6}$/i.test(c?.color) ? c.color : NEW_COLOURS[0], work: c?.work === true }));
@@ -2832,8 +2832,9 @@ export function chartTotalNote(i, total, project, docs) {
     !ok && i > 0 && Math.abs(total - original) < 0.015 ? ' It still equals the original contract.' : ''}` };
 }
 
-/** useSheet's notes on an imported sheet (chart-excel.js): what was read, then each item whose bars do not cover the days its Duration column says. */
-export const importNotes = sheet => [`Read ${sheet.items.length} items from the sheet "${sheet.name}".`, ...sheet.items.flatMap(item => {
+/** useSheet's notes on an imported sheet (chart-excel.js): what was read, the colours of its legend, then each item whose bars do not cover the days its Duration column says. */
+export const importNotes = sheet => [`Read ${sheet.items.length} items from the sheet "${sheet.name}".`,
+  ...(sheet.colors?.length ? [`Took the colours of its legend: ${sheet.colors.map(c => c.name).join(', ')}.`] : []), ...sheet.items.flatMap(item => {
   const days = item.bars.reduce((n, b) => n + barDays(b), 0), said = Object.hasOwn(sheet.durations, item.name) ? sheet.durations[item.name] : days;
   return said === days ? [] : [`${item.name}: the bar covers ${days} days but its Duration says ${said}.`];
 })];
