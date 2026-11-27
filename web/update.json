@@ -1,8 +1,8 @@
 {
-  "versionCode": 325,
-  "versionName": "2.8.45",
-  "releaseNotes": "v2.8.45: A suspension cut short by a resumption order shows the days it ran on the orders lists, the Project Profile and the monthly form, and the printed forms list orders in date and number order.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.45/NHA_Monitor_v2.8.45_Build325.apk",
-  "apkSha256": "9ea7ebabed472532eb7d4a45c1d5e436d47f1eed5f98cbbdf74f6a722b0accf3",
+  "versionCode": 326,
+  "versionName": "2.8.46",
+  "releaseNotes": "v2.8.46: A Community Facility's weekly accomplishment lists the works of its uploaded abstract, with the actual from the abstract and the target from the approved bar chart, and the office-building abstract Excel is read.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.46/NHA_Monitor_v2.8.46_Build326.apk",
+  "apkSha256": "7cd312ee6e94859f79d5fd87f992aaed13234615c978b3c63783b4821c9c2b65",
   "isMandatory": true
 }
