@@ -1,8 +1,8 @@
 {
-  "versionCode": 327,
-  "versionName": "2.8.47",
-  "releaseNotes": "v2.8.47: A Community Facility's weekly accomplishment lists the works of its uploaded abstract, with the actual from the abstract and the target from the approved bar chart, and its Actual Accomplishment tab has no \"In lots and units\" table.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.47/NHA_Monitor_v2.8.47_Build327.apk",
-  "apkSha256": "169e1e17ffe187e5be713a9179d180ddcc64a00ec6d16e40d19afde376f4d002",
+  "versionCode": 328,
+  "versionName": "2.8.48",
+  "releaseNotes": "v2.8.48: The Documents lists are in order: suspensions and resumptions by effectivity date, continuances 1st to last, time extensions and variation orders by number. A Community Facility's weekly accomplishment lists the works of its uploaded abstract.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.48/NHA_Monitor_v2.8.48_Build328.apk",
+  "apkSha256": "d6aed58a26ce336f507ca299629a93b669778c275cb3cbec8646448219cf1a79",
   "isMandatory": true
 }
