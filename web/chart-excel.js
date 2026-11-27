@@ -112,13 +112,13 @@ function sheetChart(name, xml, strings, filled) {
   const { cells, merges } = sheetCells(xml, strings);
   const all = [...cells.values()].sort((a, b) => key(a.row, a.col) - key(b.row, b.col));
   const same = (text, other) => text.toLowerCase() === other.toLowerCase(), starts = (text, prefix) => text.toLowerCase().startsWith(prefix.toLowerCase());
-  // The headings vary by project: "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row, "Amount" or "COST (PHP)",
+  // The headings vary by project: "ITEM NO.", "ITEMS" or a bare "NO." on DESCRIPTION's row ("ITEM DESCRIPTION" too), "Amount" or "COST (PHP)",
   // "Duration", "NO. OF DAYS" or "DAYS", "Month 1" or "1st Month", and the total's row.
-  const described = new Set(all.filter(c => starts(c.text, 'DESCRIPTION')).map(c => c.row));
+  const described = new Set(all.filter(c => starts(c.text, 'DESCRIPTION') || starts(c.text, 'ITEM DESCRIPTION')).map(c => c.row));
   const header = all.find(c => HEADER.test(c.text) && described.has(c.row));
   if (!header) return null;
   const column = (...prefixes) => all.find(c => c.row === header.row && prefixes.some(p => starts(c.text, p)))?.col;
-  const descCol = column('DESCRIPTION'), amountCol = column('Amount', 'Cost'), durationCol = column('Duration', 'No. of Days', 'Days');
+  const descCol = column('DESCRIPTION', 'ITEM DESCRIPTION'), amountCol = column('Amount', 'Cost'), durationCol = column('Duration', 'No. of Days', 'Days');
   const dayCol = all.find(c => same(c.text, 'Month 1') || same(c.text, '1st Month'))?.col;
   if (descCol == null || amountCol == null || dayCol == null) return null;
   // A month is 6 cells of 5 days as the contractors draw it; a sheet with another count of cells from one month's heading

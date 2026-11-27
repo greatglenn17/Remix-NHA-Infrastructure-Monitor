@@ -64,8 +64,8 @@ class BarChartExcelTest {
         assertEquals(mapOf("Mobilization" to 10, "Earthworks" to 30), sheets.single().durations)
     }
 
-    @Test fun readsAHeaderOfNoDescriptionCostDays_withAStrayNoAboveIt() {
-        val strings = strings.replace("ITEM NO.", "NO.").replace("Amount (Php)", "COST").replace("Duration (C.D)", "DAYS").replace("Month 1", "MONTH 1")
+    @Test fun readsAHeaderOfNoItemDescriptionCostDays_withAStrayNoAboveIt() {
+        val strings = strings.replace("ITEM NO.", "NO.").replace("DESCRIPTION", "ITEM DESCRIPTION").replace("Amount (Php)", "COST").replace("Duration (C.D)", "DAYS").replace("Month 1", "MONTH 1")
         val stray = """<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>No.</t></is></c><c r="B1" t="inlineStr"><is><t>12</t></is></c></row>"""
         val read = BarChartExcel.read(xlsx(sheet.replace("<sheetData>", stray), strings).inputStream()).single()
         assertEquals(listOf("Mobilization", "Earthworks"), read.items.map { it.name })
