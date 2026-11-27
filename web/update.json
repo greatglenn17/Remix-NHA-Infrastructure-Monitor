@@ -1,8 +1,8 @@
 {
-  "versionCode": 324,
-  "versionName": "2.8.44",
-  "releaseNotes": "v2.8.44: Bar chart colours drawn on the website are kept when the chart is saved from the phone, and with a Variation Order the latest revised chart must total the revised contract.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.44/NHA_Monitor_v2.8.44_Build324.apk",
-  "apkSha256": "fe5c6996e5902422dc10ce352a5412b9cbe1394c4a62b06db39b916abb42a1bf",
+  "versionCode": 325,
+  "versionName": "2.8.45",
+  "releaseNotes": "v2.8.45: A suspension cut short by a resumption order shows the days it ran on the orders lists, the Project Profile and the monthly form, and the printed forms list orders in date and number order.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.45/NHA_Monitor_v2.8.45_Build325.apk",
+  "apkSha256": "9ea7ebabed472532eb7d4a45c1d5e436d47f1eed5f98cbbdf74f6a722b0accf3",
   "isMandatory": true
 }
