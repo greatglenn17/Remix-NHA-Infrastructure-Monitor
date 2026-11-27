@@ -1365,7 +1365,7 @@ function summaryBody({ page, project, records, of, documents, payments, weekly, 
       ${housing ? kv('Land area', project.landArea) + kv('No. of units', project.numberOfUnits) : ''}
     </div>
     ${(() => { const items = L.scopeItems(project.scopeOfWork); return items.length ? fold(page, 'fold-scope', `Scope of works (${items.length})`, items.map((x, i) => `
-      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b>${kv('Amount', x.amount > 0 ? L.formatPhp(x.amount) : '-')}${kv('Weight', `${x.weightPct.toFixed(2)}%`)}</div>`).join('')) : ''; })()}
+      <div class="scope"><b>${i + 1}. ${esc(x.name)}</b><span class="num" title="Amount">${x.amount > 0 ? L.formatPhp(x.amount) : '-'}</span><span class="num" title="Weight">${x.weightPct.toFixed(2)}%</span></div>`).join('')) : ''; })()}
     ${L.canAssign(s.claims) ? `<button class="text-btn foot-btn" id="project-drive">${icon('cloud_upload', 'sm')}Copy files to Google Drive</button>` : ''}`,
     '', `${L.canAssign(s.claims) ? `<button class="text-btn" id="project-assign">${icon('person', 'sm')}Assign</button>` : ''}
       ${L.canEdit(project, s.user.uid, s.claims) ? `<button class="text-btn" id="project-edit">${icon('edit', 'sm')}Edit</button>` : ''}
