@@ -86,8 +86,14 @@ export function weekDocuments(report, letters, requests) {
   return [...fromDeveloper, ...received].sort((a, b) => a[1].localeCompare(b[1])).map(r => [r[0], longDate(r[1]), r[2], r[3]]);
 }
 
+// The cloud gives a project's orders in no order (the phone lists them as added): the forms list suspensions and
+// resumptions by their Effectivity, time extensions and variation orders by their number, one without it last.
+const inOrder = (docs, key) => [...docs].sort((a, b) => key(a) - key(b) || 0);
+const effectivity = d => Date.parse(L.remarkField(d.remarks, 'Effectivity')) || Infinity;
+const orderNumber = d => Number(/\bNo\.\s*(\d+)/i.exec(d.documentName || '')?.[1] ?? Infinity);
+
 /** ContractLogs.extensions: each Time Extension's number, days and "(for approval)" until approved. */
-export const extensionsOf = docs => docs.filter(d => /^time extension/i.test(d.documentName || '')).map(d => {
+export const extensionsOf = docs => inOrder(docs.filter(d => /^time extension/i.test(d.documentName || '')), orderNumber).map(d => {
   // "Time Extension No. 1 - 30 Days" as the phone names it; an older "Time Extension No. 1 (30 days)" reads too.
   const no = /\bNo\.\s*([^\s(-]+)/i.exec(d.documentName), days = /(\d+)\s*Days/i.exec(d.documentName);
   return { no: no?.[1] || '', days: Number(days?.[1]) || 0, reason: L.remarkField(d.remarks, 'Reason'), status: /^approved$/i.test(d.status || '') ? '' : '(for approval)' };
@@ -334,7 +340,7 @@ export function abstractItemsHtml(rows) {
 /* ---------- The Project Profile sheet (BlueBookForms.projectProfile) ---------- */
 
 /** ContractLogs.resumptions: each Work Resumption Order with its effectivity, "(for approval)" until approved. */
-export const resumptionsOf = docs => docs.filter(d => /work resumption/i.test(d.documentName || ''))
+export const resumptionsOf = docs => inOrder(docs.filter(d => /work resumption/i.test(d.documentName || '')), effectivity)
   .map(d => [L.orderLabel(d.documentName), longDate(L.remarkField(d.remarks, 'Effectivity')) + (/^approved$/i.test(d.status || '') ? '' : ' (for approval)')]);
 
 /** The Project Profile sheet; `preparer` is {name, title, office} and `asOf` an ISO date. */
@@ -427,7 +433,7 @@ export function billingSignatories(project, user) {
 /** ContractLogs.suspensions and .variations: each order as the monthly form lists it, "(for approval)" until approved. */
 export function ordersOf(docs) {
   const mark = d => (/^approved$/i.test(d.status || '') ? '' : '(for approval)');
-  const suspensions = docs.filter(d => /work suspension/i.test(d.documentName || '')).map(d => {
+  const suspensions = inOrder(docs.filter(d => /work suspension/i.test(d.documentName || '')), effectivity).map(d => {
     const ran = L.inEffect(d, docs); // the days it ran: cut short by its resumption order
     const days = L.remarkField(ran, 'Duration').split(' ')[0];
     const from = longDate(L.remarkField(d.remarks, 'Effectivity'));
@@ -437,7 +443,7 @@ export function ordersOf(docs) {
       reason: L.isSuspension(d) ? L.remarkField(d.remarks, 'Reason') : '', status: mark(d),
     };
   });
-  const variations = docs.filter(d => /^variation order/i.test(d.documentName || '')).map(d => {
+  const variations = inOrder(docs.filter(d => /^variation order/i.test(d.documentName || '')), orderNumber).map(d => {
     const name = d.documentName, cut = name.indexOf(' - ');
     const amount = cut < 0 ? '' : name.slice(cut + 3);
     const n = Number(amount.replace(/^PHP/, '').replace(/,/g, '').trim());
