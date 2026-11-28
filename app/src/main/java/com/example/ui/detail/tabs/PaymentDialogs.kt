@@ -33,6 +33,7 @@ import com.example.data.model.billedByAmount
 import com.example.data.model.facilityDeductions
 import com.example.data.model.ADVANCE_PAYMENT
 import com.example.data.model.isAdvance
+import com.example.data.model.pctOf
 import com.example.data.model.billingText
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
@@ -267,9 +268,9 @@ fun AddPaymentDialog(
                     val perLot = FormValidation.parseAmount(priceStr) ?: 0.0
                     if (typed && !byUnit && perLot > 0) Field("Lots", unitsText(Math.round(gross / perLot * 100) / 100.0))
                     Field("Gross amount", CurrencyFormatter.formatPhp(gross))
-                    if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(gross * retention / 100))
+                    if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(pctOf(gross, retention)))
                     if (facility) listOf("Recoupment", "VAT", "Withholding tax").zip(cutValues).forEach { (label, v) -> if (v > 0) Field(label, CurrencyFormatter.formatPhp(v)) }
-                    Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100) - if (facility) cutValues.sum() else 0.0))
+                    Field("Net amount", CurrencyFormatter.formatPhp(gross - pctOf(gross, retention) - if (facility) cutValues.sum() else 0.0))
                     // Recoupment stops once the advance is paid back.
                     if (facility && advanceLeft != null) {
                         val after = Math.round((advanceLeft - cutValues[0]) * 100) / 100.0

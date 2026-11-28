@@ -4148,7 +4148,7 @@ function billingForm(c, old = null, request = null) {
         : after <= 0 ? 'This billing finishes recouping the advance payment.' : `Advance left to recoup after this: ${L.formatPhp(after)}`;
     d.querySelector('.billing-preview').innerHTML = gross > 0
       ? `${lots ? kv('Lots', String(lots)) : ''}${L.isAdvance(f) ? kv('Net amount', L.formatPhp(gross))
-        : `${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${L.FACILITY_DEDUCTIONS.map(([k, label]) => (cut[k] ? kv(label, L.formatPhp(cut[k])) : '')).join('')}${kv('Net amount', L.formatPhp(L.paidAmount({ grossAmount: gross, retentionPct: r, ...cut })))}`}${note ? `<p class="muted small">${esc(note)}</p>` : ''}` : '';
+        : `${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(L.pctOf(gross, r))) : ''}${L.FACILITY_DEDUCTIONS.map(([k, label]) => (cut[k] ? kv(label, L.formatPhp(cut[k])) : '')).join('')}${kv('Net amount', L.formatPhp(L.paidAmount({ grossAmount: gross, retentionPct: r, ...cut })))}`}${note ? `<p class="muted small">${esc(note)}</p>` : ''}` : '';
   };
   // The advance has no retention or deductions; it starts at 15% of the original contract.
   const showKind = () => d.querySelectorAll('[data-progress]').forEach(el => { el.style.display = L.isAdvance(values()) ? 'none' : ''; });
