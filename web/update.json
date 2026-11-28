@@ -1,8 +1,8 @@
 {
-  "versionCode": 338,
-  "versionName": "2.8.58",
-  "releaseNotes": "v2.8.58: The project screen has a Bar chart tab, as on the website: each approved chart on file, with each item's bars across the months and the S-curve. Those who manage the bar chart edit it from there.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.58/NHA_Monitor_v2.8.58_Build338.apk",
-  "apkSha256": "2d5859b36341e69b802ee15ea0af8d766c8ad265b6ffb6905d9e2cf8986005db",
+  "versionCode": 339,
+  "versionName": "2.8.59",
+  "releaseNotes": "v2.8.59: On the project screen's Bar chart tab, the colours drawn on the website, such as a suspension, show on the bars, with a legend naming each colour.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.59/NHA_Monitor_v2.8.59_Build339.apk",
+  "apkSha256": "1cb895231ee1b597517749982829fd4702a61a31693518bb71b4185a674a885a",
   "isMandatory": false
 }
