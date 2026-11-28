@@ -4559,10 +4559,6 @@ function bindActual(c) {
 /** Which cost the billing % are on, once a variation order moved it; nothing otherwise. */
 const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
 
-/** A billing card's head: its name and DV No., with the scanned DV and Edit as buttons on the right (no row of its own for Edit). */
-const payHead = (p, title, editable) => `<div class="pc-head"><div><h3>${esc(title)}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
-  <div class="pc-actions">${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}${editable ? `<button class="text-btn" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</div></div>`;
-
 function paymentsBody({ project, payments, advances, cost, billed, of }) {
   const editable = L.canEdit(project, s.user.uid, s.claims), asked = L.pendingBillingRequests(of('developer_requests'), payments);
   // Requests for billing logged under Developer requests wait here until a billing is saved from one.
@@ -4578,33 +4574,33 @@ function paymentsBody({ project, payments, advances, cost, billed, of }) {
   const left = L.advanceLeft(advances, payments);
   if (left != null) figures.push(['Advance to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word']);
   const given = advances.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
-  const advanceCards = advances.map(p => `<li class="card pay-card">
-      ${payHead(p, p.name || L.ADVANCE_PAYMENT, editable)}
-      <p class="muted small">${esc(L.displayDate(p.date || '-'))} · 15% of the original contract</p>
-      ${kv('Net amount', L.formatPhp(Number(p.grossAmount) || 0))}
-      ${kv('Recouped so far', L.formatPhp(Math.round((given - left) * 100) / 100))}
-      ${kv('Left to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word')}
-    </li>`).join('');
   // A one-row table from 900px; under it the same figures as label-and-amount rows, which fit a phone (style.css shows one of the two).
   const summary = section('Billing summary', 'payments', `<div class="bill-sum">${figures.map(f => kv(...f)).join('')}</div>
     <div class="bill-table">${table(figures.map(([text]) => ({ text, num: 1 })), `<tr>${figures.map(([, v, cls]) => `<td class="num${cls ? ` ${cls}` : ''}">${esc(v)}</td>`).join('')}</tr>`)}</div>
     ${baseNote(project, cost)}`, '',
     editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : '');
-  if (!payments.length) return `<div class="stack">${summary}${requests}${advanceCards ? `<ul class="pay-cards">${advanceCards}</ul>` : `<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div>`}</div>`;
-  return `<div class="stack">${summary}${requests}<ul class="pay-cards">${advanceCards}${L.netBillings(payments, cost).map(p => {
+  // One table, a row per billing like the office ledger (user, 2026-11-28): cards of uneven height left holes.
+  const rows = L.netBillings(payments, cost), money = v => L.formatPhp(v);
+  const cuts = L.FACILITY_DEDUCTIONS.filter(([k]) => rows.some(p => Number(p[k])));
+  const cell = (main, sub = '') => `${esc(main)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
+  const acts = p => `<td class="act">${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}${editable ? `<button class="text-btn" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</td>`;
+  const blanks = n => '<td></td>'.repeat(n);
+  const advanceRows = advances.map(p => `<tr><td class="name">${cell(p.name || L.ADVANCE_PAYMENT, p.dvNo ? `DV ${p.dvNo}` : 'No DV number')}</td>
+    <td>${cell(L.displayDate(p.date || '-'), '15% of the original contract')}</td>
+    <td class="num">${cell(money(Number(p.grossAmount) || 0), `Recouped ${money(Math.round((given - left) * 100) / 100)}`)}</td>${blanks(4 + cuts.length)}${acts(p)}</tr>`).join('');
+  const billRows = rows.map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
-    return `<li class="card pay-card">
-      ${payHead(p, p.name || '-', editable)}
-      <p class="muted small">${esc(L.displayDate(p.date || '-'))} · ${esc(p.periodCovered || '-')}</p>
-      ${p.billingType ? `<p class="muted small">${esc(p.billingType)} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${esc(L.formatPhp(Number(p.unitPrice) || 0))}</p>` : ''}
-      ${kv('Net amount', L.formatPhp(L.paidAmount(p)))}
-      ${retention > 0 || L.paidAmount(p) !== L.netAmount(p) ? kv('Gross amount', L.formatPhp(gross)) : ''}${retention > 0 ? kv(`Retention (${Math.trunc(retention)}%)`, L.formatPhp(gross - L.netAmount(p))) : ''}
-      ${L.FACILITY_DEDUCTIONS.map(([k, label]) => (Number(p[k]) ? kv(label, L.formatPhp(Number(p[k]))) : '')).join('')}
-      ${kv('Share of contract', pct(p.percentage))}
-      ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
-      ${kv('Balance share', pct(p.balancePercentage))}
-    </li>`;
-  }).join('')}</ul></div>`;
+    return `<tr><td class="name">${cell(p.name || '-', [p.dvNo ? `DV ${p.dvNo}` : 'No DV number', p.billingType ? `${p.billingType} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${money(Number(p.unitPrice) || 0)}` : ''].filter(Boolean).join(' · '))}</td>
+      <td>${cell(L.displayDate(p.date || '-'), p.periodCovered || '')}</td>
+      <td class="num">${esc(money(L.paidAmount(p)))}</td><td class="num">${esc(money(gross))}</td>
+      <td class="num">${retention > 0 ? cell(money(gross - L.netAmount(p)), `${Math.trunc(retention)}%`) : ''}</td>
+      ${cuts.map(([k]) => `<td class="num">${Number(p[k]) ? esc(money(Number(p[k]))) : ''}</td>`).join('')}
+      <td class="num">${esc(pct(p.percentage))}</td>
+      <td class="num">${cell(money(Number(p.balanceAmount) || 0), pct(p.balancePercentage))}</td>${acts(p)}</tr>`;
+  }).join('');
+  if (!advanceRows && !billRows) return `<div class="stack">${summary}${requests}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
+  const head = ['Billing', 'Date', ...['Net amount', 'Gross amount', 'Retention', ...cuts.map(([, label]) => label), 'Share', 'Balance after'].map(text => ({ text, num: 1 })), ''];
+  return `<div class="stack">${summary}${requests}<div class="card pay-table">${table(head, advanceRows + billRows)}</div></div>`;
 }
 
 /* ---------- Documents (DocumentsSection, ContractorLettersCard, DeveloperRequestsCard) ---------- */
