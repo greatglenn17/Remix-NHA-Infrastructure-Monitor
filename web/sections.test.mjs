@@ -538,6 +538,9 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   assert.match(html, row('2', 'LAND DEVELOPMENT', '100', 'LOT', '20,000.00', '2,000,000.00', '0', '0.00', '0.00%', '15.5', '310,000.00', '15.50%', '15.5', '310,000.00', '15.50%'));
   assert.match(html, row('3.1', 'MILESTONE 1 (80%)', '100', 'UNIT', '56,000.00', '5,600,000.00'));
   // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
+  // A billing of housing construction alone is an abstract of milestones; with lots typed too it stays a summary of work.
+  assert.match(sheet({ covered: '', lots: 0, development: 0, m1: 0, m2: 2 }), /<h1>ABSTRACT OF MILESTONE ACCOMPLISHMENT<\/h1>/);
+  assert.match(sheet({ covered: '', lots: 1, development: 0, m1: 3, m2: 0 }), /<h1>SUMMARY OF WORK ACCOMPLISHED<\/h1>/);
   assert.match(sheet({ covered: '', lots: 0, development: 0, m1: 0, m2: 2 }), row('3.2', 'MILESTONE 2 (20%)', '100', 'UNIT', '14,000.00', '1,400,000.00', '0', '0.00', '0.00%', '2', '28,000.00', '2.00%'));
   assert.match(html, row('Subtotal (Housing Construction)', '', '', '70,000.00', '7,000,000.00'));
   // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.

@@ -238,7 +238,9 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
   };
   const total = (label, r) => `<tr class='tot'><td></td><td>${esc(label)}</td><td></td><td></td><td class='n'>${money(r.amount / units)}</td><td class='n'>${money(r.amount)}</td>${billed(r, 0)}</tr>`;
   const all = sumOf(parts.flatMap(p => p.lines));
-  return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, Number(abstract.overallPct) || 0, 'SUMMARY OF WORK ACCOMPLISHED')}
+  // A billing of housing construction alone (milestone units typed, no lots) is an abstract of milestones.
+  const milestones = (period.m1 > 0 || period.m2 > 0) && !(period.lots > 0) && !(period.development > 0);
+  return `${apaTop(banner, covered ? `Period covered: ${covered}` : `As of ${longDate(abstract.asOf)}`, project, docs, targetPct, Number(abstract.overallPct) || 0, milestones ? 'ABSTRACT OF MILESTONE ACCOMPLISHMENT' : 'SUMMARY OF WORK ACCOMPLISHED')}
     <table class='apa'>
       ${apaHead()}
       ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}

@@ -447,10 +447,13 @@ object BlueBookForms {
         val rows = abstract.parts.joinToString("") { p ->
             (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='14'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
+        // A billing of housing construction alone (milestone units typed, no lots) is an abstract of milestones.
+        val milestones = (period.m1 > 0 || period.m2 > 0) && period.lots <= 0 && period.development <= 0
+        val title = if (milestones) "ABSTRACT OF MILESTONE ACCOMPLISHMENT" else "SUMMARY OF WORK ACCOMPLISHED"
         return page(
-            "Summary of Work Accomplished",
+            if (milestones) "Abstract of Milestone Accomplishment" else "Summary of Work Accomplished",
             """
-            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct, "SUMMARY OF WORK ACCOMPLISHED")}
+            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct, title)}
             <table class='apa'>
               ${apaHead()}
               $rows
@@ -480,7 +483,7 @@ object BlueBookForms {
     }
 
     /**
-     * The top of both abstracts, under the banner: the [title] (the billing abstract's is SUMMARY OF WORK ACCOMPLISHED), the [period] line, then the project, its contract
+     * The top of both abstracts, under the banner: the [title] (the billing abstract's is SUMMARY OF WORK ACCOMPLISHED, or ABSTRACT OF MILESTONE ACCOMPLISHMENT for housing construction alone), the [period] line, then the project, its contract
      * (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
      * advance/slippage, the last as the two at 2 decimals each. As on the district's sheet, the contract's own cost,
      * duration and completion date stay, and what an approved variation order or time extension made of them is on the
