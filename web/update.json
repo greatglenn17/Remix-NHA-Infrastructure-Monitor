@@ -1,8 +1,8 @@
 {
-  "versionCode": 332,
-  "versionName": "2.8.52",
-  "releaseNotes": "v2.8.52: The bar chart's planned % no longer stops for suspension days an approved time extension already covers, so a project past its revised completion date plans 100%.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.52/NHA_Monitor_v2.8.52_Build332.apk",
-  "apkSha256": "9c1ce39b5462d2b9669032dbc3051968988c53c27a9aaae6c99cd62e96c5db06",
+  "versionCode": 333,
+  "versionName": "2.8.53",
+  "releaseNotes": "v2.8.53: Add billing on a Community Facility project works out the net from the gross. Retention (10%), recoupment (15%), VAT (5% ÷ 1.12) and withholding tax (2% ÷ 1.12) fill in and can each be changed.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.53/NHA_Monitor_v2.8.53_Build333.apk",
+  "apkSha256": "da5cada866758c364b70e92eb562b148bf2b90ac2f8309b66a05b22eb261bf89",
   "isMandatory": true
 }
