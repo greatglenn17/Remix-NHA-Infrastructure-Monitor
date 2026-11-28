@@ -5,8 +5,24 @@ on:
   push:
     branches: [main]
 
-# Android Gradle is left out on purpose: no release keystore here, and it is slow.
 jobs:
+  # Unit tests only: no APK is built, since the signing keystore is not in git.
+  # verifyRoborazziDebug is left out: its stored images were recorded on Windows.
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew testDebugUnitTest
+      # Gradle prints no total, so a drop in the number of tests would go unseen.
+      - name: Count tests
+        run: echo "$(cat app/build/test-results/testDebugUnitTest/*.xml | grep -c '<testcase') tests ran"
+
   web:
     runs-on: ubuntu-latest
     steps:
