@@ -128,4 +128,13 @@ class BarChartDialogTest {
         rule.onNodeWithText("No bar chart yet", substring = true).assertExists()
         rule.onAllNodesWithTag("edit_bar_chart_button").assertCountEquals(0)
     }
+
+    // A chart coloured on the website: the tab draws its colours and names them, as the website's sheet does.
+    @Test fun tab_showsTheWebsitesColoursAndTheirNames() {
+        val colors = """[{"name":"Suspension No. 1","color":"#FFD966","work":false}]"""
+        val coloured = BarChart.toJson(listOf(BarChart.Version("Original", "2026-01-05", listOf(items[0].copy(marks = "[[241,270,0]]"), items[1]), colors)))
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { BarChartSection(project.copy(barChartJson = coloured), emptyList(), LocalDate.of(2026, 7, 1), onSave = null) } }
+        rule.onNodeWithText("Suspension No. 1 (no work)").assertExists()
+        rule.onNodeWithContentDescription("month 1 day 1 to month 8 day 30, Suspension No. 1: month 9 day 1 to month 9 day 30").assertExists()
+    }
 }

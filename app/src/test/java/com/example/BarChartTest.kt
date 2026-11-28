@@ -254,4 +254,16 @@ class BarChartTest {
         assertEquals(30, BarChart.suspensionExtensionDays(listOf(ws, c1, te)))
         assertEquals(120, BarChart.suspensionExtensionDays(listOf(ws, c1, te.copy(remarks = "Reason: Typhoon"))))
     }
+
+    // The website's colours, as its sheet shows them: a colour of no work only off the bar, one of work only on it.
+    @Test fun dayFills_showTheWebsitesColoursWhereTheyAgreeWithTheBar() {
+        val v = Version("Revised No. 1", "2026-06-01", emptyList(),
+            """[{"name":"Suspension No. 1","color":"#FFD966","work":false},{"name":"Rework","color":"bad","work":true}]""")
+        val colours = BarChart.colours(v)
+        assertEquals(listOf(BarChart.Colour("Suspension No. 1", 0xFFFFD966.toInt(), false), BarChart.Colour("Rework", 0xFFFFD966.toInt(), true)), colours)
+        val item = Item("Roads", 1.0, listOf(Bar(1, 3), Bar(6, 8)), """[[3,5,0],[7,7,1],[9,9,1],[1,1,7],[0,2,0]]""")
+        val w = BarChart.WORK
+        assertEquals(listOf(w, w, w, 0, 0, w, 1, w, null, null), BarChart.dayFills(item, colours, 10))
+        assertEquals(emptyList<Any>(), BarChart.marks(item.copy(marks = "")))
+    }
 }

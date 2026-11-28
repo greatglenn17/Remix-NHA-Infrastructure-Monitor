@@ -3,6 +3,7 @@ package com.example.ui.detail.sections
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -115,25 +117,42 @@ internal fun BarChartSection(project: Project, documents: List<PendingDocument>,
             if (inForce && plan != null) Field("Planned as of today", "%.2f%%".format(plan.plannedPct))
             Field("Chart length", "${version.lastDay} calendar days · ${CurrencyFormatter.formatPhp(version.total)}")
             // Whole months across, as on the sheet; a line marks where each month starts.
-            val length = ((version.lastDay + BarChart.MONTH_DAYS - 1) / BarChart.MONTH_DAYS).coerceAtLeast(1) * BarChart.MONTH_DAYS
+            val colours = remember(version) { BarChart.colours(version) }
+            val last = maxOf(version.lastDay, version.items.flatMap { BarChart.marks(it) }.maxOfOrNull { it.second } ?: 0)
+            val length = ((last + BarChart.MONTH_DAYS - 1) / BarChart.MONTH_DAYS).coerceAtLeast(1) * BarChart.MONTH_DAYS
             Text(
                 "Each line is a month of 30 days from the start date.",
                 style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)
             )
-            version.items.forEach { ItemBarRow(it, version.total, length) }
+            version.items.forEach { ItemBarRow(it, version.total, colours, length) }
+            if (colours.isNotEmpty()) ChartLegend(colours)
             MonthTable(version)
         }
     }
     if (editing && onSave != null) BarChartDialog(project, documents, onDismiss = { editing = false }, onSave = { onSave(it); editing = false })
 }
 
-/** An item's amount, weight and days, and its bars drawn across the chart's [length] in days. */
+/** An item's amount, weight and days, and its days drawn across the chart's [length]: work, and the chart's own colours (a suspension), as on the website. */
 @Composable
-private fun ItemBarRow(item: BarChart.Item, total: Double, length: Int) {
+private fun ItemBarRow(item: BarChart.Item, total: Double, colours: List<BarChart.Colour>, length: Int) {
     val scheme = MaterialTheme.colorScheme
     val work = LocalNHAColors.current.onTrack
+    val fills = remember(item, colours, length) { BarChart.dayFills(item, colours, length) }
+    // Runs of one fill: first day, last day, fill.
+    val runs = remember(fills) {
+        val out = mutableListOf<Triple<Int, Int, Int>>()
+        fills.forEachIndexed { d, f ->
+            val prev = out.lastOrNull()
+            when {
+                f == null -> Unit
+                prev != null && prev.third == f && prev.second == d -> out.set(out.lastIndex, prev.copy(second = d + 1))
+                else -> out.add(Triple(d + 1, d + 1, f))
+            }
+        }
+        out
+    }
     fun at(day: Int) = BarChart.monthDayOf(day).let { (m, d) -> "month $m day $d" }
-    val spoken = item.bars.joinToString { "${at(it.startDay)} to ${at(it.endDay)}" }
+    val spoken = runs.joinToString { (a, b, f) -> (if (f == BarChart.WORK) "" else "${colourName(colours[f])}: ") + "${at(a)} to ${at(b)}" }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("bar_row_${item.name}")) {
         Text(item.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
         val line = "${CurrencyFormatter.formatPhp(item.amount)} · ${"%.3f".format(if (total > 0) item.amount / total * 100 else 0.0)}% · ${item.days} c.d."
@@ -141,12 +160,32 @@ private fun ItemBarRow(item: BarChart.Item, total: Double, length: Int) {
         Canvas(Modifier.fillMaxWidth().padding(top = 2.dp).height(10.dp).semantics { contentDescription = spoken }) {
             val perDay = size.width / length
             drawRect(scheme.surfaceVariant)
-            item.bars.forEach { drawRect(work, Offset((it.startDay - 1) * perDay, 0f), Size(it.days * perDay, size.height)) }
+            runs.forEach { (a, b, f) ->
+                drawRect(if (f == BarChart.WORK) work else Color(colours[f].argb), Offset((a - 1) * perDay, 0f), Size((b - a + 1) * perDay, size.height))
+            }
             for (m in 1 until length / BarChart.MONTH_DAYS) {
                 val x = m * BarChart.MONTH_DAYS * perDay
                 drawLine(scheme.outline, Offset(x, 0f), Offset(x, size.height), 1f)
             }
         }
+    }
+}
+
+private fun colourName(c: BarChart.Colour) = c.name.trim().ifEmpty { "New colour" }
+
+/** What the work colour and each of the chart's own colours stand for, as under the website's sheet. */
+@Composable
+private fun ChartLegend(colours: List<BarChart.Colour>) {
+    val scheme = MaterialTheme.colorScheme
+    @Composable
+    fun Key(color: Color, label: String) = Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+        Box(Modifier.size(12.dp).background(color, MaterialTheme.shapes.extraSmall))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = scheme.onSurface)
+    }
+    Column(Modifier.padding(top = 4.dp).testTag("bar_chart_legend")) {
+        Key(LocalNHAColors.current.onTrack, "Work")
+        colours.forEach { Key(Color(it.argb), colourName(it) + if (it.work) "" else " (no work)") }
     }
 }
 

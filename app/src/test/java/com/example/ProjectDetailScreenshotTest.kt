@@ -177,7 +177,7 @@ class ProjectDetailScreenshotTest {
         }
     }
 
-    // The Bar chart tab on a small phone: two charts on file, the revised one in force, its items' bars and S-curve.
+    // The Bar chart tab on a small phone: two charts on file, the revised one in force with a suspension coloured on the website, its legend and S-curve.
     @Config(qualifiers = "w360dp-h1100dp")
     @Test fun chart_tab_360_light() = captureRoboImage("src/test/screenshots/detail_chart_360_light.png") {
         val items = listOf(
@@ -186,7 +186,11 @@ class ProjectDetailScreenshotTest {
         )
         val chart = com.example.util.BarChart.toJson(listOf(
             com.example.util.BarChart.Version("Original", "2026-01-05", items),
-            com.example.util.BarChart.Version("Revised No. 1", "2026-06-01", items)
+            // Coloured on the website: a 30-day suspension of every item, its later work moved a month.
+            com.example.util.BarChart.Version("Revised No. 1", "2026-06-01", listOf(
+                items[0].copy(bars = listOf(com.example.util.BarChart.Bar(1, 150), com.example.util.BarChart.Bar(181, 210)), marks = "[[151,180,0]]"),
+                items[1].copy(bars = listOf(com.example.util.BarChart.Bar(61, 150), com.example.util.BarChart.Bar(241, 330)), marks = "[[151,180,0]]")
+            ), """[{"name":"Suspension No. 1","color":"#FFD966","work":false}]""")
         ))
         frame(AppThemeMode.LIGHT, collapsed = true) {
             Column {
