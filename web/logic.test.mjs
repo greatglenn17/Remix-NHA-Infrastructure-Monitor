@@ -157,6 +157,12 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.shownWord('100% / RFO'), '100% / RFO');
   assert.equal(L.formatPhp(-1234.5), '-₱1,234.50');
   assert.equal(L.netAmount({ grossAmount: 1000, retentionPct: 10 }), 900);
+  // A community facility: 10% retention, 15% recoupment, VAT 5% ÷ 1.12 and withholding 2% ÷ 1.12, each to the centavo.
+  const cut = L.facilityDeductions(1_000_000);
+  assert.deepEqual(cut, { recoupmentAmount: 150000, vatAmount: 44642.86, withholdingAmount: 17857.14 });
+  assert.equal(L.paidAmount({ grossAmount: 1_000_000, retentionPct: 10, ...cut }), 687500);
+  assert.equal(L.paidAmount({ grossAmount: 1000, retentionPct: 10 }), 900);
+  assert.deepEqual(L.billingErrors({ date: '2026-11-10', grossAmount: '1000', withholdingAmount: 'x' }), ['The withholding tax must be a number.']);
   assert.equal(L.isOpenIssue({ status: 'Pending' }), true);
   assert.equal(L.isOpenIssue({ status: 'Resolved' }), false);
   // Saved before Pending / Resolved: Approved, No Action and Closed read as resolved; anything else stays open.
@@ -408,11 +414,12 @@ test('website edits: a new billing is the record the app uploads, with share and
   const ctx = { uuid: 'b1', projectUuid: 'p', assignedUids: ['me'], uid: 'me', now: 7 };
   // A 10,000,000 contract with 500,000 already billed (gross); this billing is 1,500,000 gross.
   const earlier = [{ grossAmount: 100000 }, { grossAmount: '400000' }];
-  const f = { name: ' 3rd Progress Billing ', dvNo: 'DV-1', date: '2026-11-10', periodCovered: 'November 1 - 30, 2026', billingType: '', grossAmount: '1,500,000', units: '', unitPrice: '', retentionPct: '10' };
+  const f = { name: ' 3rd Progress Billing ', dvNo: 'DV-1', date: '2026-11-10', periodCovered: 'November 1 - 30, 2026', billingType: '', grossAmount: '1,500,000', units: '', unitPrice: '', retentionPct: '10', vatAmount: '66,964.29' };
   const r = L.newPaymentRecord(ctx, f, earlier, 10_000_000);
   assert.deepEqual({ ...r, data: undefined }, { uuid: 'b1', type: 'project_payments', projectUuid: 'p', assignedUids: ['me'], revision: 1, updatedAt: 7, updatedByUid: 'me', isDeleted: false, data: undefined });
   assert.deepEqual(JSON.parse(r.data), { name: '3rd Progress Billing', dvNo: 'DV-1', date: '2026-11-10', periodCovered: 'November 1 - 30, 2026', grossAmount: 1500000,
-    percentage: 15, balanceAmount: 8000000, balancePercentage: 80, fileUrl: '', billingType: '', units: 0, unitPrice: 0, retentionPct: 10 });
+    percentage: 15, balanceAmount: 8000000, balancePercentage: 80, fileUrl: '', billingType: '', units: 0, unitPrice: 0, retentionPct: 10,
+    recoupmentAmount: 0, vatAmount: 66964.29, withholdingAmount: 0 });
   assert.deepEqual(L.newPaymentAudit(r), { actionType: 'Payment Creation', details: 'Created payment billing: 3rd Progress Billing (DV-1)', oldValue: '',
     newValue: 'Billing: 3rd Progress Billing, DV: DV-1, Gross: ₱1500000, Retention: 10%' });
   // A housing billing: units × amount per unit, named after its type when the name is blank.
@@ -658,7 +665,8 @@ test('editing a billing: fields only, or a changed gross that moves its own and 
   const form = { name: ' B fixed ', dvNo: ' DV-2 ', date: '2026-11-12', periodCovered: 'Nov', billingType: '', grossAmount: '200', retentionPct: '10' };
   const same = L.editedBillings(payments, payments[1], form, cost);
   assert.equal(same.length, 1);
-  assert.deepEqual(same[0][1], { name: 'B fixed', dvNo: 'DV-2', date: '2026-11-12', periodCovered: 'Nov', grossAmount: 200, billingType: '', units: 0, unitPrice: 0, retentionPct: 10 });
+  assert.deepEqual(same[0][1], { name: 'B fixed', dvNo: 'DV-2', date: '2026-11-12', periodCovered: 'Nov', grossAmount: 200, billingType: '', units: 0, unitPrice: 0, retentionPct: 10,
+    recoupmentAmount: 0, vatAmount: 0, withholdingAmount: 0 });
   const moved = L.editedBillings(payments, payments[1], { ...form, grossAmount: '250' }, cost);
   assert.deepEqual(moved.map(([p]) => p.uuid), ['b', 'c']);
   assert.deepEqual([moved[0][1].grossAmount, moved[0][1].percentage, moved[0][1].balanceAmount, moved[0][1].balancePercentage], [250, 25, 650, 65]);

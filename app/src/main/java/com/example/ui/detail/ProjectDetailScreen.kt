@@ -464,6 +464,7 @@ fun ProjectDetailScreen(
                         actualPercent = currentProject.actualAccomplishment,
                         currentUserRole = currentUser.role,
                         isHousing = isHousingProject,
+                        isFacility = com.example.data.model.isCommunityFacility(currentProject.projectType),
                         landPerLot = { date ->
                             com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, runCatching { java.time.LocalDate.parse(date) }.getOrNull())[1] /
                                 com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)

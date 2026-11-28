@@ -30,6 +30,7 @@ import com.example.data.model.DeveloperRequest
 import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.ProjectPayment
 import com.example.data.model.billedByAmount
+import com.example.data.model.facilityDeductions
 import com.example.data.model.billingText
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
@@ -53,6 +54,8 @@ fun AddPaymentDialog(
     existing: ProjectPayment? = null,
     // Housing projects bill land per lot and M1/M2 per housing unit.
     isHousing: Boolean = false,
+    // A community facility also deducts recoupment, VAT and withholding, filled from the gross (facilityDeductions).
+    isFacility: Boolean = false,
     // Earlier billings; the latest of a type prefills its amount per lot or unit.
     previous: List<ProjectPayment> = emptyList(),
     // The contract amount of land development per lot on a billing date: where its amount per lot starts without an earlier billing.
@@ -83,7 +86,11 @@ fun AddPaymentDialog(
     var type by remember { mutableStateOf(existing?.billingType ?: request?.billingType ?: "") }
     var unitsStr by remember { mutableStateOf((existing?.units ?: request?.units)?.takeIf { it > 0 }?.toString() ?: "") }
     var priceStr by remember { mutableStateOf((existing?.unitPrice ?: askedPrice)?.takeIf { it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
-    var retention by remember { mutableStateOf(existing?.retentionPct ?: 0.0) }
+    val facility = isFacility && !isHousing
+    var retention by remember { mutableStateOf(existing?.retentionPct ?: if (facility) 10.0 else 0.0) }
+    fun money(v: Double) = if (v > 0) "%.2f".format(java.util.Locale.US, v) else ""
+    // Recoupment, VAT and withholding as typed; typing the gross fills them, and each can then be changed to match the official billing.
+    var cuts by remember { mutableStateOf(listOf(existing?.recoupmentAmount, existing?.vatAmount, existing?.withholdingAmount).map { money(it ?: 0.0) }) }
 
     val attachDv = rememberDvAttacher { ref -> fileUrl = ref }
 
@@ -101,7 +108,9 @@ fun AddPaymentDialog(
     // BillingRequests.billedErrors: a billing from a request counts only with its DV No. and the scanned DV form.
     val dvMissing = if (request == null) null
     else listOfNotNull("Type the DV No.".takeIf { dvNo.isBlank() }, "Attach the scanned DV form.".takeIf { fileUrl.isBlank() }).joinToString(" ").ifBlank { null }
-    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) }
+    val cutValues = cuts.map { FormValidation.parseAmount(it) ?: 0.0 }
+    val cutErrs = cuts.map { FormValidation.amountError(it, false) }
+    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) + cuts }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -186,7 +195,11 @@ fun AddPaymentDialog(
                 }
                 if (!byUnit) {
                     OutlinedTextField(
-                        value = amountStr, onValueChange = { amountStr = it },
+                        value = amountStr,
+                        onValueChange = {
+                            amountStr = it
+                            if (facility) cuts = facilityDeductions(FormValidation.parseAmount(it) ?: 0.0).map(::money)
+                        },
                         label = { Text("Gross Amount (PHP)") },
                         placeholder = { Text("e.g. 15000000") },
                         isError = amountErr != null,
@@ -207,12 +220,24 @@ fun AddPaymentDialog(
                         )
                     }
                 }
+                if (facility) listOf("Recoupment, 15%", "VAT, 5% ÷ 1.12", "Withholding tax, 2% ÷ 1.12").forEachIndexed { i, label ->
+                    OutlinedTextField(
+                        value = cuts[i], onValueChange = { v -> cuts = cuts.toMutableList().also { it[i] = v } },
+                        label = { Text("$label (PHP)") },
+                        isError = cutErrs[i] != null,
+                        supportingText = cutErrs[i]?.let { { Text(it) } },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("billing_deduction_$i")
+                    )
+                }
                 if (gross > 0) Column {
                     val perLot = FormValidation.parseAmount(priceStr) ?: 0.0
                     if (typed && !byUnit && perLot > 0) Field("Lots", unitsText(Math.round(gross / perLot * 100) / 100.0))
                     Field("Gross amount", CurrencyFormatter.formatPhp(gross))
                     if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(gross * retention / 100))
-                    Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100)))
+                    if (facility) listOf("Recoupment", "VAT", "Withholding tax").zip(cutValues).forEach { (label, v) -> if (v > 0) Field(label, CurrencyFormatter.formatPhp(v)) }
+                    Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100) - if (facility) cutValues.sum() else 0.0))
                 }
 
                 // Scanned Copy Attachment Section
@@ -271,12 +296,12 @@ fun AddPaymentDialog(
                         name = name.ifBlank { type }, dvNo = dvNo, date = date, periodCovered = periodCovered, grossAmount = gross, fileUrl = fileUrl,
                         billingType = type, units = if (byUnit) units ?: 0 else 0,
                         unitPrice = if (typed) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = retention
-                    )
+                    ).let { if (facility) it.copy(recoupmentAmount = cutValues[0], vatAmount = cutValues[1], withholdingAmount = cutValues[2]) else it }
                     val errors = check(payment)
                     if (errors.isEmpty()) onSubmit(payment)
                     else ahead = errors.joinToString(" ")
                 },
-                enabled = amountErr == null && unitsErr == null && priceErr == null && dvMissing == null,
+                enabled = amountErr == null && unitsErr == null && priceErr == null && dvMissing == null && cutErrs.all { it == null },
                 shape = RoundedCornerShape(50.dp)
             ) {
                 Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.SemiBold)

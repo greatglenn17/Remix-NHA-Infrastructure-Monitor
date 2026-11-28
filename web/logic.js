@@ -54,6 +54,15 @@ export function currentCost(project, documents) {
 
 /** ProjectPayment.netAmount: what is paid after retention. */
 export const netAmount = p => (Number(p.grossAmount) || 0) * (1 - (Number(p.retentionPct) || 0) / 100);
+/** ProjectPayment.paidAmount: the check, the net after retention less recoupment, VAT and withholding (a community facility's). */
+export const paidAmount = p => netAmount(p) - (Number(p.recoupmentAmount) || 0) - (Number(p.vatAmount) || 0) - (Number(p.withholdingAmount) || 0);
+/** facilityDeductions: a community facility's recoupment (15%), VAT (5% ÷ 1.12) and withholding tax (2% ÷ 1.12) of the gross, to the centavo. */
+export const facilityDeductions = gross => {
+  const c = x => Math.round(x * 100) / 100;
+  return { recoupmentAmount: c(gross * 0.15), vatAmount: c(gross * 0.05 / 1.12), withholdingAmount: c(gross * 0.02 / 1.12) };
+};
+/** The form fields of facilityDeductions, with their labels. */
+export const FACILITY_DEDUCTIONS = [['recoupmentAmount', 'Recoupment'], ['vatAmount', 'VAT'], ['withholdingAmount', 'Withholding tax']];
 
 /**
  * netBillings: each billing's share and balance after it on the net. They are saved from the gross with that day's
@@ -1624,6 +1633,7 @@ export function billingErrors(f) {
     !byUnit && (!String(f.grossAmount ?? '').trim() ? 'Type the gross amount.' : parseAmount(f.grossAmount) == null && 'The gross amount must be a number.'),
     byUnit && (!units ? `Type the number of ${billingUnitName(f.billingType)}s.` : !/^\d+$/.test(units) || Number(units) < 1 ? 'The number must be a whole number.' : false),
     f.billingType && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
+    ...FACILITY_DEDUCTIONS.map(([k, label]) => String(f[k] ?? '').trim() && parseAmount(f[k]) == null && `The ${label.toLowerCase()} must be a number.`),
   ].filter(Boolean);
 }
 
@@ -1634,6 +1644,7 @@ function billingFields(f) {
     name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount: billingGross(f),
     billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: f.billingType ? parseAmount(f.unitPrice) : 0,
     retentionPct: Number(f.retentionPct) || 0,
+    ...Object.fromEntries(FACILITY_DEDUCTIONS.map(([k]) => [k, parseAmount(f[k]) ?? 0])),
   };
 }
 

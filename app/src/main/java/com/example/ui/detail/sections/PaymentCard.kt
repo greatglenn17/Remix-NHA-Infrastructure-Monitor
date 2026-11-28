@@ -23,6 +23,7 @@ import com.example.data.model.billedUnits
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
 import com.example.data.model.netAmount
+import com.example.data.model.paidAmount
 import com.example.ui.theme.LocalNHAColors
 import com.example.util.ProjectSchedule
 import com.example.utils.CurrencyFormatter
@@ -86,11 +87,11 @@ fun PaymentCard(
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
-                Field("Net amount", CurrencyFormatter.formatPhp(payment.netAmount))
-                if (payment.retentionPct > 0) {
-                    Field("Gross amount", CurrencyFormatter.formatPhp(payment.grossAmount))
-                    Field("Retention (${payment.retentionPct.toInt()}%)", CurrencyFormatter.formatPhp(payment.grossAmount - payment.netAmount))
-                }
+                Field("Net amount", CurrencyFormatter.formatPhp(payment.paidAmount))
+                if (payment.retentionPct > 0 || payment.paidAmount != payment.netAmount) Field("Gross amount", CurrencyFormatter.formatPhp(payment.grossAmount))
+                if (payment.retentionPct > 0) Field("Retention (${payment.retentionPct.toInt()}%)", CurrencyFormatter.formatPhp(payment.grossAmount - payment.netAmount))
+                listOf("Recoupment" to payment.recoupmentAmount, "VAT" to payment.vatAmount, "Withholding tax" to payment.withholdingAmount)
+                    .forEach { (label, v) -> if (v != 0.0) Field(label, CurrencyFormatter.formatPhp(v)) }
                 Field("Share of contract", "%.2f%%".format(payment.percentage))
                 Field("Balance after", CurrencyFormatter.formatPhp(payment.balanceAmount))
                 Field("Balance share", "%.2f%%".format(payment.balancePercentage))
