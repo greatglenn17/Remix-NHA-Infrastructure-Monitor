@@ -13,10 +13,11 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** The project screen's sections (spec "Project detail (v1.8.0)"); Actual is the uploaded abstracts of the actual work. */
+/** The project screen's sections (spec "Project detail (v1.8.0)"); Actual is the uploaded abstracts of the actual work, Bar chart the approved bar chart, as on the website. */
 enum class ProjectSection(val label: String) {
     SUMMARY("Summary"),
     PROGRESS("Progress"),
+    CHART("Bar chart"),
     ACTUAL("Actual"),
     MONEY("Payments"),
     DOCUMENTS("Documents")
@@ -26,8 +27,8 @@ enum class ProjectSection(val label: String) {
 @Composable
 fun ProjectSectionTabs(section: ProjectSection, onSelect: (ProjectSection) -> Unit) {
     BoxWithConstraints {
-        // Five tabs on a 360dp phone are 72dp each: the label is the tab's whole content (no 16dp side padding) and 13sp,
-        // or "Documents" would be cut off. With the phone's font set larger the labels shrink together to still fit.
+        // Six tabs on a 360dp phone are 60dp each: the label is the tab's whole content (no 16dp side padding) and 13sp at most,
+        // shrunk so "Documents" is not cut off. With the phone's font set larger the labels shrink together to still fit.
         val base = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp)
         val measurer = rememberTextMeasurer()
         val widest = ProjectSection.entries.maxOf { measurer.measure(it.label, base, softWrap = false).size.width }

@@ -157,7 +157,7 @@ class ProjectDetailScreenshotTest {
         captureRoboImage("src/test/screenshots/detail_documents_${width}_$theme.png") { frame(mode) { Documents() } }
     }
 
-    // The Actual Accomplishment tab on a small phone: the five tabs, the buttons, the target/actual table and the pay
+    // The Actual Accomplishment tab on a small phone: the six tabs, the buttons, the target/actual table and the pay
     // items' table with its headings (the frame is tall enough to reach its rows).
     @Config(qualifiers = "w360dp-h1100dp")
     @Test fun actual_tab_360_light() = captureRoboImage("src/test/screenshots/detail_actual_360_light.png") {
@@ -177,7 +177,26 @@ class ProjectDetailScreenshotTest {
         }
     }
 
-    // The five tabs with the phone's font set larger: the labels shrink together to fit; none is cut off.
+    // The Bar chart tab on a small phone: two charts on file, the revised one in force, its items' bars and S-curve.
+    @Config(qualifiers = "w360dp-h1100dp")
+    @Test fun chart_tab_360_light() = captureRoboImage("src/test/screenshots/detail_chart_360_light.png") {
+        val items = listOf(
+            com.example.util.BarChart.Item("Site development", 6_000_000.0, listOf(com.example.util.BarChart.Bar(1, 180))),
+            com.example.util.BarChart.Item("Drainage", 4_000_000.0, listOf(com.example.util.BarChart.Bar(61, 150), com.example.util.BarChart.Bar(211, 300)))
+        )
+        val chart = com.example.util.BarChart.toJson(listOf(
+            com.example.util.BarChart.Version("Original", "2026-01-05", items),
+            com.example.util.BarChart.Version("Revised No. 1", "2026-06-01", items)
+        ))
+        frame(AppThemeMode.LIGHT, collapsed = true) {
+            Column {
+                com.example.ui.detail.ProjectSectionTabs(com.example.ui.detail.ProjectSection.CHART) {}
+                com.example.ui.detail.sections.BarChartSection(project.copy(barChartJson = chart), emptyList(), LocalDate.of(2026, 7, 1), onSave = {})
+            }
+        }
+    }
+
+    // The six tabs with the phone's font set larger: the labels shrink together to fit; none is cut off.
     @Config(qualifiers = "w360dp-h800dp", fontScale = 1.3f)
     @Test fun tabs_360_large_font() = captureRoboImage("src/test/screenshots/detail_tabs_360_large_font.png") {
         NHATheme(themeMode = AppThemeMode.LIGHT) { Surface { com.example.ui.detail.ProjectSectionTabs(com.example.ui.detail.ProjectSection.ACTUAL) {} } }

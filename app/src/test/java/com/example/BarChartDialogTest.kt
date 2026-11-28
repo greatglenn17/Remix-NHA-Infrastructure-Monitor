@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -15,8 +16,10 @@ import com.example.data.model.AppThemeMode
 import com.example.data.model.PendingDocument
 import com.example.data.model.Project
 import com.example.ui.detail.sections.BarChartDialog
+import com.example.ui.detail.sections.BarChartSection
 import com.example.ui.theme.NHATheme
 import com.example.util.BarChart
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -105,5 +108,24 @@ class BarChartDialogTest {
         rule.onNodeWithText("Original").performClick()
         rule.onAllNodesWithTag("item_0_amount").assertCountEquals(0)
         rule.onAllNodesWithTag("add_chart_item").assertCountEquals(0)
+    }
+
+    // The Bar chart tab: the chart in force opens first, a chip opens another chart on file, and Edit opens the form.
+    @Test fun tab_showsTheChartInForceAndItsVersions_andEditOpensTheForm() {
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { BarChartSection(project, emptyList(), LocalDate.of(2026, 7, 1), onSave = {}) } }
+        rule.onNodeWithText("In force").assertExists()
+        rule.onNodeWithText("Revised No. 1 · from Jun 1, 2026", substring = true).assertExists()
+        rule.onNodeWithTag("bar_row_Housing units").assertExists()
+        rule.onNodeWithContentDescription("month 5 day 1 to month 10 day 26, month 17 day 1 to month 19 day 14").assertExists()
+        rule.onNodeWithTag("section_chip_Original").performClick()
+        rule.onNodeWithText("On file").assertExists()
+        rule.onNodeWithTag("edit_bar_chart_button").performClick()
+        rule.onNodeWithTag("save_bar_chart").assertExists()
+    }
+
+    @Test fun tab_withoutAChartOrTheRightToEdit_saysSo() {
+        rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { BarChartSection(project.copy(barChartJson = ""), emptyList(), LocalDate.of(2026, 7, 1), onSave = null) } }
+        rule.onNodeWithText("No bar chart yet", substring = true).assertExists()
+        rule.onAllNodesWithTag("edit_bar_chart_button").assertCountEquals(0)
     }
 }

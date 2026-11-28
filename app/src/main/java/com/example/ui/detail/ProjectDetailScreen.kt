@@ -430,6 +430,11 @@ fun ProjectDetailScreen(
                             }
                         }
                     }
+                    ProjectSection.CHART -> com.example.ui.detail.sections.BarChartSection(
+                        currentProject, pendingDocuments, LocalDate.now(),
+                        onSave = { json: String -> viewModel.saveBarChart(currentProject.id, json) }
+                            .takeIf { currentUser.role.hasPermission(Permission.MANAGE_BAR_CHART) }
+                    )
                     ProjectSection.ACTUAL -> {
                         val canUpload = currentUser.role.hasPermission(Permission.SUBMIT_REPORT)
                         com.example.ui.detail.sections.ActualAccomplishmentSection(
