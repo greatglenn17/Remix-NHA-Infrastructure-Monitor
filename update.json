@@ -1,8 +1,8 @@
 {
-  "versionCode": 336,
-  "versionName": "2.8.56",
-  "releaseNotes": "v2.8.56: On the monthly report, Recommendations and the sign-offs fit under section VII instead of starting a page of their own.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.56/NHA_Monitor_v2.8.56_Build336.apk",
-  "apkSha256": "1593adf5d73238db4ca69f72c041b17702bed67a2ddce1b5781c14b7c0f74c65",
+  "versionCode": 337,
+  "versionName": "2.8.57",
+  "releaseNotes": "v2.8.57: The billing abstract is titled Summary of Work Accomplished, or Abstract of Milestone Accomplishment for a housing construction billing. A community facility's billing abstract now prints its abstract's own items.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.57/NHA_Monitor_v2.8.57_Build337.apk",
+  "apkSha256": "b83b69a45a1ac4a5f2061f8f670375be704cc2df4a099ba361194b4cad245b23",
   "isMandatory": false
 }
