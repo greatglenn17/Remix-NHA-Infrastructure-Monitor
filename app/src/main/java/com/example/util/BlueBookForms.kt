@@ -448,9 +448,9 @@ object BlueBookForms {
             (p.heading?.let { "<tr><td class='c'>${it.first}</td><td colspan='14'>${it.second}</td></tr>" } ?: "") + p.lines.joinToString("", transform = ::line) + total("Subtotal (${p.name})", sumOf(p.lines))
         }
         return page(
-            "Abstract of Physical Accomplishment",
+            "Summary of Work Accomplished",
             """
-            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct)}
+            ${apaTop(period.covered.trim().let { if (it.isEmpty()) "As of ${date(uploaded.asOf)}" else "Period covered: $it" }, project, documents, abstract.targetPct, uploaded.overallPct, "SUMMARY OF WORK ACCOMPLISHED")}
             <table class='apa'>
               ${apaHead()}
               $rows
@@ -480,14 +480,14 @@ object BlueBookForms {
     }
 
     /**
-     * The top of both abstracts, under the banner: the title, the [period] line, then the project, its contract
+     * The top of both abstracts, under the banner: the [title] (the billing abstract's is SUMMARY OF WORK ACCOMPLISHED), the [period] line, then the project, its contract
      * (its duration and dates at the sheet's right edge) and, after a blank line, its target, actual and
      * advance/slippage, the last as the two at 2 decimals each. As on the district's sheet, the contract's own cost,
      * duration and completion date stay, and what an approved variation order or time extension made of them is on the
      * REVISED lines: "360 C.D. + 291 C.D. (T.E. 1) = 651 C.D.", the total alone when the orders' names do not give the days.
      * web/print.js apaTop.
      */
-    private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double): String {
+    private fun apaTop(period: String, project: Project, documents: List<PendingDocument>, targetPct: Double, actual: Double, title: String = "ABSTRACT OF PHYSICAL ACCOMPLISHMENT"): String {
         fun info(label: String, value: String, label2: String = "", value2: String = "") =
             "<tr><td class='pl'>$label</td><td class='pc'>${if (label.isEmpty()) "" else ":"}</td><td>${esc(value)}</td><td class='pl'>$label2</td><td>${if (label2.isEmpty()) "" else ": ${esc(value2)}"}</td></tr>"
         val logs = ContractLogs.from(project, documents)
@@ -498,7 +498,7 @@ object BlueBookForms {
         val time = if (revisedDays == null) emptyList() else listOf("REVISED CONTRACT DURATION" to "$sum$revisedDays C.D.", "REVISED COMPLETION DATE" to date(logs.revisedCompletion))
         fun right(i: Int) = time.getOrNull(i) ?: ("" to "")
         return """
-            <h1>ABSTRACT OF PHYSICAL ACCOMPLISHMENT</h1>
+            <h1>$title</h1>
             <div class='period'>${esc(period)}</div>
             <table class='apa-info'>
               ${info("PROJECT NAME", project.name, "CONTRACT DURATION", "${project.contractDurationDays} C.D.")}

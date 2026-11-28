@@ -236,7 +236,7 @@ class BillingAbstractTest {
         val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 15.5))
         fun has(vararg cells: String, page: String = html) =
             assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(page))
-        assertTrue(html.contains("<div class='period'>Period covered: February 1 - 28, 2025</div>"))
+        assertTrue(Regex("<h1>SUMMARY OF WORK ACCOMPLISHED</h1>\\s*<div class='period'>Period covered: February 1 - 28, 2025</div>").containsMatchIn(html))
         assertTrue(sheet(BillingAbstract.Period(" ")).contains("<div class='period'>As of March 14, 2025</div>")) // no period typed
         assertTrue(!html.contains("equivalent", ignoreCase = true)) // the billing format has no equivalent-units columns
         // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
