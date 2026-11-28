@@ -796,7 +796,7 @@ object BlueBookForms {
         .sig1 { margin-top: 12mm; font-size: 10.5pt; }
         table.apa-info td { border: none; padding: 0.3mm 1mm; height: auto; width: auto; white-space: nowrap; }
         /* The value takes the room between, so the contract's duration and dates sit at the sheet's right edge. */
-        table.apa-info td:nth-child(3) { width: 100%; }
+        table.apa-info td:nth-child(3) { width: 100%; white-space: normal; } /* a long name wraps so the right side stays on the page */
         table.apa { font-size: 7.5pt; }
         table.apa th, table.apa td { padding: 1mm 0.8mm; }
         img.banner { display: block; width: 100%; margin-bottom: 3mm; }
