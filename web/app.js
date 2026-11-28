@@ -620,7 +620,7 @@ function itemOf(project) {
   const docs = s.docs.get(project.projectUuid) || [];
   // Without the orders the chart's plan would drop approved suspensions: keep the target and status the phone saved.
   const p = typeof s.loaded.pending_documents === 'string' ? project : L.withSchedule(project, docs, today());
-  const billed = L.billedTotal(s.payments.get(p.projectUuid) || []);
+  const billed = L.billedTotal((s.payments.get(p.projectUuid) || []).filter(x => !L.isAdvance(x)));
   const cost = L.currentCost(p, docs);
   const lastUpdate = L.latestReportDay(s.weekly.get(p.projectUuid) || []);
   const flags = L.flagsWithout(L.attentionFlags(p, docs, billed, today(), s.requests.get(p.projectUuid) || [], lastUpdate, s.issues.get(p.projectUuid) || []), failedTypes());
@@ -1174,12 +1174,13 @@ function drawProject(page) {
   const of = type => (type === 'audit_logs' ? page.audits || [] : records.filter(r => r.type === type));
   const documents = of('pending_documents');
   const project = L.withSchedule(stored, documents, today());
-  const payments = L.byBillingDate(of('project_payments'));
+  // A community facility's advance payment is not work billed: it stays out of every billed total and balance.
+  const allPayments = L.byBillingDate(of('project_payments')), payments = allPayments.filter(p => !L.isAdvance(p)), advances = allPayments.filter(L.isAdvance);
   // The phone lists weekly reports newest added first.
   const weekly = of('weekly_reports').sort((a, b) => (b.createdAtTimestamp || 0) - (a.createdAtTimestamp || 0));
   const cost = L.currentCost(project, documents);
   const billed = L.billedTotal(payments);
-  const c = { page, project, records, of, documents, payments, weekly, cost, billed, now: today() };
+  const c = { page, project, records, of, documents, payments, advances, weekly, cost, billed, now: today() };
   if (page.section === 'print') {
     const drawn = drawPrint(c);
     settle();
@@ -1299,7 +1300,7 @@ function drawProject(page) {
   if (billingAdd) billingAdd.onclick = () => billingForm(c);
   main.querySelectorAll('[data-bill-request]').forEach(b => { b.onclick = () => { const r = c.of('developer_requests').find(x => x.uuid === b.dataset.billRequest); if (r) billingForm(c, null, r); }; });
   // The saved billing, not the card's net one: an edit starts from what is stored.
-  main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = payments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
+  main.querySelectorAll('[data-edit-billing]').forEach(b => { b.onclick = () => { const p = allPayments.find(x => x.uuid === b.dataset.editBilling); if (p) billingForm(c, p); }; });
   const letterAdd = document.getElementById('letter-add');
   if (letterAdd) letterAdd.onclick = () => editLetter(c, null);
   const requestAdd = document.getElementById('request-add');
@@ -4084,10 +4085,12 @@ async function addIssue(c, f) {
  */
 function billingForm(c, old = null, request = null) {
   // An edited billing keeps its type and retention as choices, whatever the project type is now.
-  const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType) || Boolean(request);
+  const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType && !L.isAdvance(old)) || Boolean(request);
   const types = !old?.billingType || L.HOUSING_BILLING_TYPES.includes(old.billingType) ? L.HOUSING_BILLING_TYPES : [old.billingType, ...L.HOUSING_BILLING_TYPES];
   // A community facility deducts recoupment, VAT and withholding too, worked out from the gross; a new one holds 10%.
   const facility = !housing && L.isCommunityFacility(c.project.projectType);
+  // Its first billing is the 15% advance payment; the choice stays until one is saved. What is left of it caps the recoupment.
+  const canAdvance = facility && !old && !c.advances.length, left = L.advanceLeft(c.advances, c.payments, old);
   const oldRetention = old ? Number(old.retentionPct) || 0 : facility ? 10 : 0, retentions = L.RETENTIONS.includes(oldRetention) ? L.RETENTIONS : [...L.RETENTIONS, oldRetention];
   const money = v => (Number(v) > 0 ? Number(v).toFixed(2) : '');
   const d = document.createElement('dialog');
@@ -4104,8 +4107,10 @@ function billingForm(c, old = null, request = null) {
     <label class="field" data-by-unit style="display:none">Number of lots<input name="units" value="${esc(Number(old?.units) > 0 ? String(old.units) : '')}" inputmode="numeric" autocomplete="off"></label>
     <label class="field" data-by-unit style="display:none">Amount per lot (₱)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
     <label class="field" data-gross>Gross amount (₱)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
-    <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
-    ${facility ? L.FACILITY_DEDUCTIONS.map(([k, label]) => `<label class="field">${label} (₱)<input name="${k}" value="${money(old?.[k])}" inputmode="decimal" autocomplete="off"></label>`).join('') : ''}
+    ${canAdvance ? `<label class="field">Billed for<select name="billingType">${opt(L.ADVANCE_PAYMENT, 'Advance payment (15%)', c.payments.length ? '' : L.ADVANCE_PAYMENT)}${opt('', 'Progress billing', c.payments.length ? '' : L.ADVANCE_PAYMENT)}</select></label>`
+      : old && L.isAdvance(old) ? `<input type="hidden" name="billingType" value="${L.ADVANCE_PAYMENT}">` : ''}
+    <label class="field" data-progress>Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
+    ${facility ? L.FACILITY_DEDUCTIONS.map(([k, label]) => `<label class="field" data-progress>${label} (₱)<input name="${k}" value="${money(old?.[k])}" inputmode="decimal" autocomplete="off"></label>`).join('') : ''}
     <div class="billing-preview" aria-live="polite"></div>
     ${fileField('fileUrl', 'Scanned DV', old?.fileUrl)}
     <div class="form-foot"><div class="error" role="alert"></div>
@@ -4116,7 +4121,8 @@ function billingForm(c, old = null, request = null) {
   // Picking a housing type starts its amount from the latest billing of that type.
   const lastPrice = type => [...c.payments].reverse().find(p => p.billingType === type && Number(p.unitPrice) > 0)?.unitPrice;
   const showType = () => {
-    const type = values().billingType, unit = L.billingUnitName(type), byAmount = L.billedByAmount(type);
+    // The advance payment is billed by its amount, like a billing with no type.
+    const type = L.isAdvance(values()) ? '' : values().billingType, unit = L.billingUnitName(type), byAmount = L.billedByAmount(type);
     // .field sets its own display, so the hidden attribute would not hide it.
     const [units, price] = d.querySelectorAll('[data-by-unit]');
     units.style.display = type && !byAmount ? '' : 'none';
@@ -4135,17 +4141,32 @@ function billingForm(c, old = null, request = null) {
   const preview = () => {
     const f = values(), gross = L.billingGross(f), r = Number(f.retentionPct) || 0, lots = L.billedByAmount(f.billingType) ? L.billedUnits({ grossAmount: gross, unitPrice: L.parseAmount(f.unitPrice) }) : 0;
     const cut = Object.fromEntries(L.FACILITY_DEDUCTIONS.map(([k]) => [k, L.parseAmount(f[k]) ?? 0]));
+    // Recoupment stops once the advance is paid back.
+    const after = left == null ? null : Math.round((left - cut.recoupmentAmount) * 100) / 100;
+    const note = L.isAdvance(f) ? 'Paid in full and not counted as work billed: the billings after it recoup it.'
+      : after == null ? '' : left === 0 ? 'The advance payment is fully recouped: nothing left to recoup.'
+        : after <= 0 ? 'This billing finishes recouping the advance payment.' : `Advance left to recoup after this: ${L.formatPhp(after)}`;
     d.querySelector('.billing-preview').innerHTML = gross > 0
-      ? `${lots ? kv('Lots', String(lots)) : ''}${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${L.FACILITY_DEDUCTIONS.map(([k, label]) => (cut[k] ? kv(label, L.formatPhp(cut[k])) : '')).join('')}${kv('Net amount', L.formatPhp(L.paidAmount({ grossAmount: gross, retentionPct: r, ...cut })))}` : '';
+      ? `${lots ? kv('Lots', String(lots)) : ''}${L.isAdvance(f) ? kv('Net amount', L.formatPhp(gross))
+        : `${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${L.FACILITY_DEDUCTIONS.map(([k, label]) => (cut[k] ? kv(label, L.formatPhp(cut[k])) : '')).join('')}${kv('Net amount', L.formatPhp(L.paidAmount({ grossAmount: gross, retentionPct: r, ...cut })))}`}${note ? `<p class="muted small">${esc(note)}</p>` : ''}` : '';
+  };
+  // The advance has no retention or deductions; it starts at 15% of the original contract.
+  const showKind = () => d.querySelectorAll('[data-progress]').forEach(el => { el.style.display = L.isAdvance(values()) ? 'none' : ''; });
+  if (canAdvance) form.billingType.onchange = () => {
+    showKind();
+    form.grossAmount.value = L.isAdvance(values()) ? L.advanceAmount(c.project).toFixed(2) : '';
+    form.grossAmount.dispatchEvent(new Event('input', { bubbles: true }));
   };
   // Typing the gross fills the deductions; each can then be changed to match the official billing.
   if (facility) form.grossAmount.addEventListener('input', () => {
-    const gross = L.billingGross(values()), cut = L.facilityDeductions(gross);
+    const gross = L.billingGross(values()), cut = L.facilityDeductions(gross, left);
     for (const [k] of L.FACILITY_DEDUCTIONS) form[k].value = gross > 0 ? cut[k].toFixed(2) : '';
   });
   if (housing) form.billingType.onchange = () => { onType(); preview(); };
   form.oninput = preview;
   if (old) { showType(); preview(); }
+  if (canAdvance && L.isAdvance(values())) form.billingType.onchange();
+  if (old && L.isAdvance(old)) showKind();
   if (request) {
     form.billingType.value = request.billingType;
     onType();
@@ -4538,7 +4559,7 @@ function bindActual(c) {
 /** Which cost the billing % are on, once a variation order moved it; nothing otherwise. */
 const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
 
-function paymentsBody({ project, payments, cost, billed, of }) {
+function paymentsBody({ project, payments, advances, cost, billed, of }) {
   const editable = L.canEdit(project, s.user.uid, s.claims), asked = L.pendingBillingRequests(of('developer_requests'), payments);
   // Requests for billing logged under Developer requests wait here until a billing is saved from one.
   const requests = asked.length ? section(`Billing requests (${asked.length})`, 'move_to_inbox', asked.map(r => entry(L.billingRequestText(r), [
@@ -4549,13 +4570,26 @@ function paymentsBody({ project, payments, cost, billed, of }) {
     + '<p class="muted small">Not yet billed. One counts in the Status of billing once marked billed with its DV No. and scanned DV form.</p>') : '';
   const figures = [['Current contract cost', L.formatPhp(cost)], ['Total billed', payments.length ? L.formatPhp(billed) : 'No billings yet', payments.length ? '' : 'word'],
     ...(billed > 0 && cost > 0 ? [['Billed share', L.billedLabel(billed, cost)]] : []), ['Balance', L.formatPhp(cost - billed)]];
+  // A community facility's advance payment: what is left to recoup, or that it is all paid back.
+  const left = L.advanceLeft(advances, payments);
+  if (left != null) figures.push(['Advance to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word']);
+  const given = advances.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
+  const advanceCards = advances.map(p => `<li class="card pay-card">
+      <div class="pc-head"><div><h3>${esc(p.name || L.ADVANCE_PAYMENT)}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
+        ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
+      <p class="muted small">${esc(L.displayDate(p.date || '-'))} · 15% of the original contract</p>
+      ${kv('Net amount', L.formatPhp(Number(p.grossAmount) || 0))}
+      ${kv('Recouped so far', L.formatPhp(Math.round((given - left) * 100) / 100))}
+      ${kv('Left to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word')}
+      ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
+    </li>`).join('');
   // A one-row table from 900px; under it the same figures as label-and-amount rows, which fit a phone (style.css shows one of the two).
   const summary = section('Billing summary', 'payments', `<div class="bill-sum">${figures.map(f => kv(...f)).join('')}</div>
     <div class="bill-table">${table(figures.map(([text]) => ({ text, num: 1 })), `<tr>${figures.map(([, v, cls]) => `<td class="num${cls ? ` ${cls}` : ''}">${esc(v)}</td>`).join('')}</tr>`)}</div>
     ${baseNote(project, cost)}`, '',
     editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : '');
-  if (!payments.length) return `<div class="stack">${summary}${requests}<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div></div>`;
-  return `<div class="stack">${summary}${requests}<ul class="pay-cards">${L.netBillings(payments, cost).map(p => {
+  if (!payments.length) return `<div class="stack">${summary}${requests}${advanceCards ? `<ul class="pay-cards">${advanceCards}</ul>` : `<div class="empty-ledger">${icon('receipt_long')}<p>No billings yet</p></div>`}</div>`;
+  return `<div class="stack">${summary}${requests}<ul class="pay-cards">${advanceCards}${L.netBillings(payments, cost).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
       <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>

@@ -137,8 +137,12 @@ interface ProjectDao {
 
     // By billing date, as the website lists them and as netBillings works out balances, so the balances run down the list.
     // Same date: by uuid, which an edit never changes, so an edited billing keeps its place.
-    @Query("SELECT * FROM project_payments WHERE projectId = :projectId ORDER BY date ASC, uuid ASC")
+    // A community facility's advance payment is not work billed: it is left out here and read with getAdvancePayments.
+    @Query("SELECT * FROM project_payments WHERE projectId = :projectId AND billingType != 'Advance payment' ORDER BY date ASC, uuid ASC")
     fun getProjectPaymentsForProject(projectId: Long): Flow<List<ProjectPayment>>
+
+    @Query("SELECT * FROM project_payments WHERE projectId = :projectId AND billingType = 'Advance payment' ORDER BY date ASC, uuid ASC")
+    fun getAdvancePayments(projectId: Long): Flow<List<ProjectPayment>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProjectPayment(payment: ProjectPayment)
@@ -189,7 +193,7 @@ interface ProjectDao {
     @Query("SELECT * FROM project_images")
     fun getAllImages(): Flow<List<ProjectImage>>
 
-    @Query("SELECT * FROM project_payments")
+    @Query("SELECT * FROM project_payments WHERE billingType != 'Advance payment'")
     fun getAllPayments(): Flow<List<ProjectPayment>>
 
     @Query("SELECT * FROM project_issues")

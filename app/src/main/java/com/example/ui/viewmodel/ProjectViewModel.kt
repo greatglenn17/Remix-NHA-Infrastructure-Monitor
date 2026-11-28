@@ -836,6 +836,12 @@ class ProjectViewModel(application: Application) : AndroidViewModel(application)
     val projectPayments: StateFlow<List<ProjectPayment>> = selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getProjectPaymentsForProject(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** A community facility's advance payment, kept apart from [projectPayments]. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val projectAdvances: StateFlow<List<ProjectPayment>> = selectedProjectId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else repository.getAdvancePayments(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     @OptIn(ExperimentalCoroutinesApi::class)
     val projectIssues: StateFlow<List<ProjectIssue>> = _selectedProjectId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.getProjectIssues(id)

@@ -2194,3 +2194,31 @@ test('a new weekly report starts with the latest report\'s manpower and equipmen
   assert.deepEqual(L.carriedCrew([]), { manpower: start, equipment: [] });
   assert.deepEqual(L.carriedCrew([r('Oct 19, 2026 - Oct 25, 2026', [], [])]).manpower, start);
 });
+
+test('a community facility advance payment: 15% of the original contract, paid in full, recouped by the billings after it', () => {
+  assert.equal(L.advanceAmount({ contractCostOriginal: 10_000_000, contractCostRevised: 12_000_000 }), 1_500_000);
+  const advance = { uuid: 'a', billingType: L.ADVANCE_PAYMENT, grossAmount: 1_500_000 };
+  // No advance saved: the full 15% as before. With one, no more than what is left.
+  assert.equal(L.advanceLeft([], []), null);
+  assert.equal(L.facilityDeductions(2_000_000).recoupmentAmount, 300_000);
+  const b1 = { uuid: 'b1', grossAmount: 2_000_000, recoupmentAmount: 300_000 }, b2 = { uuid: 'b2', grossAmount: 7_000_000, recoupmentAmount: 1_100_000 };
+  assert.equal(L.advanceLeft([advance], [b1]), 1_200_000);
+  assert.equal(L.facilityDeductions(2_000_000, 1_200_000).recoupmentAmount, 300_000);
+  assert.equal(L.facilityDeductions(2_000_000, 100_000).recoupmentAmount, 100_000);
+  assert.equal(L.facilityDeductions(2_000_000, 0).recoupmentAmount, 0);
+  assert.equal(L.advanceLeft([advance], [b1, b2]), 100_000);
+  // An edited billing's own recoupment is not counted against it.
+  assert.equal(L.advanceLeft([advance], [b1, b2], b2), 1_200_000);
+  assert.equal(L.advanceLeft([advance], [b1, b2, { uuid: 'b3', recoupmentAmount: 100_000 }]), 0);
+
+  // Saved with its typed amount, no retention and no deductions, and never checked against the work done.
+  const f = { name: '', dvNo: '', date: '2026-11-10', periodCovered: '', billingType: L.ADVANCE_PAYMENT, grossAmount: '1,500,000', retentionPct: '10', recoupmentAmount: '225000.00', vatAmount: '66964.29' };
+  assert.deepEqual(L.billingErrors(f), []);
+  const r = JSON.parse(L.newPaymentRecord({ uuid: 'a', projectUuid: 'p', assignedUids: [], uid: 'me', now: 1 }, f, [], 10_000_000).data);
+  assert.deepEqual([r.name, r.grossAmount, r.retentionPct, r.recoupmentAmount, r.vatAmount, r.withholdingAmount, r.units, r.unitPrice], [L.ADVANCE_PAYMENT, 1_500_000, 0, 0, 0, 0, 0, 0]);
+  assert.equal(L.paidAmount(r), 1_500_000);
+  assert.deepEqual(L.billingAheadErrors({}, [], [], [], f), []);
+  // Editing or deleting it moves no balance.
+  assert.deepEqual(L.editedBillings([b1, b2], advance, { ...f, grossAmount: '1,600,000' }, 10_000_000).map(([p]) => p.uuid), ['a']);
+  assert.deepEqual(L.deletedBillingEdits([b1, b2], advance, 10_000_000), [[advance, null]]);
+});

@@ -3,6 +3,7 @@ package com.example.util
 import com.example.data.model.ACCOMPLISHMENT_LINES
 import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.PendingDocument
+import com.example.data.model.isAdvance
 import com.example.data.model.Project
 import com.example.data.model.ProjectAbstract
 import com.example.data.model.ProjectPayment
@@ -55,7 +56,7 @@ object BillingAbstract {
         project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, weekly: List<WeeklyReport>,
         new: ProjectPayment, old: ProjectPayment? = null, abstracts: List<ProjectAbstract> = emptyList()
     ): List<String> {
-        if (new.billingType.isBlank() || (old != null && old.billingType == new.billingType && round2(new.grossAmount) <= round2(old.grossAmount))) return emptyList()
+        if (new.billingType.isBlank() || new.isAdvance || (old != null && old.billingType == new.billingType && round2(new.grossAmount) <= round2(old.grossAmount))) return emptyList()
         val abstract = ProjectAbstracts.latest(abstracts)
         val last = latestWeekly(weekly)
         val actuals = abstract?.let(ProjectAbstracts::lineActuals)

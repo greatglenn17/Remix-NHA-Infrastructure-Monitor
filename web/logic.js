@@ -56,11 +56,27 @@ export function currentCost(project, documents) {
 export const netAmount = p => (Number(p.grossAmount) || 0) * (1 - (Number(p.retentionPct) || 0) / 100);
 /** ProjectPayment.paidAmount: the check, the net after retention less recoupment, VAT and withholding (a community facility's). */
 export const paidAmount = p => netAmount(p) - (Number(p.recoupmentAmount) || 0) - (Number(p.vatAmount) || 0) - (Number(p.withholdingAmount) || 0);
-/** facilityDeductions: a community facility's recoupment (15%), VAT (5% ÷ 1.12) and withholding tax (2% ÷ 1.12) of the gross, to the centavo. */
-export const facilityDeductions = gross => {
+/**
+ * facilityDeductions: a community facility's recoupment (15%, but no more than the advance `left` to recoup), VAT (5% ÷ 1.12)
+ * and withholding tax (2% ÷ 1.12) of the gross, to the centavo. Without an advance (`left` null) the recoupment is the full 15%.
+ */
+export const facilityDeductions = (gross, left = null) => {
   const c = x => Math.round(x * 100) / 100;
-  return { recoupmentAmount: c(gross * 0.15), vatAmount: c(gross * 0.05 / 1.12), withholdingAmount: c(gross * 0.02 / 1.12) };
+  return { recoupmentAmount: Math.min(c(gross * 0.15), left ?? Infinity), vatAmount: c(gross * 0.05 / 1.12), withholdingAmount: c(gross * 0.02 / 1.12) };
 };
+/**
+ * A community facility's advance payment: its first billing, 15% of the original contract, paid in full and paid back
+ * through the recoupment of the billings after it. It is not work billed, so it stays out of the billed share and balances.
+ */
+export const ADVANCE_PAYMENT = 'Advance payment';
+export const isAdvance = p => p.billingType === ADVANCE_PAYMENT;
+export const advanceAmount = project => Math.round((Number(project.contractCostOriginal) || 0) * 15) / 100;
+/** What is still to recoup of the `advances`, from every billing in `payments` but `except` (the one being edited); null without an advance. */
+export function advanceLeft(advances, payments, except = null) {
+  if (!advances.length) return null;
+  const sum = (list, k) => list.reduce((t, p) => t + (p.uuid && p.uuid === except?.uuid ? 0 : Number(p[k]) || 0), 0);
+  return Math.max(0, Math.round((sum(advances, 'grossAmount') - sum(payments, 'recoupmentAmount')) * 100) / 100);
+}
 /** The form fields of facilityDeductions, with their labels. */
 export const FACILITY_DEDUCTIONS = [['recoupmentAmount', 'Recoupment'], ['vatAmount', 'VAT'], ['withholdingAmount', 'Withholding tax']];
 
@@ -1619,7 +1635,9 @@ export function monthPeriod(day) {
   return `${month} 1 - ${new Date(Date.UTC(y, m, 0)).getUTCDate()}, ${y}`;
 }
 
-const billedByUnit = f => Boolean(f.billingType) && !billedByAmount(f.billingType);
+// A housing type: billed by lot or unit, or by the amount per lot. The advance payment is billed by its amount.
+const housingType = f => Boolean(f.billingType) && !isAdvance(f);
+const billedByUnit = f => housingType(f) && !billedByAmount(f.billingType);
 /** AddPaymentDialog's gross: units × amount per lot or unit for a housing billing type counted in whole ones, else the gross typed. */
 // Rounded to the centavo: 3 × 123,456.78 would otherwise save as 370370.33999999997.
 export const billingGross = f => (billedByUnit(f) ? Math.round((Number.parseInt(f.units, 10) || 0) * (parseAmount(f.unitPrice) ?? 0) * 100) / 100 : parseAmount(f.grossAmount) ?? 0);
@@ -1632,7 +1650,7 @@ export function billingErrors(f) {
     !/^\d{4}-\d{2}-\d{2}$/.test(f.date || '') && 'Pick the date.',
     !byUnit && (!String(f.grossAmount ?? '').trim() ? 'Type the gross amount.' : parseAmount(f.grossAmount) == null && 'The gross amount must be a number.'),
     byUnit && (!units ? `Type the number of ${billingUnitName(f.billingType)}s.` : !/^\d+$/.test(units) || Number(units) < 1 ? 'The number must be a whole number.' : false),
-    f.billingType && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
+    housingType(f) && (!String(f.unitPrice ?? '').trim() ? `Type the amount per ${billingUnitName(f.billingType)}.` : parseAmount(f.unitPrice) == null && 'The amount must be a number.'),
     ...FACILITY_DEDUCTIONS.map(([k, label]) => String(f[k] ?? '').trim() && parseAmount(f[k]) == null && `The ${label.toLowerCase()} must be a number.`),
   ].filter(Boolean);
 }
@@ -1642,9 +1660,10 @@ function billingFields(f) {
   const byUnit = billedByUnit(f);
   return {
     name: f.name.trim() || f.billingType, dvNo: f.dvNo.trim(), date: f.date, periodCovered: f.periodCovered.trim(), grossAmount: billingGross(f),
-    billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: f.billingType ? parseAmount(f.unitPrice) : 0,
-    retentionPct: Number(f.retentionPct) || 0,
-    ...Object.fromEntries(FACILITY_DEDUCTIONS.map(([k]) => [k, parseAmount(f[k]) ?? 0])),
+    billingType: f.billingType, units: byUnit ? Number(f.units) : 0, unitPrice: housingType(f) ? parseAmount(f.unitPrice) : 0,
+    // The advance is paid in full.
+    retentionPct: isAdvance(f) ? 0 : Number(f.retentionPct) || 0,
+    ...Object.fromEntries(FACILITY_DEDUCTIONS.map(([k]) => [k, isAdvance(f) ? 0 : parseAmount(f[k]) ?? 0])),
   };
 }
 
@@ -1672,7 +1691,7 @@ export function partAmounts(project, docs, asOf) {
  */
 export function billingAheadErrors(project, docs, payments, weekly, f, old = null, abstracts = []) {
   const gross = billingGross(f);
-  if (!f.billingType || (old && old.billingType === f.billingType && Math.round(gross * 100) <= Math.round((Number(old.grossAmount) || 0) * 100))) return [];
+  if (!housingType(f) || (old && old.billingType === f.billingType && Math.round(gross * 100) <= Math.round((Number(old.grossAmount) || 0) * 100))) return [];
   const abstract = latestAbstract(abstracts), last = abstract ? null : latestWeekly(weekly);
   const actuals = abstract ? abstractLineActuals(abstract).map(Number) : last ? accomplishmentOf(last.accomplishmentItemsJson).map(a => a.actualPct) : [];
   const from = abstract ? ` of the abstract as of ${displayDate(abstract.asOf)}` : last ? ` of ${last.reportingWeek}` : '';
@@ -1767,7 +1786,8 @@ export function unitsStanding(abstract, abstracts, payments, units) {
  */
 export function editedBillings(payments, old, f, cost) {
   const fields = billingFields(f), delta = fields.grossAmount - (Number(old.grossAmount) || 0);
-  if (delta === 0) return [[old, fields]];
+  // The advance is in no balance.
+  if (delta === 0 || isAdvance(old)) return [[old, fields]];
   const shift = balanceShift(delta, cost);
   return [[old, { ...fields, ...shift(old), percentage: cost > 0 ? fields.grossAmount / cost * 100 : 0 }], ...laterBillings(payments, old).map(p => [p, shift(p)])];
 }
@@ -1783,6 +1803,7 @@ const balanceShift = (delta, cost) => p => ({
  * the deleted gross (MoneySection.billingsAfterDelete).
  */
 export function deletedBillingEdits(payments, old, cost) {
+  if (isAdvance(old)) return [[old, null]];
   const shift = balanceShift(-(Number(old.grossAmount) || 0), cost);
   return [[old, null], ...laterBillings(payments, old).map(p => [p, shift(p)])];
 }

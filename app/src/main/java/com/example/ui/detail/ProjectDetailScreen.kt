@@ -77,6 +77,7 @@ fun ProjectDetailScreen(
     val monthlyReports by viewModel.monthlyReports.collectAsState()
     val projectIssues by viewModel.projectIssues.collectAsState()
     val projectPayments by viewModel.projectPayments.collectAsState()
+    val projectAdvances by viewModel.projectAdvances.collectAsState()
     val auditLogs by viewModel.auditLogs.collectAsState()
     val dailyWeatherLogs by viewModel.dailyWeatherLogs.collectAsState()
     val section by viewModel.selectedSection.collectAsState()
@@ -465,6 +466,8 @@ fun ProjectDetailScreen(
                         currentUserRole = currentUser.role,
                         isHousing = isHousingProject,
                         isFacility = com.example.data.model.isCommunityFacility(currentProject.projectType),
+                        advances = projectAdvances,
+                        advanceAmount = com.example.data.model.advanceAmount(currentProject.contractCostOriginal),
                         landPerLot = { date ->
                             com.example.util.BillingAbstract.partAmounts(currentProject, pendingDocuments, runCatching { java.time.LocalDate.parse(date) }.getOrNull())[1] /
                                 com.example.util.BillingAbstract.units(currentProject, com.example.util.SdpSummary.of(allSitesSdpItems).saleable.count)
