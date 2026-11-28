@@ -1,8 +1,8 @@
 {
-  "versionCode": 331,
-  "versionName": "2.8.51",
-  "releaseNotes": "v2.8.51: The top of the printed abstract stays on the page. A long project name wraps to a second line instead of pushing the revised contract duration past the right edge.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.51/NHA_Monitor_v2.8.51_Build331.apk",
-  "apkSha256": "08442ac7e4164b5273515aecac9bbec1c21a563a693932e8db2ff72c1882c23d",
+  "versionCode": 332,
+  "versionName": "2.8.52",
+  "releaseNotes": "v2.8.52: The bar chart's planned % no longer stops for suspension days an approved time extension already covers, so a project past its revised completion date plans 100%.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.52/NHA_Monitor_v2.8.52_Build332.apk",
+  "apkSha256": "9c1ce39b5462d2b9669032dbc3051968988c53c27a9aaae6c99cd62e96c5db06",
   "isMandatory": true
 }
