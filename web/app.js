@@ -1616,7 +1616,8 @@ function chartSheet(c, st, can) {
     <thead><tr><th rowspan="2" class="bc-name">Description</th><th rowspan="2" class="num">Cost (₱)</th><th rowspan="2" class="num">%</th><th rowspan="2" class="num">Days</th>
       ${Array.from({ length: months }, (_, m) => `<th class="m" colspan="${MONTH_CELLS}">Month ${m + 1}${dated ? ` · ${short(m * MONTH_CELLS + 1)} – ${L.displayDate(date((m + 1) * MONTH_CELLS))}` : ''}</th>`).join('')}</tr>
       <tr>${Array.from({ length: cells / 5 }, (_, k) => `<th class="bc-day${edge(k * 5)}" colspan="5">${dated ? short((k + 1) * 5) : (k % 6 + 1) * 5}</th>`).join('')}</tr></thead>
-    <tbody>${whole}${v.items.map(row).join('')}</tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
+    <tbody>${whole}${v.items.map(row).join('')}</tbody>
+    <tbody class="bc-scroll" data-scroll-row hidden><tr><td colspan="${4 + cells}"><div class="bc-scrollbar" data-scrollbar><div></div></div></td></tr></tbody><tfoot>${chartFoot(v, months)}</tfoot></table>`;
 }
 
 /**
@@ -1627,20 +1628,25 @@ function chartSheet(c, st, can) {
 function bindChart(c) {
   const { project, documents, page } = c, st = page.chart, el = document.getElementById('bc-page');
   const can = L.canEditChart(project, s.user.uid, s.claims), open = () => st.drafts[st.selected];
-  const numbers = () => {
-    const v = open(), errors = can ? L.chartErrors(st.drafts, project, documents) : [], dirty = L.chartJson(st.drafts) !== st.initial;
-    el.querySelector('[data-errors]').innerHTML = errors.map(e => `<li>${esc(e)}</li>`).join('');
-    el.querySelector('[data-print]').hidden = dirty || st.selected >= st.count; // the print page draws the saved chart
-    if (v) {
-      const note = L.chartTotalNote(st.selected, v.items.reduce((t, x) => t + x.amount, 0), project, documents), line = el.querySelector('[data-total]');
-      line.textContent = v.items.length ? note.text : '';
-      line.classList.toggle('warn', !note.ok);
-      el.querySelector('[data-legend]').innerHTML = chartLegend(v);
+  // `bars`, while a drag paints, redraws only the days: the figures follow when the button is let go (onmouseup), as
+  // writing them lays out the whole sheet again.
+  const numbers = bars => {
+    const v = open();
+    if (!bars) {
+      const errors = can ? L.chartErrors(st.drafts, project, documents) : [], dirty = L.chartJson(st.drafts) !== st.initial;
+      el.querySelector('[data-errors]').innerHTML = errors.map(e => `<li>${esc(e)}</li>`).join('');
+      el.querySelector('[data-print]').hidden = dirty || st.selected >= st.count; // the print page draws the saved chart
+      if (v) {
+        const note = L.chartTotalNote(st.selected, v.items.reduce((t, x) => t + x.amount, 0), project, documents), line = el.querySelector('[data-total]');
+        line.textContent = v.items.length ? note.text : '';
+        line.classList.toggle('warn', !note.ok);
+        el.querySelector('[data-legend]').innerHTML = chartLegend(v);
+      }
+      if (!can) { scrollbar(); return; }
+      el.querySelector('[data-save]').disabled = errors.length > 0 || !dirty;
+      el.querySelector('[data-discard]').hidden = !dirty;
+      keep(c, 'chart-draft', dirty ? L.chartKept(project.barChartJson || '', st.drafts) : null);
     }
-    if (!can) return;
-    el.querySelector('[data-save]').disabled = errors.length > 0 || !dirty;
-    el.querySelector('[data-discard]').hidden = !dirty;
-    keep(c, 'chart-draft', dirty ? L.chartKept(project.barChartJson || '', st.drafts) : null);
     if (!v) return;
     const table = el.querySelector('.bc-grid'), months = L.sheetMonths(v, project.contractDurationDays, st.months);
     if (Number(table.dataset.months) !== months) { sheet(); return; } // a bar typed past the last month drawn, or taken back
@@ -1654,19 +1660,40 @@ function bindChart(c) {
       fills.forEach((f, k) => { tr.children[4 + k].style.background = dayColor(f, v.colors); });
     };
     table.querySelectorAll('tbody tr[data-item]:not(.bc-exact)').forEach((tr, i) => {
-      put(tr.querySelector('[data-pct]'), (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3));
-      put(tr.querySelector('[data-days]'), made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0));
+      if (!bars) {
+        put(tr.querySelector('[data-pct]'), (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3));
+        put(tr.querySelector('[data-days]'), made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0));
+      }
       // A row whose days did not change is left alone: a chart of two years is 720 cells a row.
       days(tr, L.dayFills(made.items[i], v.colors, months * MONTH_CELLS));
     });
     const whole = table.querySelector('tr[data-all]');
     if (whole) days(whole, L.suspendedFills(made, v.colors, months * MONTH_CELLS));
+    if (bars) return;
     const foot = chartFoot(v, months);
     if (table.tFoot.drawn !== foot) table.tFoot.innerHTML = table.tFoot.drawn = foot;
     put(el.querySelector(`[data-tab="${st.selected}"]`), chartTabName(st, st.selected));
     el.querySelector('[data-undo]').disabled = !st.undo.length;
     v.colors.forEach((x, k) => { const b = el.querySelector(`[data-tool="${k}"]`); b.firstElementChild.style.background = x.color; put(b.lastElementChild, colorName(x)); });
+    scrollbar();
   };
+  // The sheet's scroll bar, above the figures under the items (style.css hides the box's own): shown only when the
+  // sheet is wider than the box, and as long as the sheet is wide.
+  const scrollbar = () => {
+    const box = el.querySelector('[data-sheet]'), row = box?.querySelector('[data-scroll-row]');
+    if (!row) return;
+    row.hidden = box.scrollWidth <= box.clientWidth;
+    if (row.hidden) return;
+    const bar = row.querySelector('[data-scrollbar]');
+    bar.firstElementChild.style.width = `${box.scrollWidth - box.clientWidth + bar.clientWidth}px`; // the same distance to scroll
+    bar.scrollLeft = box.scrollLeft;
+  };
+  // Moving either one moves the other (scroll does not bubble, so it is caught on the way down).
+  el.addEventListener('scroll', e => {
+    const box = el.querySelector('[data-sheet]'), bar = box?.querySelector('[data-scrollbar]');
+    if (e.target === box && bar) bar.scrollLeft = box.scrollLeft;
+    else if (e.target === bar) box.scrollLeft = bar.scrollLeft;
+  }, true);
   // Drawn again, the box or button that had focus keeps it (they are named by data-bc).
   const again = draw => {
     const a = document.activeElement, key = el.contains(a) && a.dataset.bc, at = key && a.type === 'text' ? [a.selectionStart, a.selectionEnd] : null;
@@ -1682,9 +1709,10 @@ function bindChart(c) {
   numbers();
 
   // The sheet's zoom, 5% to 200%, kept while the page is open. Fit measures the sheet at 100% and rounds down, so nothing is left to scroll.
-  const zoomTo = z => { st.zoom = Math.min(2, Math.max(0.05, Math.round(z * 1000) / 1000)); el.style.setProperty('--bc-zoom', st.zoom); const at = el.querySelector('[data-zoom-at]'); if (at) at.textContent = `${Math.round(st.zoom * 100)}%`; };
+  const zoomTo = z => { st.zoom = Math.min(2, Math.max(0.05, Math.round(z * 1000) / 1000)); el.style.setProperty('--bc-zoom', st.zoom); const at = el.querySelector('[data-zoom-at]'); if (at) at.textContent = `${Math.round(st.zoom * 100)}%`; scrollbar(); };
   const fitZoom = () => { el.style.setProperty('--bc-zoom', 1); const box = el.querySelector('[data-sheet]'); return Math.min(1, Math.floor(box.clientWidth / box.firstElementChild.getBoundingClientRect().width * 1000) / 1000); };
   zoomTo(st.zoom);
+  document.fonts.ready.then(() => { if (el.isConnected) scrollbar(); }); // the sheet widens a little when its font arrives
 
   // Pointing at a day shows where the project is planned to be by the end of it: the cumulative %, to the day.
   // `at` is read before a drag paints, so a move lays the sheet out once, not twice.
@@ -1770,7 +1798,7 @@ function bindChart(c) {
     const a = Math.min(paint.from, day), b = Math.max(paint.from, day), { tool, move } = paint;
     const one = item => (!move ? L.paintDays(item, a, b, tool, v.colors) : tool === 'erase' ? L.removeDays(item, a, b) ?? L.paintDays(item, a, b, tool, v.colors) : L.insertDays(item, a, b, tool));
     v.items = i === 'all' ? L.suspendDays(paint.items, a, b, tool) : paint.items.map((item, j) => (j === Number(i) ? one(item) : item));
-    if (i === 'all' ? Object.values(st.open).some(Boolean) : st.open[i]) sheet(); else numbers();
+    if (i === 'all' ? Object.values(st.open).some(Boolean) : st.open[i]) sheet(); else numbers(true);
   };
   // Add column and Remove column: a press is one day, put in empty where there is still work from there on (the later work a
   // day later), or taken out where nothing works on it. On the Whole project row that is every item; on an item's row, that
@@ -1797,8 +1825,8 @@ function bindChart(c) {
     if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else { paintAt(e); if (paint) undoable(paint.items); }
   };
   el.onmouseover = e => { const at = e.target.closest?.('.bc-cell')?.getBoundingClientRect(); if (paint && e.buttons === 1) paintAt(e); tipAt(e, at); };
-  el.onmouseup = () => { paint = null; };
-  el.onmouseleave = () => { paint = null; untip(); };
+  el.onmouseup = () => { if (paint) numbers(); paint = null; };
+  el.onmouseleave = () => { if (paint) numbers(); paint = null; untip(); };
 
   el.onchange = async e => {
     const input = e.target, file = input.matches('[data-file]') && input.files[0], v = open();

@@ -1070,6 +1070,11 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .bc-grid .bc-day { padding: 2px 2px 2px 0; text-align: right; font-size: 10px; font-weight: 400; letter-spacing: 0; }
 .bc-grid .bc-cell { min-width: 9px; height: 30px; padding: 0; border-right-color: color-mix(in srgb, var(--outline) 30%, transparent); } /* a day */
 .bc-grid.can .bc-cell { cursor: cell; }
+/* bindChart's scroll bar between the items and the figures, in place of the box's own under the last row: the box's width less the sheet's left border (so it never widens the sheet), at 100% whatever the zoom */
+#bc-page [data-sheet] { container-type: inline-size; scrollbar-width: none; }
+.bc-grid .bc-scroll td { padding: 0; border-right-width: 0; }
+.bc-scrollbar { position: sticky; left: 0; z-index: 2; width: calc(100cqw - 1px); zoom: calc(1 / var(--bc-zoom, 1)); overflow-x: scroll; scrollbar-width: auto; scrollbar-color: var(--accent) var(--field); }
+.bc-scrollbar > div { height: 1px; }
 /* The day pointed at and the project's planned % by it, over the cell. */
 .bc-tip { position: fixed; z-index: 5; transform: translate(-50%, calc(-100% - 6px)); padding: 4px 8px; border: 1px solid var(--outline); border-radius: 6px;
   background: var(--surface-solid); color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
