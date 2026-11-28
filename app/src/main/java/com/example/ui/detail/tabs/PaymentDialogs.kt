@@ -31,6 +31,8 @@ import com.example.data.model.HOUSING_BILLING_TYPES
 import com.example.data.model.ProjectPayment
 import com.example.data.model.billedByAmount
 import com.example.data.model.facilityDeductions
+import com.example.data.model.ADVANCE_PAYMENT
+import com.example.data.model.isAdvance
 import com.example.data.model.billingText
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
@@ -63,7 +65,12 @@ fun AddPaymentDialog(
     // Why this billing cannot be saved (it would pass the actual accomplishment) and what to do about it; empty when it can.
     check: (ProjectPayment) -> List<String> = { emptyList() },
     // A request for billing being billed: its type and lots or units start the form, and it saves only with the DV No. and scanned DV.
-    request: DeveloperRequest? = null
+    request: DeveloperRequest? = null,
+    // A community facility's first billing is its advance payment ([advanceAmount], 15% of the original contract): offered until one is saved.
+    canAdvance: Boolean = false,
+    advanceAmount: Double = 0.0,
+    // What is left to recoup of the advance before this billing, which caps its recoupment; null without an advance.
+    advanceLeft: Double? = null
 ) {
     // The latest billing of a type starts its amount per lot or unit; land development without one starts from its contract amount per lot.
     fun priceFor(t: String, on: String) = previous.filter { it.billingType == t && it.unitPrice > 0 && it.id != existing?.id }
@@ -79,11 +86,14 @@ fun AddPaymentDialog(
         mutableStateOf(
             existing?.let { "%.2f".format(java.util.Locale.US, it.grossAmount) }
                 ?: request?.takeIf { billedByAmount(it.billingType) }?.let { r -> askedPrice?.let { "%.2f".format(java.util.Locale.US, Math.round(r.units * it * 100) / 100.0) } }
+                ?: advanceAmount.takeIf { canAdvance && previous.isEmpty() && it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) }
                 ?: ""
         )
     }
     var fileUrl by remember { mutableStateOf(existing?.fileUrl ?: "") }
-    var type by remember { mutableStateOf(existing?.billingType ?: request?.billingType ?: "") }
+    var type by remember { mutableStateOf(existing?.takeUnless { it.isAdvance }?.billingType ?: request?.billingType ?: "") }
+    // The advance is paid in full: no retention and no deductions. A new facility's first billing starts as one.
+    var advance by remember { mutableStateOf(existing?.isAdvance ?: (canAdvance && previous.isEmpty())) }
     var unitsStr by remember { mutableStateOf((existing?.units ?: request?.units)?.takeIf { it > 0 }?.toString() ?: "") }
     var priceStr by remember { mutableStateOf((existing?.unitPrice ?: askedPrice)?.takeIf { it > 0 }?.let { "%.2f".format(java.util.Locale.US, it) } ?: "") }
     val facility = isFacility && !isHousing
@@ -110,7 +120,7 @@ fun AddPaymentDialog(
     else listOfNotNull("Type the DV No.".takeIf { dvNo.isBlank() }, "Attach the scanned DV form.".takeIf { fileUrl.isBlank() }).joinToString(" ").ifBlank { null }
     val cutValues = cuts.map { FormValidation.parseAmount(it) ?: 0.0 }
     val cutErrs = cuts.map { FormValidation.amountError(it, false) }
-    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString()) + cuts }
+    val snapshot = { listOf(name, dvNo, date, periodCovered, amountStr, fileUrl, type, unitsStr, priceStr, retention.toString(), advance.toString()) + cuts }
     val initial = remember { snapshot() }
     val close = rememberDiscardGuard(snapshot() != initial, onDismiss)
 
@@ -193,12 +203,31 @@ fun AddPaymentDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+                if (canAdvance) {
+                    Text("Billed for", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(true to "Advance payment (15%)", false to "Progress billing").forEach { (isAdvance, label) ->
+                            FilterChip(
+                                selected = advance == isAdvance,
+                                onClick = {
+                                    if (advance != isAdvance) {
+                                        advance = isAdvance
+                                        amountStr = if (isAdvance) money(advanceAmount) else ""
+                                        cuts = facilityDeductions(FormValidation.parseAmount(amountStr) ?: 0.0, advanceLeft).map(::money)
+                                    }
+                                },
+                                label = { Text(label) },
+                                modifier = Modifier.testTag(if (isAdvance) "billing_advance" else "billing_progress")
+                            )
+                        }
+                    }
+                }
                 if (!byUnit) {
                     OutlinedTextField(
                         value = amountStr,
                         onValueChange = {
                             amountStr = it
-                            if (facility) cuts = facilityDeductions(FormValidation.parseAmount(it) ?: 0.0).map(::money)
+                            if (facility) cuts = facilityDeductions(FormValidation.parseAmount(it) ?: 0.0, advanceLeft).map(::money)
                         },
                         label = { Text("Gross Amount (PHP)") },
                         placeholder = { Text("e.g. 15000000") },
@@ -209,8 +238,8 @@ fun AddPaymentDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                Text("Retention", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!advance) Text("Retention", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!advance) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(0.0, 5.0, 10.0).forEach { r ->
                         FilterChip(
                             selected = r == retention,
@@ -220,7 +249,7 @@ fun AddPaymentDialog(
                         )
                     }
                 }
-                if (facility) listOf("Recoupment, 15%", "VAT, 5% ÷ 1.12", "Withholding tax, 2% ÷ 1.12").forEachIndexed { i, label ->
+                if (facility && !advance) listOf("Recoupment, 15%", "VAT, 5% ÷ 1.12", "Withholding tax, 2% ÷ 1.12").forEachIndexed { i, label ->
                     OutlinedTextField(
                         value = cuts[i], onValueChange = { v -> cuts = cuts.toMutableList().also { it[i] = v } },
                         label = { Text("$label (PHP)") },
@@ -231,13 +260,29 @@ fun AddPaymentDialog(
                         modifier = Modifier.fillMaxWidth().testTag("billing_deduction_$i")
                     )
                 }
-                if (gross > 0) Column {
+                if (gross > 0 && advance) Column {
+                    Field("Net amount", CurrencyFormatter.formatPhp(gross))
+                    Text("Paid in full and not counted as work billed: the billings after it recoup it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else if (gross > 0) Column {
                     val perLot = FormValidation.parseAmount(priceStr) ?: 0.0
                     if (typed && !byUnit && perLot > 0) Field("Lots", unitsText(Math.round(gross / perLot * 100) / 100.0))
                     Field("Gross amount", CurrencyFormatter.formatPhp(gross))
                     if (retention > 0) Field("Retention (${retention.toInt()}%)", CurrencyFormatter.formatPhp(gross * retention / 100))
                     if (facility) listOf("Recoupment", "VAT", "Withholding tax").zip(cutValues).forEach { (label, v) -> if (v > 0) Field(label, CurrencyFormatter.formatPhp(v)) }
                     Field("Net amount", CurrencyFormatter.formatPhp(gross * (1 - retention / 100) - if (facility) cutValues.sum() else 0.0))
+                    // Recoupment stops once the advance is paid back.
+                    if (facility && advanceLeft != null) {
+                        val after = Math.round((advanceLeft - cutValues[0]) * 100) / 100.0
+                        Text(
+                            when {
+                                advanceLeft == 0.0 -> "The advance payment is fully recouped: nothing left to recoup."
+                                after <= 0 -> "This billing finishes recouping the advance payment."
+                                else -> "Advance left to recoup after this: ${CurrencyFormatter.formatPhp(after)}"
+                            },
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("billing_advance_note")
+                        )
+                    }
                 }
 
                 // Scanned Copy Attachment Section
@@ -293,15 +338,15 @@ fun AddPaymentDialog(
                 onClick = {
                     val base = existing ?: ProjectPayment(projectId = 0, name = "", date = "", periodCovered = "", grossAmount = 0.0, percentage = 0.0, balanceAmount = 0.0, balancePercentage = 0.0)
                     val payment = base.copy(
-                        name = name.ifBlank { type }, dvNo = dvNo, date = date, periodCovered = periodCovered, grossAmount = gross, fileUrl = fileUrl,
-                        billingType = type, units = if (byUnit) units ?: 0 else 0,
-                        unitPrice = if (typed) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = retention
-                    ).let { if (facility) it.copy(recoupmentAmount = cutValues[0], vatAmount = cutValues[1], withholdingAmount = cutValues[2]) else it }
+                        name = name.ifBlank { if (advance) ADVANCE_PAYMENT else type }, dvNo = dvNo, date = date, periodCovered = periodCovered, grossAmount = gross, fileUrl = fileUrl,
+                        billingType = if (advance) ADVANCE_PAYMENT else type, units = if (byUnit) units ?: 0 else 0,
+                        unitPrice = if (typed) FormValidation.parseAmount(priceStr) ?: 0.0 else 0.0, retentionPct = if (advance) 0.0 else retention
+                    ).let { if (facility && !advance) it.copy(recoupmentAmount = cutValues[0], vatAmount = cutValues[1], withholdingAmount = cutValues[2]) else it }
                     val errors = check(payment)
                     if (errors.isEmpty()) onSubmit(payment)
                     else ahead = errors.joinToString(" ")
                 },
-                enabled = amountErr == null && unitsErr == null && priceErr == null && dvMissing == null && cutErrs.all { it == null },
+                enabled = amountErr == null && unitsErr == null && priceErr == null && dvMissing == null && (advance || cutErrs.all { it == null }),
                 shape = RoundedCornerShape(50.dp)
             ) {
                 Text(if (existing == null) "Save Payment" else "Save changes", fontWeight = FontWeight.SemiBold)

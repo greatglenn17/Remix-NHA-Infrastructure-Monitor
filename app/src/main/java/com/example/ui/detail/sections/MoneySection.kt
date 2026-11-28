@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.DeveloperRequest
 import com.example.data.model.billingText
 import com.example.data.model.netAmount
+import com.example.data.model.advanceLeft
+import com.example.data.model.isAdvance
 import com.example.data.model.netBillings
 import com.example.data.model.ProjectPayment
 import com.example.data.model.Permission
@@ -37,6 +39,9 @@ fun MoneySection(
     isHousing: Boolean = false,
     // A community facility also deducts recoupment, VAT and withholding; see AddPaymentDialog.
     isFacility: Boolean = false,
+    // A community facility's advance payment (kept out of [payments]) and its 15% of the original contract.
+    advances: List<ProjectPayment> = emptyList(),
+    advanceAmount: Double = 0.0,
     // The contract amount of land development per lot on a billing date; see AddPaymentDialog.
     landPerLot: (date: String) -> Double = { 0.0 },
     // Why a billing (in place of the old one when editing) cannot be saved and what to do; see BillingAbstract.aheadErrors and aheadHint.
@@ -72,7 +77,8 @@ fun MoneySection(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            item { BillingSummary(payments, contractCost, actualPercent) }
+            val left = advanceLeft(advances, payments)
+            item { BillingSummary(payments, contractCost, actualPercent, left) }
             if (billingRequests.isNotEmpty()) item(key = "billing_requests") {
                 SectionCard("Billing requests (${billingRequests.size})", Icons.Default.MoveToInbox) {
                     billingRequests.forEach { r ->
@@ -88,6 +94,15 @@ fun MoneySection(
                     Text(
                         "Not yet billed. One counts in the Status of billing once marked billed with its DV No. and scanned DV form.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            advances.forEach { advance ->
+                item(key = "advance_${advance.id}") {
+                    PaymentCard(
+                        payment = advance, onViewScan = { viewingDvPayment = advance }, onAttachScan = { viewingDvPayment = advance },
+                        onDelete = { onDeletePayment(advance) }, canEdit = canManagePayments, onEdit = { paymentToEdit = advance },
+                        advanceLeft = left
                     )
                 }
             }
@@ -157,8 +172,10 @@ fun MoneySection(
             previous = payments,
             landPerLot = landPerLot,
             check = { billingCheck(it, null) },
+            canAdvance = isFacility && advances.isEmpty(), advanceAmount = advanceAmount, advanceLeft = advanceLeft(advances, payments),
             onSubmit = { p ->
-                onAddPayment(added(p))
+                // The advance is in no balance.
+                onAddPayment(if (p.isAdvance) p else added(p))
                 showAddDialog = false
             }
         )
@@ -175,8 +192,9 @@ fun MoneySection(
             previous = payments,
             landPerLot = landPerLot,
             check = { billingCheck(it, old) },
+            advanceLeft = advanceLeft(advances, payments, old),
             onSubmit = { new ->
-                editedBillings(payments, old, new, contractCost).forEach(onUpdatePayment)
+                if (old.isAdvance) onUpdatePayment(new) else editedBillings(payments, old, new, contractCost).forEach(onUpdatePayment)
                 paymentToEdit = null
             }
         )
@@ -198,7 +216,7 @@ fun MoneySection(
 
 /** The old table's grand-total row: cost, billed, billed vs work done, balance. */
 @Composable
-fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualPercent: Double) {
+fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualPercent: Double, advanceLeft: Double? = null) {
     val scheme = MaterialTheme.colorScheme
     val totalBilled = payments.sumOf { it.netAmount }
     SectionCard(
@@ -208,6 +226,8 @@ fun BillingSummary(payments: List<ProjectPayment>, contractCost: Double, actualP
         Field("Current contract cost", CurrencyFormatter.formatPhp(contractCost))
         Field("Total billed", if (payments.isEmpty()) "No billings yet" else CurrencyFormatter.formatPhp(totalBilled))
         Field("Balance", CurrencyFormatter.formatPhp(contractCost - totalBilled))
+        // A community facility's advance payment: what is left to recoup, or that it is all paid back.
+        if (advanceLeft != null) Field("Advance to recoup", if (advanceLeft > 0) CurrencyFormatter.formatPhp(advanceLeft) else "Fully recouped ✓")
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             val billedPct = if (contractCost > 0 && totalBilled > 0) totalBilled / contractCost * 100 else null

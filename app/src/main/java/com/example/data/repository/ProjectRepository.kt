@@ -131,6 +131,7 @@ class ProjectRepository(
 
     // Payments
     fun getProjectPaymentsForProject(projectId: Long): Flow<List<ProjectPayment>> = projectDao.getProjectPaymentsForProject(projectId)
+    fun getAdvancePayments(projectId: Long): Flow<List<ProjectPayment>> = projectDao.getAdvancePayments(projectId)
 
     suspend fun insertProjectPayment(payment: ProjectPayment, role: UserRole? = null) {
         validatePermission(role, Permission.MANAGE_PAYMENTS)

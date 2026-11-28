@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.model.ProjectPayment
 import com.example.data.model.billedUnits
+import com.example.data.model.isAdvance
 import com.example.data.model.billingUnitName
 import com.example.data.model.unitsText
 import com.example.data.model.netAmount
@@ -37,7 +38,9 @@ fun PaymentCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     canEdit: Boolean = true,
-    onEdit: () -> Unit = {}
+    onEdit: () -> Unit = {},
+    // For a community facility's advance payment: what is still to recoup of it.
+    advanceLeft: Double? = null
 ) {
     val scheme = MaterialTheme.colorScheme
     val hasScan = payment.fileUrl.isNotBlank()
@@ -81,6 +84,13 @@ fun PaymentCard(
                     color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
+                if (payment.isAdvance) {
+                    val left = advanceLeft ?: 0.0
+                    Field("Net amount", CurrencyFormatter.formatPhp(payment.grossAmount))
+                    Field("Recouped so far", CurrencyFormatter.formatPhp(Math.round((payment.grossAmount - left) * 100) / 100.0))
+                    Field("Left to recoup", if (left > 0) CurrencyFormatter.formatPhp(left) else "Fully recouped ✓")
+                    return@Column
+                }
                 if (payment.billingType.isNotBlank()) Text(
                     "${payment.billingType} · ${unitsText(payment.billedUnits)} ${billingUnitName(payment.billingType)}${if (payment.billedUnits == 1.0) "" else "s"} × ${CurrencyFormatter.formatPhp(payment.unitPrice)}",
                     style = MaterialTheme.typography.bodySmall,
