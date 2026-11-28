@@ -236,7 +236,7 @@ class BillingAbstractTest {
         val html = sheet(BillingAbstract.Period(" February 1 - 28, 2025 ", development = 15.5))
         fun has(vararg cells: String, page: String = html) =
             assertTrue(cells.joinToString(), Regex(cells.joinToString("<td[^>]*") { ">" + Regex.escape(it) + "</td>" }).containsMatchIn(page))
-        assertTrue(html.contains("<div class='period'>Period covered: February 1 - 28, 2025</div>"))
+        assertTrue(Regex("<h1>SUMMARY OF WORK ACCOMPLISHED</h1>\\s*<div class='period'>Period covered: February 1 - 28, 2025</div>").containsMatchIn(html))
         assertTrue(sheet(BillingAbstract.Period(" ")).contains("<div class='period'>As of March 14, 2025</div>")) // no period typed
         assertTrue(!html.contains("equivalent", ignoreCase = true)) // the billing format has no equivalent-units columns
         // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
@@ -245,6 +245,9 @@ class BillingAbstractTest {
         has("2", "LAND DEVELOPMENT", "100", "LOT", "20,000.00", "2,000,000.00", "0", "0.00", "0.00%", "15.5", "310,000.00", "15.50%", "15.5", "310,000.00", "15.50%")
         has("3.1", "MILESTONE 1 (80%)", "100", "UNIT", "56,000.00", "5,600,000.00")
         // Typed quantities become amounts: 2 units at Milestone 2 are 28,000.
+        // A billing of housing construction alone is an abstract of milestones; with lots typed too it stays a summary of work.
+        assertTrue(sheet(BillingAbstract.Period(m2 = 2.0)).contains("<h1>ABSTRACT OF MILESTONE ACCOMPLISHMENT</h1>"))
+        assertTrue(sheet(BillingAbstract.Period(lots = 1.0, m1 = 3.0)).contains("<h1>SUMMARY OF WORK ACCOMPLISHED</h1>"))
         has("3.2", "MILESTONE 2 (20%)", "100", "UNIT", "14,000.00", "1,400,000.00", "0", "0.00", "0.00%", "2", "28,000.00", "2.00%", page = sheet(BillingAbstract.Period(m2 = 2.0)))
         has("Subtotal (Housing Construction)", "", "", "70,000.00", "7,000,000.00")
         // The advance payment has no type, so it is not in the abstract: 710,000 of 10,000,000 billed to date.

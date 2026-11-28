@@ -72,7 +72,7 @@ is read only.
     else its saleable lots), at 2 decimals. A blank, unreadable or negative figure is 0. Only
     the sheet redraws as they are typed, and they survive a redraw for an arriving record (kept on the page), but not
     leaving the page.
-  - **The heading** says "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
+  - **The heading** is "SUMMARY OF WORK ACCOMPLISHED", or "ABSTRACT OF MILESTONE ACCOMPLISHMENT" when only Milestone 1 or 2 units are typed (a housing construction billing), as on the phone; under it, "Period covered: ..." when one is typed, else "As of October 30, 2026". The target is the
     bar chart's plan on the "As of" date, else the project's stored target, and the actual is the abstract's own
     overall actual, both as on Print abstract (it is not what is billed to date; that is the grand total's TO DATE).
     Prepared, Checked and Approved by are the monthly report's signatories.
