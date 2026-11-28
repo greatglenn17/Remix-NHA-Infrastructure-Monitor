@@ -1,8 +1,8 @@
 {
-  "versionCode": 334,
-  "versionName": "2.8.54",
-  "releaseNotes": "v2.8.54: On a Community Facility project, the first billing can be the 15% advance payment, paid in full. Later billings recoup 15% of their gross until the advance is paid back, then recoupment stops and the Billing summary shows \"Fully recouped\".",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.54/NHA_Monitor_v2.8.54_Build334.apk",
-  "apkSha256": "3e66a6a109838cc7d49a2af8e6f085da5d9b44a81f2b5193cae215e7d5def0cf",
-  "isMandatory": true
+  "versionCode": 335,
+  "versionName": "2.8.55",
+  "releaseNotes": "v2.8.55: A billing's net amount matches the official DV to the centavo. Retention, recoupment, VAT and withholding are each rounded to the centavo before the net is worked out.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.55/NHA_Monitor_v2.8.55_Build335.apk",
+  "apkSha256": "3ace39cd7439247cc9d3b4df29fd4532dde5bf8b5b888ec91cf2e726d44b495e",
+  "isMandatory": false
 }
