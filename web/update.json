@@ -1,8 +1,8 @@
 {
-  "versionCode": 333,
-  "versionName": "2.8.53",
-  "releaseNotes": "v2.8.53: Add billing on a Community Facility project works out the net from the gross. Retention (10%), recoupment (15%), VAT (5% ÷ 1.12) and withholding tax (2% ÷ 1.12) fill in and can each be changed.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.53/NHA_Monitor_v2.8.53_Build333.apk",
-  "apkSha256": "da5cada866758c364b70e92eb562b148bf2b90ac2f8309b66a05b22eb261bf89",
+  "versionCode": 334,
+  "versionName": "2.8.54",
+  "releaseNotes": "v2.8.54: On a Community Facility project, the first billing can be the 15% advance payment, paid in full. Later billings recoup 15% of their gross until the advance is paid back, then recoupment stops and the Billing summary shows \"Fully recouped\".",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.54/NHA_Monitor_v2.8.54_Build334.apk",
+  "apkSha256": "3e66a6a109838cc7d49a2af8e6f085da5d9b44a81f2b5193cae215e7d5def0cf",
   "isMandatory": true
 }
