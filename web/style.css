@@ -697,8 +697,9 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 @media (min-width: 900px) { .bill-sum { display: none; } .bill-table { display: block; } }
 .kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
-.pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; align-items: start; } /* a short card keeps its own height */
-.pay-card { padding: 12px 16px 14px; min-width: 0; }
+/* Columns, not a grid: the next card moves up under a short one (the advance payment) instead of leaving a hole. */
+.pay-cards { list-style: none; margin: 0; padding: 0; columns: 340px; column-gap: 12px; }
+.pay-card { padding: 12px 16px 14px; min-width: 0; break-inside: avoid; margin-bottom: 12px; }
 .pc-head { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: flex-start; } /* on a phone the buttons drop under the name as one row */
 .pc-head h3 { font-size: 15px; font-weight: 600; }
 .pc-head .muted { font-size: 12px; }
