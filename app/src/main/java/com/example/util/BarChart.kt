@@ -91,6 +91,46 @@ object BarChart {
         }.sortedBy { it.effective }
     }.getOrDefault(emptyList())
 
+    /** One of a chart's own colours, named on the website (e.g. Suspension No. 1); [work] is whether work is done on its days. */
+    data class Colour(val name: String, val argb: Int, val work: Boolean)
+
+    /** A day of the plain bar in [dayFills]; a coloured day is its colour's index. */
+    const val WORK = -1
+
+    /** The chart's colours as the website reads them: one that is not #RRGGBB shows as its first new colour, #FFD966. */
+    fun colours(version: Version): List<Colour> = runCatching {
+        val arr = JSONArray(version.colors)
+        (0 until arr.length()).map { i ->
+            val c = arr.optJSONObject(i) ?: JSONObject()
+            val hex = c.optString("color").takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#FFD966"
+            Colour(c.optString("name"), (0xFF000000 or hex.substring(1).toLong(16)).toInt(), c.opt("work") == true)
+        }
+    }.getOrDefault(emptyList())
+
+    /** An item's coloured days as saved by the website: from day, to day, colour index; one that does not read is left out. */
+    fun marks(item: Item): List<Triple<Int, Int, Int>> = runCatching {
+        val arr = JSONArray(item.marks)
+        (0 until arr.length()).mapNotNull { i ->
+            val m = arr.optJSONArray(i)?.takeIf { it.length() == 3 } ?: return@mapNotNull null
+            val (a, b, k) = (0..2).map { m.opt(it) as? Int ?: return@mapNotNull null }
+            Triple(a, b, k).takeIf { a in 1..b && b <= 120 * MONTH_DAYS && k >= 0 }
+        }
+    }.getOrDefault(emptyList())
+
+    /**
+     * What each of an item's first [days] days shows, as on the website's sheet: null, [WORK] or a colour's index.
+     * A coloured day shows only where it agrees with the bar: on it for a colour work is done on, off it for one with none.
+     */
+    fun dayFills(item: Item, colours: List<Colour>, days: Int): List<Int?> {
+        val out = arrayOfNulls<Int>(days)
+        fun put(a: Int, b: Int, value: Int, on: Boolean?) {
+            for (d in maxOf(a, 1)..minOf(b, days)) if (on == null || (out[d - 1] == WORK) == on) out[d - 1] = value
+        }
+        item.bars.forEach { put(it.startDay, it.endDay, WORK, null) }
+        marks(item).forEach { (a, b, k) -> colours.getOrNull(k)?.let { put(a, b, k, it.work) } }
+        return out.toList()
+    }
+
     fun toJson(versions: List<Version>): String = JSONArray(versions.map { v ->
         JSONObject().put("label", v.label).put("effective", v.effective).put("items", JSONArray(v.items.map { item ->
             JSONObject().put("name", item.name).put("amount", item.amount)
