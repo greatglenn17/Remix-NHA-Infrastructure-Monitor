@@ -697,11 +697,12 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 @media (min-width: 900px) { .bill-sum { display: none; } .bill-table { display: block; } }
 .kv b.word { font-weight: 400; color: var(--text-2); } /* "No billings yet" in place of an amount */
 /* Payments (BillingSummary, PaymentCard): one card per billing, two across from 600px. */
-.pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 12px; }
+.pay-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; align-items: start; } /* a short card keeps its own height */
 .pay-card { padding: 12px 16px 14px; min-width: 0; }
-.pc-head { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; }
+.pc-head { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: flex-start; } /* on a phone the buttons drop under the name as one row */
 .pc-head h3 { font-size: 15px; font-weight: 600; }
 .pc-head .muted { font-size: 12px; }
+.pc-actions { display: flex; gap: 6px; margin-left: auto; }
 .pay-card > .muted { margin: 6px 0; }
 
 /* Documents: LogEntry rows; continuances sit under their suspension; requests not yet packaged stand out. */
@@ -847,8 +848,8 @@ ul.photos p { font-size: 12px; color: var(--text-2); margin-top: 4px; overflow-w
 .plan-tools .danger { margin: 0 0 0 auto; }
 /* The plan's actions are outlined buttons, and Plan setup opens its tools as one tight row of them under the toolbar,
    Delete plan last in rose (user, 2026-11-25: they must read as buttons, with no dead space). */
-.lots-head .text-btn, .lots-head a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn, .apa-actions .text-btn, #bc-page .text-btn:not([data-days]) { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
-.lots-head .text-btn:hover, .lots-head a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover, .apa-actions .text-btn:hover, #bc-page .text-btn:not([data-days]):hover, #bc-page [data-help][aria-expanded="true"] { background: var(--primary-container); border-color: var(--link); }
+.lots-head .text-btn, .lots-head a.file, .pc-actions .text-btn, .pc-actions a.file, .plan-panel .text-btn, .entry > .entry-edit, .month-head .text-btn, .apa-foot .text-btn, .apa-actions .text-btn, #bc-page .text-btn:not([data-days]) { padding: 8px 12px; border: 1px solid var(--outline); border-radius: 6px; background: var(--field); }
+.lots-head .text-btn:hover, .lots-head a.file:hover, .pc-actions .text-btn:hover, .pc-actions a.file:hover, .plan-panel .text-btn:hover, #plan-setup[aria-expanded="true"], .entry > .entry-edit:hover, .month-head .text-btn:hover, .apa-foot .text-btn:hover, .apa-actions .text-btn:hover, #bc-page .text-btn:not([data-days]):hover, #bc-page [data-help][aria-expanded="true"] { background: var(--primary-container); border-color: var(--link); }
 .lots-head .lots-links { gap: 8px; }
 .plan-panel { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .plan-panel[hidden] { display: none; }
