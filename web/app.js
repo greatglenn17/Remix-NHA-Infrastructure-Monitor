@@ -4086,7 +4086,9 @@ function billingForm(c, old = null, request = null) {
   // An edited billing keeps its type and retention as choices, whatever the project type is now.
   const housing = /housing/i.test(c.project.projectType || '') || Boolean(old?.billingType) || Boolean(request);
   const types = !old?.billingType || L.HOUSING_BILLING_TYPES.includes(old.billingType) ? L.HOUSING_BILLING_TYPES : [old.billingType, ...L.HOUSING_BILLING_TYPES];
-  const oldRetention = Number(old?.retentionPct) || 0, retentions = L.RETENTIONS.includes(oldRetention) ? L.RETENTIONS : [...L.RETENTIONS, oldRetention];
+  // A community facility deducts recoupment, VAT and withholding too, worked out from the gross; a new one holds 10%.
+  const facility = !housing && L.isCommunityFacility(c.project.projectType);
+  const oldRetention = old ? Number(old.retentionPct) || 0 : facility ? 10 : 0, retentions = L.RETENTIONS.includes(oldRetention) ? L.RETENTIONS : [...L.RETENTIONS, oldRetention];
   const money = v => (Number(v) > 0 ? Number(v).toFixed(2) : '');
   const d = document.createElement('dialog');
   d.className = 'help edit-form';
@@ -4103,6 +4105,7 @@ function billingForm(c, old = null, request = null) {
     <label class="field" data-by-unit style="display:none">Amount per lot (₱)<input name="unitPrice" value="${money(old?.unitPrice)}" inputmode="decimal" autocomplete="off"></label>
     <label class="field" data-gross>Gross amount (₱)<input name="grossAmount" value="${money(old?.grossAmount)}" inputmode="decimal" placeholder="e.g. 15000000" autocomplete="off"></label>
     <label class="field">Retention<select name="retentionPct">${retentions.map(r => opt(String(r), r ? `${r}%` : 'None', String(oldRetention))).join('')}</select></label>
+    ${facility ? L.FACILITY_DEDUCTIONS.map(([k, label]) => `<label class="field">${label} (₱)<input name="${k}" value="${money(old?.[k])}" inputmode="decimal" autocomplete="off"></label>`).join('') : ''}
     <div class="billing-preview" aria-live="polite"></div>
     ${fileField('fileUrl', 'Scanned DV', old?.fileUrl)}
     <div class="form-foot"><div class="error" role="alert"></div>
@@ -4131,9 +4134,15 @@ function billingForm(c, old = null, request = null) {
   };
   const preview = () => {
     const f = values(), gross = L.billingGross(f), r = Number(f.retentionPct) || 0, lots = L.billedByAmount(f.billingType) ? L.billedUnits({ grossAmount: gross, unitPrice: L.parseAmount(f.unitPrice) }) : 0;
+    const cut = Object.fromEntries(L.FACILITY_DEDUCTIONS.map(([k]) => [k, L.parseAmount(f[k]) ?? 0]));
     d.querySelector('.billing-preview').innerHTML = gross > 0
-      ? `${lots ? kv('Lots', String(lots)) : ''}${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${kv('Net amount', L.formatPhp(gross * (1 - r / 100)))}` : '';
+      ? `${lots ? kv('Lots', String(lots)) : ''}${kv('Gross amount', L.formatPhp(gross))}${r ? kv(`Retention (${r}%)`, L.formatPhp(gross * r / 100)) : ''}${L.FACILITY_DEDUCTIONS.map(([k, label]) => (cut[k] ? kv(label, L.formatPhp(cut[k])) : '')).join('')}${kv('Net amount', L.formatPhp(L.paidAmount({ grossAmount: gross, retentionPct: r, ...cut })))}` : '';
   };
+  // Typing the gross fills the deductions; each can then be changed to match the official billing.
+  if (facility) form.grossAmount.addEventListener('input', () => {
+    const gross = L.billingGross(values()), cut = L.facilityDeductions(gross);
+    for (const [k] of L.FACILITY_DEDUCTIONS) form[k].value = gross > 0 ? cut[k].toFixed(2) : '';
+  });
   if (housing) form.billingType.onchange = () => { onType(); preview(); };
   form.oninput = preview;
   if (old) { showType(); preview(); }
@@ -4553,8 +4562,9 @@ function paymentsBody({ project, payments, cost, billed, of }) {
         ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
       <p class="muted small">${esc(L.displayDate(p.date || '-'))} · ${esc(p.periodCovered || '-')}</p>
       ${p.billingType ? `<p class="muted small">${esc(p.billingType)} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${esc(L.formatPhp(Number(p.unitPrice) || 0))}</p>` : ''}
-      ${kv('Net amount', L.formatPhp(L.netAmount(p)))}
-      ${retention > 0 ? kv('Gross amount', L.formatPhp(gross)) + kv(`Retention (${Math.trunc(retention)}%)`, L.formatPhp(gross - L.netAmount(p))) : ''}
+      ${kv('Net amount', L.formatPhp(L.paidAmount(p)))}
+      ${retention > 0 || L.paidAmount(p) !== L.netAmount(p) ? kv('Gross amount', L.formatPhp(gross)) : ''}${retention > 0 ? kv(`Retention (${Math.trunc(retention)}%)`, L.formatPhp(gross - L.netAmount(p))) : ''}
+      ${L.FACILITY_DEDUCTIONS.map(([k, label]) => (Number(p[k]) ? kv(label, L.formatPhp(Number(p[k]))) : '')).join('')}
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}

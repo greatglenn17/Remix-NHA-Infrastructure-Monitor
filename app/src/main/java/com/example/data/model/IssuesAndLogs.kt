@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -119,6 +120,11 @@ data class ProjectPayment(
     val unitPrice: Double = 0.0,
     // Percent of the gross held back; balances stay on the gross.
     val retentionPct: Double = 0.0,
+    // A community facility's deductions from the check (facilityDeductions); they leave the billed share and balances alone.
+    // The SQL default lets a billing synced without them (an older website or app) still be stored.
+    @ColumnInfo(defaultValue = "0") val recoupmentAmount: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val vatAmount: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val withholdingAmount: Double = 0.0,
     // Cross-device sync identity and version; see RecordSyncSchema.
     val uuid: String = UUID.randomUUID().toString(),
     val revision: Long = 1,
@@ -127,6 +133,13 @@ data class ProjectPayment(
 
 /** What is paid after retention. */
 val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 100)
+
+/** The check: the net after retention less recoupment, VAT and withholding (logic.js paidAmount). */
+val ProjectPayment.paidAmount: Double get() = netAmount - recoupmentAmount - vatAmount - withholdingAmount
+
+/** A community facility's recoupment (15%), VAT (5% ÷ 1.12) and withholding tax (2% ÷ 1.12) of [gross], to the centavo, as on the website. */
+fun facilityDeductions(gross: Double): List<Double> =
+    listOf(gross * 0.15, gross * 0.05 / 1.12, gross * 0.02 / 1.12).map { Math.round(it * 100) / 100.0 }
 
 /**
  * [payments] with each billing's share and balance after it on the net. A billing saves them from the gross, with

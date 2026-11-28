@@ -35,6 +35,8 @@ fun MoneySection(
     currentUserRole: UserRole,
     // Housing projects bill land and housing units by count; see HOUSING_BILLING_TYPES.
     isHousing: Boolean = false,
+    // A community facility also deducts recoupment, VAT and withholding; see AddPaymentDialog.
+    isFacility: Boolean = false,
     // The contract amount of land development per lot on a billing date; see AddPaymentDialog.
     landPerLot: (date: String) -> Double = { 0.0 },
     // Why a billing (in place of the old one when editing) cannot be saved and what to do; see BillingAbstract.aheadErrors and aheadHint.
@@ -151,6 +153,7 @@ fun MoneySection(
             currentTotalPaid = payments.sumOf { it.grossAmount },
             onDismiss = { showAddDialog = false },
             isHousing = isHousing,
+            isFacility = isFacility,
             previous = payments,
             landPerLot = landPerLot,
             check = { billingCheck(it, null) },
@@ -168,6 +171,7 @@ fun MoneySection(
             existing = old,
             onDismiss = { paymentToEdit = null },
             isHousing = isHousing,
+            isFacility = isFacility,
             previous = payments,
             landPerLot = landPerLot,
             check = { billingCheck(it, old) },
