@@ -4581,7 +4581,8 @@ function paymentsBody({ project, payments, advances, cost, billed, of }) {
     editable ? `<button class="btn billing-add" id="billing-add">${icon('add_circle', 'sm')}Add billing</button>` : '');
   // One table, a row per billing like the office ledger (user, 2026-11-28): cards of uneven height left holes.
   const rows = L.netBillings(payments, cost), money = v => L.formatPhp(v);
-  const cuts = L.FACILITY_DEDUCTIONS.filter(([k]) => rows.some(p => Number(p[k])));
+  // Only the recoupment: VAT and withholding tax are hidden here (user, 2026-11-28); the DV and the edit form still have them.
+  const cuts = L.FACILITY_DEDUCTIONS.filter(([k]) => k === 'recoupmentAmount' && rows.some(p => Number(p[k])));
   const cell = (main, sub = '') => `${esc(main)}${sub ? `<small>${esc(sub)}</small>` : ''}`;
   const acts = p => `<td class="act">${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}${editable ? `<button class="text-btn" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</td>`;
   const blanks = n => '<td></td>'.repeat(n);
