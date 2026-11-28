@@ -529,7 +529,7 @@ test('billing abstract: each line as quantity, amount and share before, in this 
   const sheet = period => P.billingAbstractHtml({ project, docs: [], payments, abstract, period, units: 100, signatories });
   const html = sheet({ covered: ' February 1 - 28, 2025 ', lots: 0, development: 15.5, m1: 0, m2: 0 });
   const row = (...cells) => new RegExp(cells.map(c => `>${c.replace(/[.()%]/g, '\\$&')}</td>`).join('<td[^>]*'));
-  assert.match(html, /<div class='period'>Period covered: February 1 - 28, 2025<\/div>/);
+  assert.match(html, /<h1>SUMMARY OF WORK ACCOMPLISHED<\/h1>\s*<div class='period'>Period covered: February 1 - 28, 2025<\/div>/);
   assert.match(sheet({ covered: ' ', lots: 0, development: 0, m1: 0, m2: 0 }), /<div class='period'>As of March 14, 2025<\/div>/); // no period typed
   assert.ok(!/equivalent/i.test(html)); // the billing format has no equivalent-units columns
   // Land acquisition: 40 of 100 lots billed before, nothing in this billing.
