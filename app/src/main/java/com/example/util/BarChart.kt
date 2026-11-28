@@ -107,9 +107,12 @@ object BarChart {
      * Contract day of [date] for [item] (the start date is day 1), less the days of approved suspensions that
      * pause it and took effect on or after [effective]: a revised chart already draws earlier ones as idle months.
      * A Full suspension pauses every item; a Partial one only the items it names. A null [item] counts Full ones only.
+     * The [extended] days an approved time extension adds to the chart cover suspended days, less those drawn before [effective].
      */
-    fun contractDay(start: LocalDate, effective: LocalDate, documents: List<PendingDocument>, date: LocalDate, item: String? = null): Int =
-        (ChronoUnit.DAYS.between(start, date) + 1 - suspendedDays(documents, effective, date, item)).toInt()
+    fun contractDay(start: LocalDate, effective: LocalDate, documents: List<PendingDocument>, date: LocalDate, item: String? = null, extended: Int = 0): Int {
+        val covered = (extended - suspendedDays(documents, start, effective.minusDays(1), item)).coerceAtLeast(0)
+        return (ChronoUnit.DAYS.between(start, date) + 1 - (suspendedDays(documents, effective, date, item) - covered).coerceAtLeast(0)).toInt()
+    }
 
     /** Days from [from] through [until] that approved suspensions (and their continuances) pause [item]; null: Full ones only. */
     fun suspendedDays(documents: List<PendingDocument>, from: LocalDate, until: LocalDate, item: String? = null): Long =
@@ -246,9 +249,11 @@ object BarChart {
         val version = versionOn(parse(project.barChartJson), date) ?: return null
         val start = isoDate(project.dateStarted) ?: return null
         val effective = isoDate(version.effective)?.takeIf { it.isAfter(start) } ?: start
+        // shortcut: an extension is taken to be for the suspensions, as the office grants them; one for another cause would hide a later suspension too.
+        val extended = minOf(ProjectSchedule.addedDays(documents), version.lastDay - project.contractDurationDays).coerceAtLeast(0)
         return Plan(
-            version, contractDay(start, effective, documents, date),
-            version.items.map { contractDay(start, effective, documents, date, it.name) }
+            version, contractDay(start, effective, documents, date, extended = extended),
+            version.items.map { contractDay(start, effective, documents, date, it.name, extended) }
         )
     }
 
