@@ -1,8 +1,8 @@
 {
-  "versionCode": 330,
-  "versionName": "2.8.50",
-  "releaseNotes": "v2.8.50: The printed abstract follows the office sheet. Original beside V.O.#1 under QTY, Unit Cost and Amount (upload the abstract's Excel again to print an older one this way), and Revised Contract Cost, Duration and Completion Date lines at the top once a variation order or time extension is approved.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.50/NHA_Monitor_v2.8.50_Build330.apk",
-  "apkSha256": "1da10b79de13f09fa2bb1ab16b5ee6c7f2003bd4fb5547370af3f4a60559dd45",
+  "versionCode": 331,
+  "versionName": "2.8.51",
+  "releaseNotes": "v2.8.51: The top of the printed abstract stays on the page. A long project name wraps to a second line instead of pushing the revised contract duration past the right edge.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.51/NHA_Monitor_v2.8.51_Build331.apk",
+  "apkSha256": "08442ac7e4164b5273515aecac9bbec1c21a563a693932e8db2ff72c1882c23d",
   "isMandatory": true
 }
