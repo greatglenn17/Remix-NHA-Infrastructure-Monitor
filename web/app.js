@@ -4956,7 +4956,9 @@ function drawAbstractPrint(c) {
   const back = `<a class="text-btn back" href="#/p/${esc(page.id)}/actual/${esc(asOf)}">${icon('arrow_back', 'sm')}Actual Accomplishment</a>`;
   if (!abstract) { drawOnce(main, `${back}<p class="muted" role="alert">This abstract was deleted or does not exist.</p>`); return; }
   document.title = `Billing Abstract - As of ${L.displayDate(asOf)}`; // not the detailed abstract's name, so the two PDFs do not replace each other
-  const [acquisition, development, housing] = L.abstractLineAmounts(abstract);
+  // A community facility's sheet is the abstract's own rows: only the period is typed.
+  const facility = L.isCommunityFacility(project.projectType);
+  const [acquisition, development, housing] = facility ? [0, 0, 0] : L.abstractLineAmounts(abstract);
   const typed = page.billing ??= { covered: '', lots: '', development: '', m1: '', m2: '' };
   const box = (name, label, attrs = ' inputmode="decimal" placeholder="0"') => `<label class="field">${label}<input name="${name}" autocomplete="off" value="${esc(typed[name])}"${attrs}></label>`;
   // The box being typed in, when a record arrives mid-typing: it keeps the cursor after the redraw.
@@ -4966,7 +4968,7 @@ function drawAbstractPrint(c) {
     ${section('This billing', 'receipt_long', `<div class="apa-typed" id="apa-typed">${box('covered', 'Period covered', '')}
         ${acquisition > 0 ? box('lots', 'Land acquisition (lots)') : ''}${development > 0 ? box('development', 'Land development (lots)') : ''}
         ${housing > 0 ? box('m1', 'Milestone 1 (units)') + box('m2', 'Milestone 2 (units)') : ''}</div>
-      <p class="muted small">Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to. Nothing typed here is saved.</p>
+      <p class="muted small">${facility ? `The sheet is the abstract as of ${esc(L.displayDate(asOf))}.` : `Previous is what the billings saved up to ${esc(L.displayDate(asOf))} came to.`} Nothing typed here is saved.</p>
       <div class="n-watch" id="apa-warn" role="status"></div>`, 'no-print')}
     <div class="bb-scroll"><div class="bb full land" id="sheet"></div></div>`;
   // A blank or unreadable number is 0 (parseAmount takes no minus sign, so a negative is 0 too).
@@ -4980,7 +4982,7 @@ function drawAbstractPrint(c) {
       signatories: P.billingSignatories(project, s.profile), banner: 'blue-book-header.png',
     });
     // Billed above the work done is only warned of: the sheet still prints.
-    warnings = L.billingAbstractWarnings(abstract, L.billingAbstract(project, documents, payments, abstract, period, units));
+    warnings = facility ? [] : L.billingAbstractWarnings(abstract, L.billingAbstract(project, documents, payments, abstract, period, units));
     document.getElementById('apa-warn').innerHTML = warnings.map(w => `<p>${icon('warning', 'sm')}${esc(w)}</p>`).join('');
   };
   drawSheet();

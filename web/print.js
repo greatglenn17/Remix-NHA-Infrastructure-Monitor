@@ -225,9 +225,12 @@ const qty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigit
  * (quantity, amount, share of the line). `units` is the project's lots or housing units. Its target and actual are
  * the Print abstract's (actualAbstractHtml): the plan on the "As of" date and the abstract's own overall actual, not
  * what is billed. It has neither BALANCE nor equivalent-units columns. Its signers are its own four (billingSignatories).
+ * A community facility has no lots or units to bill by: its sheet is the abstract's own rows, as on Print abstract.
  */
 export function billingAbstractHtml({ project, docs, payments, abstract, period, units, signatories, banner }) {
-  const { parts, targetPct } = L.billingAbstract(project, docs, payments, abstract, period, units), covered = String(period.covered ?? '').trim();
+  const covered = String(period.covered ?? '').trim();
+  if (L.isCommunityFacility(project.projectType)) return actualAbstractHtml({ project, docs, abstract, signatories, banner, billing: { covered } });
+  const { parts, targetPct } = L.billingAbstract(project, docs, payments, abstract, period, units);
   const sumOf = lines => Object.fromEntries(['amount', 'previous', 'thisPeriod'].map(k => [k, lines.reduce((t, l) => t + l[k], 0)]));
   // Previous, this period, to date: quantity (a line's only), amount, share of the row's contract amount.
   const billed = (r, unitCost) => [r.previous, r.thisPeriod, r.previous + r.thisPeriod].map(x =>
@@ -246,8 +249,11 @@ export function billingAbstractHtml({ project, docs, payments, abstract, period,
       ${parts.map(p => `${p.heading ? `<tr><td class='c'>${p.heading[0]}</td><td colspan='14'>${p.heading[1]}</td></tr>` : ''}${p.lines.map(line).join('')}${total(`Subtotal (${p.name})`, sumOf(p.lines))}`).join('')}
       ${total('GRAND TOTAL', all)}
     </table>
-    <div class='keep'>${signRow(signatories, [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval', 'recommended']])}</div>`;
+    <div class='keep'>${billingSigners(signatories)}</div>`;
 }
+
+/** The billing abstract's own four signers in one row; the last title has no colon, as on the district's sheet. */
+const billingSigners = s => signRow(s, [['Prepared by:', 'prepared'], ['Checked by:', 'checked'], ['Reviewed by:', 'reviewed'], ['Recommending Approval', 'recommended']]);
 
 /**
  * The district's column layout of an Abstract of Physical Accomplishment under three header rows (BlueBookForms.apaHead):
@@ -301,9 +307,11 @@ function apaTop(banner, period, project, docs, targetPct, actual, title = 'ABSTR
  * the abstract's own actual, then every row of `abstract` in the abstract's columns up to TO DATE, an empty cell
  * left blank, and the signatures. The header rows repeat on each page. Neither BALANCE nor the sheet's "EQUIVALENT
  * TO <N> UNITS" columns are shown. An abstract in terms of a variation order (its rows have `was`) prints as its
- * sheet: the Original quantity, unit cost and amount beside the V.O.'s.
+ * sheet: the Original quantity, unit cost and amount beside the V.O.'s. With `billing` ({ covered }, a community
+ * facility's billing abstract) it is titled SUMMARY OF WORK ACCOMPLISHED over the period covered, else its "As of"
+ * date, and signed by the billing abstract's four.
  */
-export function actualAbstractHtml({ project, docs, abstract, signatories, banner }) {
+export function actualAbstractHtml({ project, docs, abstract, signatories, banner, billing = null }) {
   const overall = L.abstractStanding(project, docs, abstract).at(-1);
   const n = (v, show) => `<td class='n'>${v == null ? '' : show(v)}</td>`;
   const quantity = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 });
@@ -313,12 +321,14 @@ export function actualAbstractHtml({ project, docs, abstract, signatories, banne
   const cells = (r, i, v, show) => Array.from({ length: earlier }, (_, j) => n(r.was?.[j]?.[i], show)).join('') + n(v, show);
   const row = r => `<tr${r.kind === 'subtotal' || r.kind === 'total' ? " class='tot'" : ''}><td class='c'>${esc(r.no)}</td><td>${r.kind === 'part' || r.kind === 'group' ? `<b>${esc(r.name)}</b>` : esc(r.name)}</td>${cells(r, 0, r.qty, quantity)}<td class='c'>${esc(r.unit)}</td>`
     + `${cells(r, 1, r.unitCost, money)}${cells(r, 2, r.amount, money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>`;
-  return `${apaTop(banner, `As of ${longDate(abstract.asOf)}`, project, docs, overall.target, overall.actual)}
+  const asOf = `As of ${longDate(abstract.asOf)}`;
+  return `${billing ? apaTop(banner, billing.covered ? `Period covered: ${billing.covered}` : asOf, project, docs, overall.target, overall.actual, 'SUMMARY OF WORK ACCOMPLISHED')
+    : apaTop(banner, asOf, project, docs, overall.target, overall.actual)}
     <table class='apa'>
       <thead>${apaHead(earlier)}</thead>
       <tbody>${rows.map(row).join('')}</tbody>
     </table>
-    <div class='keep'>${signatures(signatories, 'Checked by', 'Approved by')}</div>`;
+    <div class='keep'>${billing ? billingSigners(signatories) : signatures(signatories, 'Checked by', 'Approved by')}</div>`;
 }
 
 /* ---------- The Actual Accomplishment tab's pay items (an uploaded abstract's rows, every column as in Excel) ---------- */

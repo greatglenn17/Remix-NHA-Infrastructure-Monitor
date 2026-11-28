@@ -60,7 +60,9 @@ is read only.
   quantity, unit cost and amount, what was billed before, in this billing and to date as quantity, amount and share,
   subtotals and the grand total. It has neither BALANCE nor equivalent-units columns. It is signed by its own four
   (`P.billingSignatories`, the project's `billing*` fields): Prepared by, Checked by, Reviewed by and Recommending
-  Approval. Its figures (`L.billingAbstract`,
+  Approval. A community facility has no lots or units to bill by: its billing abstract is Print abstract's sheet (the
+  abstract's own rows, target and actual) under SUMMARY OF WORK ACCOMPLISHED and the period covered, with these four
+  signers, and only the period is typed. Its figures (`L.billingAbstract`,
   the phone's `BillingAbstract.of`):
   - **The part amounts** are the uploaded abstract's own, its parts' contract amounts by accomplishment line
     (`L.abstractLineAmounts`), not the bar chart's or the Scope of Works'. A line without an amount is left out.
