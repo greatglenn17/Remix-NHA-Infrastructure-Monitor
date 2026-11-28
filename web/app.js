@@ -1645,6 +1645,8 @@ function bindChart(c) {
     const table = el.querySelector('.bc-grid'), months = L.sheetMonths(v, project.contractDurationDays, st.months);
     if (Number(table.dataset.months) !== months) { sheet(); return; } // a bar typed past the last month drawn, or taken back
     const made = L.draftVersion(v), total = v.items.reduce((t, x) => t + x.amount, 0), hues = v.colors.map(x => x.color).join();
+    // Text is written only where it changed: any write in the sheet makes the browser lay out its thousands of cells again.
+    const put = (node, text) => { if (node.textContent !== String(text)) node.textContent = text; };
     const days = (tr, fills) => {
       const drawn = `${fills.join()}|${hues}`;
       if (tr.dataset.drawn === drawn) return;
@@ -1652,17 +1654,18 @@ function bindChart(c) {
       fills.forEach((f, k) => { tr.children[4 + k].style.background = dayColor(f, v.colors); });
     };
     table.querySelectorAll('tbody tr[data-item]:not(.bc-exact)').forEach((tr, i) => {
-      tr.querySelector('[data-pct]').textContent = (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3);
-      tr.querySelector('[data-days]').textContent = made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0);
+      put(tr.querySelector('[data-pct]'), (total > 0 ? v.items[i].amount / total * 100 : 0).toFixed(3));
+      put(tr.querySelector('[data-days]'), made.items[i].bars.reduce((n, [a, b]) => n + b - a + 1, 0));
       // A row whose days did not change is left alone: a chart of two years is 720 cells a row.
       days(tr, L.dayFills(made.items[i], v.colors, months * MONTH_CELLS));
     });
     const whole = table.querySelector('tr[data-all]');
     if (whole) days(whole, L.suspendedFills(made, v.colors, months * MONTH_CELLS));
-    table.tFoot.innerHTML = chartFoot(v, months);
-    el.querySelector(`[data-tab="${st.selected}"]`).textContent = chartTabName(st, st.selected);
+    const foot = chartFoot(v, months);
+    if (table.tFoot.drawn !== foot) table.tFoot.innerHTML = table.tFoot.drawn = foot;
+    put(el.querySelector(`[data-tab="${st.selected}"]`), chartTabName(st, st.selected));
     el.querySelector('[data-undo]').disabled = !st.undo.length;
-    v.colors.forEach((x, k) => { const b = el.querySelector(`[data-tool="${k}"]`); b.firstElementChild.style.background = x.color; b.lastElementChild.textContent = colorName(x); });
+    v.colors.forEach((x, k) => { const b = el.querySelector(`[data-tool="${k}"]`); b.firstElementChild.style.background = x.color; put(b.lastElementChild, colorName(x)); });
   };
   // Drawn again, the box or button that had focus keeps it (they are named by data-bc).
   const again = draw => {
@@ -1684,12 +1687,13 @@ function bindChart(c) {
   zoomTo(st.zoom);
 
   // Pointing at a day shows where the project is planned to be by the end of it: the cumulative %, to the day.
-  const tipAt = e => {
+  // `at` is read before a drag paints, so a move lays the sheet out once, not twice.
+  const tipAt = (e, at = e.target.closest?.('.bc-cell')?.getBoundingClientRect()) => {
     const td = e.target.closest?.('.bc-cell'), v = open();
     let tip = el.querySelector('.bc-tip');
     if (!td || !v) { if (tip) tip.hidden = true; return; }
     if (!tip) { tip = el.appendChild(document.createElement('div')); tip.className = 'bc-tip'; }
-    const day = Number(td.dataset.cell) + 1, at = td.getBoundingClientRect(), date = L.chartDayDate(project.dateStarted, day);
+    const day = Number(td.dataset.cell) + 1, date = L.chartDayDate(project.dateStarted, day);
     tip.textContent = `${date ? `${L.displayDate(date)} · ` : ''}Month ${Math.ceil(day / MONTH_CELLS)}, day ${(day - 1) % MONTH_CELLS + 1} · Project at ${L.chartPctOn(L.draftVersion(v), day).toFixed(2)}%`;
     tip.hidden = false;
     tip.style.left = `${at.left + at.width / 2}px`;
@@ -1792,7 +1796,7 @@ function bindChart(c) {
     e.preventDefault();
     if (st.tool === 'column' || st.tool === 'uncolumn') columnAt(td); else { paintAt(e); if (paint) undoable(paint.items); }
   };
-  el.onmouseover = e => { if (paint && e.buttons === 1) paintAt(e); tipAt(e); };
+  el.onmouseover = e => { const at = e.target.closest?.('.bc-cell')?.getBoundingClientRect(); if (paint && e.buttons === 1) paintAt(e); tipAt(e, at); };
   el.onmouseup = () => { paint = null; };
   el.onmouseleave = () => { paint = null; untip(); };
 
