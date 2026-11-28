@@ -1,8 +1,8 @@
 {
-  "versionCode": 335,
-  "versionName": "2.8.55",
-  "releaseNotes": "v2.8.55: A billing's net amount matches the official DV to the centavo. Retention, recoupment, VAT and withholding are each rounded to the centavo before the net is worked out.",
-  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.55/NHA_Monitor_v2.8.55_Build335.apk",
-  "apkSha256": "3ace39cd7439247cc9d3b4df29fd4532dde5bf8b5b888ec91cf2e726d44b495e",
+  "versionCode": 336,
+  "versionName": "2.8.56",
+  "releaseNotes": "v2.8.56: On the monthly report, Recommendations and the sign-offs fit under section VII instead of starting a page of their own.",
+  "apkDownloadUrl": "https://github.com/greatglenn17/Remix-NHA-Infrastructure-Monitor/releases/download/v2.8.56/NHA_Monitor_v2.8.56_Build336.apk",
+  "apkSha256": "1593adf5d73238db4ca69f72c041b17702bed67a2ddce1b5781c14b7c0f74c65",
   "isMandatory": false
 }
