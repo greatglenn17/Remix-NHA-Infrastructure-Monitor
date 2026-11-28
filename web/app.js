@@ -4559,6 +4559,10 @@ function bindActual(c) {
 /** Which cost the billing % are on, once a variation order moved it; nothing otherwise. */
 const baseNote = (project, cost) => { const t = L.costBaseNote(L.originalCost(project), cost); return t ? `<p class="none-note">${icon('info', 'sm')}${esc(t)}</p>` : ''; };
 
+/** A billing card's head: its name and DV No., with the scanned DV and Edit as buttons on the right (no row of its own for Edit). */
+const payHead = (p, title, editable) => `<div class="pc-head"><div><h3>${esc(title)}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
+  <div class="pc-actions">${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}${editable ? `<button class="text-btn" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}</div></div>`;
+
 function paymentsBody({ project, payments, advances, cost, billed, of }) {
   const editable = L.canEdit(project, s.user.uid, s.claims), asked = L.pendingBillingRequests(of('developer_requests'), payments);
   // Requests for billing logged under Developer requests wait here until a billing is saved from one.
@@ -4575,13 +4579,11 @@ function paymentsBody({ project, payments, advances, cost, billed, of }) {
   if (left != null) figures.push(['Advance to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word']);
   const given = advances.reduce((t, p) => t + (Number(p.grossAmount) || 0), 0);
   const advanceCards = advances.map(p => `<li class="card pay-card">
-      <div class="pc-head"><div><h3>${esc(p.name || L.ADVANCE_PAYMENT)}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
-        ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
+      ${payHead(p, p.name || L.ADVANCE_PAYMENT, editable)}
       <p class="muted small">${esc(L.displayDate(p.date || '-'))} · 15% of the original contract</p>
       ${kv('Net amount', L.formatPhp(Number(p.grossAmount) || 0))}
       ${kv('Recouped so far', L.formatPhp(Math.round((given - left) * 100) / 100))}
       ${kv('Left to recoup', left > 0 ? L.formatPhp(left) : 'Fully recouped', left > 0 ? '' : 'word')}
-      ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`).join('');
   // A one-row table from 900px; under it the same figures as label-and-amount rows, which fit a phone (style.css shows one of the two).
   const summary = section('Billing summary', 'payments', `<div class="bill-sum">${figures.map(f => kv(...f)).join('')}</div>
@@ -4592,8 +4594,7 @@ function paymentsBody({ project, payments, advances, cost, billed, of }) {
   return `<div class="stack">${summary}${requests}<ul class="pay-cards">${advanceCards}${L.netBillings(payments, cost).map(p => {
     const gross = Number(p.grossAmount) || 0, retention = Number(p.retentionPct) || 0, units = L.billedUnits(p);
     return `<li class="card pay-card">
-      <div class="pc-head"><div><h3>${esc(p.name || '-')}</h3><p class="muted">${p.dvNo ? `DV ${esc(p.dvNo)}` : 'No DV number'}</p></div>
-        ${p.fileUrl ? fileLink(p.fileUrl, 'Scanned DV') : ''}</div>
+      ${payHead(p, p.name || '-', editable)}
       <p class="muted small">${esc(L.displayDate(p.date || '-'))} · ${esc(p.periodCovered || '-')}</p>
       ${p.billingType ? `<p class="muted small">${esc(p.billingType)} · ${units} ${L.billingUnitName(p.billingType)}${units === 1 ? '' : 's'} × ${esc(L.formatPhp(Number(p.unitPrice) || 0))}</p>` : ''}
       ${kv('Net amount', L.formatPhp(L.paidAmount(p)))}
@@ -4602,7 +4603,6 @@ function paymentsBody({ project, payments, advances, cost, billed, of }) {
       ${kv('Share of contract', pct(p.percentage))}
       ${kv('Balance after', L.formatPhp(Number(p.balanceAmount) || 0))}
       ${kv('Balance share', pct(p.balancePercentage))}
-      ${editable ? `<button class="text-btn entry-edit" data-edit-billing="${esc(p.uuid)}">${icon('edit', 'sm')}Edit</button>` : ''}
     </li>`;
   }).join('')}</ul></div>`;
 }
