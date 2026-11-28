@@ -126,6 +126,22 @@ class BarChartTest {
     }
 
     @Test
+    fun suspensionDays_anApprovedTimeExtensionCovers_doNotStopTheClockAgain() {
+        // A 100-day contract; Time Extension No. 1 adds 30 days and the revised chart, from Mar 1, runs to day 130. web/logic.test.mjs.
+        val revised = Version("Revised No. 1", "2026-03-01", listOf(Item("All works", 100.0, listOf(Bar(1, 130)))))
+        val p = project(listOf(revised)).copy(contractDurationDays = 100)
+        val te = approved("Time Extension No. 1 - 30 Days", "")
+        val ws = approved("Work Suspension Order No. 1", "Duration: 20 Days | Effectivity: 2026-03-10 | End: 2026-03-29")
+        val may20 = LocalDate.of(2026, 5, 20) // day 140
+        assertEquals(100.0, BarChart.targetOn(p, listOf(te, ws), may20)!!, 1e-9)
+        assertEquals(120, BarChart.planOn(p, listOf(ws), may20)!!.day) // no extension: the clock stops
+        val longer = approved("Work Suspension Order No. 1", "Duration: 40 Days | Effectivity: 2026-03-10 | End: 2026-04-18")
+        assertEquals(130, BarChart.planOn(p, listOf(te, longer), may20)!!.day)
+        val before = approved("Work Suspension Order No. 2", "Duration: 30 Days | Effectivity: 2026-01-11 | End: 2026-02-09")
+        assertEquals(120, BarChart.planOn(p, listOf(te, before, ws), may20)!!.day)
+    }
+
+    @Test
     fun json_roundTrips_andJunkIsNoChart() {
         assertEquals(listOf(sanIldefonso), BarChart.parse(BarChart.toJson(listOf(sanIldefonso))))
         // The website's colours and coloured days pass through as they are; a chart without them has no such keys.

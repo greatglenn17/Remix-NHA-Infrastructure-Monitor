@@ -178,7 +178,8 @@ export function chartMonths(v) {
  * BarChart.planOn: on `today` (yyyy-MM-dd), the chart version in force (and all `versions`), its contract day and the planned
  * accomplishment (%); null without a chart or start date. Each item's amount is spread evenly over its bars' contract
  * days (the start date is day 1); a revised chart applies from its effective date; approved suspensions taking effect
- * on or after it stop the clock, a Partial one only for the items it names.
+ * on or after it stop the clock, a Partial one only for the items it names, except the days an approved time extension
+ * already covers: its days the chart draws past the contract duration, less the suspended days drawn before it took effect.
  */
 export function planOn(project, docs, today) {
   const versions = chartVersions(project.barChartJson);
@@ -187,7 +188,10 @@ export function planOn(project, docs, today) {
   if (start == null || now == null) return null;
   const v = [...versions].reverse().find(x => { const e = isoDay(x.effective); return e == null || e <= now; }) || versions[0];
   const from = Math.max(isoDay(v.effective) ?? start, start);
-  const dayOf = item => (now - start) / DAY + 1 - suspendedDays(docs, from, now, item);
+  // shortcut: an extension is taken to be for the suspensions, as the office grants them; one for another cause would hide a later suspension too.
+  const extended = Math.max(0, Math.min(addedDays(docs), chartLastDay(v) - (Number(project.contractDurationDays) || 0)));
+  const dayOf = item => (now - start) / DAY + 1
+    - Math.max(0, suspendedDays(docs, from, now, item) - Math.max(0, extended - suspendedDays(docs, start, from - DAY, item)));
   const total = chartTotal(v);
   const plannedPct = total <= 0 ? 0 : (v.items || []).reduce((t, i) => t + (Number(i.amount) || 0) * plannedShare(i, dayOf(i.name)), 0) / total * 100;
   // Plan.itemTargets: each item's planned accomplishment (% of the item, 2 decimals).

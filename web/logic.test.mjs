@@ -309,6 +309,23 @@ test('bar chart target: a revised chart applies from its effective date', () => 
   assert.equal(L.plannedTarget(p, [before, later], '2026-03-07'), 61);
 });
 
+test('bar chart target: suspension days an approved time extension covers do not stop the clock again', () => {
+  // A 100-day contract; Time Extension No. 1 adds 30 days and the revised chart, from Mar 1, runs to day 130.
+  const revised = { label: 'Revised No. 1', effective: '2026-03-01', items: [{ name: 'All works', amount: 100, bars: [[1, 130]] }] };
+  const p = { ...chartProject([revised]), contractDurationDays: 100 };
+  const te = approvedDoc('Time Extension No. 1 - 30 Days', '');
+  const ws = approvedDoc('Work Suspension Order No. 1', 'Duration: 20 Days | Effectivity: 2026-03-10 | End: 2026-03-29');
+  // May 20 is day 140: the chart ran out on day 130, so 100% though 20 days were suspended.
+  assert.equal(L.planOn(p, [te, ws], '2026-05-20').plannedPct, 100);
+  assert.equal(L.planOn(p, [ws], '2026-05-20').day, 120); // no extension: the clock stops
+  // Only the extension's days: 40 suspended against 30 covered stop it for 10.
+  const longer = approvedDoc('Work Suspension Order No. 1', 'Duration: 40 Days | Effectivity: 2026-03-10 | End: 2026-04-18');
+  assert.equal(L.planOn(p, [te, longer], '2026-05-20').day, 130);
+  // Days suspended before the chart took effect are drawn in it already and use up the extension.
+  const before = approvedDoc('Work Suspension Order No. 2', 'Duration: 30 Days | Effectivity: 2026-01-11 | End: 2026-02-09');
+  assert.equal(L.planOn(p, [te, before, ws], '2026-05-20').day, 120);
+});
+
 test('suspension End: the effectivity date is day 1, old one-day-late Ends read right', () => {
   assert.equal(L.withEnd('Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-24'), 'Duration: 90 Days | Effectivity: 2026-05-26 | End: 2026-08-23');
   assert.equal(L.withEnd('Duration: 10 Days | Effectivity: 2026-12-27'), 'Duration: 10 Days | Effectivity: 2026-12-27 | End: 2027-01-05');
