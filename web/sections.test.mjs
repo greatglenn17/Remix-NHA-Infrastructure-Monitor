@@ -611,6 +611,16 @@ test('abstract of the actual work: the billing format\'s top with the tab\'s tar
   assert.match(html, row('2.2.1', 'Road Excavation', '1,234.5679', 'cu.m.', '', '1,600,000.00', '', '', '', '', '', '', '', '404,000.00', '25.25%'));
   assert.match(html, new RegExp(`<tr class='tot'><td class='c'></td><td${row('GRAND TOTAL', '', '', '', '10,000,000.00', '', '', '', '', '', '', '', '1,074,000.00', '10.73%').source}`));
   assert.match(html, /<div class='keep'><table class='sig'>.*Prepared by:.*Checked by:.*Approved by:/s);
+  // A community facility's billing abstract is this sheet, titled as a summary of work over the period, signed by the billing four.
+  const billing = covered => P.billingAbstractHtml({ project: { ...project, projectType: 'Community Facility' }, docs: [], payments: [], abstract,
+    period: { covered, lots: 5, development: 5, m1: 0, m2: 0 }, units: 1, signatories: P.billingSignatories(project, { name: 'Juan' }) });
+  const facility = billing(' May 1 - 25, 2025 ');
+  assert.match(facility, /<h1>SUMMARY OF WORK ACCOMPLISHED<\/h1>\s*<div class='period'>Period covered: May 1 - 25, 2025<\/div>/);
+  assert.match(billing(''), /<h1>SUMMARY OF WORK ACCOMPLISHED<\/h1>\s*<div class='period'>As of March 14, 2025<\/div>/);
+  assert.match(facility, row('2.1.1', 'Mobilization/Demobilization', '1', 'l.s.', '400,000.00', '400,000.00', '0', '0.00', '0.00%', '0.25', '100,000.00', '25.00%', '0.25', '100,000.00', '25.00%'));
+  assert.match(facility, /ACTUAL ACCOMPLISHMENT<\/td><td class='pc'>:<\/td><td>10.73%/);
+  assert.match(facility, /Prepared by:.*Checked by:.*Reviewed by:.*Recommending Approval/s);
+  assert.ok(!/LAND ACQUISITION COST|MILESTONE|Approved by/.test(facility)); // no billed lines, and the billing's signers
   // An approved time extension and variation order: the contract's own figures stay, and the REVISED lines say what they made of them.
   const orders = [{ documentName: 'Time Extension No. 1 - 30 Days', status: 'Approved' }, { documentName: 'Variation Order No. 1 - PHP 500.00', status: 'Approved' },
     { documentName: 'Time Extension No. 2 - 15 Days', status: 'Pending' }];

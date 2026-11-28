@@ -266,4 +266,17 @@ class BillingAbstractTest {
             "\\s*<td>Recommending Approval<br><br><br><b>ROSA LIM</b><div class='line'></div>Regional Manager<br>Region 9 Office</td>\\s*</tr></table>").containsMatchIn(html))
         assertTrue(!html.contains("Approved by") && !html.contains("Noted by"))
     }
+
+    @Test fun aCommunityFacilityPrintsTheAbstractsOwnRows() {
+        // No lots or units to bill by: the sheet is Print abstract's, under the billing title and period, signed by the billing four.
+        val facility = project.copy(projectType = "Community Facility")
+        val signers = Signatories("Juan Dela Paz", "General Manager", "Ana Cruz", "Principal Engineer A", "Rosa Lim", "Regional Manager", reviewedName = "Ben Reyes")
+        fun sheet(covered: String) = BlueBookForms.billingAbstract(facility, emptyList(), payments, uploaded, BillingAbstract.Period(covered, lots = 5.0, development = 5.0), 100, signers)
+        val html = sheet(" May 1 - 25, 2025 ")
+        assertTrue(Regex("<h1>SUMMARY OF WORK ACCOMPLISHED</h1>\\s*<div class='period'>Period covered: May 1 - 25, 2025</div>").containsMatchIn(html))
+        assertTrue(Regex("<h1>SUMMARY OF WORK ACCOMPLISHED</h1>\\s*<div class='period'>As of March 14, 2025</div>").containsMatchIn(sheet("")))
+        assertTrue(html.contains(">Road Excavation</td>") && html.contains("<b>ROADWORKS</b>")) // the abstract's own rows
+        assertTrue(Regex("Prepared by:.*Checked by:.*Reviewed by:.*Recommending Approval", RegexOption.DOT_MATCHES_ALL).containsMatchIn(html))
+        assertTrue(!html.contains("MILESTONE") && !html.contains("Approved by"))
+    }
 }

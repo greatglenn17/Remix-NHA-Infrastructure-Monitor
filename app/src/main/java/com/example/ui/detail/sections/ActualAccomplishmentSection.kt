@@ -156,11 +156,13 @@ private fun ItemRow(row: AbstractExcel.Row, index: Int, scroll: ScrollState) {
 private fun BillingFiguresDialog(
     abstract: ProjectAbstract,
     onDismiss: () -> Unit,
+    // A community facility's sheet is the abstract's own rows: only the period is typed.
+    facility: Boolean = false,
     // Where billed to date would pass the actual (BillingAbstract.printWarnings): shown, but the sheet still prints.
     warnings: (BillingAbstract.Period) -> List<String> = { emptyList() },
     onPrint: (BillingAbstract.Period) -> Unit
 ) {
-    val amounts = remember(abstract.rowsJson) { ProjectAbstracts.lineAmounts(abstract) }
+    val amounts = remember(abstract.rowsJson, facility) { if (facility) listOf(0.0, 0.0, 0.0) else ProjectAbstracts.lineAmounts(abstract) }
     var covered by remember { mutableStateOf("") }
     var lots by remember { mutableStateOf("") }
     var development by remember { mutableStateOf("") }
@@ -188,7 +190,7 @@ private fun BillingFiguresDialog(
                     FigureBox("Milestone 2 (units)", m2, "billing_m2") { m2 = it }
                 }
                 Text(
-                    "Previous is what the billings saved up to ${ProjectSchedule.displayDate(abstract.asOf)} came to. Nothing typed here is saved.",
+                    (if (facility) "The sheet is the abstract as of ${ProjectSchedule.displayDate(abstract.asOf)}." else "Previous is what the billings saved up to ${ProjectSchedule.displayDate(abstract.asOf)} came to.") + " Nothing typed here is saved.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 warned.forEach {
@@ -372,8 +374,8 @@ fun ActualAccomplishmentSection(
     var making by rememberSaveable { mutableStateOf(false) }
     billing?.let { record ->
         BillingFiguresDialog(
-            record, onDismiss = { billing = null },
-            warnings = { period -> BillingAbstract.printWarnings(record, BillingAbstract.of(project, documents, payments, record, period, units)) }
+            record, onDismiss = { billing = null }, facility = com.example.data.model.isCommunityFacility(project.projectType),
+            warnings = { period -> if (com.example.data.model.isCommunityFacility(project.projectType)) emptyList() else BillingAbstract.printWarnings(record, BillingAbstract.of(project, documents, payments, record, period, units)) }
         ) { period -> billing = null; onPrintBilling(record, period) }
     }
 

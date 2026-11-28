@@ -425,6 +425,8 @@ object BlueBookForms {
         project: Project, documents: List<PendingDocument>, payments: List<ProjectPayment>, uploaded: ProjectAbstract,
         period: BillingAbstract.Period, units: Int, signatories: Signatories, banner: String = ""
     ): String {
+        // A community facility has no lots or units to bill by: its sheet is the abstract's own rows, as on Print abstract.
+        if (com.example.data.model.isCommunityFacility(project.projectType)) return actualAbstract(project, documents, uploaded, signatories, banner, billing = period)
         val abstract = BillingAbstract.of(project, documents, payments, uploaded, period, units)
         fun money(v: Double) = "%,.2f".format(Locale.US, v)
         // A quantity: 2 decimals at most, none when whole.
@@ -523,8 +525,10 @@ object BlueBookForms {
      * up to TO DATE, an empty cell left blank, and the signatures. The header rows repeat on each page. Neither BALANCE
      * nor the sheet's "EQUIVALENT TO N UNITS" columns are shown. An abstract in terms of a variation order (its rows have
      * was) prints as its sheet: the Original quantity, unit cost and amount beside the V.O.'s. web/print.js actualAbstractHtml prints the same page.
+     * With [billing] (a community facility's billing abstract) it is titled SUMMARY OF WORK ACCOMPLISHED over the period
+     * covered, else its "As of" date, and signed by the billing abstract's four.
      */
-    fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = ""): String {
+    fun actualAbstract(project: Project, documents: List<PendingDocument>, abstract: ProjectAbstract, signatories: Signatories, banner: String = "", billing: BillingAbstract.Period? = null): String {
         val overall = ProjectAbstracts.standing(project, documents, abstract).last()
         // A quantity: 4 decimals at most, none when whole.
         val quantity = java.text.DecimalFormat("#,##0.####", java.text.DecimalFormatSymbols(Locale.US)).apply { roundingMode = java.math.RoundingMode.HALF_UP }
@@ -541,15 +545,18 @@ object BlueBookForms {
             "<tr${if (r.kind == "subtotal" || r.kind == "total") " class='tot'" else ""}><td class='c'>${esc(r.no)}</td><td>$name</td>${cells(r, 0, r.qty, ::qty)}<td class='c'>${esc(r.unit)}</td>" +
                 "${cells(r, 1, r.unitCost, ::money)}${cells(r, 2, r.amount, ::money)}${figures(r.prev)}${figures(r.period)}${figures(r.toDate)}</tr>"
         }
+        val asOf = "As of ${date(abstract.asOf)}"
+        val target = overall.target ?: project.targetAccomplishment
         return page(
-            "Abstract of Physical Accomplishment",
+            if (billing != null) "Summary of Work Accomplished" else "Abstract of Physical Accomplishment",
             """
-            ${apaTop("As of ${date(abstract.asOf)}", project, documents, overall.target ?: project.targetAccomplishment, overall.actual)}
+            ${if (billing != null) apaTop(billing.covered.trim().ifEmpty { null }?.let { "Period covered: $it" } ?: asOf, project, documents, target, overall.actual, "SUMMARY OF WORK ACCOMPLISHED")
+              else apaTop(asOf, project, documents, target, overall.actual)}
             <table class='apa'>
               <thead>${apaHead(earlier)}</thead>
               <tbody>$rows</tbody>
             </table>
-            <div class='keep'>${signatures(signatories, "Checked by", "Approved by")}</div>
+            <div class='keep'>${if (billing != null) billingSignatures(signatories) else signatures(signatories, "Checked by", "Approved by")}</div>
             """,
             banner,
             fullPage = true,
