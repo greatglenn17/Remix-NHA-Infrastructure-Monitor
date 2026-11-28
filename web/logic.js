@@ -52,25 +52,28 @@ export function currentCost(project, documents) {
   }, 0);
 }
 
-/** ProjectPayment.netAmount: what is paid after retention. */
-export const netAmount = p => (Number(p.grossAmount) || 0) * (1 - (Number(p.retentionPct) || 0) / 100);
+/**
+ * `pct`% of `gross` to the centavo, half a centavo up, as on the official billing. Worked in whole centavos: 1,282.35 × 10%
+ * in floating point is just under 128.235 and would round down.
+ */
+export const pctOf = (gross, pct) => Math.round(Math.round((Number(gross) || 0) * 100) * pct / 100) / 100;
+/** ProjectPayment.netAmount: what is paid after retention, held to the centavo. */
+export const netAmount = p => (Number(p.grossAmount) || 0) - pctOf(p.grossAmount, Number(p.retentionPct) || 0);
 /** ProjectPayment.paidAmount: the check, the net after retention less recoupment, VAT and withholding (a community facility's). */
 export const paidAmount = p => netAmount(p) - (Number(p.recoupmentAmount) || 0) - (Number(p.vatAmount) || 0) - (Number(p.withholdingAmount) || 0);
 /**
  * facilityDeductions: a community facility's recoupment (15%, but no more than the advance `left` to recoup), VAT (5% ÷ 1.12)
  * and withholding tax (2% ÷ 1.12) of the gross, to the centavo. Without an advance (`left` null) the recoupment is the full 15%.
  */
-export const facilityDeductions = (gross, left = null) => {
-  const c = x => Math.round(x * 100) / 100;
-  return { recoupmentAmount: Math.min(c(gross * 0.15), left ?? Infinity), vatAmount: c(gross * 0.05 / 1.12), withholdingAmount: c(gross * 0.02 / 1.12) };
-};
+export const facilityDeductions = (gross, left = null) =>
+  ({ recoupmentAmount: Math.min(pctOf(gross, 15), left ?? Infinity), vatAmount: pctOf(gross, 5 / 1.12), withholdingAmount: pctOf(gross, 2 / 1.12) });
 /**
  * A community facility's advance payment: its first billing, 15% of the original contract, paid in full and paid back
  * through the recoupment of the billings after it. It is not work billed, so it stays out of the billed share and balances.
  */
 export const ADVANCE_PAYMENT = 'Advance payment';
 export const isAdvance = p => p.billingType === ADVANCE_PAYMENT;
-export const advanceAmount = project => Math.round((Number(project.contractCostOriginal) || 0) * 15) / 100;
+export const advanceAmount = project => pctOf(project.contractCostOriginal, 15);
 /** What is still to recoup of the `advances`, from every billing in `payments` but `except` (the one being edited); null without an advance. */
 export function advanceLeft(advances, payments, except = null) {
   if (!advances.length) return null;

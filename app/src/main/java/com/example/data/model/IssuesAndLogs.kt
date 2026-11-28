@@ -131,8 +131,14 @@ data class ProjectPayment(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
-/** What is paid after retention. */
-val ProjectPayment.netAmount: Double get() = grossAmount * (1 - retentionPct / 100)
+/**
+ * [pct]% of [gross] to the centavo, half a centavo up, as on the official billing (logic.js pctOf). Worked in whole
+ * centavos: 1,282.35 × 10% in floating point is just under 128.235 and would round down.
+ */
+fun pctOf(gross: Double, pct: Double): Double = Math.round(Math.round(gross * 100) * pct / 100) / 100.0
+
+/** What is paid after retention, held to the centavo. */
+val ProjectPayment.netAmount: Double get() = grossAmount - pctOf(grossAmount, retentionPct)
 
 /** The check: the net after retention less recoupment, VAT and withholding (logic.js paidAmount). */
 val ProjectPayment.paidAmount: Double get() = netAmount - recoupmentAmount - vatAmount - withholdingAmount
@@ -142,8 +148,7 @@ val ProjectPayment.paidAmount: Double get() = netAmount - recoupmentAmount - vat
  * tax (2% ÷ 1.12) of [gross], to the centavo, as on the website. Without an advance ([left] null) the recoupment is the full 15%.
  */
 fun facilityDeductions(gross: Double, left: Double? = null): List<Double> =
-    listOf(gross * 0.15, gross * 0.05 / 1.12, gross * 0.02 / 1.12).map { Math.round(it * 100) / 100.0 }
-        .let { (r, v, w) -> listOf(minOf(r, left ?: Double.POSITIVE_INFINITY), v, w) }
+    listOf(minOf(pctOf(gross, 15.0), left ?: Double.POSITIVE_INFINITY), pctOf(gross, 5 / 1.12), pctOf(gross, 2 / 1.12))
 
 /**
  * A community facility's advance payment (logic.js ADVANCE_PAYMENT): its first billing, 15% of the original contract, paid
@@ -152,7 +157,7 @@ fun facilityDeductions(gross: Double, left: Double? = null): List<Double> =
  */
 const val ADVANCE_PAYMENT = "Advance payment"
 val ProjectPayment.isAdvance: Boolean get() = billingType == ADVANCE_PAYMENT
-fun advanceAmount(originalCost: Double) = Math.round(originalCost * 15) / 100.0
+fun advanceAmount(originalCost: Double) = pctOf(originalCost, 15.0)
 
 /** What is still to recoup of the [advances], from every billing in [payments] but [except] (the one being edited); null without an advance. */
 fun advanceLeft(advances: List<ProjectPayment>, payments: List<ProjectPayment>, except: ProjectPayment? = null): Double? =

@@ -22,6 +22,8 @@ import kotlinx.coroutines.runBlocking
 import com.example.data.model.ProjectPayment
 import com.example.data.model.facilityDeductions
 import com.example.data.model.paidAmount
+import com.example.data.model.pctOf
+import com.example.data.model.netAmount
 import com.example.ui.detail.tabs.AddPaymentDialog
 import com.example.ui.theme.NHATheme
 import org.junit.Assert.assertEquals
@@ -69,6 +71,15 @@ class FacilityBillingTest {
     private fun billing(gross: Double, recoup: Double = 0.0, type: String = "", uuid: String = java.util.UUID.randomUUID().toString(), projectId: Long = 1) =
         ProjectPayment(projectId = projectId, name = "", date = "2026-11-10", periodCovered = "", grossAmount = gross, percentage = 0.0, balanceAmount = 0.0,
             balancePercentage = 0.0, billingType = type, recoupmentAmount = recoup, uuid = uuid)
+
+    @Test fun retentionIsHeldToTheCentavo() {
+        // 10% of 1,282.35 is 128.24 on the official billing, not floating point's 128.23499…; the net follows it (logic.test.mjs).
+        assertEquals(128.24, pctOf(1282.35, 10.0), 0.0)
+        val p = billing(1282.35).copy(retentionPct = 10.0)
+        assertEquals(1154.11, p.netAmount, 1e-9)
+        val (r, v, w) = facilityDeductions(1282.35)
+        assertEquals("₱881.61", com.example.utils.CurrencyFormatter.formatPhp(p.copy(recoupmentAmount = r, vatAmount = v, withholdingAmount = w).paidAmount))
+    }
 
     @Test fun recoupmentStopsOnceTheAdvanceIsPaidBack() {
         assertEquals(1_500_000.0, advanceAmount(10_000_000.0), 0.0)

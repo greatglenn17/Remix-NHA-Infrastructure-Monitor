@@ -157,6 +157,10 @@ test('days left, schedule words, dates, money, attachment paths', () => {
   assert.equal(L.shownWord('100% / RFO'), '100% / RFO');
   assert.equal(L.formatPhp(-1234.5), '-₱1,234.50');
   assert.equal(L.netAmount({ grossAmount: 1000, retentionPct: 10 }), 900);
+  // Retention to the centavo, half up, as the official billing has it: 10% of 1,282.35 is 128.24, not floating point's 128.23499….
+  assert.equal(L.pctOf(1282.35, 10), 128.24);
+  assert.equal(L.netAmount({ grossAmount: 1282.35, retentionPct: 10 }), 1154.11);
+  assert.equal(L.formatPhp(L.paidAmount({ grossAmount: 1282.35, retentionPct: 10, ...L.facilityDeductions(1282.35) })), '₱881.61');
   // A community facility: 10% retention, 15% recoupment, VAT 5% ÷ 1.12 and withholding 2% ÷ 1.12, each to the centavo.
   const cut = L.facilityDeductions(1_000_000);
   assert.deepEqual(cut, { recoupmentAmount: 150000, vatAmount: 44642.86, withholdingAmount: 17857.14 });
