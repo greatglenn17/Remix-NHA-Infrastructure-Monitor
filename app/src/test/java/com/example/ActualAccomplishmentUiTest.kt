@@ -73,7 +73,7 @@ class ActualAccomplishmentUiTest {
     private val typed = SemanticsMatcher.keyIsDefined(SemanticsActions.SetText)
 
     @Config(qualifiers = "w360dp-h640dp")
-    @Test fun allFiveSectionTabs_fitA360dpPhone() {
+    @Test fun allSixSectionTabs_fitA360dpPhone() {
         rule.setContent { NHATheme(themeMode = AppThemeMode.LIGHT) { ProjectSectionTabs(ProjectSection.ACTUAL) {} } }
         val cut = ProjectSection.entries.mapNotNull { s ->
             val layout = mutableListOf<TextLayoutResult>()

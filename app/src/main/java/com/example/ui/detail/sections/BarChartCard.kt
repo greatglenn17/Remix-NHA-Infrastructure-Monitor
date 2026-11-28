@@ -2,6 +2,9 @@ package com.example.ui.detail.sections
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,8 +18,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +33,7 @@ import com.example.data.model.Project
 import com.example.data.model.unitsText
 import com.example.ui.components.DateField
 import com.example.ui.components.LongForm
+import com.example.ui.theme.LocalNHAColors
 import com.example.ui.theme.figures
 import com.example.util.BarChart
 import com.example.util.BarChartExcel
@@ -70,6 +78,75 @@ internal fun BarChartCard(project: Project, documents: List<PendingDocument>, to
         Field("Chart length", "${version.lastDay} calendar days")
         versions.filter { it != version }.forEach { Field("Also on file", "${it.label} · from ${ProjectSchedule.displayDate(it.effective)}") }
         MonthTable(version)
+    }
+}
+
+/**
+ * The Bar chart tab: a chip per chart on file, the one in force open first, with each item's bars across the months
+ * and the S-curve. [onSave] null hides editing; Edit opens [BarChartDialog], the form the Summary's card opens.
+ */
+@Composable
+internal fun BarChartSection(project: Project, documents: List<PendingDocument>, today: LocalDate, onSave: ((String) -> Unit)?) {
+    val scheme = MaterialTheme.colorScheme
+    val versions = remember(project.barChartJson) { BarChart.parse(project.barChartJson) }
+    val plan = remember(project, documents, today) { BarChart.planOn(project, documents, today) }
+    var selected by remember(versions, plan) { mutableIntStateOf(versions.indexOf(plan?.version).takeIf { it >= 0 } ?: versions.lastIndex) }
+    var editing by remember { mutableStateOf(false) }
+    val labels = versions.mapIndexed { i, v -> v.label.ifBlank { "Chart ${i + 1}" } }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 8.dp).testTag("bar_chart_section")) {
+        if (versions.size > 1) ChipRow(labels, labels[selected]) { selected = labels.indexOf(it) }
+        SectionCard(
+            "Approved bar chart", Icons.Default.StackedLineChart, Modifier.padding(16.dp).fillMaxWidth(),
+            action = onSave?.let {
+                {
+                    IconButton(onClick = { editing = true }, modifier = Modifier.testTag("edit_bar_chart_button")) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit bar chart", tint = scheme.onSurfaceVariant)
+                    }
+                }
+            }
+        ) {
+            val version = versions.getOrNull(selected)
+            if (version == null) {
+                Text("No bar chart yet. The target % is typed in each weekly report.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                return@SectionCard
+            }
+            val inForce = version == plan?.version
+            Field(if (inForce) "In force" else "On file", "${version.label} · from ${ProjectSchedule.displayDate(version.effective)}")
+            if (inForce && plan != null) Field("Planned as of today", "%.2f%%".format(plan.plannedPct))
+            Field("Chart length", "${version.lastDay} calendar days · ${CurrencyFormatter.formatPhp(version.total)}")
+            // Whole months across, as on the sheet; a line marks where each month starts.
+            val length = ((version.lastDay + BarChart.MONTH_DAYS - 1) / BarChart.MONTH_DAYS).coerceAtLeast(1) * BarChart.MONTH_DAYS
+            Text(
+                "Each line is a month of 30 days from the start date.",
+                style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)
+            )
+            version.items.forEach { ItemBarRow(it, version.total, length) }
+            MonthTable(version)
+        }
+    }
+    if (editing && onSave != null) BarChartDialog(project, documents, onDismiss = { editing = false }, onSave = { onSave(it); editing = false })
+}
+
+/** An item's amount, weight and days, and its bars drawn across the chart's [length] in days. */
+@Composable
+private fun ItemBarRow(item: BarChart.Item, total: Double, length: Int) {
+    val scheme = MaterialTheme.colorScheme
+    val work = LocalNHAColors.current.onTrack
+    fun at(day: Int) = BarChart.monthDayOf(day).let { (m, d) -> "month $m day $d" }
+    val spoken = item.bars.joinToString { "${at(it.startDay)} to ${at(it.endDay)}" }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("bar_row_${item.name}")) {
+        Text(item.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+        val line = "${CurrencyFormatter.formatPhp(item.amount)} · ${"%.3f".format(if (total > 0) item.amount / total * 100 else 0.0)}% · ${item.days} c.d."
+        Text(line, style = MaterialTheme.typography.bodySmall.figures(line), color = scheme.onSurfaceVariant)
+        Canvas(Modifier.fillMaxWidth().padding(top = 2.dp).height(10.dp).semantics { contentDescription = spoken }) {
+            val perDay = size.width / length
+            drawRect(scheme.surfaceVariant)
+            item.bars.forEach { drawRect(work, Offset((it.startDay - 1) * perDay, 0f), Size(it.days * perDay, size.height)) }
+            for (m in 1 until length / BarChart.MONTH_DAYS) {
+                val x = m * BarChart.MONTH_DAYS * perDay
+                drawLine(scheme.outline, Offset(x, 0f), Offset(x, size.height), 1f)
+            }
+        }
     }
 }
 
